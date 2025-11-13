@@ -168,6 +168,7 @@ class TestLLMInteractionImplProtocolCompliance:
             "essay_a_id": sample_comparison_task.essay_a.id,
             "essay_b_id": sample_comparison_task.essay_b.id,
         }
+        assert successful_provider.last_call_params["system_prompt_override"] is None
 
     @pytest.mark.asyncio
     async def test_protocol_compliance_with_parameter_overrides(
@@ -189,6 +190,7 @@ class TestLLMInteractionImplProtocolCompliance:
             model_override="test-model",
             temperature_override=0.7,
             max_tokens_override=500,
+            system_prompt_override="CJ prompt",
         )
 
         # Assert - Parameter passing verification
@@ -199,7 +201,7 @@ class TestLLMInteractionImplProtocolCompliance:
         assert params["model_override"] == "test-model"
         assert params["temperature_override"] == 0.7
         assert params["max_tokens_override"] == 500
-        assert params["system_prompt_override"] is None
+        assert params["system_prompt_override"] == "CJ prompt"
         assert params["request_metadata"] == {
             "essay_a_id": sample_comparison_task.essay_a.id,
             "essay_b_id": sample_comparison_task.essay_b.id,

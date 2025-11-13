@@ -619,8 +619,8 @@ def get_rubric(
 
     # Extract fields with type-safe coercion
     raw_rubric_text = data.get("rubric_text", "")
-    rubric_text = raw_rubric_text if isinstance(raw_rubric_text, str) else str(
-        raw_rubric_text or ""
+    rubric_text = (
+        raw_rubric_text if isinstance(raw_rubric_text, str) else str(raw_rubric_text or "")
     )
     storage_id = data.get("judge_rubric_storage_id", "unknown")
     grade_scale = data.get("grade_scale", "unknown")

@@ -226,6 +226,7 @@ class LLMConfigOverrides(BaseModel):
     temperature_override: Optional[float] = None   # 0.0-2.0
     max_tokens_override: Optional[int] = None      # Positive integer
     provider_override: Optional[str] = None        # "openai", "anthropic", etc.
+    system_prompt_override: Optional[str] = None   # Caller-supplied system instructions
 ```
 
 ### Usage Example
@@ -236,7 +237,8 @@ class LLMConfigOverrides(BaseModel):
     "model_override": "gpt-4o",
     "temperature_override": 0.3,
     "max_tokens_override": 2000,
-    "provider_override": "openai"
+    "provider_override": "openai",
+    "system_prompt_override": "You are an impartial Comparative Judgement assessor..."
   }
 }
 ```

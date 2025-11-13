@@ -153,6 +153,7 @@ class TestBatchRetryProcessor:
                 model_override=None,
                 temperature_override=None,
                 max_tokens_override=None,
+                system_prompt_override=None,
             )
 
             # Verify metrics
@@ -252,6 +253,8 @@ class TestBatchRetryProcessor:
             assert call_args[1]["model_override"] == model_override
             assert call_args[1]["temperature_override"] == temperature_override
             assert call_args[1]["max_tokens_override"] == max_tokens_override
+            assert call_args[1]["system_prompt_override"] is None
+            assert call_args[1]["system_prompt_override"] is None
 
     async def test_submit_retry_batch_force_retry_all(
         self,

@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from types import TracebackType
 from typing import Any, Awaitable, Callable, Dict
+from unittest.mock import AsyncMock
 
 import aiohttp
 import pytest
 from huleedu_service_libs.error_handling import HuleEduError
-from unittest.mock import AsyncMock
 
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.implementations.content_client_impl import ContentClientImpl
@@ -66,9 +66,7 @@ class RecordingRequestContext:
 class PassthroughRetryManager:
     """Retry manager stub that simply calls the operation."""
 
-    async def with_retry(
-        self, operation: Callable[..., Awaitable[Any]], **kwargs: Any
-    ) -> Any:
+    async def with_retry(self, operation: Callable[..., Awaitable[Any]], **kwargs: Any) -> Any:
         return await operation()
 
 

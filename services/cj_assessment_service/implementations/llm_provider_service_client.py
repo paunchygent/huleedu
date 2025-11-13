@@ -22,7 +22,6 @@ from huleedu_service_libs.error_handling import (
     raise_resource_not_found,
     raise_service_unavailable,
     raise_timeout_error,
-    raise_validation_error,
 )
 from huleedu_service_libs.logging_utils import create_service_logger
 
@@ -53,52 +52,6 @@ class LLMProviderServiceClient(LLMProviderProtocol):
         self.retry_manager = retry_manager
         self.base_url = settings.LLM_PROVIDER_SERVICE_URL.rstrip("/")
 
-    def _extract_essays_from_prompt(self, prompt: str) -> tuple[str, str, str] | None:
-        """Extract base prompt and essays from formatted prompt.
-
-        Args:
-            prompt: Formatted prompt containing essays
-
-        Returns:
-            Tuple of (base_prompt, essay_a, essay_b) or None if extraction fails
-        """
-        try:
-            # Find Essay A and Essay B sections
-            lines = prompt.strip().split("\n")
-            essay_a_start = essay_b_start = -1
-
-            for i, line in enumerate(lines):
-                stripped = line.strip()
-                # Handle both old format "Essay A:" and new format "**Essay A (ID: ...):**"
-                if (stripped.startswith("Essay A") or stripped.startswith("**Essay A")) and ":" in stripped:
-                    essay_a_start = i + 1
-                elif (stripped.startswith("Essay B") or stripped.startswith("**Essay B")) and ":" in stripped:
-                    essay_b_start = i + 1
-
-            if essay_a_start == -1 or essay_b_start == -1:
-                return None
-
-            # Extract base prompt (everything before Essay A)
-            base_prompt = "\n".join(lines[: essay_a_start - 1]).strip()
-
-            # Extract Essay A (between Essay A and Essay B)
-            essay_a = "\n".join(lines[essay_a_start : essay_b_start - 1]).strip()
-
-            # Extract Essay B (after Essay B header)
-            essay_b_lines = []
-            for line in lines[essay_b_start:]:
-                # Stop at the JSON instruction part if present
-                if "Please respond with" in line or "Please provide your assessment" in line:
-                    break
-                essay_b_lines.append(line)
-            essay_b = "\n".join(essay_b_lines).strip()
-
-            return base_prompt, essay_a, essay_b
-
-        except Exception as e:
-            logger.error(f"Failed to extract essays from prompt: {e}")
-            return None
-
     async def generate_comparison(
         self,
         user_prompt: str,
@@ -127,25 +80,10 @@ class LLMProviderServiceClient(LLMProviderProtocol):
         Returns:
             Comparison result dict for immediate responses, None for queued responses
         """
-        # Extract essays from the formatted prompt
-        extraction_result = self._extract_essays_from_prompt(user_prompt)
-        if not extraction_result:
-            raise_validation_error(
-                service="cj_assessment_service",
-                operation="generate_comparison",
-                field="user_prompt",
-                message="Invalid prompt format: Could not extract essays",
-                correlation_id=correlation_id,
-                prompt_length=len(user_prompt),
-            )
-
-        base_prompt, essay_a, essay_b = extraction_result
-
         # Build request body for LLM Provider Service
+        # Note: user_prompt now contains the complete prompt with essays embedded
         request_body = {
-            "user_prompt": base_prompt,
-            "essay_a": essay_a,
-            "essay_b": essay_b,
+            "user_prompt": user_prompt,
             "metadata": request_metadata or {},
             "llm_config_overrides": {
                 "provider_override": provider_override or self.settings.DEFAULT_LLM_PROVIDER.value,
@@ -160,8 +98,8 @@ class LLMProviderServiceClient(LLMProviderProtocol):
         }
 
         logger.info(
-            f"DEBUG: Sending request to LLM Provider with correlation_id: {correlation_id}",
-            extra={"essay_a_preview": essay_a[:50], "essay_b_preview": essay_b[:50]},
+            f"Sending LLM comparison request with correlation_id: {correlation_id}",
+            extra={"prompt_length": len(user_prompt)},
         )
 
         # Make initial HTTP request with retry logic

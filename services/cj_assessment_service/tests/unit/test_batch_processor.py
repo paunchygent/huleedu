@@ -264,6 +264,7 @@ class TestBatchProcessor:
                 model_override="gpt-4",
                 temperature_override=0.2,
                 max_tokens_override=1000,
+                system_prompt_override="CJ prompt",
             ),
         }
         mock_llm_interaction.perform_comparisons.return_value = sample_comparison_results
@@ -287,6 +288,7 @@ class TestBatchProcessor:
         assert call_args.kwargs["model_override"] == "gpt-4"
         assert call_args.kwargs["temperature_override"] == 0.2
         assert call_args.kwargs["max_tokens_override"] == 1000
+        assert call_args.kwargs["system_prompt_override"] == "CJ prompt"
 
     # Note: Tests for _get_effective_batch_size, _get_effective_threshold, and _submit_batch_chunk
     # have been removed as these methods were extracted to separate modules during refactoring.

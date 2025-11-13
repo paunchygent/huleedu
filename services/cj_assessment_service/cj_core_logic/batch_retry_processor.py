@@ -59,6 +59,7 @@ class BatchRetryProcessor:
         model_override: str | None = None,
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,
+        system_prompt_override: str | None = None,
     ) -> BatchSubmissionResult | None:
         """Submit retry batch if threshold reached.
 
@@ -114,6 +115,7 @@ class BatchRetryProcessor:
                     model_override=model_override,
                     temperature_override=temperature_override,
                     max_tokens_override=max_tokens_override,
+                    system_prompt_override=system_prompt_override,
                 ),
             )
 
@@ -177,6 +179,7 @@ class BatchRetryProcessor:
         model_override: str | None = None,
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,
+        system_prompt_override: str | None = None,
     ) -> BatchSubmissionResult | None:
         """Process all remaining failed comparisons at end of batch.
 
@@ -210,6 +213,7 @@ class BatchRetryProcessor:
                 model_override=model_override,
                 temperature_override=temperature_override,
                 max_tokens_override=max_tokens_override,
+                system_prompt_override=system_prompt_override,
             )
 
         except Exception as e:

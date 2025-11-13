@@ -76,11 +76,13 @@ async def submit_comparisons_for_async_processing(
     model_override = None
     temperature_override = None
     max_tokens_override = None
+    system_prompt_override = None
 
     if llm_config_overrides:
         model_override = llm_config_overrides.model_override
         temperature_override = llm_config_overrides.temperature_override
         max_tokens_override = llm_config_overrides.max_tokens_override
+        system_prompt_override = llm_config_overrides.system_prompt_override
 
         logger.info(
             f"Using LLM overrides - model: {model_override}, "
@@ -136,6 +138,7 @@ async def submit_comparisons_for_async_processing(
             model_override=model_override,
             temperature_override=temperature_override,
             max_tokens_override=max_tokens_override,
+            system_prompt_override=system_prompt_override,
         )
 
         logger.info(
@@ -197,6 +200,12 @@ async def _process_comparison_iteration(
     if "batch_config_overrides" in request_data:
         batch_config_overrides = BatchConfigOverrides(**request_data["batch_config_overrides"])
 
+    # Extract system_prompt_override from request_data if available
+    system_prompt_override = None
+    llm_config_overrides = request_data.get("llm_config_overrides")
+    if llm_config_overrides:
+        system_prompt_override = llm_config_overrides.system_prompt_override
+
     # Submit batch and update state to WAITING_CALLBACKS
     submission_result = await batch_processor.submit_comparison_batch(
         cj_batch_id=cj_batch_id,
@@ -206,6 +215,7 @@ async def _process_comparison_iteration(
         model_override=model_override,
         temperature_override=temperature_override,
         max_tokens_override=max_tokens_override,
+        system_prompt_override=system_prompt_override,
     )
 
     logger.info(

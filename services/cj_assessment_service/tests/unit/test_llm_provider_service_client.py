@@ -92,48 +92,10 @@ def client(
 class TestLLMProviderServiceClient:
     """Test cases for LLM Provider Service client."""
 
-    async def test_extract_essays_from_prompt_success(
-        self, client: LLMProviderServiceClient
-    ) -> None:
-        """Test successful extraction of essays from formatted prompt."""
-        prompt = """Compare these two essays and determine which is better written.
-Essay A (ID: 123):
-This is the content of essay A.
-It has multiple lines.
-
-Essay B (ID: 456):
-This is the content of essay B.
-It also has multiple lines.
-
-Please respond with a JSON object containing:
-- 'winner': 'Essay A' or 'Essay B'
-- 'justification': Brief explanation of your decision
-- 'confidence': Rating from 1-5 (5 = very confident)"""
-
-        result = client._extract_essays_from_prompt(prompt)
-
-        assert result is not None
-        base_prompt, essay_a, essay_b = result
-
-        assert "Compare these two essays" in base_prompt
-        assert "This is the content of essay A" in essay_a
-        assert "multiple lines" in essay_a
-        assert "This is the content of essay B" in essay_b
-        assert "multiple lines" in essay_b
-
-    async def test_extract_essays_from_prompt_failure(
-        self, client: LLMProviderServiceClient
-    ) -> None:
-        """Test extraction failure with malformed prompt."""
-        prompt = "This prompt doesn't contain the expected essay format"
-
-        result = client._extract_essays_from_prompt(prompt)
-        assert result is None
-
     async def test_generate_comparison_async_success(
         self, client: LLMProviderServiceClient, mock_session: AsyncMock
     ) -> None:
-        """Test successful async comparison generation (202 response)."""
+        """Test successful async comparison generation forwards payload verbatim."""
         # Mock async response - LLM Provider Service queues request and returns 202
         mock_response = AsyncMock()
         mock_response.status = 202
@@ -162,6 +124,7 @@ Essay B (ID: 456):
 Essay B content.
 
 Please respond with a JSON object."""
+        metadata = {"essay_a_id": "123", "essay_b_id": "456"}
 
         # Call generate_comparison
         correlation_id = uuid4()
@@ -170,6 +133,7 @@ Please respond with a JSON object."""
             model_override="claude-3-5-haiku",
             temperature_override=0.1,
             correlation_id=correlation_id,
+            request_metadata=metadata,
         )
 
         # Async-only architecture: result should always be None
@@ -183,15 +147,42 @@ Please respond with a JSON object."""
 
         # Verify request body
         request_body = call_args[1]["json"]
-        # The extraction includes header lines up to essay content
-        assert "Compare these two essays." in request_body["user_prompt"]
-        assert request_body["essay_a"] == "Essay A content."
-        assert request_body["essay_b"] == "Essay B content."
+        assert request_body["user_prompt"] == prompt
+        # Verify no separate essay fields exist
+        assert "essay_a" not in request_body
+        assert "essay_b" not in request_body
         assert request_body["llm_config_overrides"]["provider_override"] == "anthropic"
         assert request_body["llm_config_overrides"]["model_override"] == "claude-3-5-haiku"
         assert request_body["llm_config_overrides"]["temperature_override"] == 0.1
+        assert request_body["llm_config_overrides"]["system_prompt_override"] is None
         assert "callback_topic" in request_body
         assert request_body["callback_topic"] == client.settings.LLM_PROVIDER_CALLBACK_TOPIC
+        assert request_body["metadata"] == metadata
+
+    async def test_generate_comparison_passes_system_prompt_override(
+        self, client: LLMProviderServiceClient, mock_session: AsyncMock
+    ) -> None:
+        """Ensure system prompt overrides flow into llm_config_overrides."""
+        mock_response = AsyncMock()
+        mock_response.status = 202
+        mock_response.text = AsyncMock(
+            return_value=json.dumps({"queue_id": str(uuid4()), "status": "queued"})
+        )
+        mock_session.post.return_value.__aenter__.return_value = mock_response
+
+        prompt = "Compare essays"
+        correlation_id = uuid4()
+        override_prompt = "CJ canonical prompt"
+
+        await client.generate_comparison(
+            user_prompt=prompt,
+            correlation_id=correlation_id,
+            system_prompt_override=override_prompt,
+        )
+
+        request_body = mock_session.post.call_args[1]["json"]
+        assert request_body["llm_config_overrides"]["system_prompt_override"] == override_prompt
+        assert request_body["user_prompt"] == prompt
         assert request_body["metadata"] == {}
 
     async def test_generate_comparison_passes_request_metadata(
@@ -308,21 +299,6 @@ Essay B content."""
         correlation_id = uuid4()
         with assert_raises_huleedu_error(
             error_code=ErrorCode.EXTERNAL_SERVICE_ERROR, message_contains="Connection failed"
-        ) as _:
-            await client.generate_comparison(
-                user_prompt=prompt,
-                correlation_id=correlation_id,
-            )
-
-    async def test_generate_comparison_invalid_prompt(
-        self, client: LLMProviderServiceClient
-    ) -> None:
-        """Test handling of invalid prompt format."""
-        prompt = "This is not a valid comparison prompt"
-
-        correlation_id = uuid4()
-        with assert_raises_huleedu_error(
-            error_code=ErrorCode.VALIDATION_ERROR, message_contains="Invalid prompt format"
         ) as _:
             await client.generate_comparison(
                 user_prompt=prompt,

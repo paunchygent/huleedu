@@ -12,6 +12,7 @@ from dishka import Provider, Scope, make_async_container, provide
 from huleedu_service_libs.error_handling.correlation import CorrelationContext
 from huleedu_service_libs.error_handling.quart import register_error_handlers
 from huleedu_service_libs.testing.jwt_helpers import build_jwt_headers
+from pydantic import SecretStr
 from quart import Quart
 from quart.typing import TestClientProtocol as QuartTestClient
 from quart_dishka import QuartDishka
@@ -22,7 +23,6 @@ from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.models_db import AssessmentInstruction
 from services.cj_assessment_service.protocols import CJRepositoryProtocol
 from services.cj_assessment_service.tests.unit.instruction_store import AssessmentInstructionStore
-from pydantic import SecretStr
 
 
 class AdminRepositoryMock(CJRepositoryProtocol):

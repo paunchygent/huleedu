@@ -302,6 +302,7 @@ class TestDualModeRetryLogic:
                 model_override=None,
                 temperature_override=None,
                 max_tokens_override=None,
+                system_prompt_override=None,
             )
 
     @pytest.mark.asyncio
@@ -335,6 +336,7 @@ class TestDualModeRetryLogic:
                 model_override=None,
                 temperature_override=None,
                 max_tokens_override=None,
+                system_prompt_override=None,
             )
 
 

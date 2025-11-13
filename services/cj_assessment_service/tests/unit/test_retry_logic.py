@@ -537,6 +537,7 @@ class TestFailedComparisonPoolSubmitRetry:
             assert kwargs["model_override"] == model_override
             assert kwargs["temperature_override"] == temperature_override
             assert kwargs["max_tokens_override"] == max_tokens_override
+            assert kwargs["system_prompt_override"] is None
 
 
 class TestRetryBatchSizing:

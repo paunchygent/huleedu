@@ -96,7 +96,7 @@ class TestMultiProviderValidation:
             "the causes. More research is needed before making expensive policy changes.\n\n"
             "Please respond with a JSON object containing:\n"
             "- 'winner': 'Essay A' or 'Essay B'\n"
-            "- 'justification': Brief explanation (max 50 characters)\n"
+            "- 'justification': Explanation (max 500 characters)\n"
             "- 'confidence': Rating from 1-5 (5 = very confident)"
         )
 
@@ -152,7 +152,7 @@ class TestMultiProviderValidation:
 Essay A: Good structure and clear arguments.
 Essay B: Poor organization and weak points.
 
-JSON response with winner, justification (max 50 chars), confidence 1-5."""
+JSON response with winner, justification (max 500 chars), confidence 1-5."""
 
         import time
 
@@ -183,7 +183,7 @@ JSON response with winner, justification (max 50 chars), confidence 1-5."""
     async def test_justification_length_enforcement(
         self, llm_client: LLMProviderServiceClient
     ) -> None:
-        """Test that justification length is properly enforced at max 50 characters."""
+        """Test that justification length accepts up to max 500 characters."""
         # Prompt that might encourage longer responses
         prompt = (
             "Compare these two detailed essays and provide comprehensive analysis.\n\n"
@@ -207,7 +207,9 @@ JSON response with winner, justification (max 50 chars), confidence 1-5."""
             print("\n✅ Justification Length Integration Test Passed:")
             print("   - Request successfully queued for async processing")
             print("   - Results will be delivered via Kafka callbacks")
-            print("   - Length constraints will be enforced during callback processing")
+            print(
+                "   - Justifications up to 500 characters will be accepted during callback processing"
+            )
             print(f"   - Correlation ID: {correlation_id}")
 
         except Exception as e:

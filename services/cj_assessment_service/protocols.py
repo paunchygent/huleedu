@@ -337,9 +337,11 @@ class LLMInteractionProtocol(Protocol):
         tasks: list[Any],
         correlation_id: UUID,
         tracking_map: dict[tuple[str, str], UUID] | None = None,
+        bos_batch_id: str | None = None,
         model_override: str | None = None,
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,
+        system_prompt_override: str | None = None,
     ) -> list[Any]:
         """Perform comparative judgment on a list of comparison tasks.
 
@@ -349,6 +351,7 @@ class LLMInteractionProtocol(Protocol):
             model_override: Optional model name override
             temperature_override: Optional temperature override (0.0-2.0)
             max_tokens_override: Optional max tokens override
+            system_prompt_override: Optional system prompt override
 
         Returns:
             List of ComparisonResult objects
@@ -368,6 +371,7 @@ class BatchProcessorProtocol(Protocol):
         model_override: str | None = None,
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,
+        system_prompt_override: str | None = None,
     ) -> "BatchSubmissionResult":
         """Submit comparison batch with configurable batch size."""
         ...
@@ -407,6 +411,7 @@ class BatchRetryProcessorProtocol(Protocol):
         model_override: str | None = None,
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,
+        system_prompt_override: str | None = None,
     ) -> "BatchSubmissionResult | None":
         """Submit retry batch if threshold reached."""
         ...
@@ -418,6 +423,7 @@ class BatchRetryProcessorProtocol(Protocol):
         model_override: str | None = None,
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,
+        system_prompt_override: str | None = None,
     ) -> "BatchSubmissionResult | None":
         """Process all remaining failed comparisons at end of batch."""
         ...

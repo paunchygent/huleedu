@@ -65,6 +65,7 @@ class BatchProcessor:
         model_override: str | None = None,
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,
+        system_prompt_override: str | None = None,
     ) -> BatchSubmissionResult:
         """Submit comparison batch with configurable batch size.
 
@@ -134,6 +135,7 @@ class BatchProcessor:
                     model_override=model_override,
                     temperature_override=temperature_override,
                     max_tokens_override=max_tokens_override,
+                    system_prompt_override=system_prompt_override,
                 )
 
                 total_submitted += len(batch_tasks)
@@ -243,11 +245,13 @@ class BatchProcessor:
         model_override = None
         temperature_override = None
         max_tokens_override = None
+        system_prompt_override = None
 
         if llm_config_overrides:
             model_override = llm_config_overrides.model_override
             temperature_override = llm_config_overrides.temperature_override
             max_tokens_override = llm_config_overrides.max_tokens_override
+            system_prompt_override = llm_config_overrides.system_prompt_override
 
         return await self.submit_comparison_batch(
             cj_batch_id=cj_batch_id,
@@ -257,6 +261,7 @@ class BatchProcessor:
             model_override=model_override,
             temperature_override=temperature_override,
             max_tokens_override=max_tokens_override,
+            system_prompt_override=system_prompt_override,
         )
 
     # Private helper methods

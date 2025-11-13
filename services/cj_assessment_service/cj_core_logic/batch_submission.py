@@ -44,6 +44,7 @@ async def submit_batch_chunk(
     model_override: str | None = None,
     temperature_override: float | None = None,
     max_tokens_override: int | None = None,
+    system_prompt_override: str | None = None,
 ) -> None:
     """Submit a chunk of comparison tasks with tracking.
 
@@ -61,12 +62,25 @@ async def submit_batch_chunk(
         HuleEduError: On LLM provider communication failure
     """
     try:
-        # Create tracking records and get unique correlation IDs if database is provided
+        # Get bos_batch_id for metadata and create tracking records if database is available
+        bos_batch_id = None
         tracking_map = {}
         if database is not None:
+            from services.cj_assessment_service.models_db import CJBatchUpload
+
             from .batch_submission_tracking import create_tracking_records
 
             async with database.session() as session:
+                # Query batch to get bos_batch_id
+                batch_record = await session.get(CJBatchUpload, cj_batch_id)
+                if batch_record:
+                    bos_batch_id = batch_record.bos_batch_id
+                    logger.debug(
+                        f"Retrieved bos_batch_id '{bos_batch_id}' for cj_batch_id {cj_batch_id}",
+                        extra={"correlation_id": str(correlation_id)},
+                    )
+
+                # Create tracking records
                 tracking_map = await create_tracking_records(
                     session=session,
                     batch_tasks=batch_tasks,
@@ -91,13 +105,16 @@ async def submit_batch_chunk(
         # Use existing LLM interaction protocol for batch submission
         # This will handle async processing (returns None for queued requests)
         # Pass tracking_map so unique correlation IDs can be used for each task
+        # Pass bos_batch_id for runner correlation
         results = await llm_interaction.perform_comparisons(
             tasks=batch_tasks,
             correlation_id=correlation_id,
             tracking_map=tracking_map,  # Pass the unique correlation IDs
+            bos_batch_id=bos_batch_id,  # Pass external batch ID for runner correlation
             model_override=model_override,
             temperature_override=temperature_override,
             max_tokens_override=max_tokens_override,
+            system_prompt_override=system_prompt_override,
         )
 
         # Log submission results

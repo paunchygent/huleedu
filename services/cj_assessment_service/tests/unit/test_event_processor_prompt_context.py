@@ -21,7 +21,6 @@ from services.cj_assessment_service.event_processor import (
 from services.cj_assessment_service.models_api import PromptHydrationFailure
 from services.cj_assessment_service.protocols import (
     CJEventPublisherProtocol,
-    CJRepositoryProtocol,
     ContentClientProtocol,
     LLMInteractionProtocol,
 )

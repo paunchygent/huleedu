@@ -90,6 +90,7 @@ def llm_config_overrides() -> LLMConfigOverrides:
         temperature_override=0.3,
         max_tokens_override=2000,
         provider_override="openai",
+        system_prompt_override="CJ system prompt",
     )
 
 

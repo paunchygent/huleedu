@@ -29,6 +29,7 @@ class TestLLMConfigOverridesContract:
             temperature_override=0.3,
             max_tokens_override=2000,
             provider_override="openai",
+            system_prompt_override="CJ system prompt",
         )
 
         # Assert
@@ -36,6 +37,7 @@ class TestLLMConfigOverridesContract:
         assert overrides.temperature_override == 0.3
         assert overrides.max_tokens_override == 2000
         assert overrides.provider_override == "openai"
+        assert overrides.system_prompt_override == "CJ system prompt"
 
     def test_llm_config_overrides_minimal_model(self) -> None:
         """Test LLMConfigOverrides with only model override."""
@@ -47,6 +49,7 @@ class TestLLMConfigOverridesContract:
         assert overrides.temperature_override is None
         assert overrides.max_tokens_override is None
         assert overrides.provider_override is None
+        assert overrides.system_prompt_override is None
 
     def test_llm_config_overrides_empty_model(self) -> None:
         """Test LLMConfigOverrides with no overrides."""
@@ -58,6 +61,7 @@ class TestLLMConfigOverridesContract:
         assert overrides.temperature_override is None
         assert overrides.max_tokens_override is None
         assert overrides.provider_override is None
+        assert overrides.system_prompt_override is None
 
     def test_llm_config_overrides_temperature_validation(self) -> None:
         """Test temperature validation constraints."""
@@ -95,6 +99,7 @@ class TestLLMConfigOverridesContract:
             temperature_override=0.8,
             max_tokens_override=3000,
             provider_override="openai",
+            system_prompt_override="Override prompt",
         )
 
         # Act - Serialize and deserialize
@@ -108,6 +113,7 @@ class TestLLMConfigOverridesContract:
         assert reconstructed.temperature_override == original.temperature_override
         assert reconstructed.max_tokens_override == original.max_tokens_override
         assert reconstructed.provider_override == original.provider_override
+        assert reconstructed.system_prompt_override == original.system_prompt_override
 
 
 class TestELSCJAssessmentRequestV1WithOverrides:
@@ -125,6 +131,7 @@ class TestELSCJAssessmentRequestV1WithOverrides:
         assert llm_overrides.model_override == "gpt-4o"
         assert llm_overrides.temperature_override == 0.3
         assert llm_overrides.max_tokens_override == 2000
+        assert llm_overrides.system_prompt_override == "CJ system prompt"
 
     def test_request_without_llm_overrides(
         self,
@@ -150,6 +157,7 @@ class TestELSCJAssessmentRequestV1WithOverrides:
         assert reconstructed.llm_config_overrides.model_override == "gpt-4o"
         assert reconstructed.llm_config_overrides.temperature_override == 0.3
         assert reconstructed.llm_config_overrides.max_tokens_override == 2000
+        assert reconstructed.llm_config_overrides.system_prompt_override == "CJ system prompt"
 
     def test_request_serialization_without_overrides(
         self,
@@ -192,6 +200,7 @@ class TestEventEnvelopeWithOverrides:
         assert typed_data.llm_config_overrides.model_override == "gpt-4o"
         assert typed_data.llm_config_overrides.temperature_override == 0.3
         assert typed_data.llm_config_overrides.max_tokens_override == 2000
+        assert typed_data.llm_config_overrides.system_prompt_override == "CJ system prompt"
 
     def test_envelope_serialization_without_overrides(
         self,

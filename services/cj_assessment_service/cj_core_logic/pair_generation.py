@@ -238,11 +238,7 @@ async def _fetch_assessment_context(
         student_prompt_text = None
 
     # Warn if no context is available
-    if (
-        not assessment_instructions
-        and not student_prompt_text
-        and not judge_rubric_text
-    ):
+    if not assessment_instructions and not student_prompt_text and not judge_rubric_text:
         logger.warning(
             "No assessment context available for prompt building",
             extra={

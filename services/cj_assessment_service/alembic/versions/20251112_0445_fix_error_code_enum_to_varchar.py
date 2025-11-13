@@ -25,7 +25,6 @@ Per rule 085.4, this migration is tested by:
 
 from alembic import op
 
-
 # revision identifiers, used by Alembic.
 revision = "52a8b9c3e4f1"
 down_revision = "20251110_1200"

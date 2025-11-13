@@ -196,9 +196,7 @@ class TestIdentityThreadingInBatchCreation:
             == "rubric-storage-base"
         )
         assert (
-            mock_database.create_new_cj_batch.return_value.processing_metadata[
-                "judge_rubric_text"
-            ]
+            mock_database.create_new_cj_batch.return_value.processing_metadata["judge_rubric_text"]
             == "Judge rubric baseline"
         )
 
@@ -361,9 +359,7 @@ class TestIdentityThreadingInBatchCreation:
 
         mock_batch = mock_database.create_new_cj_batch.return_value
         mock_batch.processing_metadata = {}
-        mock_content_client.fetch_content = AsyncMock(
-            side_effect=["Hydrated rubric guidance"]
-        )
+        mock_content_client.fetch_content = AsyncMock(side_effect=["Hydrated rubric guidance"])
 
         request_data = {
             **base_request_data,
@@ -381,9 +377,7 @@ class TestIdentityThreadingInBatchCreation:
         metadata = mock_batch.processing_metadata
         assert metadata["judge_rubric_storage_id"] == "rubric-storage-base"
         assert metadata["judge_rubric_text"] == "Hydrated rubric guidance"
-        mock_content_client.fetch_content.assert_awaited_once_with(
-            "rubric-storage-base", ANY
-        )
+        mock_content_client.fetch_content.assert_awaited_once_with("rubric-storage-base", ANY)
 
     @pytest.mark.asyncio
     async def test_identity_field_precedence_over_defaults(

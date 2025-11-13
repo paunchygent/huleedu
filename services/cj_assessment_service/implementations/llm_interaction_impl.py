@@ -87,9 +87,11 @@ class LLMInteractionImpl(LLMInteractionProtocol):
         tasks: list[ComparisonTask],
         correlation_id: UUID,
         tracking_map: dict[tuple[str, str], UUID] | None = None,
+        bos_batch_id: str | None = None,
         model_override: str | None = None,
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,
+        system_prompt_override: str | None = None,
     ) -> list[ComparisonResult]:
         """Perform multiple comparison tasks using configured LLM providers.
 
@@ -158,10 +160,12 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                         "essay_a_id": task.essay_a.id,
                         "essay_b_id": task.essay_b.id,
                     }
+                    if bos_batch_id:
+                        request_metadata["bos_batch_id"] = bos_batch_id
                     response_data = await provider.generate_comparison(
                         user_prompt=task.prompt,
                         correlation_id=task_correlation_id,  # Use unique correlation ID
-                        system_prompt_override=None,
+                        system_prompt_override=system_prompt_override,
                         model_override=model_override,
                         temperature_override=temperature_override,
                         max_tokens_override=max_tokens_override,
