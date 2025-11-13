@@ -1,0 +1,29 @@
+---
+description: Canonical map of where CJ prompt components and system prompt overrides live so agents can reference concrete files quickly.
+globs:
+  - "services/cj_assessment_service/**"
+  - "services/llm_provider_service/**"
+  - "scripts/cj_experiments_runners/eng5_np/**"
+---
+
+# 020.20: CJ → LLM Prompt Contract Reference
+
+Use this rule whenever you need to locate or update the text that reaches Anthropic/OpenAI/etc. during ENG5 comparative judgement runs.
+
+## Prompt Sections (CJ Assessment Service)
+- **Student Assignment**: hydrated inside `event_processor.py: converted_request_data["student_prompt_text"]`, then rendered by `_build_comparison_prompt()` in `services/cj_assessment_service/cj_core_logic/pair_generation.py:278-305` as the `**Student Assignment:**` block.
+- **Assessment Criteria**: comes from `assessment_instructions.instructions_text`, fetched in `_fetch_assessment_context()` (`pair_generation.py:195-255`) and emitted as `**Assessment Criteria:**` inside `_build_comparison_prompt()` (`pair_generation.py:301-304`).
+- **Judge Instructions / Rubric**: copied from `processing_metadata["judge_rubric_text"]` or hydrated via Content Service in `_fetch_assessment_context()`; rendered in `_build_comparison_prompt()` (`pair_generation.py:304-312`).
+- **Essays A/B**: instances of `EssayForComparison` (`services/cj_assessment_service/models_api.py:21-34`) whose `text_content` is appended under `**Essay A (ID: …)**` / `**Essay B (ID: …)**` in `_build_comparison_prompt()` (`pair_generation.py:312-320`).
+- **Response Instructions**: the final paragraph inside `_build_comparison_prompt()` (`pair_generation.py:320-327`) describes the JSON contract (winner/justification/confidence) that must be honored by downstream providers.
+
+## System Prompt Handling (LLM Provider Service)
+- Default Anthropic message lives in `services/llm_provider_service/implementations/anthropic_provider_impl.py:82-124` (same pattern for OpenAI/Google/OpenRouter implementations).
+- CJ can override this by setting `system_prompt_override` in the payload; the HTTP client forwards it via `services/cj_assessment_service/implementations/llm_provider_service_client.py:70-111`. If `None`, providers fall back to their hard-coded defaults.
+- ENG5 runner now ships its own override helper in `scripts/cj_experiments_runners/eng5_np/system_prompt.py`; enable/disable via the `--cj-system-prompt/--no-cj-system-prompt` flag wired up in `scripts/cj_experiments_runners/eng5_np/cli.py`. The helper emits the impartial-judge role, neutrality guardrails, decisive ≤50-word justification requirement, confidence scale, and tool-schema reminder.
+
+## ENG5 Runner Overrides
+- The ENG5 runner builds `LLMConfigOverrides` in `scripts/cj_experiments_runners/eng5_np/cli.py:208-244`, covering provider/model/temperature/max-tokens plus the `--cj-system-prompt` flag that injects the canonical CJ system prompt (sourced from `scripts/cj_experiments_runners/eng5_np/system_prompt.py`).
+- All runner-emitted overrides flow through the shared event schema `libs/common_core/src/common_core/events/cj_assessment_events.py:78-101` (look here before changing contract fields).
+
+Keep this map in mind before editing prompts, adding metadata, or questioning “which file owns the system prompt?”—the locations above are the single sources of truth referenced by Anthropic during production comparisons.

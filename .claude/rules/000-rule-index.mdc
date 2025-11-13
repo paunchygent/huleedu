@@ -31,6 +31,7 @@ alwaysApply: false
   - [020.17-entitlements-service-architecture.mdc](mdc:020.17-entitlements-service-architecture.mdc): Entitlements Service
   - [020.18-language-tool-service-patterns.mdc](mdc:020.18-language-tool-service-patterns.mdc): Language Tool Service (Grammar checking via Java subprocess)
   - [020.19-eng5-np-runner-container.mdc](mdc:020.19-eng5-np-runner-container.mdc): ENG5 NP Runner containerization patterns and volume mount standards
+  - [020.20-cj-llm-prompt-contract.mdc](mdc:020.20-cj-llm-prompt-contract.mdc): CJ → LLM prompt composition map (student assignment, rubric, essays, system prompt overrides)
 - [030-event-driven-architecture-eda-standards.mdc](mdc:030-event-driven-architecture-eda-standards.mdc): Event-driven communication standards with header-first optimization
 
 ## Processing Flows

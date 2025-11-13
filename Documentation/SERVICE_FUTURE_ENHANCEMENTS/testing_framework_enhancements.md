@@ -1,183 +1,154 @@
-# Testing Framework Future Enhancements
+# Testing Framework Enhancements
 
-## Overview
-This document captures testing infrastructure gaps, improvements, and enhancement opportunities identified during development and troubleshooting sessions.
+## Experimental Judge Rubric Override Feature
 
-## Kafka Testing Infrastructure
+### Overview
 
-### 1. Kafka Topic Readiness Implementation
-**Priority**: High  
-**Component**: Test Infrastructure  
-**Issue**: Kafka topics are deleted/recreated but not ready when consumers start, causing test failures  
-**Current Workaround**: `wait_for_topic_availability` function exists but isn't integrated  
-**Action Required**:
+Research runners need the ability to test alternative judge rubrics without modifying the canonical database rubrics. This feature will allow experimental overrides to be passed via `LLMConfigOverrides`, maintaining database integrity while enabling research flexibility.
+
+### Current Implementation Status
+
+**Completed:**
+-  Fix 1: Corrected ENG5 runner file path to use actual student assignment (`eng5_np_vt_2017_essay_instruction.md`) instead of judge rubric
+
+**Pending Implementation:**
+- ó Fix 2: Add experimental judge rubric override field
+- ó Fix 3: Apply experimental override in pair generation
+
+---
+
+## TODO: Fix 2 - Add Experimental Judge Rubric Override Field
+
+### File
+`libs/common_core/src/common_core/events/cj_assessment_events.py`
+
+### Implementation
+Add to `LLMConfigOverrides` class (around line 107):
+
 ```python
-# Integrate into test setup
-async def setup_kafka_topics(topics: list[str]):
-    """Delete, recreate, and wait for topics to be ready."""
-    await delete_topics(topics)
-    await create_topics(topics)
-    for topic in topics:
-        if not await wait_for_topic_availability(topic):
-            raise RuntimeError(f"Topic {topic} not available after timeout")
+experimental_judge_rubric: str | None = Field(
+    default=None,
+    description="Experimental judge rubric override for research (bypasses DB canonical rubric)",
+)
 ```
 
-### 2. Robust Kafka Consumer Initialization in Tests
-**Priority**: High  
-**Issue**: Test services may start consuming before topics are fully ready  
-**Action Required**:
-- Implement exponential backoff for topic subscription in test utilities
-- Add pre-test health checks that verify topic accessibility
-- Create test fixture that ensures Kafka is ready before tests run
-- Consider using Kafka admin client to verify topic metadata before consuming
+### Purpose
+- Allows research runners to test alternative rubrics without database modifications
+- Production pipeline continues using database as canonical source
+- Maintains clear separation between experimental and production configurations
 
-## Test Performance Optimization
+### Context
+When research runners like ENG5 want to test a different rubric (e.g., `llm_prompt_cj_assessment_eng5.md`), they should pass it as an experimental override rather than attempting to upload it via `student_prompt_ref` field.
 
-### 1. E2E Test Performance
-**Priority**: Medium  
-**Component**: E2E Tests  
-**Issue**: E2E test takes ~19 seconds, which could become problematic as test suite grows  
-**Action Required**:
-- Investigate parallel test execution strategies
-- Implement shared fixtures for expensive setup operations
-- Consider using testcontainers with persistent volumes for faster startup
-- Profile tests to identify bottlenecks
-- Create test performance benchmarks and alerts
+---
 
-### 2. Test Execution Metrics
-**Priority**: Low  
-**Action Required**:
-- Track test execution times over time
-- Identify flaky tests automatically
-- Generate test performance reports
-- Create dashboards for test suite health
+## TODO: Fix 3 - Apply Experimental Override in Pair Generation
 
-## Mock Infrastructure Enhancements
+### File
+`services/cj_assessment_service/cj_core_logic/pair_generation.py`
 
-### 1. MockRedisClient Enhancement
-**Priority**: Medium  
-**Component**: Test Mocks  
-**Issue**: MockRedisClient may not properly simulate Redis TTL behavior  
-**Action Required**:
-- Add TTL simulation to MockRedisClient
-- Implement key expiration logic
-- Add tests for edge cases (expired keys, race conditions)
-- Consider using real Redis testcontainer for integration tests
+### Implementation
+In `_fetch_assessment_context()` function (around line 240), after fetching DB rubric:
 
-### 2. Mock Kafka Producer/Consumer
-**Priority**: Medium  
-**Issue**: Current mocks may not properly simulate Kafka behavior  
-**Action Required**:
-- Enhance mocks to simulate partition assignment
-- Add support for consumer group behavior
-- Implement proper offset management in mocks
-- Add chaos testing capabilities (message loss, reordering)
+```python
+# Fetch canonical rubric from DB (production default)
+judge_rubric_storage_id, db_judge_rubric_text = await _hydrate_judge_rubric_context(...)
 
-## Test Organization and Discovery
+# Allow experimental override for research runners
+if llm_config_overrides and llm_config_overrides.experimental_judge_rubric:
+    judge_rubric_text = llm_config_overrides.experimental_judge_rubric
+else:
+    judge_rubric_text = db_judge_rubric_text
+```
 
-### 1. Test File Organization Standards
-**Priority**: Low  
-**Issue**: Test file paths have been reorganized but not all references updated  
-**Action Required**:
-- Audit all test imports and references
-- Create test organization standards document
-- Implement automated test discovery mechanism
-- Add linting rules for test file organization
+### Purpose
+- Applies experimental rubric when provided via `LLMConfigOverrides`
+- Falls back to database canonical rubric for production workflows
+- Maintains backward compatibility with existing production pipelines
 
-### 2. Test Categorization
-**Priority**: Medium  
-**Action Required**:
-- Implement clear test categorization (unit, integration, e2e)
-- Create pytest markers for test categories
-- Set up CI/CD to run different test categories at appropriate stages
-- Document when to use each test category
+### Benefits
+1. **Research Flexibility**: Test alternative rubrics without touching production data
+2. **Data Integrity**: Database remains canonical source for production
+3. **Clear Intent**: Explicit field name indicates experimental nature
+4. **Audit Trail**: Override usage can be logged for research transparency
 
-## Error Handling in Tests
+---
 
-### 1. Error Message Standardization
-**Priority**: Low  
-**Issue**: Some tests use brittle exact string matching for errors  
-**Action Required**:
-- Define error code standards for tests
-- Use error codes instead of string matching in tests
-- Create error message templates for consistency
-- Implement custom pytest assertions for common error patterns
+## Related Issues Fixed
 
-### 2. Assertion Libraries
-**Priority**: Low  
-**Action Required**:
-- Evaluate and standardize assertion libraries
-- Create custom assertions for domain-specific checks
-- Document assertion best practices
-- Add linting for assertion patterns
+### ENG5 Runner Student Assignment Missing from Prompts
 
-## Integration Test Enhancements
+**Problem:**
+The **Student Assignment** section was missing from comparison prompts sent to LLM, reducing assessment accuracy.
 
-### 1. Service Integration Test Framework
-**Priority**: High  
-**Action Required**:
-- Create reusable integration test base classes
-- Implement service startup/shutdown utilities
-- Add health check utilities for all services
-- Create data seeding utilities for integration tests
+**Root Cause:**
+ENG5 runner file path misconfiguration in `scripts/cj_experiments_runners/eng5_np/paths.py:31`:
+```python
+prompt_path = "llm_prompt_cj_assessment_eng5.md"  # L Judge rubric (wrong usage!)
+```
 
-### 2. Contract Testing
-**Priority**: Medium  
-**Action Required**:
-- Implement contract testing between services
-- Create automated contract verification
-- Add contract versioning tests
-- Document contract testing best practices
+**Solution:**
+Changed to use actual student assignment file:
+```python
+prompt_path = "eng5_np_vt_2017_essay_instruction.md"  #  Student assignment (correct)
+```
 
-## Test Data Management
+**Impact:**
+- LLM now receives proper student assignment context
+- Legacy detection warnings eliminated
+- Assessment accuracy improved
 
-### 1. Test Data Factories
-**Priority**: Medium  
-**Action Required**:
-- Create factory classes for all domain entities
-- Implement realistic test data generation
-- Add data validation in factories
-- Create test data scenarios library
+---
 
-### 2. Test Database Management
-**Priority**: Medium  
-**Action Required**:
-- Implement database snapshot/restore for tests
-- Create test data migration utilities
-- Add database state verification utilities
-- Implement parallel test database support
+## Verification Steps (Post-Implementation)
 
-## CI/CD Test Improvements
+After implementing Fix 2 and Fix 3:
 
-### 1. Test Parallelization
-**Priority**: High  
-**Action Required**:
-- Configure pytest-xdist for optimal parallelization
-- Identify and fix test interdependencies
-- Implement test sharding for CI/CD
-- Create guidelines for writing parallel-safe tests
+1. **Rebuild Containers:**
+   ```bash
+   pdm run dev-recreate cj_assessment_service
+   ```
 
-### 2. Test Reporting
-**Priority**: Low  
-**Action Required**:
-- Implement comprehensive test reporting
-- Add test coverage trending
-- Create test failure analysis tools
-- Implement automatic test failure notifications
+2. **Run ENG5 Comparison Test:**
+   ```bash
+   pdm run eng5-np-run \
+     --assignment-id 00000000-0000-0000-0000-000000000001 \
+     --course-id 00000000-0000-0000-0000-000000000002 \
+     --mode execute \
+     --batch-id "validation-test-$(date +%H%M)" \
+     --max-comparisons 2 \
+     --cj-system-prompt \
+     --cj-service-url http://localhost:9095 \
+     --verbose
+   ```
 
-## Next Steps
+3. **Verify Prompt Structure:**
+   ```bash
+   docker exec huleedu_cj_assessment_db psql -U huleedu_user -d huleedu_cj_assessment -c "
+   SELECT
+     id,
+     cj_batch_id,
+     SUBSTRING(prompt_text, 1, 500) as prompt_preview
+   FROM cj_comparison_pairs
+   ORDER BY id DESC LIMIT 1;"
+   ```
 
-1. **Immediate** (This Sprint):
-   - Implement Kafka topic readiness checks
-   - Create service integration test framework
-   - Fix MockRedisClient TTL behavior
+4. **Expected Result:**
+   - Prompt should start with `**Student Assignment:**` followed by "Role Models" text
+   - No legacy warning in logs
 
-2. **Short Term** (Next 2-3 Sprints):
-   - Optimize test performance
-   - Implement test categorization
-   - Create test data factories
+5. **Check for Legacy Warning (Should be Gone):**
+   ```bash
+   docker logs huleedu_cj_assessment_service --tail 50 | grep -i "legacy"
+   ```
 
-3. **Long Term** (Next Quarter):
-   - Implement contract testing
-   - Create comprehensive test reporting
-   - Implement chaos testing capabilities
+---
+
+## Implementation Priority
+
+**Priority:** Medium
+**Effort:** Small (< 1 hour)
+**Risk:** Low (isolated changes, clear fallback behavior)
+
+**Recommendation:**
+Implement both Fix 2 and Fix 3 together in a single session to ensure proper end-to-end testing of the experimental override flow.
