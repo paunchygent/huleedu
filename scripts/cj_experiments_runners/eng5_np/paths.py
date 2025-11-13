@@ -28,7 +28,7 @@ class RunnerPaths:
             repo_root=repo_root,
             role_models_root=role_models_root,
             instructions_path=role_models_root / "eng5_np_vt_2017_essay_instruction.md",
-            prompt_path=role_models_root / "llm_prompt_cj_assessment_eng5.md",
+            prompt_path=role_models_root / "eng5_np_vt_2017_essay_instruction.md",
             anchors_csv=role_models_root / "ANCHOR_ESSAYS_BAYESIAN_INFERENCE_DATA.csv",
             anchors_xlsx=role_models_root / "ANCHOR_ESSAYS_BAYESIAN_INFERENCE_DATA.xlsx",
             anchor_docs_dir=role_models_root / "anchor_essays",

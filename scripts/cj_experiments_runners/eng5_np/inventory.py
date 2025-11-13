@@ -12,7 +12,6 @@ import typer
 from scripts.cj_experiments_runners.eng5_np.paths import RunnerPaths
 from scripts.cj_experiments_runners.eng5_np.utils import (
     generate_essay_id,
-    sanitize_identifier,
     sha256_of_file,
 )
 

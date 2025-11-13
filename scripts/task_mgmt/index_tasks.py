@@ -3,6 +3,7 @@
 Generate TASKS/INDEX.md summarizing tasks by domain, status, and programme.
 No external dependencies; parses simple front matter only.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -18,8 +19,14 @@ TASKS_DIR = ROOT / "TASKS"
 INDEX_FILE = TASKS_DIR / "INDEX.md"
 
 ALLOWED_DOMAINS = [
-    "assessment", "content", "identity", "frontend", "infrastructure",
-    "security", "integrations", "architecture"
+    "assessment",
+    "content",
+    "identity",
+    "frontend",
+    "infrastructure",
+    "security",
+    "integrations",
+    "architecture",
 ]
 
 

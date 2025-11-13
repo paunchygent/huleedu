@@ -53,6 +53,7 @@ from scripts.cj_experiments_runners.eng5_np.requests import (
 )
 from scripts.cj_experiments_runners.eng5_np.schema import ensure_schema_available
 from scripts.cj_experiments_runners.eng5_np.settings import RunnerMode, RunnerSettings
+from scripts.cj_experiments_runners.eng5_np.system_prompt import build_cj_system_prompt
 
 app = typer.Typer(help="ENG5 NP batch runner tooling (plan, dry-run, execute)")
 
@@ -213,8 +214,9 @@ def _build_llm_overrides(
     model: str | None,
     temperature: float | None,
     max_tokens: int | None,
+    system_prompt: str | None,
 ) -> LLMConfigOverrides | None:
-    if not any([provider, model, temperature, max_tokens]):
+    if not any([provider, model, temperature, max_tokens, system_prompt]):
         return None
 
     provider_value: LLMProviderType | None = None
@@ -240,6 +242,7 @@ def _build_llm_overrides(
         model_override=model,
         temperature_override=temperature,
         max_tokens_override=max_tokens,
+        system_prompt_override=system_prompt,
     )
 
 
@@ -325,6 +328,11 @@ def main(
         min=1,
         help="Override max completion tokens",
     ),
+    cj_system_prompt: bool = typer.Option(
+        True,
+        "--cj-system-prompt/--no-cj-system-prompt",
+        help="Embed the ENG5 Comparative Judgement system prompt override in each LLM request.",
+    ),
     max_comparisons: int | None = typer.Option(
         None,
         min=1,
@@ -353,6 +361,8 @@ def main(
     # Validate LLM model override against manifest before proceeding
     validate_llm_overrides(provider=llm_provider, model=llm_model)
 
+    system_prompt_override = build_cj_system_prompt() if cj_system_prompt else None
+
     settings = RunnerSettings(
         assignment_id=assignment_id,
         course_id=course_id,
@@ -377,6 +387,7 @@ def main(
             model=llm_model,
             temperature=llm_temperature,
             max_tokens=llm_max_tokens,
+            system_prompt=system_prompt_override,
         ),
         max_comparisons=max_comparisons,
         await_completion=await_completion,
@@ -530,10 +541,11 @@ def main(
         # Upload prompt file if it exists
         prompt_storage_id: str | None = None
         if inventory.prompt.exists:
+            import aiohttp
+
             from scripts.cj_experiments_runners.eng5_np.content_upload import (
                 upload_essay_content,
             )
-            import aiohttp
 
             async def _upload_prompt() -> str:
                 timeout = aiohttp.ClientTimeout(total=300)

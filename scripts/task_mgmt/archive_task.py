@@ -3,6 +3,7 @@
 Archive a TASKS markdown file by moving it to archive/YYYY/MM/{domain}/ and updating status.
 Optionally uses `git mv` if --git is provided and git is available.
 """
+
 from __future__ import annotations
 
 import argparse

@@ -276,6 +276,10 @@ docker compose -f docker-compose.yml -f docker-compose.eng5-runner.yml run --rm 
 - `--assignment-id`: Must match the `assignment_id` created in Step 1
 - `--course-id`: Course identifier for metadata
 
+### System Prompt Override
+
+The runner now exposes `--cj-system-prompt/--no-cj-system-prompt`. Keep the default (`--cj-system-prompt`) to inject the canonical Comparative Judgement system instructions defined in `scripts/cj_experiments_runners/eng5_np/system_prompt.py`. Disable it only if you plan to supply a different override downstream; otherwise the provider falls back to the generic “LLM comparison engine” prompt.
+
 ## What Happens During Execution
 
 ### With Registered Prompt & Anchors (Recommended Path)

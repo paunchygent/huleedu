@@ -31,6 +31,7 @@ from scripts.cj_experiments_runners.eng5_np.cli import (
 )
 from scripts.cj_experiments_runners.eng5_np.requests import compose_cj_assessment_request
 from scripts.cj_experiments_runners.eng5_np.settings import RunnerMode, RunnerSettings
+from scripts.cj_experiments_runners.eng5_np.system_prompt import build_cj_system_prompt
 from services.llm_provider_service.model_manifest import (
     ModelConfig,
     ProviderName,
@@ -112,7 +113,7 @@ class TestValidateLLMOverrides:
         mock_get_config.assert_not_called()
 
     def test_validate_handles_deprecated_model_warning(self) -> None:
-        """Verify validation passes for deprecated models (warning is logged but no exception raised)."""
+        """Verify deprecated models pass validation while logging warnings."""
         mock_config = ModelConfig(
             model_id="claude-old-deprecated",
             provider=ProviderName.ANTHROPIC,
@@ -161,6 +162,7 @@ class TestBuildLLMOverrides:
             model="claude-haiku-4-5-20251001",
             temperature=0.3,
             max_tokens=2000,
+            system_prompt="system prompt",
         )
 
         assert result is not None
@@ -169,10 +171,13 @@ class TestBuildLLMOverrides:
         assert result.model_override == "claude-haiku-4-5-20251001"
         assert result.temperature_override == 0.3
         assert result.max_tokens_override == 2000
+        assert result.system_prompt_override == "system prompt"
 
     def test_build_returns_none_when_no_overrides(self) -> None:
         """Verify _build_llm_overrides returns None when no parameters specified."""
-        result = _build_llm_overrides(provider=None, model=None, temperature=None, max_tokens=None)
+        result = _build_llm_overrides(
+            provider=None, model=None, temperature=None, max_tokens=None, system_prompt=None
+        )
 
         assert result is None
 
@@ -180,7 +185,11 @@ class TestBuildLLMOverrides:
         """Verify _build_llm_overrides handles partial parameter sets."""
         # Only model specified
         result = _build_llm_overrides(
-            provider=None, model="claude-haiku-4-5-20251001", temperature=None, max_tokens=None
+            provider=None,
+            model="claude-haiku-4-5-20251001",
+            temperature=None,
+            max_tokens=None,
+            system_prompt=None,
         )
 
         assert result is not None
@@ -188,17 +197,35 @@ class TestBuildLLMOverrides:
         assert result.provider_override is None
         assert result.temperature_override is None
         assert result.max_tokens_override is None
+        assert result.system_prompt_override is None
 
     def test_build_converts_provider_string_to_enum(self) -> None:
         """Verify provider string attempts enum conversion."""
         # Use lowercase "anthropic" which matches LLMProviderType enum value
         result = _build_llm_overrides(
-            provider="anthropic", model="test-model", temperature=None, max_tokens=None
+            provider="anthropic",
+            model="test-model",
+            temperature=None,
+            max_tokens=None,
+            system_prompt=None,
         )
 
         assert result is not None
         # Provider should be converted to enum when lowercase string matches
         assert result.provider_override == LLMProviderType.ANTHROPIC
+
+    def test_build_supports_system_prompt_only(self) -> None:
+        """Verify _build_llm_overrides emits overrides when only system prompt is set."""
+        result = _build_llm_overrides(
+            provider=None,
+            model=None,
+            temperature=None,
+            max_tokens=None,
+            system_prompt="CJ prompt",
+        )
+
+        assert result is not None
+        assert result.system_prompt_override == "CJ prompt"
 
 
 class TestEventComposition:
@@ -207,6 +234,7 @@ class TestEventComposition:
     @pytest.fixture
     def sample_settings_with_overrides(self) -> RunnerSettings:
         """Create runner settings with LLM overrides."""
+        system_prompt = build_cj_system_prompt()
         return RunnerSettings(
             assignment_id=uuid.UUID(int=1),
             course_id=uuid.UUID(int=2),
@@ -230,6 +258,7 @@ class TestEventComposition:
                 model_override="claude-haiku-4-5-20251001",
                 temperature_override=0.3,
                 max_tokens_override=2000,
+                system_prompt_override=system_prompt,
             ),
             await_completion=False,
             completion_timeout=1800.0,
@@ -269,6 +298,7 @@ class TestEventComposition:
         assert envelope.data.llm_config_overrides.model_override == "claude-haiku-4-5-20251001"
         assert envelope.data.llm_config_overrides.temperature_override == 0.3
         assert envelope.data.llm_config_overrides.max_tokens_override == 2000
+        assert envelope.data.llm_config_overrides.system_prompt_override == build_cj_system_prompt()
 
     def test_compose_event_without_overrides(
         self, sample_essay_refs: list[EssayProcessingInputRefV1]
