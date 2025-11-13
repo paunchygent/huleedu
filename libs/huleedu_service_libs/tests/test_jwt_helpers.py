@@ -7,10 +7,9 @@ from typing import Any
 
 import jwt
 import pytest
-from pydantic import SecretStr
-
 from huleedu_service_libs.auth.jwt_settings import JWTValidationSettings
 from huleedu_service_libs.testing.jwt_helpers import build_jwt_headers, create_jwt
+from pydantic import SecretStr
 
 
 class MockJWTSettings(JWTValidationSettings):
@@ -313,7 +312,9 @@ class TestCreateJwt:
 
         token = create_jwt(secret, payload)
 
-        decoded = jwt.decode(token, secret, algorithms=["HS256"], options={"verify_signature": False})
+        decoded = jwt.decode(
+            token, secret, algorithms=["HS256"], options={"verify_signature": False}
+        )
         assert decoded["sub"] == "user-123"
 
     def test_create_jwt_with_custom_algorithm(self):
@@ -338,7 +339,9 @@ class TestCreateJwt:
 
         token = create_jwt(secret, payload)
 
-        decoded = jwt.decode(token, secret, algorithms=["HS256"], options={"verify_signature": False})
+        decoded = jwt.decode(
+            token, secret, algorithms=["HS256"], options={"verify_signature": False}
+        )
         assert decoded["nested"]["key"] == "value"
         assert decoded["array"] == ["a", "b", "c"]
 

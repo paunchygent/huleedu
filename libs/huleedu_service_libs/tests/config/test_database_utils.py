@@ -3,7 +3,6 @@ from __future__ import annotations
 from urllib.parse import quote_plus
 
 import pytest
-
 from huleedu_service_libs.config.database_utils import build_database_url
 
 

@@ -101,6 +101,10 @@ class LLMConfigOverrides(BaseModel):
         default=None,
         description="LLM provider to use (e.g., 'openai', 'anthropic')",
     )
+    system_prompt_override: str | None = Field(
+        default=None,
+        description="System prompt to force for this batch (caller-supplied instructions).",
+    )
 
 
 class ELS_CJAssessmentRequestV1(BaseEventData):

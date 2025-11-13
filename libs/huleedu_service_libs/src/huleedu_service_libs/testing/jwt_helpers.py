@@ -29,8 +29,9 @@ from typing import Any, Mapping, Sequence
 from uuid import uuid4
 
 import jwt
-from huleedu_service_libs.auth.jwt_settings import JWTValidationSettings
 from pydantic import SecretStr
+
+from huleedu_service_libs.auth.jwt_settings import JWTValidationSettings
 
 
 def build_jwt_headers(

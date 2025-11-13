@@ -3,7 +3,6 @@
 from dataclasses import dataclass
 
 import pytest
-
 from huleedu_service_libs import Result
 
 
