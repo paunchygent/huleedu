@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-import base64
-import json
 import time
 from typing import Any
+
+import jwt
+from jwt import InvalidTokenError
 
 from services.identity_service.config import settings
 from services.identity_service.protocols import TokenIssuer
@@ -14,6 +15,9 @@ class DevTokenIssuer(TokenIssuer):
 
     For production, implement RS256 with JWKS exposure.
     """
+
+    def __init__(self) -> None:
+        self._secret = settings.JWT_DEV_SECRET.get_secret_value()
 
     def issue_access_token(self, user_id: str, org_id: str | None, roles: list[str]) -> str:
         payload = {
@@ -34,25 +38,22 @@ class DevTokenIssuer(TokenIssuer):
             "jti": jti,
             "exp": int(time.time()) + settings.JWT_ACCESS_TOKEN_EXPIRES_SECONDS * 24,
             "iss": settings.JWT_ISSUER,
+            "aud": settings.JWT_AUDIENCE,
         }
         return self._encode(payload), jti
 
     def verify(self, token: str) -> dict[str, Any]:
-        # Dev-only: decode without signature verification
         try:
-            _, body_b64, _ = token.split(".")
-            padded = body_b64 + "=" * (-len(body_b64) % 4)
-            decoded = json.loads(base64.urlsafe_b64decode(padded))
-            return decoded if isinstance(decoded, dict) else {}
-        except Exception:
+            return jwt.decode(
+                token,
+                self._secret,
+                algorithms=["HS256"],
+                audience=settings.JWT_AUDIENCE,
+                issuer=settings.JWT_ISSUER,
+                options={"verify_exp": False},
+            )
+        except InvalidTokenError:
             return {}
 
     def _encode(self, payload: dict[str, Any]) -> str:
-        header = {"alg": "HS256", "typ": "JWT"}
-        h = base64.urlsafe_b64encode(json.dumps(header).encode()).rstrip(b"=")
-        b = base64.urlsafe_b64encode(json.dumps(payload).encode()).rstrip(b"=")
-        # Dev signature placeholder
-        sig = base64.urlsafe_b64encode(settings.JWT_DEV_SECRET.get_secret_value().encode()).rstrip(
-            b"="
-        )
-        return f"{h.decode()}.{b.decode()}.{sig.decode()}"
+        return jwt.encode(payload, self._secret, algorithm="HS256")

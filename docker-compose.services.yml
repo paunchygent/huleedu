@@ -405,6 +405,8 @@ services:
       - OTEL_SERVICE_NAME=cj_assessment_service
       - OTEL_TRACES_EXPORTER=otlp
       - OTEL_METRICS_EXPORTER=none
+      # JWT authentication for admin endpoints
+      - CJ_ASSESSMENT_SERVICE_JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-secret-key-here}
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:9090/healthz || exit 1"]
       interval: 15s
@@ -443,7 +445,7 @@ services:
       - API_GATEWAY_SERVICE_HOST=0.0.0.0
       - API_GATEWAY_SERVICE_REDIS_URL=redis://redis:6379
       # JWT Configuration
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-secret-key-here}
+      - API_GATEWAY_JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-secret-key-here}
       # Backend service URLs
       - BATCH_ORCHESTRATOR_SERVICE_URL=http://batch_orchestrator_service:5000
       - CLASS_MANAGEMENT_SERVICE_URL=http://class_management_service:5002

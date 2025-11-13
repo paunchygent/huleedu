@@ -15,6 +15,7 @@ from uuid import uuid4
 import jwt
 import pytest
 
+from services.identity_service.config import settings
 from services.identity_service.implementations.jwks_store import JwksStore
 from services.identity_service.implementations.token_issuer_impl import DevTokenIssuer
 from services.identity_service.implementations.token_issuer_rs256_impl import Rs256TokenIssuer
@@ -247,11 +248,7 @@ class TestDevTokenIssuer:
 
             # Dev mode doesn't check expiration
             assert result["sub"] == sample_user_id
-            assert (
-                result["exp"]
-                == 1000000000
-                + issuer._encode.__globals__["settings"].JWT_ACCESS_TOKEN_EXPIRES_SECONDS
-            )
+            assert result["exp"] == 1000000000 + settings.JWT_ACCESS_TOKEN_EXPIRES_SECONDS
 
 
 class TestRs256TokenIssuer:
