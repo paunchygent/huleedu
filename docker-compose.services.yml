@@ -47,6 +47,8 @@ services:
       - CONTENT_STORE_ROOT_PATH=/data/huleedu_content_store
       - PORT=8000
       - LOG_LEVEL=INFO
+      - HULEEDU_DB_USER=${HULEEDU_DB_USER}
+      - HULEEDU_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
       - OTEL_SERVICE_NAME=content_service
       - OTEL_TRACES_EXPORTER=otlp

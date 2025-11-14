@@ -8,13 +8,21 @@ from pathlib import Path
 
 from dishka import Provider, Scope, provide
 from prometheus_client import CollectorRegistry, Counter
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from services.content_service.config import Settings, settings
+from services.content_service.implementations.content_repository_impl import (
+    ContentRepository,
+)
 from services.content_service.implementations.filesystem_content_store import FileSystemContentStore
 from services.content_service.implementations.prometheus_content_metrics import (
     PrometheusContentMetrics,
 )
-from services.content_service.protocols import ContentMetricsProtocol, ContentStoreProtocol
+from services.content_service.protocols import (
+    ContentMetricsProtocol,
+    ContentRepositoryProtocol,
+    ContentStoreProtocol,
+)
 
 
 class ContentServiceProvider(Provider):
@@ -45,6 +53,17 @@ class ContentServiceProvider(Provider):
         return PrometheusContentMetrics(content_operations)
 
     @provide(scope=Scope.APP)
+    def provide_database_engine(self, settings: Settings) -> AsyncEngine:
+        """Provide async database engine for Content Service."""
+        return create_async_engine(
+            settings.DATABASE_URL,
+            echo=False,
+            pool_size=5,
+            max_overflow=10,
+            pool_pre_ping=True,
+        )
+
+    @provide(scope=Scope.APP)
     def provide_store_root(self) -> Path:
         """Provide content store root path."""
         return Path(settings.CONTENT_STORE_ROOT_PATH)
@@ -53,3 +72,11 @@ class ContentServiceProvider(Provider):
     def provide_content_store(self, store_root: Path) -> ContentStoreProtocol:
         """Provide content store implementation."""
         return FileSystemContentStore(store_root)
+
+    @provide(scope=Scope.APP)
+    def provide_content_repository(
+        self,
+        engine: AsyncEngine,
+    ) -> ContentRepositoryProtocol:
+        """Provide database-backed content repository implementation."""
+        return ContentRepository(engine)

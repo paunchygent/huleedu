@@ -16,6 +16,7 @@ volumes:
   result_aggregator_db_data:
   spellchecker_db_data:
   file_service_db_data:
+  content_service_db_data:
   nlp_db_data:
   identity_db_data:
   email_db_data:

@@ -64,6 +64,32 @@ class ContentStoreProtocol(Protocol):
         ...
 
 
+class ContentRepositoryProtocol(Protocol):
+    """Protocol for database-backed content persistence."""
+
+    async def save_content(
+        self,
+        content_id: str,
+        content_data: bytes,
+        content_type: str,
+        correlation_id: UUID | None = None,
+    ) -> None:
+        """Persist content bytes and metadata."""
+        ...
+
+    async def get_content(
+        self,
+        content_id: str,
+        correlation_id: UUID | None = None,
+    ) -> tuple[bytes, str]:
+        """Retrieve content bytes and content type."""
+        ...
+
+    async def content_exists(self, content_id: str) -> bool:
+        """Return True if content exists for the given identifier."""
+        ...
+
+
 @runtime_checkable
 class ContentMetricsProtocol(Protocol):
     """Protocol for content service metrics collection."""

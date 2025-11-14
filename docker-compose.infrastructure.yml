@@ -109,6 +109,28 @@ services:
       retries: 5
       start_period: 30s
 
+  # PostgreSQL database for Content Service
+  content_service_db:
+    image: postgres:15
+    container_name: huleedu_content_service_db
+    restart: unless-stopped
+    networks:
+      - huleedu_internal_network
+    ports:
+      - "5445:5432"
+    environment:
+      - POSTGRES_DB=huleedu_content
+      - POSTGRES_USER=${HULEEDU_DB_USER}
+      - POSTGRES_PASSWORD=${HULEEDU_DB_PASSWORD}
+    volumes:
+      - content_service_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${HULEEDU_DB_USER} -d huleedu_content"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
   # Redis cache for idempotency and session management
   redis:
     image: redis:7-alpine

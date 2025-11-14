@@ -42,6 +42,28 @@ class Settings(SecureServiceSettings):
     HTTP_HOST: str = "0.0.0.0"
     HTTP_PORT: int = 8001
 
+    @property
+    def DATABASE_URL(self) -> str:
+        """Return the PostgreSQL database URL for Content Service."""
+        import os
+
+        env_type = os.getenv("ENV_TYPE", "development").lower()
+        if env_type == "docker":
+            dev_host = os.getenv("CONTENT_SERVICE_DB_HOST", "content_service_db")
+            dev_port_str = os.getenv("CONTENT_SERVICE_DB_PORT", "5432")
+        else:
+            dev_host = "localhost"
+            dev_port_str = "5445"
+
+        dev_port = int(dev_port_str)
+
+        return self.build_database_url(
+            database_name="huleedu_content",
+            service_env_var_prefix="CONTENT_SERVICE",
+            dev_port=dev_port,
+            dev_host=dev_host,
+        )
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
