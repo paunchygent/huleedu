@@ -132,7 +132,7 @@ def ensure_comparison_capacity(
             messages.append(f"No anchor essays found in {anchors.root}.")
         if student_count == 0:
             messages.append(f"No student essays found in {students.root}.")
-        pairs = anchor_count * student_count
+        anchor_count * student_count
         messages.append(
             "Anchor × student comparisons currently total 0; add files or update the dataset "
             "before running ENG5 batch modes."

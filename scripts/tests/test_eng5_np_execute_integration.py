@@ -441,7 +441,7 @@ def test_execute_mode_schema_validation(tmp_path: Path) -> None:
 
     # Create test environment
     paths, settings = _create_test_environment(tmp_path)
-    canonical_batch = str(settings.batch_uuid)
+    str(settings.batch_uuid)
     inventory = collect_inventory(paths)
 
     # Load schema

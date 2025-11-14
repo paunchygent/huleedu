@@ -127,10 +127,16 @@ class ConfigValidator:
         has_jwt_secret = any(required_var in env_var for env_var in service_env)
 
         if not has_jwt_secret:
-            fix = f"Add to docker-compose.services.yml environment section:\n        - {required_var}=${{JWT_SECRET_KEY}}"
+            fix = (
+                "Add to docker-compose.services.yml environment section:\n"
+                f"        - {required_var}=${{JWT_SECRET_KEY}}"
+            )
             self.error(
                 service_name,
-                f"Inherits JWTValidationSettings but missing {required_var} in docker-compose",
+                (
+                    f"Inherits JWTValidationSettings but missing {required_var} "
+                    "in docker-compose"
+                ),
                 fix,
             )
 

@@ -197,7 +197,10 @@ def format_output(
     lines.append("=" * 100)
     lines.append("")
     lines.append(
-        f"{'Rank':<6} {'Essay ID':<38} {'BT Score':<12} {'BT SE':<12} {'Wins':<6} {'Losses':<8} {'Total':<6} {'Anchor':<8}"
+        (
+            f"{'Rank':<6} {'Essay ID':<38} {'BT Score':<12} {'BT SE':<12} "
+            f"{'Wins':<6} {'Losses':<8} {'Total':<6} {'Anchor':<8}"
+        )
     )
     lines.append("-" * 100)
 

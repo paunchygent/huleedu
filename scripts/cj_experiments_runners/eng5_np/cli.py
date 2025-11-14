@@ -544,7 +544,10 @@ def main(
         if not upload_targets:
             raise RuntimeError("No essays available for upload; ensure dataset is populated")
         typer.echo(
-            f"Uploading {len(upload_targets)} essays to Content Service at {settings.content_service_url}",
+            (
+                f"Uploading {len(upload_targets)} essays to Content Service at "
+                f"{settings.content_service_url}"
+            ),
             err=True,
         )
         storage_id_map = asyncio.run(
