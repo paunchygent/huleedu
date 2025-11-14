@@ -12,12 +12,14 @@
 End-to-end batch processing fails with RESOURCE_NOT_FOUND errors when retrieving anchor essays from Content Service.
 
 ### Symptoms
+
 - Database contains 60 anchor essay references for assignment `00000000-0000-0000-0000-000000000001`
 - Expected: Only 12 anchor essays (one per grade level)
 - Batch processing fails when trying to retrieve content for IDs 1-48
 - Only IDs 49-60 successfully retrieve content
 
 ### Root Cause
+
 **Content Service uses ephemeral file storage that is lost on container restart.**
 
 ---
@@ -47,6 +49,7 @@ async def get_anchor_essay_references(
 ```
 
 **Issues Identified**:
+
 - No `ORDER BY` clause - returns records in arbitrary order
 - No `LIMIT` clause - fetches ALL matching records
 - No deduplication logic
@@ -72,11 +75,13 @@ await session.flush()
 ```
 
 **Issues Identified**:
+
 - Always uses INSERT - never updates existing records
 - No unique constraint on database table
 - No deduplication check before insertion
 
 **Database Schema**:
+
 ```sql
 Table: anchor_essay_references
 Indexes:
@@ -109,6 +114,7 @@ Five separate upload operations created 60 records:
 ### 4. Content Service Storage Details
 
 #### Current Implementation (MVP)
+
 - **Type**: File-based ephemeral storage
 - **Path**: `/app/.local_content_store_mvp/` (inside container)
 - **Persistence**: NONE - data lost on container restart
@@ -117,6 +123,7 @@ Five separate upload operations created 60 records:
 #### Evidence from Logs
 
 **Valid Uploads (IDs 49-60, after restart)**:
+
 ```
 2025-11-13 18:36:10 [info] Stored content with ID: 54c995dc26de42568d75b4e3a89c2295
 2025-11-13 18:36:10 [info] Stored content with ID: 51e3cddb66f5434385ca055ec738eb46
@@ -124,6 +131,7 @@ Five separate upload operations created 60 records:
 ```
 
 **Failed Retrievals (IDs 1-48, before restart)**:
+
 ```
 2025-11-13 18:37:45 [warning] Content download failed: content with ID 'f54e560cb23c4e69985f3d90c621f8f4' not found
 2025-11-13 18:37:45 [warning] Content download failed: content with ID '67fbdbc9adae449ead3708b72717998c' not found
@@ -143,721 +151,258 @@ Five separate upload operations created 60 records:
 
 ## Implementation Plan
 
-### Phase 1: Migrate Content Service to Database-Backed Storage
+This task is implemented in three phases. The parent document stays **architectural and intent-focused**; detailed steps, code sketches, and commands live in the child checklist:
 
-**Objective**: Replace ephemeral file storage with PostgreSQL-backed storage following established patterns
+- `TASK-FIX-ANCHOR-ESSAY-INFRASTRUCTURE-CHECKLIST.md` – developer playbook.
 
-**Pattern Reference**: `services/file_service/` for database storage implementation
+### Phase 1: Content Service persistence
 
-#### 1.1: Create Database Model
+**Goal**: Replace Content Service’s ephemeral filesystem storage with a PostgreSQL-backed store that matches existing service patterns.
 
-**File**: `services/content_service/models_db.py` (NEW)
+**Key outcomes**:
 
-**Pattern**: Based on `services/file_service/models_db.py`
+- Stored content survives container restarts.
+- Content is addressable by a stable `content_id` used across File Service, CJ, ENG5 runners, etc.
+- Content Service exposes a **single protocol** for persistence (repository or store abstraction), with:
+  - A `StoredContent` model that includes bytes, size, timestamps, correlation_id, and `content_type` for HTTP semantics.
+  - A repository implementation that owns its own `AsyncSession` lifecycle and raises `RESOURCE_NOT_FOUND` on missing content.
+- DI and config follow the `file_service` pattern:
+  - `DATABASE_URL` computed via `SecureServiceSettings`.
+  - A dedicated `content_service_db` in `docker-compose.infrastructure.yml`.
 
-**Content**:
-```python
-"""SQLAlchemy models for Content Service."""
+**Implementation guidance**:
 
-from __future__ import annotations
+- Use `services/file_service/` as the reference for:
+  - Database model layout and metadata.
+  - Repository + protocol patterns.
+  - DI wiring and `DATABASE_URL` conventions.
+- Keep routes thin:
+  - Inject only the protocol (not sessions/engines).
+  - Delegate all DB work and error semantics to the repository.
+- For concrete steps (models, protocols, DI, migrations, Docker, manual curl checks), follow **Phase 1** in the child checklist.
 
-from datetime import datetime
-from typing import Optional
-from uuid import UUID
+### Phase 2: Anchor uniqueness and cleanup
 
-from sqlalchemy import DateTime, Integer, LargeBinary, String, func
-from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
-from sqlalchemy.ext.asyncio import AsyncAttrs
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+**Goal**: Ensure CJ uses a clean, non-duplicated set of anchors for each assignment and prevent future duplicates at the database level.
 
+**Key outcomes**:
 
-class Base(AsyncAttrs, DeclarativeBase):
-    """Base class for all SQLAlchemy models."""
-    pass
+- `anchor_essay_references` contains exactly one row per `(assignment_id, grade, grade_scale)` combination.
+- ENG5 dev data is cleaned so only the post-restart anchor set (IDs 49–60) remains for the test assignment.
+- A unique constraint enforces the invariant for all future writes.
 
+**Design points**:
 
-class StoredContent(Base):
-    """Model for storing content data in PostgreSQL."""
+- Anchors are **assignment-scoped** today and use `assignment_id` as the join key to `AssessmentInstruction`.
+- The unique constraint is defined on `(assignment_id, grade, grade_scale)` and is meant to capture the **assignment-level** invariant only.
+- Cleanup for ENG5 is explicitly scoped to the known test assignment and grade scale to avoid touching any future/production data.
 
-    __tablename__ = "stored_content"
+**Implementation guidance**:
 
-    # Primary key - use content_id as string (UUID hex)
-    content_id: Mapped[str] = mapped_column(
-        String(32),
-        primary_key=True,
-        comment="UUID hex string identifying the content"
-    )
+- Add a CJ Alembic migration that:
+  - Deletes stale ENG5 duplicates created before the Content Service persistence fix.
+  - Adds the unique constraint `uq_anchor_assignment_grade_scale`.
+- Add migration tests to exercise:
+  - Upgrade from a clean database.
+  - Duplicate-prevention behaviour.
+  - Basic NULL semantics (for documentation only, not relied on in current flows).
+- For exact SQL snippets, test structure, and verification commands, follow **Phase 2** and **Phase 2.5** in the child checklist.
 
-    # Content data
-    content_data: Mapped[bytes] = mapped_column(
-        LargeBinary,
-        nullable=False,
-        comment="Raw content bytes"
-    )
+### Phase 3: Anchor upsert and ENG5 runner verification
 
-    # Metadata
-    content_size: Mapped[int] = mapped_column(
-        Integer,
-        nullable=False,
-        comment="Size of content in bytes"
-    )
+**Goal**: Make anchor registration idempotent at the assignment/grade/scale level and prove that ENG5 execute flows run cleanly end-to-end.
 
-    # Timestamps
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-        server_default=func.current_timestamp(),
-        index=True,  # ← Index for time-based queries
-        comment="When content was stored"
-    )
+**Key outcomes**:
 
-    # Tracing
-    correlation_id: Mapped[Optional[UUID]] = mapped_column(  # ← Optional
-        PostgresUUID(as_uuid=True),
-        nullable=True,  # ← nullable=True for consistency
-        comment="Correlation ID for request tracing"
-    )
-```
+- Registering anchors for the same `(assignment_id, grade, grade_scale)` updates the existing row instead of creating duplicates.
+- The CJ anchor registration API remains stable (still returns `anchor_id`, `storage_id`, and `grade_scale`).
+- ENG5 runner execute-mode uses the corrected anchor set without `RESOURCE_NOT_FOUND` errors from Content Service.
 
-#### 1.2: Create Repository Protocol
+**Design points**:
 
-**File**: `services/content_service/protocols.py`
+- Upsert logic should live in the **CJ repository implementation**, not directly in the API handler:
+  - The repository can implement a Postgres `INSERT ... ON CONFLICT ... DO UPDATE` or an explicit select-then-update pattern.
+  - It should return the `anchor_id` so the handler can preserve the response contract.
+- `register_anchor_essay` should:
+  - Resolve `grade_scale` via `AssessmentInstruction` using `assignment_id`.
+  - Store essay text via Content Service (storage-by-reference, no inline text).
+  - Delegate anchor persistence to the repository’s upsert method.
 
-**Pattern**: Based on `services/file_service/protocols.py` - FileRepositoryProtocol
+**Implementation guidance**:
 
-**Add**:
-```python
-from typing import Protocol
-from uuid import UUID
-
-
-class ContentRepositoryProtocol(Protocol):
-    """Protocol for content persistence operations."""
-
-    async def save_content(
-        self,
-        content_id: str,
-        content_data: bytes,
-        correlation_id: UUID | None = None
-    ) -> None:
-        """
-        Store content in database.
-
-        Args:
-            content_id: UUID hex string for content identifier
-            content_data: Raw bytes to store
-            correlation_id: Optional correlation ID for tracing
-
-        Note:
-            Repository manages its own sessions internally.
-        """
-        ...
-
-    async def get_content(
-        self,
-        content_id: str,
-        correlation_id: UUID | None = None
-    ) -> bytes:
-        """
-        Retrieve content from database.
-
-        Args:
-            content_id: UUID hex string for content identifier
-            correlation_id: Optional correlation ID for tracing
-
-        Returns:
-            Raw content bytes
-
-        Raises:
-            HuleEduError: If content not found (via raise_resource_not_found)
-
-        Note:
-            Repository manages its own sessions internally.
-        """
-        ...
-
-    async def content_exists(
-        self,
-        content_id: str
-    ) -> bool:
-        """
-        Check if content exists.
-
-        Args:
-            content_id: UUID hex string for content identifier
-
-        Returns:
-            True if content exists, False otherwise
-
-        Note:
-            Repository manages its own sessions internally.
-        """
-        ...
-```
-
-#### 1.3: Implement Database Repository
-
-**File**: `services/content_service/implementations/content_repository_impl.py` (NEW)
-
-**Pattern**: Based on `services/file_service/implementations/file_repository_impl.py`
-
-**Content**:
-```python
-"""Repository implementation for Content Service."""
-
-from __future__ import annotations
-
-from contextlib import asynccontextmanager
-from typing import AsyncGenerator
-from uuid import UUID
-
-from huleedu_service_libs.error_handling import raise_resource_not_found
-from huleedu_service_libs.logging_utils import create_service_logger
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
-
-from services.content_service.models_db import StoredContent
-from services.content_service.protocols import ContentRepositoryProtocol
-
-logger = create_service_logger("content_service.repository")
-
-
-class ContentRepository(ContentRepositoryProtocol):
-    """Repository implementation for Content Service with database persistence."""
-
-    def __init__(self, engine: AsyncEngine) -> None:
-        """
-        Initialize the repository with a database engine.
-
-        Args:
-            engine: SQLAlchemy async engine for database operations
-        """
-        self._engine = engine
-        self._sessionmaker = async_sessionmaker(
-            engine,
-            class_=AsyncSession,
-            expire_on_commit=False,
-        )
-        logger.info("Initialized content repository")
-
-    @asynccontextmanager
-    async def _get_session(self) -> AsyncGenerator[AsyncSession, None]:
-        """Get a database session with proper cleanup."""
-        async with self._sessionmaker() as session:
-            try:
-                yield session
-                await session.commit()
-            except Exception:
-                await session.rollback()
-                raise
-            finally:
-                await session.close()
-
-    async def save_content(
-        self,
-        content_id: str,
-        content_data: bytes,
-        correlation_id: UUID | None = None
-    ) -> None:
-        """
-        Store content in database.
-
-        Args:
-            content_id: UUID hex string for content identifier
-            content_data: Raw bytes to store
-            correlation_id: Optional correlation ID for tracing
-        """
-        async with self._get_session() as session:
-            stored_content = StoredContent(
-                content_id=content_id,
-                content_data=content_data,
-                content_size=len(content_data),
-                correlation_id=correlation_id,
-            )
-            session.add(stored_content)
-
-            logger.info(
-                f"Stored content with ID: {content_id}",
-                extra={
-                    "content_id": content_id,
-                    "content_size": len(content_data),
-                    "correlation_id": str(correlation_id) if correlation_id else None,
-                },
-            )
-
-    async def get_content(
-        self,
-        content_id: str,
-        correlation_id: UUID | None = None
-    ) -> bytes:
-        """
-        Retrieve content from database.
-
-        Args:
-            content_id: UUID hex string for content identifier
-            correlation_id: Optional correlation ID for tracing
-
-        Returns:
-            Raw content bytes
-
-        Raises:
-            HuleEduError: If content not found
-        """
-        async with self._get_session() as session:
-            stmt = select(StoredContent).where(StoredContent.content_id == content_id)
-            result = await session.execute(stmt)
-            stored_content = result.scalar_one_or_none()
-
-            if not stored_content:
-                logger.warning(
-                    f"Content not found for ID: {content_id}",
-                    extra={"correlation_id": str(correlation_id) if correlation_id else None},
-                )
-                raise_resource_not_found(
-                    service="content_service",
-                    operation="get_content",
-                    resource_type="content",
-                    resource_id=content_id,
-                    correlation_id=correlation_id,
-                )
-
-            return stored_content.content_data
-
-    async def content_exists(
-        self,
-        content_id: str
-    ) -> bool:
-        """
-        Check if content exists.
-
-        Args:
-            content_id: UUID hex string for content identifier
-
-        Returns:
-            True if content exists, False otherwise
-        """
-        async with self._get_session() as session:
-            stmt = select(StoredContent.content_id).where(
-                StoredContent.content_id == content_id
-            )
-            result = await session.execute(stmt)
-            exists = result.scalar_one_or_none() is not None
-
-            logger.debug(
-                f"Content exists check for ID {content_id}: {exists}",
-                extra={"content_id": content_id},
-            )
-
-            return exists
-```
-
-#### 1.4: Create Mock Repository for Tests
-
-**File**: `services/content_service/implementations/mock_content_repository.py` (NEW)
-
-**Pattern**: Dict-based in-memory mock (similar to Essay Lifecycle mock pattern)
-
-**Content**:
-```python
-"""Mock repository for testing Content Service."""
-
-from __future__ import annotations
-
-from uuid import UUID
-
-from huleedu_service_libs.error_handling import raise_resource_not_found
-from huleedu_service_libs.logging_utils import create_service_logger
-
-from services.content_service.protocols import ContentRepositoryProtocol
-
-logger = create_service_logger("content_service.repository.mock")
-
-
-class MockContentRepository(ContentRepositoryProtocol):
-    """In-memory mock implementation for testing."""
-
-    def __init__(self) -> None:
-        """Initialize mock repository with empty storage."""
-        self.content_store: dict[str, bytes] = {}
-        logger.info("Initialized mock content repository")
-
-    async def save_content(
-        self,
-        content_id: str,
-        content_data: bytes,
-        correlation_id: UUID | None = None
-    ) -> None:
-        """Store content in memory."""
-        self.content_store[content_id] = content_data
-        logger.debug(f"Stored content {content_id} in mock")
-
-    async def get_content(
-        self,
-        content_id: str,
-        correlation_id: UUID | None = None
-    ) -> bytes:
-        """Retrieve content from memory."""
-        if content_id not in self.content_store:
-            raise_resource_not_found(
-                service="content_service",
-                operation="get_content",
-                resource_type="content",
-                resource_id=content_id,
-                correlation_id=correlation_id,
-            )
-        return self.content_store[content_id]
-
-    async def content_exists(
-        self,
-        content_id: str
-    ) -> bool:
-        """Check if content exists in memory."""
-        return content_id in self.content_store
-```
-
-#### 1.5: Update DI Configuration
-
-**File**: `services/content_service/di.py`
-
-**Pattern**: Based on `services/file_service/di.py` lines 134-170
-
-**Changes**:
-```python
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
-from dishka import Provider, Scope, provide
-
-from services.content_service.protocols import ContentRepositoryProtocol
-from services.content_service.implementations.content_repository_impl import ContentRepository
-
-
-class CoreInfrastructureProvider(Provider):
-    """Provider for core infrastructure dependencies."""
-
-    @provide(scope=Scope.APP)
-    async def provide_database_engine(self, settings: Settings) -> AsyncEngine:
-        """Provide async database engine for Content Service."""
-        engine = create_async_engine(
-            settings.DATABASE_URL,
-            echo=False,  # Set to True for SQL debugging
-            pool_size=5,
-            max_overflow=10,
-            pool_pre_ping=True,  # Verify connections before use
-        )
-        return engine
-
-    @provide(scope=Scope.APP)
-    def provide_content_repository(
-        self,
-        engine: AsyncEngine,
-    ) -> ContentRepositoryProtocol:
-        """Provide content repository implementation."""
-        return ContentRepository(engine)
-```
-
-#### 1.6: Update Content Routes
-
-**File**: `services/content_service/api/content_routes.py`
-
-**Pattern**: Inject repository protocol only (NO session injection)
-
-**Changes**:
-```python
-from dishka.integrations.quart import FromDishka
-
-from services.content_service.protocols import ContentRepositoryProtocol
-
-
-@content_bp.route("", methods=["POST"])
-@inject
-async def upload_content(
-    repository: FromDishka[ContentRepositoryProtocol],  # ← Only protocol
-    metrics: FromDishka[ContentMetricsProtocol],
-) -> Response | tuple[Response, int]:
-    """
-    Upload content endpoint.
-
-    Repository manages its own sessions internally.
-    """
-    # ... existing request parsing ...
-
-    # Call repository method - it handles session lifecycle
-    content_id = uuid.uuid4().hex
-    await repository.save_content(
-        content_id=content_id,
-        content_data=content_bytes,
-        correlation_id=correlation_id
-    )
-
-    # ... return response ...
-
-
-@content_bp.route("/<content_id>", methods=["GET"])
-@inject
-async def get_content(
-    content_id: str,
-    repository: FromDishka[ContentRepositoryProtocol],  # ← Only protocol
-    metrics: FromDishka[ContentMetricsProtocol],
-) -> Response | tuple[Response, int]:
-    """
-    Retrieve content endpoint.
-
-    Repository manages its own sessions internally.
-    """
-    # Call repository method - it handles session lifecycle
-    content_data = await repository.get_content(
-        content_id=content_id,
-        correlation_id=correlation_id
-    )
-
-    # ... return response ...
-```
-
-#### 1.7: Create Alembic Migration
-
-**Directory**: `services/content_service/alembic/` (setup if not exists)
-
-**Migration**: Create `stored_content` table
-
-**Pattern**: Based on `.claude/rules/085-database-migration-standards.md`
-
-**Commands**:
-```bash
-cd services/content_service
-
-# Initialize alembic (first time only)
-pdm run alembic init alembic
-# Then edit alembic.ini and alembic/env.py to reference models_db
-
-# Create migration
-pdm run alembic revision --autogenerate -m "Create stored_content table"
-
-# Review the generated migration file
-
-# Restart services with new database
-pdm run dev-build-start content_service  # Or dev-restart if already running
-
-# Apply migration
-pdm run alembic upgrade head
-
-# Verify migration applied
-pdm run alembic current
-```
-
-#### 1.8: Update Docker Compose
-
-**File**: `docker-compose.infrastructure.yml`
-
-**Pattern**: Based on file_service_db configuration (infrastructure.yml lines 90-107)
-
-**Add**:
-```yaml
-content_service_db:
-  image: postgres:15
-  container_name: huleedu_content_service_db
-  restart: unless-stopped
-  networks:
-    - huleedu_internal_network
-  ports:
-    - "5445:5432"  # Port 5445 (5440 used by nlp_db)
-  environment:
-    - POSTGRES_DB=huleedu_content
-    - POSTGRES_USER=${HULEEDU_DB_USER}
-    - POSTGRES_PASSWORD=${HULEEDU_DB_PASSWORD}
-  volumes:
-    - content_service_db_data:/var/lib/postgresql/data
-  healthcheck:
-    test: ["CMD-SHELL", "pg_isready -U ${HULEEDU_DB_USER} -d huleedu_content"]
-    interval: 10s
-    timeout: 5s
-    retries: 5
-    start_period: 30s
-```
-
-**Update content_service section**:
-```yaml
-content_service:
-  depends_on:
-    - content_service_db  # ← Correct reference
-  environment:
-    # ... existing env vars ...
-```
-
-**Add to docker-compose.yml volumes section**:
-```yaml
-volumes:
-  content_service_db_data:
-```
-
-#### 1.9: Update Config
-
-**File**: `services/content_service/config.py`
-
-**Pattern**: Based on `services/file_service/config.py` lines 12-18, 103-123
-
-**Add at module level (top of file)**:
-```python
-from dotenv import find_dotenv, load_dotenv
-
-# Load .env file from repository root, regardless of current working directory
-load_dotenv(find_dotenv(".env"))
-```
-
-**Add to Settings class**:
-```python
-from huleedu_service_libs.config import SecureServiceSettings
-
-
-class Settings(SecureServiceSettings):
-    """Configuration settings for Content Service."""
-
-    # ... existing settings ...
-
-    @property
-    def DATABASE_URL(self) -> str:
-        """Return the PostgreSQL database URL for both runtime and migrations."""
-        import os
-
-        env_type = os.getenv("ENV_TYPE", "development").lower()
-        if env_type == "docker":
-            dev_host = os.getenv("CONTENT_SERVICE_DB_HOST", "content_service_db")
-            dev_port_str = os.getenv("CONTENT_SERVICE_DB_PORT", "5432")
-        else:
-            dev_host = "localhost"
-            dev_port_str = "5445"  # External port (5440 used by nlp_db)
-
-        dev_port = int(dev_port_str)
-
-        return self.build_database_url(
-            database_name="huleedu_content",
-            service_env_var_prefix="CONTENT_SERVICE",
-            dev_port=dev_port,
-            dev_host=dev_host,
-        )
-
-
-# Create a single instance for the application to use
-settings = Settings()
-```
-
-#### 1.10: Testing
-
-**Sequence**:
-1. Build and start services with new database:
-   ```bash
-   pdm run dev-build-start content_service
-   ```
-
-2. Run database migration:
-   ```bash
-   cd services/content_service
-   pdm run alembic upgrade head
-   pdm run alembic current  # Verify
-   ```
-
-3. Upload test content via API:
-   ```bash
-   curl -X POST http://localhost:8001/v1/content \
-     -H "Content-Type: application/json" \
-     -d '{"content": "test content for persistence", "metadata": {}}'
-   ```
-
-4. Verify content stored in database:
-   ```bash
-   source .env
-   docker exec huleedu_content_service_db psql -U "$HULEEDU_DB_USER" -d huleedu_content \
-     -c "SELECT content_id, content_size, created_at FROM stored_content;"
-   ```
-
-5. Restart Content Service:
-   ```bash
-   pdm run dev-restart content_service
-   ```
-
-6. Retrieve same content via API (use content_id from step 3):
-   ```bash
-   curl http://localhost:8001/v1/content/{content_id}
-   ```
-
-**Expected**: Content still accessible after restart (proves persistence)
+- Follow **Phase 3** in the child checklist for:
+  - Repository method signature and upsert pattern.
+  - API changes in `anchor_management.py`.
+  - Unit/integration tests that verify row-count stability and updated `text_storage_id`.
+- Use the ENG5 CLI flows described in the checklist to validate that:
+  - Re-registering anchors does not create extra rows.
+  - The ENG5 execute flow completes successfully with anchors and grade projections in place.
 
 ---
 
-### Phase 2: Database Cleanup
+## Understanding Nullable assignment_id
 
-**Objective**: Remove stale anchor references pointing to lost content
+**Current reality**
 
-**Action**: Execute SQL cleanup
-```sql
-DELETE FROM anchor_essay_references
-WHERE assignment_id = '00000000-0000-0000-0000-000000000001'
-AND id < 49;
-```
+- `AnchorEssayReference` is **assignment-scoped** today.
+- All anchors used by ENG5 / CJ flows are created with a **non-NULL `assignment_id`**.
+- There is **no `course_id` column** on `anchor_essay_references`, and no logic that loads anchors by course.
 
-**Command**:
-```bash
-source .env
-docker exec huleedu_cj_assessment_db psql -U "$HULEEDU_DB_USER" -d huleedu_cj_assessment -c "DELETE FROM anchor_essay_references WHERE assignment_id = '00000000-0000-0000-0000-000000000001' AND id < 49;"
-```
+**Relationship to AssessmentInstruction**
 
-**Verification**:
-```bash
-docker exec huleedu_cj_assessment_db psql -U "$HULEEDU_DB_USER" -d huleedu_cj_assessment -c "SELECT COUNT(*), MIN(id), MAX(id) FROM anchor_essay_references WHERE assignment_id = '00000000-0000-0000-0000-000000000001';"
-```
+- `AssessmentInstruction` supports two scopes via an XOR constraint:
+  - Assignment-level (`assignment_id` NOT NULL, `course_id` NULL)
+  - Course-level (`assignment_id` NULL, `course_id` NOT NULL)
+- For ENG5 and current CJ batches, anchors are **only** attached to the assignment-level scope:
+  - `assignment_id` is the join key between AssessmentInstruction and AnchorEssayReference.
+  - Grade scale and prompt/rubric references come from AssessmentInstruction.
 
-Expected: `COUNT=12, MIN=49, MAX=60`
+**Why is `assignment_id` nullable on AnchorEssayReference?**
+
+- The column is declared nullable to leave room for a future design where anchors might also exist at course scope.
+- That future has **not** been modeled yet:
+  - There is no `course_id` on the anchor table.
+  - There is no code path that queries anchors by course.
+
+**Implications for this migration**
+
+- The unique constraint `UNIQUE (assignment_id, grade, grade_scale)` is intentionally defined for **assignment-level anchors only**.
+- We do **not** rely on PostgreSQL's `NULL` semantics here; real anchors always have `assignment_id` set.
+- When/if we add course-level anchors, we will do so via a dedicated schema change (e.g. adding `course_id` to the anchor table and defining explicit uniqueness rules), not by overloading NULL `assignment_id` rows.
 
 ---
 
-### Phase 3: Add Database Unique Constraint
+### Phase 2: Add Database Unique Constraint with Cleanup
 
-**Objective**: Prevent future duplicate anchor uploads
+**Objective**: Prevent future duplicate anchor uploads and clean up existing stale data
 
-**Action**: Create Alembic migration
+**File**: `services/cj_assessment_service/alembic/versions/20251113_HHMM_add_anchor_unique_constraint.py`
 
-**File**: `services/cj_assessment_service/alembic/versions/YYYYMMDD_add_anchor_unique_constraint.py`
+**Pattern Reference**: Based on `20250719_0003_add_content_idempotency_constraints.py` (cleanup before constraint)
 
-**Migration SQL**:
-```sql
-ALTER TABLE anchor_essay_references
-ADD CONSTRAINT uq_anchor_assignment_grade_scale
-UNIQUE (assignment_id, grade, grade_scale);
+**Migration Content**:
+
+```python
+"""Add unique constraint to anchor_essay_references
+
+Prevents duplicate anchor essays for same assignment/grade/scale combination.
+Includes cleanup of existing duplicates before constraint application.
+
+Revision ID: <generated>
+Revises: <previous_revision>
+Create Date: 2025-11-13
+"""
+
+import sqlalchemy as sa
+from alembic import op
+
+revision: str = "<generated>"
+down_revision: str = "<previous_revision>"
+branch_labels = None
+depends_on = None
+
+
+def upgrade() -> None:
+    """Add unique constraint and clean up duplicate anchors."""
+
+    # Step 1: Clean up stale anchor references before adding constraint.
+    # This is a **development-only** cleanup for ENG5 test data created before the
+    # Content Service persistence fix. It is deliberately scoped to the known
+    # ENG5 assignment and grade scale to avoid touching any future data.
+    op.execute("""
+        DELETE FROM anchor_essay_references
+        WHERE assignment_id = '00000000-0000-0000-0000-000000000001'
+          AND grade_scale = 'swedish_8_anchor'
+          AND id < 49
+    """)
+
+    # Step 2: Add unique constraint to prevent future duplicates.
+    # This constraint captures the intended invariant for **assignment-level**
+    # anchors (one anchor per assignment/grade/scale combination). Any future
+    # course-level anchor design will be implemented via a separate schema
+    # change rather than overloading NULL assignment IDs.
+    op.create_unique_constraint(
+        "uq_anchor_assignment_grade_scale",
+        "anchor_essay_references",
+        ["assignment_id", "grade", "grade_scale"]
+    )
+
+
+def downgrade() -> None:
+    """Remove unique constraint (does not restore deleted records)."""
+    op.drop_constraint(
+        "uq_anchor_assignment_grade_scale",
+        "anchor_essay_references",
+        type_="unique"
+    )
 ```
 
 **Commands**:
+
 ```bash
 # Create migration
 cd services/cj_assessment_service
 ../../.venv/bin/alembic revision -m "Add unique constraint to anchor_essay_references"
+# Then manually edit the generated file to include the cleanup and constraint logic above
 
 # Apply migration
 pdm run dev-restart cj_assessment_service
+../../.venv/bin/alembic upgrade head
+
+# Verify migration applied
+../../.venv/bin/alembic current
 ```
 
-**Testing**:
-- Attempt to upload duplicate anchor for same assignment/grade
-- Should fail with constraint violation error
+**Verification**:
+
+```bash
+# Check constraint exists
+docker exec huleedu_cj_assessment_db psql -U "$HULEEDU_DB_USER" -d huleedu_cj_assessment -c "
+SELECT constraint_name, constraint_type
+FROM information_schema.table_constraints
+WHERE table_name = 'anchor_essay_references'
+AND constraint_type = 'UNIQUE';"
+
+# Verify cleanup worked
+docker exec huleedu_cj_assessment_db psql -U "$HULEEDU_DB_USER" -d huleedu_cj_assessment -c "
+SELECT COUNT(*), MIN(id), MAX(id)
+FROM anchor_essay_references
+WHERE assignment_id = '00000000-0000-0000-0000-000000000001';"
+```
+
+Expected:
+
+- Constraint `uq_anchor_assignment_grade_scale` exists
+- `COUNT=12, MIN=49, MAX=60`
 
 ---
 
-### Phase 4: Implement Upsert Logic in API
+### Phase 2.5: Create Migration Test (Rule 085.4)
+
+**File**: `services/cj_assessment_service/tests/integration/test_anchor_unique_migration.py`
+
+**Pattern**: Based on `test_judge_rubric_migration.py` and `test_error_code_migration.py`
+
+**Required Tests**:
+
+1. `test_migration_upgrade_from_clean_database` - MANDATORY smoke test
+2. `test_constraint_prevents_duplicate_assignment_anchors` - Verify uniqueness
+3. `test_constraint_allows_null_assignment_id_duplicates` - Verify NULL behavior
+4. `test_migration_idempotency` - Guard against DDL conflicts
+
+**Run**: `pdm run pytest-root services/cj_assessment_service/tests/integration/test_anchor_unique_migration.py -v`
+
+---
+
+### Phase 3: Implement Upsert Logic in API
 
 **Objective**: Update existing anchors instead of creating duplicates
 
 **File**: `services/cj_assessment_service/api/anchor_management.py:108-115`
 
-**Current Code**:
-```python
-anchor_ref = AnchorEssayReference(
-    assignment_id=register_request.assignment_id,
-    grade=register_request.grade,
-    grade_scale=grade_scale,
-    text_storage_id=storage_id,
-)
-session.add(anchor_ref)
-await session.flush()
-```
+**New repository method** (using SQLAlchemy upsert; the API handler should call this,
+not embed raw SQL directly):
 
-**New Code** (using SQLAlchemy upsert):
 ```python
 from sqlalchemy.dialects.postgresql import insert
 
@@ -878,6 +423,7 @@ await session.flush()
 ```
 
 **Testing**:
+
 1. Upload 12 anchor essays
 2. Upload same 12 anchor essays again
 3. Verify database still contains exactly 12 records (not 24)
@@ -888,6 +434,7 @@ await session.flush()
 ## Files to Modify
 
 ### Phase 1: Content Service Database Migration
+
 1. `services/content_service/models_db.py` - NEW: Database model
 2. `services/content_service/protocols.py` - Add ContentRepositoryProtocol
 3. `services/content_service/implementations/content_repository_impl.py` - NEW: DB repository
@@ -896,78 +443,67 @@ await session.flush()
 6. `services/content_service/api/content_routes.py` - Use repository instead of file store
 7. `services/content_service/config.py` - Add DATABASE_URL
 8. `services/content_service/alembic/` - Initialize and create migration
-9. `docker-compose.dev.yml` - Add content_db service and volume
+9. `docker-compose.infrastructure.yml` - Add content_db service and volume
 
-### Phase 2: Anchor Cleanup
-10. SQL cleanup via docker exec
+### Phase 2: CJ Assessment Constraint Migration
 
-### Phase 3: CJ Assessment Constraint
-11. `services/cj_assessment_service/alembic/versions/[NEW]` - Unique constraint migration
+10. `services/cj_assessment_service/alembic/versions/[NEW]` - Unique constraint + cleanup
 
-### Phase 4: CJ Assessment Upsert
+### Phase 2.5: Migration Test
+
+11. `services/cj_assessment_service/tests/integration/test_anchor_unique_migration.py` - NEW
+
+### Phase 3: CJ Assessment Upsert
+
 12. `services/cj_assessment_service/api/anchor_management.py:108-115` - Upsert logic
 
 ---
 
 ## Testing Plan
 
-### After Phase 1 (Persistence)
+### After Phase 1 (Content Persistence)
+
 ```bash
-# Upload test content
-curl -X POST http://localhost:8001/v1/content \
-  -H "Content-Type: application/json" \
-  -d '{"content": "test", "metadata": {}}'
-
-# Note the storage_id from response
-
-# Restart Content Service
+# Upload, restart service, verify content persists
+curl -X POST http://localhost:8001/v1/content -H "Content-Type: application/json" -d '{"content": "test", "metadata": {}}'
 pdm run dev-restart content_service
-
-# Verify content still exists
-curl http://localhost:8001/v1/content/{storage_id}
+curl http://localhost:8001/v1/content/{storage_id}  # Should succeed
 ```
 
-### After Phase 2 (Cleanup)
+### After Phase 2 (Constraint Migration)
+
 ```bash
-# Run batch processing test
-pdm run python -m scripts.cj_experiments_runners.eng5_np.cli \
-  --mode execute \
-  --assignment-id 00000000-0000-0000-0000-000000000001 \
-  --course-id 00000000-0000-0000-0000-000000000002 \
-  --batch-id test-cleanup-$(date +%Y%m%d-%H%M) \
-  --max-comparisons 5 \
-  --kafka-bootstrap localhost:9093 \
-  --await-completion \
-  --completion-timeout 30 \
-  --verbose
+# Run batch processing - should succeed with clean anchor data
+pdm run python -m scripts.cj_experiments_runners.eng5_np.cli --mode execute \
+  --assignment-id 00000000-0000-0000-0000-000000000001 --course-id 00000000-0000-0000-0000-000000000002 \
+  --batch-id test-$(date +%Y%m%d-%H%M) --max-comparisons 5 --kafka-bootstrap localhost:9093 \
+  --await-completion --completion-timeout 30 --verbose
 ```
 
 Expected: No RESOURCE_NOT_FOUND errors
 
-### After Phase 3 (Constraint)
+### After Phase 2.5 (Migration Test)
+
 ```bash
-# Try to upload duplicate anchor (should fail)
-pdm run python -m scripts.cj_experiments_runners.eng5_np.cli \
-  --mode register-anchors \
-  --assignment-id 00000000-0000-0000-0000-000000000001 \
-  --anchors scripts/cj_experiments_runners/eng5_np/data/eng5_np_anchor_essays.json
+pdm run pytest-root services/cj_assessment_service/tests/integration/test_anchor_unique_migration.py -v
 ```
 
-Expected: Database constraint violation error
+Expected: All 4 tests pass
 
-### After Phase 4 (Upsert)
+### After Phase 3 (Upsert Implementation)
+
 ```bash
-# Upload anchors twice (should succeed with updates)
-pdm run python -m scripts.cj_experiments_runners.eng5_np.cli \
-  --mode register-anchors \
+# Upload anchors twice - second upload should update, not duplicate
+pdm run python -m scripts.cj_experiments_runners.eng5_np.cli --mode register-anchors \
   --assignment-id 00000000-0000-0000-0000-000000000001 \
   --anchors scripts/cj_experiments_runners/eng5_np/data/eng5_np_anchor_essays.json
 
-# Verify still only 12 records
-docker exec huleedu_cj_assessment_db psql -U "$HULEEDU_DB_USER" -d huleedu_cj_assessment -c "SELECT COUNT(*) FROM anchor_essay_references WHERE assignment_id = '00000000-0000-0000-0000-000000000001';"
+# Verify only 12 records exist (not 24)
+docker exec huleedu_cj_assessment_db psql -U "$HULEEDU_DB_USER" -d huleedu_cj_assessment \
+  -c "SELECT COUNT(*) FROM anchor_essay_references WHERE assignment_id = '00000000-0000-0000-0000-000000000001';"
 ```
 
-Expected: COUNT=12 (not 24)
+Expected: COUNT=12
 
 ---
 
@@ -976,6 +512,7 @@ Expected: COUNT=12 (not 24)
 - ✅ Content Service storage persists across container restarts
 - ✅ Database contains exactly 12 anchor references for test assignment
 - ✅ All anchor storage IDs valid in Content Service
+- ✅ Migration test passes (rule 085.4 compliance)
 - ✅ Batch processing completes without RESOURCE_NOT_FOUND errors
 - ✅ Database constraint prevents duplicate anchors
 - ✅ Re-uploading anchors updates existing records (no duplicates)
@@ -986,6 +523,7 @@ Expected: COUNT=12 (not 24)
 ## Related Tasks
 
 - `TASK-FIX-CJ-LLM-PROMPT-CONSTRUCTION.md` - Metadata passthrough implementation (COMPLETE)
+- `TASK-FIX-ANCHOR-ESSAY-INFRASTRUCTURE-CHECKLIST.md` - Developer checklist and step-by-step implementation guide for this task
 - This task unblocks end-to-end testing of metadata passthrough feature
 
 ---
@@ -994,8 +532,9 @@ Expected: COUNT=12 (not 24)
 
 - CJ Assessment DB was reset on 2025-11-13, so all 60 records were created same day
 - The duplicate upload issue is a workflow problem (manual re-uploads), not a code bug
-- However, the code should handle this gracefully with upsert logic
 - Content Service restart was the triggering event that exposed the storage issue
 - Root cause: Content Service used ephemeral file storage instead of persistent database
 - Solution: Migrate to PostgreSQL-backed storage following established File Service pattern
-- Benefits: Transactional consistency, backup integration, no volume mount dependencies
+- **Pattern Compliance**: Phase 2 migration combines cleanup + constraint following `20250719_0003_add_content_idempotency_constraints.py`
+- **Migration Testing**: Phase 2.5 follows rule 085.4 mandatory smoke test pattern
+- **Nullable assignment_id**: Intentional design supporting both assignment-level and future course-level anchors
