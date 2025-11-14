@@ -116,6 +116,9 @@ prompt storage references end-to-end:
   automation, exposes `instructions create|list|get|delete`, `scales list`, and
   provides a non-interactive token helper `pdm run cj-admin token issue` (reads
   `CJ_ADMIN_EMAIL`/`CJ_ADMIN_PASSWORD` or accepts `--email/--password`).
+- **ENG5 NP Dev Runner**: `scripts/cj_experiments_runners/eng5_np` can self-mint
+  admin tokens for local development (production runs require
+  `HULEEDU_SERVICE_ACCOUNT_TOKEN`). See `scripts/cj_experiments_runners/eng5_np/AUTH.md`.
 
 ### Student Prompt Management
 

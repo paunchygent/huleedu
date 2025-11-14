@@ -9,34 +9,45 @@ from pydantic import Field, SecretStr
 
 
 class JWTValidationSettings:
-    """Mixin that adds JWT validation configuration to service settings."""
+    """Mixin that adds JWT validation configuration to service settings.
+
+    All JWT settings use validation_alias to read from global environment
+    variables, bypassing service-specific env_prefix settings.
+    """
 
     JWT_ALGORITHM: str = Field(
         default="HS256",
+        validation_alias="JWT_ALGORITHM",
         description="JWT signing/validation algorithm (e.g., HS256, RS256)",
     )
     JWT_AUDIENCE: str = Field(
         default="huleedu-platform",
+        validation_alias="JWT_AUDIENCE",
         description="Expected JWT audience claim",
     )
     JWT_ISSUER: str = Field(
         default="huleedu-identity-service",
+        validation_alias="JWT_ISSUER",
         description="Expected JWT issuer claim",
     )
     JWT_SECRET_KEY: SecretStr | None = Field(
         default=None,
+        validation_alias="JWT_SECRET_KEY",
         description="Shared secret for verifying HS* tokens",
     )
     JWT_PUBLIC_KEY: str | None = Field(
         default=None,
+        validation_alias="JWT_PUBLIC_KEY",
         description="PEM-encoded public key for RS*/ES* tokens",
     )
     JWT_PUBLIC_KEY_PATH: str | None = Field(
         default=None,
+        validation_alias="JWT_PUBLIC_KEY_PATH",
         description="Path to PEM public key file for RS*/ES* tokens",
     )
     JWT_JWKS_URL: str | None = Field(
         default=None,
+        validation_alias="JWT_JWKS_URL",
         description="Optional JWKS endpoint for remote key discovery (not yet used)",
     )
 

@@ -1,8 +1,13 @@
-"""HTTP helpers for interacting with the CJ Assessment Service."""
+"""HTTP helpers for interacting with the CJ Assessment Service.
+
+AUTH: Call build_admin_headers() for admin endpoints. Auto-generates tokens in dev.
+Production requires HULEEDU_SERVICE_ACCOUNT_TOKEN env var.
+"""
 
 from __future__ import annotations
 
 import asyncio
+import os
 import uuid
 from pathlib import Path
 from typing import Sequence
@@ -70,3 +75,42 @@ async def register_anchor_essays(
         await asyncio.gather(*(_register(record) for record in valid_records))
 
     return responses
+
+
+def build_admin_headers() -> dict[str, str]:
+    """
+    Build HTTP headers with admin JWT for CJ service requests.
+
+    Priority:
+    1. HULEEDU_SERVICE_ACCOUNT_TOKEN (production service accounts)
+    2. HULEEDU_ADMIN_TOKEN (manual token override)
+    3. Auto-generate dev token (development only, import fails in prod)
+
+    Returns:
+        Dict with Authorization and Content-Type headers
+
+    Raises:
+        RuntimeError: If no token available or in production without token
+    """
+    # Production: Service account token
+    if token := os.getenv("HULEEDU_SERVICE_ACCOUNT_TOKEN"):
+        return {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        }
+
+    # Manual override (testing)
+    if token := os.getenv("HULEEDU_ADMIN_TOKEN"):
+        return {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        }
+
+    # Development: Auto-generate (import fails in production)
+    from scripts.cj_experiments_runners.eng5_np.dev_auth import create_dev_admin_token
+
+    token = create_dev_admin_token()
+    return {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    }

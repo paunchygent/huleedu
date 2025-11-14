@@ -57,7 +57,11 @@ from scripts.cj_experiments_runners.eng5_np.schema import ensure_schema_availabl
 from scripts.cj_experiments_runners.eng5_np.settings import RunnerMode, RunnerSettings
 from scripts.cj_experiments_runners.eng5_np.system_prompt import build_cj_system_prompt
 
-app = typer.Typer(help="ENG5 NP batch runner tooling (plan, dry-run, execute)")
+app = typer.Typer(
+    help="ENG5 NP batch runner tooling (plan, dry-run, execute)\n\n"
+    "AUTH: Development auto-generates admin tokens. "
+    "Production requires HULEEDU_SERVICE_ACCOUNT_TOKEN env var."
+)
 
 
 @app.command("register-anchors")
@@ -108,6 +112,45 @@ def register_anchors_command(
         raise typer.Exit(code=1)
 
     typer.echo(f"Successfully registered {len(results)} anchors via {cj_service_url}")
+
+
+@app.command("verify-auth")
+def verify_auth_command() -> None:
+    """Verify JWT authentication configuration and production safety."""
+    try:
+        from scripts.cj_experiments_runners.eng5_np.cj_client import build_admin_headers
+        import jwt
+
+        headers = build_admin_headers()
+        token = headers["Authorization"].replace("Bearer ", "")
+
+        # Decode without verification (just inspect claims)
+        claims = jwt.decode(token, options={"verify_signature": False})
+
+        typer.echo("✅ Authentication working:")
+        typer.echo(f"   Subject: {claims.get('sub')}")
+        typer.echo(f"   Roles: {claims.get('roles')}")
+        typer.echo(f"   Issuer: {claims.get('iss')}")
+        typer.echo(f"   Audience: {claims.get('aud')}")
+
+        from datetime import datetime
+
+        exp_dt = datetime.fromtimestamp(claims["exp"])
+        typer.echo(f"   Expires: {exp_dt}")
+
+    except RuntimeError as e:
+        if "production" in str(e).lower():
+            typer.echo(
+                "✅ Production safety ACTIVE - dev auth blocked",
+                err=True,
+            )
+            typer.echo(
+                "   Set HULEEDU_SERVICE_ACCOUNT_TOKEN to authenticate",
+                err=True,
+            )
+        else:
+            typer.echo(f"❌ Error: {e}", err=True)
+            raise typer.Exit(1)
 
 
 def validate_llm_overrides(

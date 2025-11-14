@@ -16,16 +16,29 @@ The ENG5 NP runner requires a valid `assignment_id` that exists in the CJ Assess
 
 All admin CLI commands require authentication. Choose one of the following methods:
 
-### Option A: Environment Variable Token (Recommended for CI/Automation)
+### Option A: Auto-Generate (Development Only - AI/Scripts)
 
-```bash
-export CJ_ADMIN_TOKEN="your-jwt-token-here"
-# Token checked first by AuthManager (no login needed)
+```python
+# No setup needed - auto-generates admin tokens in development
+from scripts.cj_experiments_runners.eng5_np.cj_client import build_admin_headers
+headers = build_admin_headers()  # Works immediately in dev
 ```
 
-The `CJ_ADMIN_TOKEN` environment variable provides a direct token override, bypassing cached tokens and login prompts. This is ideal for automated scripts and CI/CD pipelines.
+Development environment auto-generates tokens. Production blocked, requires service account token.
 
-### Option B: Issue Token with Credentials (Recommended for Development)
+### Option B: Environment Variable Token (CI/Automation/Production)
+
+```bash
+# Production
+export HULEEDU_SERVICE_ACCOUNT_TOKEN="service-account-token"
+
+# Development override
+export HULEEDU_ADMIN_TOKEN="your-jwt-token-here"
+```
+
+Service account tokens (90-day) for production. Manual tokens for dev override.
+
+### Option C: Issue Token with Credentials (Human Development)
 
 ```bash
 # Set credentials in environment
