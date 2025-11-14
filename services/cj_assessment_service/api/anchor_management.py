@@ -96,6 +96,8 @@ async def register_anchor_essay(
                     "error": (f"Invalid grade '{register_request.grade}' for scale '{grade_scale}'")
                 }, 400
 
+            # TODO(TASK-CONTENT-SERVICE-IDEMPOTENT-UPLOADS): switch to hashed lookup-or-create flow
+            # once Content Service exposes the new API (avoids duplicate blobs).
             storage_response = await content_client.store_content(
                 content=register_request.essay_text,
                 content_type="text/plain",

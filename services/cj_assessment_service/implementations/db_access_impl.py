@@ -164,6 +164,12 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
         processing_metadata: dict | None = None,
     ) -> ProcessedEssay:
         """Create or update a processed essay in CJ batch."""
+
+        metadata = processing_metadata or {}
+        anchor_flag: bool | None = None
+        if "is_anchor" in metadata:
+            anchor_flag = bool(metadata["is_anchor"])
+
         # Check if essay already exists
         existing_essay = await session.get(ProcessedEssay, els_essay_id)
 
@@ -172,21 +178,27 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
             existing_essay.cj_batch_id = cj_batch_id
             existing_essay.text_storage_id = text_storage_id
             existing_essay.assessment_input_text = assessment_input_text
-            existing_essay.processing_metadata = processing_metadata or {}
+            existing_essay.processing_metadata = metadata
+            if anchor_flag is not None:
+                existing_essay.is_anchor = anchor_flag
             await session.flush()
             return existing_essay
-        else:
-            # Create new essay
-            essay = ProcessedEssay(
-                els_essay_id=els_essay_id,
-                cj_batch_id=cj_batch_id,
-                text_storage_id=text_storage_id,
-                assessment_input_text=assessment_input_text,
-                processing_metadata=processing_metadata or {},
-            )
-            session.add(essay)
-            await session.flush()
-            return essay
+
+        # Create new essay
+        essay_kwargs: dict[str, Any] = {
+            "els_essay_id": els_essay_id,
+            "cj_batch_id": cj_batch_id,
+            "text_storage_id": text_storage_id,
+            "assessment_input_text": assessment_input_text,
+            "processing_metadata": metadata,
+        }
+        if anchor_flag is not None:
+            essay_kwargs["is_anchor"] = anchor_flag
+
+        essay = ProcessedEssay(**essay_kwargs)
+        session.add(essay)
+        await session.flush()
+        return essay
 
     async def get_essays_for_cj_batch(
         self,
@@ -594,7 +606,7 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
             text_storage_id=text_storage_id,
         )
 
-        stmt = stmt.on_conflict_do_update(
+        stmt = stmt.on_conflict_do_update(  # type: ignore[assignment]
             index_elements=["assignment_id", "anchor_label", "grade_scale"],
             set_={"text_storage_id": text_storage_id, "grade": grade},
         ).returning(AnchorEssayReference.id)

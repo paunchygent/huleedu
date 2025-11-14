@@ -49,7 +49,7 @@ class ComparisonIterationResult(BaseModel):
 
 
 async def _persist_llm_overrides_if_present(
-    session,
+    session: AsyncSession,
     cj_batch_id: int,
     llm_config_overrides: Any | None,
     correlation_id: UUID,
@@ -233,18 +233,18 @@ async def _process_comparison_iteration(
     if "batch_config_overrides" in request_data:
         batch_config_overrides = BatchConfigOverrides(**request_data["batch_config_overrides"])
 
+    # Extract LLM config overrides and system_prompt_override from request_data if available
+    llm_config_overrides = request_data.get("llm_config_overrides")
+    system_prompt_override = None
+    if llm_config_overrides:
+        system_prompt_override = llm_config_overrides.system_prompt_override
+
     await _persist_llm_overrides_if_present(
         session=session,
         cj_batch_id=cj_batch_id,
         llm_config_overrides=llm_config_overrides,
         correlation_id=correlation_id,
     )
-
-    # Extract system_prompt_override from request_data if available
-    system_prompt_override = None
-    llm_config_overrides = request_data.get("llm_config_overrides")
-    if llm_config_overrides:
-        system_prompt_override = llm_config_overrides.system_prompt_override
 
     # Submit batch and update state to WAITING_CALLBACKS
     submission_result = await batch_processor.submit_comparison_batch(

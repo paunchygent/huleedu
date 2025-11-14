@@ -27,6 +27,9 @@ from services.cj_assessment_service.protocols import (
     LLMInteractionProtocol,
 )
 
+# Import shared fixtures (includes mock_get_batch_state)
+pytest_plugins = ["services.cj_assessment_service.tests.unit.conftest_pool"]
+
 
 class TestBatchRetryProcessor:
     """Test cases for BatchRetryProcessor class."""
@@ -66,17 +69,6 @@ class TestBatchRetryProcessor:
     def mock_batch_submitter(self) -> AsyncMock:
         """Create mock batch submitter protocol."""
         return AsyncMock(spec=BatchProcessorProtocol)
-
-    @pytest.fixture(autouse=True)
-    def mock_get_batch_state(self, monkeypatch) -> AsyncMock:
-        """Patch get_batch_state to avoid hitting the database."""
-        mock = AsyncMock()
-        mock.return_value = SimpleNamespace(processing_metadata=None)
-        monkeypatch.setattr(
-            "services.cj_assessment_service.cj_core_logic.batch_submission.get_batch_state",
-            mock,
-        )
-        return mock
 
     @pytest.fixture
     def retry_processor(
@@ -227,10 +219,22 @@ class TestBatchRetryProcessor:
             # Assert
             assert result is not None
             call_args = mock_batch_submitter.submit_comparison_batch.call_args
-            assert call_args[1]["model_override"] == overrides_metadata["model_override"]
-            assert call_args[1]["temperature_override"] == overrides_metadata["temperature_override"]
-            assert call_args[1]["max_tokens_override"] == overrides_metadata["max_tokens_override"]
-            assert call_args[1]["system_prompt_override"] == overrides_metadata["system_prompt_override"]
+            assert (
+                call_args[1]["model_override"]
+                == overrides_metadata["model_override"]
+            )
+            assert (
+                call_args[1]["temperature_override"]
+                == overrides_metadata["temperature_override"]
+            )
+            assert (
+                call_args[1]["max_tokens_override"]
+                == overrides_metadata["max_tokens_override"]
+            )
+            assert (
+                call_args[1]["system_prompt_override"]
+                == overrides_metadata["system_prompt_override"]
+            )
 
     async def test_submit_retry_batch_disabled(
         self,

@@ -15,8 +15,12 @@ import types
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
+from common_core.status_enums import CJBatchStateEnum as CoreCJState
 from huleedu_service_libs.logging_utils import create_service_logger
 
+from services.cj_assessment_service.cj_core_logic.batch_submission import (
+    update_batch_state_in_session,
+)
 from services.cj_assessment_service.cj_core_logic.dual_event_publisher import (
     DualEventPublishingData,
     publish_dual_assessment_events,
@@ -84,6 +88,14 @@ class BatchFinalizer:
                     extra={**log_extra, "batch_id": batch_id},
                 )
                 return
+
+            # Transition the CJ state machine into SCORING once finalization starts
+            await update_batch_state_in_session(
+                session=session,
+                cj_batch_id=batch_id,
+                state=CoreCJState.SCORING,
+                correlation_id=correlation_id,
+            )
 
             # Get essays for scoring
             essays = await self._db.get_essays_for_cj_batch(session=session, cj_batch_id=batch_id)
@@ -162,6 +174,14 @@ class BatchFinalizer:
                 processing_started_at=batch_upload.created_at,
             )
 
+            # Mark the workflow as complete in the fine-grained CJ state machine
+            await update_batch_state_in_session(
+                session=session,
+                cj_batch_id=batch_id,
+                state=CoreCJState.COMPLETED,
+                correlation_id=correlation_id,
+            )
+
             logger.info(
                 "Completed scoring finalization for batch",
                 extra={**log_extra, "batch_id": batch_id, "essay_count": len(essays)},
@@ -201,11 +221,6 @@ class BatchFinalizer:
 
             grade_projector = _gp
 
-        from common_core.status_enums import CJBatchStateEnum as CoreCJState
-
-        from services.cj_assessment_service.cj_core_logic.batch_submission import (
-            update_batch_state_in_session,
-        )
         from services.cj_assessment_service.models_db import CJBatchUpload
 
         try:

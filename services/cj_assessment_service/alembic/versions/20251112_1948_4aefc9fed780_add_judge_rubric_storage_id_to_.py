@@ -35,7 +35,10 @@ def upgrade() -> None:
         "grade_scale",
         existing_type=sa.VARCHAR(length=50),
         comment=None,
-        existing_comment="Grade scale identifier (swedish_8_anchor, eng5_np_legacy_9_step, eng5_np_national_9_step)",
+        existing_comment=(  # noqa: E501
+            "Grade scale identifier (swedish_8_anchor, eng5_np_legacy_9_step, "
+            "eng5_np_national_9_step)"
+        ),
         existing_nullable=False,
         existing_server_default=sa.text("'swedish_8_anchor'::character varying"),
     )
@@ -77,7 +80,10 @@ def upgrade() -> None:
     )
     op.drop_table_comment(
         "assessment_instructions",
-        existing_comment="Stores assessment instructions for AI judges, linked to assignment or course",
+        existing_comment=(
+            "Stores assessment instructions for AI judges, linked to "
+            "assignment or course"
+        ),
         schema=None,
     )
     op.alter_column(
@@ -441,7 +447,10 @@ def downgrade() -> None:
         "anchor_essay_references",
         "grade_scale",
         existing_type=sa.VARCHAR(length=50),
-        comment="Grade scale identifier (swedish_8_anchor, eng5_np_legacy_9_step, eng5_np_national_9_step)",
+        comment=(
+            "Grade scale identifier (swedish_8_anchor, eng5_np_legacy_9_step, "
+            "eng5_np_national_9_step)"
+        ),
         existing_nullable=False,
         existing_server_default=sa.text("'swedish_8_anchor'::character varying"),
     )

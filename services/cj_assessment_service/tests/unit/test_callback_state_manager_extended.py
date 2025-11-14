@@ -242,6 +242,19 @@ class MockRepository(CJRepositoryProtocol):
     async def initialize_db_schema(self) -> None:
         pass
 
+    async def upsert_anchor_reference(
+        self,
+        session: AsyncSession,
+        *,
+        assignment_id: str,
+        anchor_label: str,
+        grade: str,
+        grade_scale: str,
+        text_storage_id: str,
+    ) -> int:
+        """Stub implementation for test mocks."""
+        return 1  # Return a mock anchor ID
+
 
 def create_test_comparison_pair(
     cj_batch_id: int = 1,

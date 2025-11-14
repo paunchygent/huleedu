@@ -157,6 +157,19 @@ class AdminRepositoryMock(CJRepositoryProtocol):
     async def initialize_db_schema(self) -> None:
         raise NotImplementedError("Not needed for admin prompt tests")
 
+    async def upsert_anchor_reference(
+        self,
+        session: AsyncSession,
+        *,
+        assignment_id: str,
+        anchor_label: str,
+        grade: str,
+        grade_scale: str,
+        text_storage_id: str,
+    ) -> int:
+        """Stub implementation for test mocks."""
+        return 1  # Return a mock anchor ID
+
 
 class ContentClientMock(ContentClientProtocol):
     """Content client mock capturing correlation usage."""

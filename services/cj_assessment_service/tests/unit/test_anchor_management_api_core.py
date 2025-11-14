@@ -182,7 +182,7 @@ class TestAnchorRegistrationEndpoint:
     ) -> None:
         mock_repository.register_assignment_context("idempotent-assignment")
 
-        mock_content_client.storage_id = "content-first"
+        mock_content_client.storage_id = "content-first"  # type: ignore[attr-defined]
         request_data = {
             "assignment_id": "idempotent-assignment",
             "grade": "A",
@@ -198,7 +198,7 @@ class TestAnchorRegistrationEndpoint:
         first_anchor_id = first_payload["anchor_id"]
         assert first_payload["storage_id"] == "content-first"
 
-        mock_content_client.storage_id = "content-second"
+        mock_content_client.storage_id = "content-second"  # type: ignore[attr-defined]
         response_second = await client.post("/api/v1/anchors/register", json=request_data)
         assert response_second.status_code == 201
         second_payload = await response_second.get_json()

@@ -10,12 +10,11 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select
-
 from common_core.status_enums import CJBatchStateEnum
 from huleedu_service_libs.error_handling import raise_external_service_error
 from huleedu_service_libs.logging_utils import create_service_logger
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.cj_assessment_service.models_api import ComparisonTask
@@ -393,16 +392,25 @@ async def append_to_failed_pool_atomic(
                     || jsonb_build_object(
                         'failed_comparison_pool',
                         (
-                            COALESCE((processing_metadata->'failed_comparison_pool')::jsonb, '[]'::jsonb)
+                            (COALESCE(
+                                (processing_metadata->'failed_comparison_pool')::jsonb,
+                                '[]'::jsonb
+                            ))
                             || CAST(:entry AS jsonb)
                         ),
                         'pool_statistics',
                         jsonb_build_object(
                             'total_failed',
-                            COALESCE((processing_metadata->'pool_statistics'->>'total_failed')::int, 0)
+                            (COALESCE(
+                                (processing_metadata->'pool_statistics'->>'total_failed')::int,
+                                0
+                            ))
                             + 1,
                             'retry_attempts',
-                            COALESCE((processing_metadata->'pool_statistics'->>'retry_attempts')::int, 0),
+                            COALESCE(
+                                (processing_metadata->'pool_statistics'->>'retry_attempts')::int,
+                                0
+                            ),
                             'last_retry_batch',
                             processing_metadata->'pool_statistics'->>'last_retry_batch',
                             'successful_retries',

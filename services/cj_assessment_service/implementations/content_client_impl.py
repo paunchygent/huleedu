@@ -130,6 +130,8 @@ class ContentClientImpl(ContentClientProtocol):
             url = self.content_service_base_url
             correlation_id = uuid4()
 
+            # TODO(TASK-CONTENT-SERVICE-IDEMPOTENT-UPLOADS): compute a content hash and call
+            # the upcoming lookup-or-create API instead of blindly uploading new blobs.
             async with self.session.post(
                 url,
                 data=content.encode("utf-8"),

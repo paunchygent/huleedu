@@ -143,7 +143,8 @@ class PromptHydrationFailure:
     enabling Result-based error discrimination without raising exceptions.
     """
 
-    reason: str  # "empty_content", "content_service_error", "unexpected_error", "batch_creation_hydration_failed"
+    reason: str  # "empty_content", "content_service_error", "unexpected_error",  # noqa: E501
+    # "batch_creation_hydration_failed"
     storage_id: str | None = None
 
 

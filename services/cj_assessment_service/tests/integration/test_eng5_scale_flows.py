@@ -337,8 +337,9 @@ class TestENG5ScaleFlows:
         assert projection_summary.projections_available, "Should have grade projections available"
 
         # Verify correct scale in calibration info
-        assert projection_summary.calibration_info["grade_scale"] == grade_scale, (
-            f"Expected scale {grade_scale}, got {projection_summary.calibration_info['grade_scale']}"
+        actual_scale = projection_summary.calibration_info["grade_scale"]
+        assert actual_scale == grade_scale, (
+            f"Expected scale {grade_scale}, got {actual_scale}"
         )
 
         # Verify all students got grades
@@ -477,8 +478,9 @@ class TestENG5ScaleFlows:
         assert projection_summary.projections_available, "Should have grade projections available"
 
         # Verify correct scale in calibration info
-        assert projection_summary.calibration_info["grade_scale"] == grade_scale, (
-            f"Expected scale {grade_scale}, got {projection_summary.calibration_info['grade_scale']}"
+        actual_scale = projection_summary.calibration_info["grade_scale"]
+        assert actual_scale == grade_scale, (
+            f"Expected scale {grade_scale}, got {actual_scale}"
         )
 
         # Verify all students got grades

@@ -461,3 +461,16 @@ class MockDatabase(CJRepositoryProtocol):
         """Store grade projections in database."""
         # Mock implementation - no-op for tests
         pass
+
+    async def upsert_anchor_reference(
+        self,
+        session: AsyncSession,
+        *,
+        assignment_id: str,
+        anchor_label: str,
+        grade: str,
+        grade_scale: str,
+        text_storage_id: str,
+    ) -> int:
+        """Stub implementation for test mocks."""
+        return 1  # Return a mock anchor ID

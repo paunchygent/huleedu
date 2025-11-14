@@ -152,6 +152,19 @@ class RepoMock(CJRepositoryProtocol):
     async def initialize_db_schema(self) -> None:
         return None
 
+    async def upsert_anchor_reference(
+        self,
+        session: Any,
+        *,
+        assignment_id: str,
+        anchor_label: str,
+        grade: str,
+        grade_scale: str,
+        text_storage_id: str,
+    ) -> int:
+        """Stub implementation for test mocks."""
+        return 1  # Return a mock anchor ID
+
 
 @pytest.mark.asyncio
 async def test_finalize_single_essay_publishes_and_updates(monkeypatch: Any) -> None:

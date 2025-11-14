@@ -207,9 +207,11 @@ JSON response with winner, justification (max 500 chars), confidence 1-5."""
             print("\n✅ Justification Length Integration Test Passed:")
             print("   - Request successfully queued for async processing")
             print("   - Results will be delivered via Kafka callbacks")
-            print(
-                "   - Justifications up to 500 characters will be accepted during callback processing"
+            msg = (
+                "   - Justifications up to 500 characters will be "
+                "accepted during callback processing"
             )
+            print(msg)
             print(f"   - Correlation ID: {correlation_id}")
 
         except Exception as e:

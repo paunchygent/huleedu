@@ -167,7 +167,8 @@ class TestAnchorUniqueConstraintMigration:
         migration_engine: AsyncEngine,
         migration_session: AsyncSession,
     ) -> None:
-        """Duplicate anchors for same (assignment_id, anchor_label, grade_scale) raise IntegrityError."""
+        """Duplicate anchors for same (assignment_id, anchor_label, grade_scale)."""
+        # raise IntegrityError when duplicate created
         # Ensure schema is migrated
         result = run_alembic_upgrade(migration_postgres_container)
         assert result.returncode == 0, "Migration must succeed before testing constraint"

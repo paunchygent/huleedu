@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
 
@@ -41,6 +42,22 @@ from services.cj_assessment_service.protocols import (
     CJRepositoryProtocol,
     LLMInteractionProtocol,
 )
+
+
+@pytest.fixture(autouse=True)
+def mock_get_batch_state(monkeypatch: pytest.MonkeyPatch) -> AsyncMock:
+    """Patch get_batch_state to avoid hitting the database.
+
+    This fixture is autouse=True so it applies to all tests that use batch_retry_processor.
+    Tests can override the return_value if they need custom metadata.
+    """
+    mock = AsyncMock()
+    mock.return_value = SimpleNamespace(processing_metadata=None)
+    monkeypatch.setattr(
+        "services.cj_assessment_service.cj_core_logic.batch_submission.get_batch_state",
+        mock,
+    )
+    return mock
 
 
 @pytest.fixture
