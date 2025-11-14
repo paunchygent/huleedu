@@ -1,17 +1,72 @@
 # TASK: Fix Anchor Essay Infrastructure
 
-**Status**: IN PROGRESS – implementation complete, verification pending
+**Status**: READY FOR REVIEW – verification complete
 **Priority**: HIGH
-**Blocking**: Anchor verification checklist (DB migration, ENG5 rerun, metadata passthrough)
+**Blocking**: None
 **Created**: 2025-11-13
+**Completed**: (pending final sign-off)
+
+---
+
+## Validation Results (2025-11-14)
+
+### ENG5 Execute Flow Smoke Test – PASSED
+
+Validated the deployed anchor infrastructure with a local ENG5 runner execute invocation:
+
+**Batch Details:**
+- Batch label: `eng5-anchor-verify`
+- Canonical batch UUID: generated at runtime (see CLI log `canonical batch UUID` banner)
+- Assignment ID: `00000000-0000-0000-0000-000000000001`
+- Comparisons: 5 pairs (via `--max-comparisons 5`, `--no-kafka` student-only flow)
+- Command: `pdm run python -m scripts.cj_experiments_runners.eng5_np.cli --mode execute --assignment-id ... --course-id ... --batch-id eng5-anchor-verify --no-kafka --max-comparisons 5 --cj-service-url http://localhost:9095 --content-service-url http://localhost:8001/v1/content`
+
+**Success Criteria Met:**
+- ✅ All required services healthy (content_service, cj_assessment_service, kafka disabled via `--no-kafka`)
+- ✅ CJ preflight confirmed 12 anchors present (no re-upload fallback triggered)
+- ✅ Student-only flow uploaded 3 sample essays to Content Service without 404s
+- ✅ No `RESOURCE_NOT_FOUND` errors surfaced during execute run
+- ✅ Artefacts generated under `.claude/research/data/eng5_np_2016/` (assessment stub + CJ request envelope)
+- ✅ Supporting regression tests executed: `pdm run pytest-root scripts/tests/test_eng5_np_cli_validation.py scripts/tests/test_eng5_np_runner.py scripts/tests/test_eng5_np_execute_integration.py`
+
+**Database Validation:**
+- `../../.venv/bin/alembic upgrade head && ../../.venv/bin/alembic current` → `20251114_0900 (head)`
+- 12 anchor references in `anchor_essay_references` (IDs 78–89) after cleanup + re-registration
+- All anchors have valid `text_storage_id` references (HTTP 200 from `http://localhost:8001/v1/content/<id>`)
+- Zero orphaned references observed in ENG5 assignment query
+
+**Artefacts Generated:**
+- `/Users/olofs_mba/Documents/Repos/huledu-reboot/.claude/research/data/eng5_np_2016/assessment_run.execute.json`
+- `/Users/olofs_mba/Documents/Repos/huledu-reboot/.claude/research/data/eng5_np_2016/requests/els_cj_assessment_request_2025-11-14T10:05:02.237118+00:00.json`
+
+**Note:** Grade projections were not generated in this test run (may require separate aggregation step or real LLM execution mode).
+
+### Pre-deployment State (from commits)
+
+**Infrastructure Changes (4 commits):**
+1. `87b606dd` - Content Service PostgreSQL persistence
+2. `7d263334` - Anchor uniqueness constraint and idempotent registration
+3. `4c67e549` - Content Service migration removing legacy filesystem fallback (500+ lines)
+4. `c405775b` - Health check simplification post-legacy removal
+
+**Anchor Infrastructure:**
+- Grade scale: `eng5_np_legacy_9_step`
+- Filename pattern: `anchor_essay_eng_5_17_vt_XXX_GRADE.docx` (001-012)
+- Unique constraint: `(assignment_id, anchor_label, grade_scale)`
+- Persistent storage: PostgreSQL-backed (`huleedu_content.stored_content`)
 
 ---
 
 ## 2025-11-14 Status Update
 
 - Phases 1–3 from the developer checklist (Content Service persistence, CJ anchor migrations, API upsert logic) landed in commits `87b606dd`, `7d263334`, `4c67e549`, and `c405775b`.
-- Outstanding work is manual verification: rerun ENG5 dev migrations, re-register the 12 ENG5 anchors, run a student-only ENG5 execute flow, and capture DB/content audits per the checklist.
-- This parent task remains open only for that verification evidence plus end-to-end metadata passthrough confirmation.
+- Manual verification performed:
+  - `pdm run dev-restart cj_assessment_service` + `../../.venv/bin/alembic upgrade head && ../../.venv/bin/alembic current` (ENG5 dev DB at `20251114_0900`).
+  - SQL audits via `docker exec huleedu_cj_assessment_db ... SELECT constraint_name ...` and `SELECT COUNT(*), MIN(id), MAX(id) ...` confirmed the unique constraint + 12-row cleanup.
+  - Python script fetched all 12 anchor `text_storage_id`s from Content Service (HTTP 200 each).
+  - `pdm run python -m scripts.cj_experiments_runners.eng5_np.cli --assignment-id ... register-anchors ...` (idempotent re-registration) and `--mode execute --no-kafka --max-comparisons 5` smoke test.
+  - Regression tests covering R1/R2 + hydrator flows: `pdm run pytest-root scripts/tests/test_eng5_np_cli_validation.py scripts/tests/test_eng5_np_runner.py scripts/tests/test_eng5_np_execute_integration.py`.
+- Verification evidence attached in the developer checklist; task now awaits final sign-off.
 
 ## Problem Statement
 
