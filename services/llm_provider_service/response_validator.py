@@ -117,7 +117,18 @@ def validate_and_normalize_response(
 
 
 def _fast_normalize_fields(parsed_data: Dict[str, Any]) -> Dict[str, Any]:
-    """Fast field normalization with minimal overhead."""
+    """Fast field normalization with contract enforcement.
+
+    LLM API Contract: Confidence should be 1-5 scale.
+
+    Contract Violation Handling:
+    - If LLM returns 0-1 scale: Convert to 1-5 (contract normalization)
+    - If LLM returns 1-5 scale: Clamp to range (contract enforcement)
+
+    This ensures downstream conversions work correctly:
+    - Provider: 1-5 → 0-1 (internal mathematical operations)
+    - Queue: 0-1 → 1-5 (event contract for domain language)
+    """
     # Extract fields with defaults
     winner = parsed_data.get("winner", EssayComparisonWinner.ESSAY_A.value)
     justification = parsed_data.get("justification", "Analysis provided")
@@ -131,9 +142,15 @@ def _fast_normalize_fields(parsed_data: Dict[str, Any]) -> Dict[str, Any]:
         else:
             winner = EssayComparisonWinner.ESSAY_A.value
 
-    # Fast confidence normalization
+    # Fast confidence normalization with contract enforcement
     if isinstance(confidence, (int, float)):
-        confidence = min(5.0, max(1.0, float(confidence)))
+        confidence = float(confidence)
+        # Handle contract violations: if LLM returns 0-1 scale instead of 1-5
+        if confidence <= 1.0:
+            # Convert 0-1 → 1-5 to match expected contract
+            confidence = confidence * 4.0 + 1.0
+        # Enforce 1-5 contract
+        confidence = min(5.0, max(1.0, confidence))
     else:
         confidence = 3.0
 
@@ -243,7 +260,9 @@ def _ultra_fast_normalize_fields(parsed_data: Dict[str, Any]) -> Dict[str, Any]:
     else:
         winner = EssayComparisonWinner.ESSAY_A.value
 
-    # Simple confidence clamping
+    # Contract enforcement: handle 0-1 scale violations
+    if confidence <= 1.0:
+        confidence = confidence * 4.0 + 1.0
     confidence = max(1.0, min(5.0, confidence))
 
     # Simple justification handling - accept up to 500 characters

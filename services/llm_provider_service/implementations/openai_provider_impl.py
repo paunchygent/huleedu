@@ -95,8 +95,10 @@ class OpenAIProviderImpl(LLMProviderProtocol):
 
         # Use system prompt from override or default comparison prompt
         system_prompt = (
-            system_prompt_override
-            or "You are an LLM comparison engine. Follow the caller-supplied instructions and ensure your output satisfies the required tool schema."
+            system_prompt_override or (
+                "You are an LLM comparison engine. Follow the caller-supplied "
+                "instructions and ensure your output satisfies the required tool schema."
+            )
         )
 
         # Execute with retry
@@ -263,7 +265,9 @@ class OpenAIProviderImpl(LLMProviderProtocol):
                             else:
                                 winner = EssayComparisonWinner.ERROR
 
-                            # Convert confidence from 1-5 scale to 0-1 scale for internal model
+                            # ARCHITECTURAL BOUNDARY: Convert from LLM contract scale (1-5)
+                            # to internal mathematical scale (0-1) for probability operations.
+                            # Validator ensures input is always 1-5 even if LLM violates contract.
                             confidence_normalized = (validated_response.confidence - 1.0) / 4.0
 
                             # Get token usage

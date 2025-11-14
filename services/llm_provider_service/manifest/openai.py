@@ -36,7 +36,7 @@ OPENAI_MODELS = [
         supports_top_p=False,
         supports_frequency_penalty=False,
         supports_presence_penalty=False,
-        uses_max_completion_tokens=False,
+        uses_max_completion_tokens=True,
         capabilities={
             "function_calling": True,
             "json_mode": True,
@@ -66,7 +66,7 @@ OPENAI_MODELS = [
         supports_top_p=False,
         supports_frequency_penalty=False,
         supports_presence_penalty=False,
-        uses_max_completion_tokens=False,
+        uses_max_completion_tokens=True,
         capabilities={
             "function_calling": True,
             "json_mode": True,
@@ -96,7 +96,7 @@ OPENAI_MODELS = [
         supports_top_p=False,
         supports_frequency_penalty=False,
         supports_presence_penalty=False,
-        uses_max_completion_tokens=False,
+        uses_max_completion_tokens=True,
         capabilities={
             "function_calling": True,
             "json_mode": True,

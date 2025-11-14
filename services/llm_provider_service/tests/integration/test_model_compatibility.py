@@ -14,10 +14,13 @@ Test Coverage:
 
 Usage:
     # Run without financial tests (free tests only)
-    pdm run pytest-root services/llm_provider_service/tests/integration/test_model_compatibility.py -v
+    pdm run pytest-root \\
+        services/llm_provider_service/tests/integration/test_model_compatibility.py -v
 
     # Run with financial tests (incurs API costs)
-    CHECK_NEW_MODELS=1 pdm run pytest-root services/llm_provider_service/tests/integration/test_model_compatibility.py -v -m "financial"
+    CHECK_NEW_MODELS=1 pdm run pytest-root \\
+        services/llm_provider_service/tests/integration/test_model_compatibility.py \\
+        -v -m "financial"
 """
 
 from __future__ import annotations
@@ -151,8 +154,9 @@ class TestAnthropicModelCompatibility:
 
         # Validate justification quality
         assert len(response.justification) > 0, "Justification should be non-empty"
-        assert len(response.justification) <= 500, (
-            f"Justification accepted up to max 500 chars by validator, got: {len(response.justification)}"
+        just_len = len(response.justification)
+        assert just_len <= 500, (
+            f"Justification accepted up to max 500 chars by validator, got: {just_len}"
         )
         assert isinstance(response.justification, str), "Justification must be string"
 
@@ -217,8 +221,8 @@ class TestAnthropicModelCompatibility:
             assert field in response_json, f"Required field '{field}' missing from response"
 
         # Verify winner is valid enum value
-        assert response.winner.value in ["essay_a", "essay_b"], (
-            f"Winner enum should have value essay_a or essay_b, got: {response.winner.value}"
+        assert response.winner.value in ["Essay A", "Essay B"], (
+            f"Winner enum should have value 'Essay A' or 'Essay B', got: {response.winner.value}"
         )
 
     @pytest.mark.integration
@@ -364,10 +368,14 @@ class TestOpenAIModelCompatibility:
         assert response is not None
         assert response.winner in [EssayComparisonWinner.ESSAY_A, EssayComparisonWinner.ESSAY_B]
         assert len(response.justification) > 0, "Justification should be non-empty"
-        assert len(response.justification) <= 500, (
-            f"Justification accepted up to max 500 chars by validator, got: {len(response.justification)}"
+        just_len = len(response.justification)
+        assert just_len <= 500, (
+            f"Justification accepted up to max 500 chars by validator, got: {just_len}"
         )
-        assert 1.0 <= response.confidence <= 5.0
+        # Internal model uses 0-1 scale (converted from LLM's 1-5 scale)
+        assert 0.0 <= response.confidence <= 1.0, (
+            f"Internal model should use 0-1 scale, got: {response.confidence}"
+        )
         assert response.model == model_config.model_id
         assert response.provider == "openai"
         assert response.prompt_tokens > 0
