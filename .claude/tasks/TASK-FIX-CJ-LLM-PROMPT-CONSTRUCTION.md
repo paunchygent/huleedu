@@ -12,9 +12,9 @@
 
 ## Status
 
-**IN PROGRESS** – Phase 2 COMPLETE ✅, Phase 1 NOT STARTED
+**IN PROGRESS** – Phase 2 COMPLETE , Phase 1 CORE IMPLEMENTATION COMPLETE (validation pending)
 
-**2025-11-13 session notes**
+**2025-11-14 status notes**
 - **Phase 2 COMPLETE**: Essay duplication removal fully implemented and tested
   - Removed essay_a/essay_b fields from LLMComparisonRequest (clean refactor, 14 files updated)
   - All tests passing (400/400 CJ Assessment, 62/62 LLM Provider, 9/9 integration)
@@ -22,7 +22,7 @@
   - Redis queue flushed (stale requests cleared)
   - Bug fixes: mock_provider_impl.py token calculation, circuit_breaker signature, comparison_processing scope issue
   - Essays now sent once (embedded in user_prompt only), achieving ~50% token reduction for essay content
-- **Phase 1 NOT STARTED**: Student assignment prompt separation remains for future work
+- **Phase 1 CORE IMPLEMENTATION COMPLETE**: Student assignment vs judge rubric separation implemented in CJ service (assessment_instructions.judge_rubric_storage_id, event_processor prompt/rubric hydration, batch_preparation metadata, pair_generation assessment context + prompt builder). Remaining work is end-to-end ENG5 validation and documentation cleanup.
 - Identity dev issuer now signs HS256 tokens, so CJ admin CLI can log in directly (no manual `CJ_ADMIN_TOKEN`)
 - `_fetch_assessment_context()` ships with rubric-detection heuristics; see `services/cj_assessment_service/cj_core_logic/pair_generation.py`
 
@@ -324,12 +324,12 @@ manual `CJ_ADMIN_TOKEN` override.
     --assignment-id 00000000-0000-0000-0000-000000000001 \
     --rubric-file "test_uploads/ANCHOR ESSAYS/ROLE_MODELS_ENG5_NP_2016/llm_prompt_cj_assessment_eng5.md"
   ```
-- [ ] **Update `_fetch_assessment_context()`** to hydrate both prompts
+- [x] **Update `_fetch_assessment_context()`** to hydrate both prompts
   - File: `services/cj_assessment_service/cj_core_logic/pair_generation.py:153-228`
   - Fetch `student_prompt_storage_id` → student assignment (existing)
   - Fetch `judge_rubric_storage_id` → judge instructions (NEW)
   - Return both in context dict
-- [ ] **Update `_build_comparison_prompt()`** to use correct labels
+- [x] **Update `_build_comparison_prompt()`** to use correct labels
   - File: `services/cj_assessment_service/cj_core_logic/pair_generation.py:231-269`
   - "Assignment Prompt" → `student_prompt_text` (actual assignment)
   - "Assessment Rubric" → `judge_rubric` (from config/settings)
@@ -397,7 +397,7 @@ manual `CJ_ADMIN_TOKEN` override.
 2. **Leftover Code (Resolved)**: Unused `start_time` parameter and `raise_validation_error` import removed during cleanup
 3. **Queue Migration Risk (Resolved)**: Redis queue flushed successfully (2025-11-13) - stale requests cleared, safe to deploy
 
-#### 2d. Tests ✅ COMPLETE (2025-11-13)
+#### 2d. Tests 
 - [x] **Unit tests**: Updated 13 test files (64 occurrences)
   - LLM Provider Service: test_comparison_processor.py (30), test_orchestrator.py (10), test_mock_provider.py (10), test_queue_processor_error_handling.py (6), test_callback_publishing.py (4), test_api_routes_simple.py (4)
   - CJ Assessment Service: test_llm_provider_service_client.py (deleted 3 test methods for removed _extract_essays_from_prompt, updated request validation)
@@ -436,7 +436,7 @@ manual `CJ_ADMIN_TOKEN` override.
 {content}
 ```
 
-**Final Test Results:** ✅
+**Final Test Results:** 
 - All tests passing: 400/400 CJ Assessment unit tests, 62/62 LLM Provider unit tests, 9/9 integration tests
 - Type checking: Passing (only 1 pre-existing unrelated error in identity_service)
 
@@ -502,7 +502,7 @@ manual `CJ_ADMIN_TOKEN` override.
 
 ## Architecture Decisions (RESOLVED)
 
-### 1. Student Assignment Prompt Source → **Option B** ✅
+### 1. Student Assignment Prompt Source → **Option B** 
 
 **Decision**: Store in `assessment_instructions` table, already wired correctly.
 
@@ -526,7 +526,7 @@ manual `CJ_ADMIN_TOKEN` override.
 `eng5_np_vt_2017_essay_instruction.md`, then re-upload prompts/rubrics for the ENG5 assignment and
 only build a migration if future data drifts again.
 
-### 2. Metadata Field Naming → **Keep Existing + Fix Data** ✅
+### 2. Metadata Field Naming → **Keep Existing + Fix Data** 
 
 **Decision**: Keep `student_prompt_text` field name, fix data loaded into it.
 
@@ -537,7 +537,7 @@ only build a migration if future data drifts again.
 
 **Rationale**: The field name is correct - the data we load into it is wrong.
 
-### 3. Duplication Fix → **Option B with Contract Coordination** ✅
+### 3. Duplication Fix → **Option B with Contract Coordination** 
 
 **Decision**: CJ sends complete prompt, LLM Provider uses as-is.
 
@@ -569,7 +569,7 @@ only build a migration if future data drifts again.
 
 **Coordination Requirement**: Feature branch spanning both services, updated in lockstep.
 
-### 4. Backwards Compatibility → **Data Migration Required** ✅
+### 4. Backwards Compatibility → **Data Migration Required** 
 
 **Problem**: Existing `processing_metadata` contains wrong content in `student_prompt_text`.
 
@@ -589,7 +589,7 @@ WHERE processing_metadata->>'student_prompt_text' LIKE 'You are an impartial%';
 
 ## Success Criteria
 
-**Phase 2 (Essay Duplication Removal):** ✅ COMPLETE
+**Phase 2 (Essay Duplication Removal):** 
 - [x] Essays appear exactly once in prompts
 - [x] Token usage for essay content reduced by ~50%
 - [x] All tests pass (400/400 CJ Assessment, 62/62 LLM Provider, 9/9 integration)
@@ -597,15 +597,15 @@ WHERE processing_metadata->>'student_prompt_text' LIKE 'You are an impartial%';
 - [x] Documentation updated
 - [x] Redis queue cleared of stale requests
 
-**Phase 1 (Student Assignment Prompt Separation):** ⏸️ NOT STARTED
-- [ ] LLM prompts include actual student assignment prompt in "Student Assignment" section
-- [ ] LLM prompts include assessment rubric in "Assessment Rubric" section
-- [ ] End-to-end validation test succeeds with correct prompt structure
+**Phase 1 (Student Assignment Prompt Separation):** 
+- [x] LLM prompts include actual student assignment prompt in "Student Assignment" section for batches with correct `student_prompt_storage_id`
+- [x] LLM prompts include assessment rubric / judge instructions in dedicated sections when configured
+- [ ] End-to-end validation test succeeds with correct prompt structure (ENG5 runner flow + log inspection)
 
-## Current Status Summary (2025-11-13)
+## Current Status Summary (2025-11-14)
 
 **What's Complete:**
-- ✅ **Phase 2: Essay Duplication Removal** - Fully implemented, tested, and ready
+- **Phase 2: Essay Duplication Removal** - Fully implemented, tested, and ready
   - Clean refactor: removed essay_a/essay_b from LLM Provider Service contract
   - All 471 tests passing across both services
   - Type checking passing
@@ -613,10 +613,10 @@ WHERE processing_metadata->>'student_prompt_text' LIKE 'You are an impartial%';
   - Token usage reduced by ~50% for essay content
 
 **What Remains:**
-- ⏸️ **Phase 1: Student Assignment Prompt Separation** - Design complete, implementation pending
-  - Separate student-facing assignment prompt from LLM judge rubric
-  - Update prompt construction to include both correctly labeled sections
-  - See Phase 1 checklist above for implementation details
+- **Phase 1: Student Assignment Prompt Separation** - Core CJ service implementation complete; remaining work is end-to-end ENG5 validation and documentation
+  - Exercise ENG5 runner validation scenario and inspect CJ/LLM logs for correct prompt structure
+  - Keep docs (HANDOFF, ASSIGNMENT_SETUP.md, this task) in sync with the implemented prompt separation
+  - See Phase 1 checklist above for remaining items (CLI uploads, targeted tests, optional data migration)
 
 **Next Session:**
 If continuing with Phase 1, start at "Phase 1: Fix Prompt Source (CJ Assessment Service)" section.

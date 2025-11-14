@@ -10,11 +10,26 @@
 
 ## Status
 
-**NOT STARTED** – Awaiting assignment
+**IN PROGRESS** – Awaiting ENG5 anchor verification + runner implementation kickoff
 
 ## Context
 
 Recent validation exposed several incorrect ENG5 runner assumptions that mask configuration bugs, duplicate assets, and block automated verification. The runner should guide contributors toward valid CJ Assessment requests rather than silently emitting unusable payloads.
+
+## Prerequisite Status (2025-11-14)
+
+- Anchor infrastructure fixes (Content Service PostgreSQL store, CJ anchor upsert + uniqueness) landed in commits `87b606dd`, `7d263334`, `4c67e549`, and `c405775b` and are ready for runner consumption.
+- Manual verification from `TASK-FIX-ANCHOR-ESSAY-INFRASTRUCTURE-CHECKLIST.md` is pending (ENG5 dev DB migration rerun, anchor re-registration, ENG5 execute smoke test). Runner changes that assume canonical anchors should wait for this evidence or run in parallel with clear coordination.
+- Proceed with runner hardening under the assumption that anchor uploads are now service-managed; remove any ENG5-side dedupe once verification confirms the DB contains the expected 12 anchors with valid `text_storage_id`s.
+
+## Immediate Next Actions
+
+1. Close out anchor verification checklist items (DB migration audit, ENG5 anchor re-registration, student-only ENG5 execute run, metadata passthrough proof) so the runner can rely on canonical anchors without fallback code.
+2. Implement Checkpoint 1 (R1/R2) by enforcing comparison-count validation and switching `execute` runs to always emit a canonical `batch_uuid`, with updated artefacts/tests.
+3. Implement Checkpoint 2 (R3) by wiring CJ assignment metadata lookups into `plan/execute/register-anchors`, surfacing slug + grade_scale, and hard-failing unknown assignments before Kafka publication.
+4. Implement Checkpoint 3 (R4/R5) to remove automatic anchor uploads, add a CJ anchor preflight, and introduce `--auto-extract-eng5-db` tied to `--await-completion`, including smoke coverage.
+5. Complete Checkpoint 4 (R6) by documenting grade-scale ownership in CJ, updating ENG5 examples accordingly, and filing any CJ-side follow-ups discovered during the research pass.
+6. Complete Checkpoint 5 (R7 Phase 1–2) by documenting the current essay-upload flow, then adding manifest-level caching with a `--force-reupload` override plus unit coverage.
 
 This task hardens the ENG5 runner as a **strict validating orchestrator**: it validates inputs, resolves authoritative metadata from CJ APIs, and emits well-formed batches without owning persistence rules that belong in services.
 

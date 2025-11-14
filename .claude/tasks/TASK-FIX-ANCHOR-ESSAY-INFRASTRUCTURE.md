@@ -1,11 +1,17 @@
 # TASK: Fix Anchor Essay Infrastructure
 
-**Status**: NOT STARTED
+**Status**: IN PROGRESS – implementation complete, verification pending
 **Priority**: HIGH
-**Blocking**: End-to-end metadata passthrough testing
+**Blocking**: Anchor verification checklist (DB migration, ENG5 rerun, metadata passthrough)
 **Created**: 2025-11-13
 
 ---
+
+## 2025-11-14 Status Update
+
+- Phases 1–3 from the developer checklist (Content Service persistence, CJ anchor migrations, API upsert logic) landed in commits `87b606dd`, `7d263334`, `4c67e549`, and `c405775b`.
+- Outstanding work is manual verification: rerun ENG5 dev migrations, re-register the 12 ENG5 anchors, run a student-only ENG5 execute flow, and capture DB/content audits per the checklist.
+- This parent task remains open only for that verification evidence plus end-to-end metadata passthrough confirmation.
 
 ## Problem Statement
 

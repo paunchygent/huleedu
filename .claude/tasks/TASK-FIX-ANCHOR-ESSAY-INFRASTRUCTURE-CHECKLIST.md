@@ -6,6 +6,13 @@ It is intended for the engineer implementing the fix and verifying that ENG5 / C
 
 ---
 
+## Verification Outstanding (2025-11-14)
+
+- DB verification steps (run migration against ENG5 dev DB, confirm unique constraint, capture SQL output) are still unchecked in Section 2 of Phase 2.
+- End-to-end ENG5 checks remain: re-register the 12 ENG5 anchors, execute a student-only ENG5 run, and ensure no Content Service 404s.
+- Final success checklist items still open: confirm the DB row count (12 rows), validate every `text_storage_id`, capture a clean batch run, and run the metadata passthrough test.
+- Task closure now depends solely on capturing the above evidence; all implementation bullets through Phase 3 are complete.
+
 ## Phase 1 – Content Service: Database-backed storage
 
 ### 1. Implement models and protocols
