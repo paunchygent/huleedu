@@ -49,6 +49,7 @@ def write_stub_artefact(
             "git_sha": settings.git_sha,
             "generated_at": dt.datetime.now(dt.timezone.utc).isoformat(),
             "runner_mode": settings.mode.value,
+            "batch_uuid": str(settings.batch_uuid),
             "batch_id": settings.batch_id,
             "course_code": settings.course_code.value,
             "llm_config_overrides": settings.llm_overrides.model_dump()

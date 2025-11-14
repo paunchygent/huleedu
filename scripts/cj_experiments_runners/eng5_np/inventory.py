@@ -106,6 +106,40 @@ def ensure_execute_requirements(inventory: RunnerInventory) -> None:
         raise FileNotFoundError(f"Execute mode prerequisites not met:\n - {joined}")
 
 
+class ComparisonValidationError(ValueError):
+    """Raised when ENG5 comparison inputs cannot yield valid pairs."""
+
+
+def ensure_comparison_capacity(
+    *,
+    anchors: DirectorySnapshot,
+    students: DirectorySnapshot,
+    max_comparisons: int | None,
+) -> None:
+    """Validate that CLI arguments can yield at least one comparison."""
+
+    if max_comparisons is not None and max_comparisons < 2:
+        raise ComparisonValidationError(
+            "--max-comparisons must be at least 2 to produce anchor × student pairs."
+            " Set a higher value or omit the flag to use the full dataset."
+        )
+
+    anchor_count = anchors.count
+    student_count = students.count
+    if anchor_count == 0 or student_count == 0:
+        messages: list[str] = []
+        if anchor_count == 0:
+            messages.append(f"No anchor essays found in {anchors.root}.")
+        if student_count == 0:
+            messages.append(f"No student essays found in {students.root}.")
+        pairs = anchor_count * student_count
+        messages.append(
+            "Anchor × student comparisons currently total 0; add files or update the dataset "
+            "before running ENG5 batch modes."
+        )
+        raise ComparisonValidationError(" ".join(messages))
+
+
 def print_inventory(inventory: RunnerInventory) -> None:
     """Emit a human-readable summary for plan mode."""
 
@@ -217,8 +251,18 @@ def apply_comparison_limit(
 ) -> tuple[list[FileRecord], list[FileRecord], int | None]:
     """Return slices respecting the requested comparison limit."""
 
+    if not anchors or not students:
+        raise ComparisonValidationError(
+            "At least one anchor and one student essay are required to compute comparisons."
+        )
+
     if max_comparisons is None:
         return list(anchors), list(students), None
+
+    if max_comparisons < 2:
+        raise ComparisonValidationError(
+            "--max-comparisons must be >= 2 so the runner can build at least one pair."
+        )
 
     per_dimension = math.ceil(math.sqrt(max_comparisons))
     limited_anchors = list(anchors[:per_dimension])

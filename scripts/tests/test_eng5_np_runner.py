@@ -162,6 +162,7 @@ def test_write_stub_creates_schema_compliant_file(tmp_path: Path) -> None:
         output_dir=tmp_path / "output",
         runner_version="0.1.0",
         git_sha="deadbeef",
+        batch_uuid=uuid.UUID(int=4),
         batch_id="batch-1",
         user_id="user-1",
         org_id="org-1",
@@ -212,10 +213,15 @@ def test_compose_cj_request_generates_envelope(tmp_path: Path) -> None:
     student_dir.mkdir()
     essay_file = student_dir / "JA24.docx"
     essay_file.write_text("essay", encoding="utf-8")
+    anchor_dir = tmp_path / "anchors"
+    anchor_dir.mkdir()
+    anchor_file = anchor_dir / "AK24.docx"
+    anchor_file.write_text("anchor essay", encoding="utf-8")
 
     FileRecord.from_path(prompt)
+    anchor_records = [FileRecord.from_path(anchor_file)]
     essay_records = [FileRecord.from_path(essay_file)]
-    essay_refs = build_essay_refs(anchors=[], students=essay_records)
+    essay_refs = build_essay_refs(anchors=anchor_records, students=essay_records)
 
     settings = RunnerSettings(
         assignment_id=uuid.UUID(int=1),
@@ -226,6 +232,7 @@ def test_compose_cj_request_generates_envelope(tmp_path: Path) -> None:
         output_dir=tmp_path / "out",
         runner_version="0.1.0",
         git_sha="deadbeef",
+        batch_uuid=uuid.UUID(int=5),
         batch_id="batch-42",
         user_id="user-42",
         org_id="org-42",
@@ -277,11 +284,13 @@ def test_build_essay_refs_prefers_uploaded_storage_ids(tmp_path: Path) -> None:
 
 def test_hydrator_appends_llm_comparison_and_manifest(tmp_path: Path) -> None:
     artefact_path = _write_base_artefact(tmp_path)
+    batch_uuid = uuid.uuid4()
     hydrator = AssessmentRunHydrator(
         artefact_path=artefact_path,
         output_dir=tmp_path,
         grade_scale="eng5_np_legacy_9_step",
         batch_id="batch-llm",
+        batch_uuid=batch_uuid,
     )
 
     llm_event = LLMComparisonResultV1(
@@ -300,7 +309,7 @@ def test_hydrator_appends_llm_comparison_and_manifest(tmp_path: Path) -> None:
         completed_at=dt.datetime.now(dt.timezone.utc),
         trace_id="trace",
         request_metadata={
-            "batch_id": "batch-llm",
+            "batch_id": str(batch_uuid),
             "essay_a_id": "A1",
             "essay_b_id": "B1",
             "prompt_sha256": "a" * 64,
@@ -329,11 +338,13 @@ def test_hydrator_appends_llm_comparison_and_manifest(tmp_path: Path) -> None:
 
 def test_hydrator_applies_assessment_results(tmp_path: Path) -> None:
     artefact_path = _write_base_artefact(tmp_path)
+    batch_uuid = uuid.uuid4()
     hydrator = AssessmentRunHydrator(
         artefact_path=artefact_path,
         output_dir=tmp_path,
         grade_scale="eng5_np_legacy_9_step",
         batch_id="batch-results",
+        batch_uuid=batch_uuid,
     )
 
     essay = EssayResultV1(
@@ -351,7 +362,7 @@ def test_hydrator_applies_assessment_results(tmp_path: Path) -> None:
     )
 
     assessment_event = AssessmentResultV1(
-        batch_id="batch-results",
+        batch_id=str(batch_uuid),
         cj_assessment_job_id="cj-1",
         assessment_method="cj_assessment",
         model_used="claude",
@@ -383,11 +394,13 @@ def test_hydrator_applies_assessment_results(tmp_path: Path) -> None:
 
 def test_hydrator_deduplicates_comparison_events(tmp_path: Path) -> None:
     artefact_path = _write_base_artefact(tmp_path)
+    batch_uuid = uuid.uuid4()
     hydrator = AssessmentRunHydrator(
         artefact_path=artefact_path,
         output_dir=tmp_path,
         grade_scale="eng5_np_legacy_9_step",
         batch_id="batch-dup",
+        batch_uuid=batch_uuid,
     )
 
     llm_event = LLMComparisonResultV1(
@@ -406,7 +419,7 @@ def test_hydrator_deduplicates_comparison_events(tmp_path: Path) -> None:
         completed_at=dt.datetime.now(dt.timezone.utc),
         trace_id="trace",
         request_metadata={
-            "batch_id": "batch-dup",
+            "batch_id": str(batch_uuid),
             "essay_a_id": "A1",
             "essay_b_id": "B1",
             "prompt_sha256": "b" * 64,
@@ -429,11 +442,13 @@ def test_hydrator_deduplicates_comparison_events(tmp_path: Path) -> None:
 
 def test_hydrator_raises_when_prompt_hash_missing(tmp_path: Path) -> None:
     artefact_path = _write_base_artefact(tmp_path)
+    batch_uuid = uuid.uuid4()
     hydrator = AssessmentRunHydrator(
         artefact_path=artefact_path,
         output_dir=tmp_path,
         grade_scale="eng5_np_legacy_9_step",
         batch_id="batch-missing",
+        batch_uuid=batch_uuid,
     )
 
     llm_event = LLMComparisonResultV1(
@@ -452,7 +467,7 @@ def test_hydrator_raises_when_prompt_hash_missing(tmp_path: Path) -> None:
         completed_at=dt.datetime.now(dt.timezone.utc),
         trace_id="trace",
         request_metadata={
-            "batch_id": "batch-missing",
+            "batch_id": str(batch_uuid),
             "essay_a_id": "A1",
             "essay_b_id": "B1",
         },
@@ -511,6 +526,7 @@ def test_stub_validates_against_schema(tmp_path: Path) -> None:
         output_dir=tmp_path / "output",
         runner_version="0.1.0",
         git_sha="deadbeef",
+        batch_uuid=uuid.uuid4(),
         batch_id="batch-schema",
         user_id="user",
         org_id="org",

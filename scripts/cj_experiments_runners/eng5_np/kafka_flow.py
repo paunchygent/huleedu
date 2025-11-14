@@ -34,6 +34,7 @@ async def publish_envelope_to_kafka(
 
     logger = _LOGGER.bind(
         batch_id=settings.batch_id,
+        batch_uuid=str(settings.batch_uuid),
         kafka_client_id=settings.kafka_client_id,
         kafka_bootstrap=settings.kafka_bootstrap,
         runner_mode=settings.mode.value,
@@ -54,7 +55,7 @@ async def publish_envelope_to_kafka(
         await kafka_bus.publish(
             topic=topic_name(ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED),
             envelope=envelope,
-            key=envelope.data.entity_id,
+            key=str(settings.batch_uuid),
         )
         logger.info(
             "kafka_publish_success",
@@ -76,6 +77,7 @@ async def run_publish_and_capture(
 
     logger = _LOGGER.bind(
         batch_id=settings.batch_id,
+        batch_uuid=str(settings.batch_uuid),
         kafka_client_id=settings.kafka_client_id,
         kafka_bootstrap=settings.kafka_bootstrap,
         await_completion=settings.await_completion,
@@ -133,7 +135,8 @@ class AssessmentEventCollector:
         self._started_at: float | None = None
         self._logger = _LOGGER.bind(
             batch_id=settings.batch_id,
-            kafka_group=f"{settings.kafka_client_id}-eng5np-{settings.batch_id}",
+            batch_uuid=str(settings.batch_uuid),
+            kafka_group=f"{settings.kafka_client_id}-eng5np-{settings.batch_uuid}",
             kafka_client_id=settings.kafka_client_id,
             kafka_bootstrap=settings.kafka_bootstrap,
             runner_mode=settings.mode.value,
@@ -157,7 +160,7 @@ class AssessmentEventCollector:
         consumer = AIOKafkaConsumer(
             *topics,
             bootstrap_servers=self.settings.kafka_bootstrap,
-            group_id=f"{self.settings.kafka_client_id}-eng5np-{self.settings.batch_id}",
+            group_id=f"{self.settings.kafka_client_id}-eng5np-{self.settings.batch_uuid}",
             enable_auto_commit=False,
             auto_offset_reset="latest",
             session_timeout_ms=45000,
@@ -235,13 +238,15 @@ class AssessmentEventCollector:
             return False
 
         topic = record.topic
+        target_batch = str(self.settings.batch_uuid)
+
         if topic == topic_name(ProcessingEvent.LLM_COMPARISON_RESULT):
             envelope = EventEnvelope[LLMComparisonResultV1].model_validate_json(payload)
             result_data = LLMComparisonResultV1.model_validate(envelope.data)
             envelope.data = result_data  # Update envelope with validated model
             metadata = result_data.request_metadata or {}
             batch_hint = metadata.get("batch_id") or metadata.get("bos_batch_id")
-            if batch_hint and batch_hint != self.settings.batch_id:
+            if batch_hint and batch_hint != target_batch:
                 self._logger.debug(
                     "comparison_event_skipped",
                     request_id=result_data.request_id,
@@ -262,7 +267,7 @@ class AssessmentEventCollector:
             envelope = EventEnvelope[CJAssessmentCompletedV1].model_validate_json(payload)
             completion_data = CJAssessmentCompletedV1.model_validate(envelope.data)
             envelope.data = completion_data  # Update envelope with validated model
-            if completion_data.entity_id != self.settings.batch_id:
+            if completion_data.entity_id != target_batch:
                 self._logger.debug(
                     "completion_event_skipped",
                     event_batch=completion_data.entity_id,
@@ -284,7 +289,7 @@ class AssessmentEventCollector:
             envelope = EventEnvelope[AssessmentResultV1].model_validate_json(payload)
             result_data = AssessmentResultV1.model_validate(envelope.data)
             envelope.data = result_data  # Update envelope with validated model
-            if result_data.batch_id != self.settings.batch_id:
+            if result_data.batch_id != target_batch:
                 self._logger.debug(
                     "assessment_result_skipped",
                     event_batch=result_data.batch_id,

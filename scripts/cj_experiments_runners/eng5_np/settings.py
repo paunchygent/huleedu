@@ -29,6 +29,7 @@ class RunnerSettings:
     output_dir: Path
     runner_version: str
     git_sha: str
+    batch_uuid: uuid.UUID
     batch_id: str
     user_id: str
     org_id: str | None

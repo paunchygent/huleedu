@@ -86,6 +86,7 @@ def _create_test_environment(tmp_path: Path) -> tuple[RunnerPaths, RunnerSetting
     )
 
     # Create settings for execute mode
+    batch_uuid = uuid.uuid4()
     settings = RunnerSettings(
         assignment_id=uuid.uuid4(),
         course_id=uuid.uuid4(),
@@ -95,6 +96,7 @@ def _create_test_environment(tmp_path: Path) -> tuple[RunnerPaths, RunnerSetting
         output_dir=output_dir,
         runner_version="0.1.0",
         git_sha="deadbeef",  # Valid git SHA format
+        batch_uuid=batch_uuid,
         batch_id="batch-execute-test",
         user_id="test-user",
         org_id="test-org",
@@ -218,6 +220,7 @@ def test_execute_mode_complete_artefact(tmp_path: Path) -> None:
     """
     # Create test environment
     paths, settings = _create_test_environment(tmp_path)
+    canonical_batch = str(settings.batch_uuid)
     inventory = collect_inventory(paths)
 
     # Write stub artefact
@@ -238,6 +241,7 @@ def test_execute_mode_complete_artefact(tmp_path: Path) -> None:
         output_dir=settings.output_dir,
         grade_scale=settings.grade_scale,
         batch_id=settings.batch_id,
+        batch_uuid=settings.batch_uuid,
     )
 
     # Apply LLM comparison events (3 comparisons)
@@ -250,7 +254,7 @@ def test_execute_mode_complete_artefact(tmp_path: Path) -> None:
 
     for essay_a_id, essay_b_id, winner, request_id in comparisons:
         envelope = _create_llm_comparison_envelope(
-            batch_id=settings.batch_id,
+            batch_id=canonical_batch,
             request_id=request_id,
             essay_a_id=essay_a_id,
             essay_b_id=essay_b_id,
@@ -303,7 +307,7 @@ def test_execute_mode_complete_artefact(tmp_path: Path) -> None:
     ]
 
     result_envelope = _create_assessment_result_envelope(
-        batch_id=settings.batch_id,
+        batch_id=canonical_batch,
         essay_results=essay_results,
     )
     hydrator.apply_assessment_result(result_envelope)
@@ -362,6 +366,7 @@ def test_execute_mode_timeout_scenario(tmp_path: Path) -> None:
     """
     # Create test environment
     paths, settings = _create_test_environment(tmp_path)
+    canonical_batch = str(settings.batch_uuid)
     inventory = collect_inventory(paths)
 
     # Write stub artefact
@@ -378,11 +383,12 @@ def test_execute_mode_timeout_scenario(tmp_path: Path) -> None:
         output_dir=settings.output_dir,
         grade_scale=settings.grade_scale,
         batch_id=settings.batch_id,
+        batch_uuid=settings.batch_uuid,
     )
 
     # Apply only one LLM comparison (incomplete)
     envelope = _create_llm_comparison_envelope(
-        batch_id=settings.batch_id,
+        batch_id=canonical_batch,
         request_id="req-timeout",
         essay_a_id="A1",
         essay_b_id="S1",
@@ -435,6 +441,7 @@ def test_execute_mode_schema_validation(tmp_path: Path) -> None:
 
     # Create test environment
     paths, settings = _create_test_environment(tmp_path)
+    canonical_batch = str(settings.batch_uuid)
     inventory = collect_inventory(paths)
 
     # Load schema
@@ -490,11 +497,13 @@ def test_hydrator_metadata_validation_enforced(tmp_path: Path) -> None:
     artefact_path = tmp_path / "test.json"
     artefact_path.write_text(json.dumps(artefact), encoding="utf-8")
 
+    batch_uuid = uuid.uuid4()
     hydrator = AssessmentRunHydrator(
         artefact_path=artefact_path,
         output_dir=tmp_path,
         grade_scale="eng5_np_legacy_9_step",
         batch_id="batch-validation",
+        batch_uuid=batch_uuid,
     )
 
     # Create envelope with missing prompt_sha256
@@ -514,7 +523,7 @@ def test_hydrator_metadata_validation_enforced(tmp_path: Path) -> None:
         completed_at=dt.datetime.now(dt.timezone.utc),
         trace_id="trace",
         request_metadata={
-            "batch_id": "batch-validation",
+            "batch_id": str(batch_uuid),
             "essay_a_id": "A1",
             "essay_b_id": "B1",
             # Missing prompt_sha256!

@@ -26,10 +26,12 @@ from scripts.cj_experiments_runners.eng5_np.environment import (
 )
 from scripts.cj_experiments_runners.eng5_np.hydrator import AssessmentRunHydrator
 from scripts.cj_experiments_runners.eng5_np.inventory import (
+    ComparisonValidationError,
     FileRecord,
     apply_comparison_limit,
     build_essay_refs,
     collect_inventory,
+    ensure_comparison_capacity,
     ensure_execute_requirements,
     print_inventory,
     snapshot_directory,
@@ -372,6 +374,7 @@ def main(
         output_dir=output_dir or paths.artefact_output_dir,
         runner_version=__version__,
         git_sha=gather_git_sha(repo_root),
+        batch_uuid=uuid.uuid4(),
         batch_id=batch_id,
         user_id=user_id,
         org_id=org_id,
@@ -396,6 +399,12 @@ def main(
 
     logger = setup_cli_logger(settings=settings)
 
+    typer.echo(
+        "Canonical batch UUID: "
+        f"{settings.batch_uuid} (label: {settings.batch_id})",
+        err=True,
+    )
+
     logger.info(
         "runner_invocation",
         assignment_id=str(settings.assignment_id),
@@ -408,6 +417,25 @@ def main(
     )
 
     inventory = collect_inventory(paths)
+
+    try:
+        ensure_comparison_capacity(
+            anchors=inventory.anchor_docs,
+            students=inventory.student_docs,
+            max_comparisons=settings.max_comparisons,
+        )
+    except ComparisonValidationError as exc:
+        typer.echo("❌ Comparison validation failed:", err=True)
+        typer.echo(f"   {exc}", err=True)
+        typer.echo(
+            f"   Anchors found: {inventory.anchor_docs.count} in {inventory.anchor_docs.root}",
+            err=True,
+        )
+        typer.echo(
+            f"   Students found: {inventory.student_docs.count} in {inventory.student_docs.root}",
+            err=True,
+        )
+        raise typer.Exit(code=1)
 
     if mode is RunnerMode.PLAN:
         logger.info(
@@ -455,6 +483,7 @@ def main(
             output_dir=settings.output_dir,
             grade_scale=settings.grade_scale,
             batch_id=settings.batch_id,
+            batch_uuid=settings.batch_uuid,
         )
 
     if mode is RunnerMode.DRY_RUN:

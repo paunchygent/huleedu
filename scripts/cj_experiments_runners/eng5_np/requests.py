@@ -60,8 +60,10 @@ def compose_cj_assessment_request(
     if not settings.batch_id or settings.batch_id.strip() == "":
         raise ValueError("batch_id cannot be empty - must be provided via --batch-id CLI argument")
 
+    canonical_batch_id = str(settings.batch_uuid)
+
     system_metadata = SystemProcessingMetadata(
-        entity_id=settings.batch_id,
+        entity_id=canonical_batch_id,
         entity_type="batch",
         parent_id=str(settings.assignment_id),
         processing_stage=ProcessingStage.PENDING,
@@ -70,7 +72,7 @@ def compose_cj_assessment_request(
 
     event_data = ELS_CJAssessmentRequestV1(
         event_name=ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED,
-        entity_id=settings.batch_id,
+        entity_id=canonical_batch_id,
         entity_type="batch",
         parent_id=str(settings.assignment_id),
         system_metadata=system_metadata,
@@ -89,7 +91,7 @@ def compose_cj_assessment_request(
         source_service="eng5_np_batch_runner",
         correlation_id=settings.correlation_id,
         data=event_data,
-        metadata={"runner_mode": settings.mode.value},
+        metadata={"runner_mode": settings.mode.value, "batch_label": settings.batch_id},
     )
     return envelope
 

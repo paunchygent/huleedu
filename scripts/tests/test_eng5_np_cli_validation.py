@@ -14,7 +14,11 @@ from uuid import UUID
 
 import pytest
 
-from scripts.cj_experiments_runners.eng5_np.inventory import FileRecord, apply_comparison_limit
+from scripts.cj_experiments_runners.eng5_np.inventory import (
+    ComparisonValidationError,
+    FileRecord,
+    apply_comparison_limit,
+)
 from scripts.cj_experiments_runners.eng5_np.settings import RunnerMode, RunnerSettings
 
 
@@ -35,12 +39,10 @@ class TestEng5CliValidation:
     - `.claude/tasks/TASK-ENG5-RUNNER-ASSUMPTION-HARDENING.md`
     - `.claude/tasks/TASK-ENG5-RUNNER-TESTING-PLAN.md`
 
-    Some expectations (e.g., strict rejection of `max_comparisons < 2` and a
-    dedicated `batch_uuid`) are not yet implemented in the runner and are
-    therefore marked xfail as TDD markers.
+    These tests codify R1/R2 behaviour (comparison validation + canonical
+    batch UUID). They serve as regression coverage for the hardened runner.
     """
 
-    @pytest.mark.xfail(reason="R1: min comparison validation not implemented yet", strict=False)
     def test_apply_comparison_limit_rejects_max_comparisons_below_two(self) -> None:
         """`--max-comparisons < 2` should be rejected even with enough essays.
 
@@ -52,7 +54,7 @@ class TestEng5CliValidation:
         students = _make_files(5)
 
         # Expected future behaviour: fail fast for max_comparisons < 2
-        with pytest.raises(ValueError):
+        with pytest.raises(ComparisonValidationError):
             apply_comparison_limit(
                 anchors=anchors,
                 students=students,
@@ -60,7 +62,6 @@ class TestEng5CliValidation:
                 emit_notice=False,
             )
 
-    @pytest.mark.xfail(reason="R1: zero-pair validation not implemented yet", strict=False)
     def test_apply_comparison_limit_rejects_when_no_pairs_possible(self) -> None:
         """Configurations with anchors×students < 1 should fail fast.
 
@@ -71,7 +72,7 @@ class TestEng5CliValidation:
         anchors = _make_files(0)
         students = _make_files(5)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ComparisonValidationError):
             apply_comparison_limit(
                 anchors=anchors,
                 students=students,
@@ -79,7 +80,6 @@ class TestEng5CliValidation:
                 emit_notice=False,
             )
 
-    @pytest.mark.xfail(reason="R1/R2 behaviour not finalised", strict=False)
     def test_apply_comparison_limit_accepts_valid_configuration(self) -> None:
         """Valid configuration should pass and compute expected comparisons.
 
@@ -103,7 +103,6 @@ class TestEng5CliValidation:
         assert actual is not None
         assert actual >= 1
 
-    @pytest.mark.xfail(reason="R2: batch_uuid not yet present on RunnerSettings", strict=False)
     def test_runner_settings_includes_canonical_batch_uuid(self) -> None:
         """RunnerSettings should expose a canonical batch_uuid alongside batch_id.
 
@@ -120,6 +119,7 @@ class TestEng5CliValidation:
             output_dir=Path("/tmp/out"),
             runner_version="0.1.0",
             git_sha="deadbeef",
+            batch_uuid=UUID(int=4),
             batch_id="human-batch-label",
             user_id="user-1",
             org_id="org-1",
@@ -131,6 +131,5 @@ class TestEng5CliValidation:
             content_service_url="http://localhost:8001/v1/content",
         )
 
-        # Expected future behaviour: settings has a UUID field distinct from batch_id
-        assert isinstance(getattr(settings, "batch_uuid"), UUID)
+        assert isinstance(settings.batch_uuid, UUID)
         assert settings.batch_id == "human-batch-label"

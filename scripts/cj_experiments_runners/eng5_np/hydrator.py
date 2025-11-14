@@ -7,6 +7,7 @@ import re
 from hashlib import sha256
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 import typer
 from common_core.events.cj_assessment_events import AssessmentResultV1
@@ -35,11 +36,13 @@ class AssessmentRunHydrator:
         output_dir: Path,
         grade_scale: str,
         batch_id: str,
+        batch_uuid: UUID,
     ) -> None:
         self.artefact_path = artefact_path
         self.output_dir = output_dir
         self.grade_scale = grade_scale
-        self.batch_id = batch_id
+        self.batch_label = batch_id
+        self.batch_uuid = str(batch_uuid)
         (self.output_dir / "events").mkdir(parents=True, exist_ok=True)
         self._seen_request_ids: set[str] = set()
         self._runner_status: dict[str, Any] = {
@@ -53,6 +56,7 @@ class AssessmentRunHydrator:
         }
         self._logger = _LOGGER.bind(
             batch_id=batch_id,
+            batch_uuid=self.batch_uuid,
             grade_scale=grade_scale,
             artefact_path=str(self.artefact_path),
         )
@@ -105,7 +109,7 @@ class AssessmentRunHydrator:
 
         metadata = envelope.data.request_metadata or {}
         batch_hint = metadata.get("batch_id") or metadata.get("bos_batch_id")
-        if batch_hint and batch_hint != self.batch_id:
+        if batch_hint and batch_hint != self.batch_uuid:
             self._logger.debug(
                 "comparison_batch_mismatch_skipped",
                 request_id=request_id,
@@ -133,7 +137,7 @@ class AssessmentRunHydrator:
     def apply_assessment_result(self, envelope: EventEnvelope[AssessmentResultV1]) -> None:
         """Persist and hydrate Bradley–Terry and grade projection outputs."""
 
-        if envelope.data.batch_id != self.batch_id:
+        if envelope.data.batch_id != self.batch_uuid:
             self._logger.debug(
                 "assessment_result_batch_mismatch_skipped",
                 event_batch=envelope.data.batch_id,

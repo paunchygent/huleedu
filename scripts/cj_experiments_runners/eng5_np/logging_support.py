@@ -33,11 +33,13 @@ def setup_cli_logger(*, settings: RunnerSettings) -> BoundLogger:
     bind_contextvars(
         correlation_id=str(settings.correlation_id),
         batch_id=settings.batch_id,
+        batch_uuid=str(settings.batch_uuid),
         runner_mode=settings.mode.value,
     )
 
     return create_service_logger("eng5_np_cli").bind(
         batch_id=settings.batch_id,
+        batch_uuid=str(settings.batch_uuid),
         runner_mode=settings.mode.value,
     )
 
