@@ -8,9 +8,12 @@ This CLI provides operational tools for:
 
 Usage:
     pdm run llm-admin list-models --provider openai
-    pdm run llm-admin show-capabilities --provider openai --model gpt-5-mini-2025-08-07
-    pdm run llm-admin dry-run-payload --provider openai --model gpt-5-mini-2025-08-07
-    pdm run llm-admin call --provider openai --model gpt-4o-mini-2024-07-18 --essay-a "A" --essay-b "B"
+    pdm run llm-admin show-capabilities --provider openai \\
+        --model gpt-5-mini-2025-08-07
+    pdm run llm-admin dry-run-payload --provider openai \\
+        --model gpt-5-mini-2025-08-07
+    pdm run llm-admin call --provider openai \\
+        --model gpt-4o-mini-2024-07-18 --essay-a "A" --essay-b "B"
 """
 
 from __future__ import annotations
@@ -158,13 +161,18 @@ def show_capabilities_cmd(
         console.print(f"[dim]Provider:[/dim] {config.provider.value}")
 
         console.print("\n[bold]Parameter Compatibility:[/bold]")
-        console.print(f"  Temperature:       {'✓' if config.supports_temperature else '✗'}")
-        console.print(f"  Top-P:             {'✓' if config.supports_top_p else '✗'}")
-        console.print(f"  Frequency Penalty: {'✓' if config.supports_frequency_penalty else '✗'}")
-        console.print(f"  Presence Penalty:  {'✓' if config.supports_presence_penalty else '✗'}")
-        console.print(
-            f"  Token Parameter:   {'max_completion_tokens' if config.uses_max_completion_tokens else 'max_tokens'}"
+        temp_status = "✓" if config.supports_temperature else "✗"
+        console.print(f"  Temperature:       {temp_status}")
+        top_p_status = "✓" if config.supports_top_p else "✗"
+        console.print(f"  Top-P:             {top_p_status}")
+        freq_status = "✓" if config.supports_frequency_penalty else "✗"
+        console.print(f"  Frequency Penalty: {freq_status}")
+        pres_status = "✓" if config.supports_presence_penalty else "✗"
+        console.print(f"  Presence Penalty:  {pres_status}")
+        token_param = (
+            "max_completion_tokens" if config.uses_max_completion_tokens else "max_tokens"
         )
+        console.print(f"  Token Parameter:   {token_param}")
 
         console.print("\n[bold]Capabilities:[/bold]")
         for cap, supported in config.capabilities.items():

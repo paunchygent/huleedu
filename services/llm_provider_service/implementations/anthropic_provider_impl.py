@@ -109,8 +109,10 @@ class AnthropicProviderImpl(LLMProviderProtocol):
 
         # Use system prompt from override or default comparison prompt
         system_prompt = (
-            system_prompt_override
-            or "You are an LLM comparison engine. Follow the caller-supplied instructions and ensure your output satisfies the required tool schema."
+            system_prompt_override or (
+                "You are an LLM comparison engine. Follow the caller-supplied "
+                "instructions and ensure your output satisfies the required tool schema."
+            )
         )
 
         # Execute with retry

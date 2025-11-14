@@ -9,7 +9,8 @@ from __future__ import annotations
 # Representative essays for CJ assessment testing
 # These simulate the quality difference between strong and weak student essays
 
-ESSAY_A_STRONG = """Climate change represents one of the most pressing challenges facing humanity today.
+ESSAY_A_STRONG = (  # noqa: E501
+    """Climate change represents one of the most pressing challenges facing humanity today.
 The scientific consensus is clear: human activities, particularly the burning of fossil
 fuels, are driving unprecedented changes in our planet's climate. The evidence is
 overwhelming, from rising global temperatures to melting polar ice caps and increasingly
@@ -41,8 +42,10 @@ In conclusion, climate change poses an existential threat that demands immediate
 sustained action. While the challenge is daunting, solutions exist if we have the
 political will to implement them. The future of our planet depends on the choices we
 make today."""
+)
 
-ESSAY_B_WEAK = """Climate change is a big problem that affects everyone. Many people are worried about
+ESSAY_B_WEAK = (  # noqa: E501
+    """Climate change is a big problem that affects everyone. Many people are worried about
 it and think we should do something. There are different opinions about what causes
 it and what we should do about it.
 
@@ -61,10 +64,14 @@ everyone does their part, maybe we can make a difference.
 Climate change is complicated and there is still a lot we don't know about it.
 Scientists are studying it to learn more. Hopefully they will find better solutions
 in the future."""
+)
 
 # Simplified essays for quick tests
 SHORT_ESSAY_A = "This is a well-structured essay with clear thesis and evidence."
 SHORT_ESSAY_B = "This essay lacks organization and has weak arguments."
 
 # Representative prompt for full integration tests
-REPRESENTATIVE_COMPARISON_PROMPT = """Compare these two essays and determine which is better written based on clarity, structure, argument quality, and writing mechanics."""
+REPRESENTATIVE_COMPARISON_PROMPT = (  # noqa: E501
+    """Compare these two essays and determine which is better written based on """
+    """clarity, structure, argument quality, and writing mechanics."""
+)

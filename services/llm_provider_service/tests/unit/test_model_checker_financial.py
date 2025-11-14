@@ -5,7 +5,9 @@ with @pytest.mark.financial and must be explicitly opted-in to run.
 
 Usage:
     # Run financial tests
-    pdm run pytest-root services/llm_provider_service/tests/unit/test_model_checker_financial.py -m financial
+    pdm run pytest-root \\
+        services/llm_provider_service/tests/unit/test_model_checker_financial.py \\
+        -m financial
 
 Tests cover:
 - Anthropic real API integration (4 tests)

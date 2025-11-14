@@ -52,4 +52,4 @@ def opentelemetry_test_isolation() -> Generator[InMemorySpanExporter, None, None
 
 
 # Import all test fixtures to register them with pytest
-from services.llm_provider_service.tests.fixtures import *  # noqa: F401,F403
+from services.llm_provider_service.tests.fixtures import *  # noqa: F401,F403,E402

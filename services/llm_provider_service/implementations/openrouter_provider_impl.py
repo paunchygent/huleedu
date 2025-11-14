@@ -87,8 +87,8 @@ class OpenRouterProviderImpl(LLMProviderProtocol):
                 details={"provider": "openrouter"},
             )
 
-        # OpenRouter needs JSON instruction appended - use format_comparison_prompt from prompt_utils
-        from common_core import LLMProviderType
+        # OpenRouter needs JSON instruction appended - use format_comparison_prompt  # noqa: E501
+        from common_core import LLMProviderType  # noqa: E501
 
         from services.llm_provider_service.prompt_utils import format_comparison_prompt
 
@@ -100,8 +100,10 @@ class OpenRouterProviderImpl(LLMProviderProtocol):
 
         # Use system prompt from override or default comparison prompt
         system_prompt = (
-            system_prompt_override
-            or "You are an LLM comparison engine. Follow the caller-supplied instructions and ensure your output satisfies the required tool schema."
+            system_prompt_override or (
+                "You are an LLM comparison engine. Follow the caller-supplied "
+                "instructions and ensure your output satisfies the required tool schema."
+            )
         )
 
         # Execute with retry

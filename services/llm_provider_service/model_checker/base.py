@@ -134,8 +134,10 @@ class ModelComparisonResult(BaseModel):
 
     Attributes:
         provider: Which provider was checked
-        new_models_in_tracked_families: New models within families we're actively tracking (actionable)
-        new_untracked_families: Models from entirely new families not in active tracking (informational)
+        new_models_in_tracked_families: New models within families we're actively
+            tracking (actionable)
+        new_untracked_families: Models from entirely new families not in active
+            tracking (informational)
         deprecated_models: Model IDs in manifest but marked deprecated by provider
         breaking_changes: List of breaking change descriptions
         is_up_to_date: True if manifest matches provider API exactly
@@ -150,11 +152,15 @@ class ModelComparisonResult(BaseModel):
     )
     new_models_in_tracked_families: list[DiscoveredModel] = Field(
         default_factory=list,
-        description="New models within families we're actively tracking (actionable)",
+        description=(
+            "New models within families we're actively tracking (actionable)"
+        ),
     )
     new_untracked_families: list[DiscoveredModel] = Field(
         default_factory=list,
-        description="Models from entirely new families not in active tracking (informational)",
+        description=(
+            "Models from entirely new families not in active tracking (informational)"
+        ),
     )
     deprecated_models: list[str] = Field(
         default_factory=list,
