@@ -44,7 +44,7 @@ class DevTokenIssuer(TokenIssuer):
 
     def verify(self, token: str) -> dict[str, Any]:
         try:
-            return jwt.decode(
+            decoded: dict[str, Any] = jwt.decode(
                 token,
                 self._secret,
                 algorithms=["HS256"],
@@ -52,6 +52,7 @@ class DevTokenIssuer(TokenIssuer):
                 issuer=settings.JWT_ISSUER,
                 options={"verify_exp": False},
             )
+            return decoded
         except InvalidTokenError:
             return {}
 

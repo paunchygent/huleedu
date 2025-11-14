@@ -46,7 +46,7 @@ class MockContentRepository:
                 service="content_service",
                 operation="save_content",
                 message="No content data provided",
-                correlation_id=correlation_id,
+                correlation_id=correlation_id or uuid.uuid4(),
             )
 
         self.stored_content[content_id] = (content_data, content_type)
@@ -63,7 +63,7 @@ class MockContentRepository:
                 operation="get_content",
                 resource_type="content",
                 resource_id=content_id,
-                correlation_id=correlation_id,
+                correlation_id=correlation_id or uuid.uuid4(),
             )
 
         return self.stored_content[content_id]

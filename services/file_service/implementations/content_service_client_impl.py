@@ -43,6 +43,8 @@ class DefaultContentServiceClient(ContentServiceClientProtocol):
             HuleEduError: If storage operation fails
         """
         try:
+            # TODO(TASK-CONTENT-SERVICE-IDEMPOTENT-UPLOADS): compute content hash and reuse existing
+            # storage IDs once Content Service exposes lookup-or-create.
             # Content Service expects raw bytes data in request body
             headers = {"X-Correlation-ID": str(correlation_id)}
             async with self.http_session.post(

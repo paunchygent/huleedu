@@ -106,7 +106,7 @@ class Settings(SecureServiceSettings):
     DATABASE_POOL_RECYCLE: int = 3600  # 1 hour
 
     @property
-    def DATABASE_URL(self) -> str:
+    def DATABASE_URL(self) -> str:  # noqa: N802
         """Return the PostgreSQL database URL for both runtime and migrations.
 
         Uses shared database URL helper to construct environment-aware connection strings.

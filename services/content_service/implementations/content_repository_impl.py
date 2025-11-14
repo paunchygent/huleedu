@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from huleedu_service_libs.error_handling import (
     HuleEduError,
@@ -86,7 +86,7 @@ class ContentRepository(ContentRepositoryProtocol):
                     service="content_service",
                     operation="save_content",
                     message=f"Failed to store content: {exc}",
-                    correlation_id=correlation_id,
+                    correlation_id=correlation_id or uuid4(),
                     content_id=content_id,
                 )
 
@@ -116,7 +116,7 @@ class ContentRepository(ContentRepositoryProtocol):
                         operation="get_content",
                         resource_type="content",
                         resource_id=content_id,
-                        correlation_id=correlation_id,
+                        correlation_id=correlation_id or uuid4(),
                     )
 
                 logger.info(
@@ -140,7 +140,7 @@ class ContentRepository(ContentRepositoryProtocol):
                     service="content_service",
                     operation="get_content",
                     message=f"Failed to load content: {exc}",
-                    correlation_id=correlation_id,
+                    correlation_id=correlation_id or uuid4(),
                     content_id=content_id,
                 )
 

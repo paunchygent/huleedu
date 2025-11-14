@@ -9,7 +9,6 @@ from common_core.status_enums import OperationStatus
 from dishka import FromDishka
 from huleedu_service_libs.error_handling import (
     HuleEduError,
-    raise_content_service_error,
     raise_validation_error,
 )
 from huleedu_service_libs.logging_utils import create_service_logger
@@ -53,6 +52,8 @@ async def upload_content(
         # Determine content type from request, defaulting to text/plain for backward compatibility
         content_type = request.headers.get("Content-Type") or "text/plain"
 
+        # TODO(TASK-CONTENT-SERVICE-IDEMPOTENT-UPLOADS): replace random ID assignment with
+        # hash-based lookup-or-create so uploads can reuse existing blobs when content matches.
         content_id = uuid.uuid4().hex
         await repository.save_content(content_id, raw_data, content_type, correlation_id)
         metrics.record_operation(OperationType.UPLOAD, OperationStatus.SUCCESS)

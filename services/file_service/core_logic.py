@@ -89,6 +89,8 @@ async def process_single_file_upload(
     # Step 1: Store raw file blob immediately (pre-emptive storage)
     # This establishes an immutable source of truth before any processing occurs
     try:
+        # TODO(TASK-CONTENT-SERVICE-IDEMPOTENT-UPLOADS): hash raw uploads and reuse existing blobs
+        # when content matches, once lookup-or-create is available.
         raw_file_storage_id = await content_client.store_content(
             file_content,
             ContentType.RAW_UPLOAD_BLOB,
@@ -289,6 +291,7 @@ async def process_single_file_upload(
         }
 
     # Step 4: Store validated extracted plaintext and publish success event
+    # TODO(TASK-CONTENT-SERVICE-IDEMPOTENT-UPLOADS): dedupe extracted plaintext uploads via hash.
     text_storage_id = await content_client.store_content(
         text.encode("utf-8"),
         ContentType.EXTRACTED_PLAINTEXT,

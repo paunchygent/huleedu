@@ -10,8 +10,6 @@ from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry, generate_l
 from quart import Blueprint, Response, jsonify
 from quart_dishka import inject
 
-from services.content_service.config import Settings
-
 logger = create_service_logger("content.api.health")
 health_bp = Blueprint("health_routes", __name__)
 
