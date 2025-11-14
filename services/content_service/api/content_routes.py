@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from pathlib import Path
 
-import aiofiles
 from common_core.observability_enums import OperationType
 from common_core.status_enums import OperationStatus
 from dishka import FromDishka
@@ -21,7 +19,6 @@ from quart_dishka import inject
 from services.content_service.protocols import (
     ContentMetricsProtocol,
     ContentRepositoryProtocol,
-    ContentStoreProtocol,
 )
 
 logger = create_service_logger("content.api.content")
@@ -93,7 +90,6 @@ async def upload_content(
 async def download_content(
     content_id: str,
     repository: FromDishka[ContentRepositoryProtocol],
-    legacy_store: FromDishka[ContentStoreProtocol],
     metrics: FromDishka[ContentMetricsProtocol],
 ) -> Response | tuple[Response, int]:
     """Download content endpoint."""
@@ -115,12 +111,7 @@ async def download_content(
                 value=content_id,
             )
 
-        content_bytes, content_type = await _get_content_with_legacy_fallback(
-            content_id,
-            repository,
-            legacy_store,
-            correlation_id,
-        )
+        content_bytes, content_type = await repository.get_content(content_id, correlation_id)
         logger.info(
             "Serving content for ID: %s", content_id, extra={"correlation_id": str(correlation_id)}
         )
@@ -158,114 +149,6 @@ async def download_content(
                 }
             }
         ), 500
-
-
-LEGACY_FALLBACK_CONTENT_TYPE = "application/octet-stream"
-
-
-async def _get_content_with_legacy_fallback(
-    content_id: str,
-    repository: ContentRepositoryProtocol,
-    legacy_store: ContentStoreProtocol,
-    correlation_id: uuid.UUID,
-) -> tuple[bytes, str]:
-    """Fetch content from the DB and fall back to the filesystem if needed."""
-
-    try:
-        return await repository.get_content(content_id, correlation_id)
-    except HuleEduError as exc:
-        if exc.error_detail.error_code != "RESOURCE_NOT_FOUND":
-            raise
-
-        legacy_payload = await _load_legacy_content_from_store(
-            content_id,
-            legacy_store,
-            correlation_id,
-        )
-        if legacy_payload is None:
-            raise
-
-        content_bytes, content_type = legacy_payload
-        await _backfill_legacy_content(
-            repository,
-            content_id,
-            content_bytes,
-            content_type,
-            correlation_id,
-        )
-        return content_bytes, content_type
-
-
-async def _load_legacy_content_from_store(
-    content_id: str,
-    legacy_store: ContentStoreProtocol,
-    correlation_id: uuid.UUID,
-) -> tuple[bytes, str] | None:
-    """Return legacy filesystem content if present."""
-
-    try:
-        file_path = await legacy_store.get_content_path(content_id, correlation_id)
-    except HuleEduError as legacy_error:
-        if legacy_error.error_detail.error_code == "RESOURCE_NOT_FOUND":
-            logger.info(
-                "Legacy content not found for ID: %s",
-                content_id,
-                extra={"correlation_id": str(correlation_id)},
-            )
-            return None
-        raise
-
-    try:
-        async with aiofiles.open(file_path, "rb") as legacy_file:
-            legacy_bytes = await legacy_file.read()
-    except Exception as exc:  # pragma: no cover - defensive
-        logger.error(
-            "Failed to read legacy content for ID %s from %s: %s",
-            content_id,
-            Path(file_path).resolve(),
-            exc,
-            extra={"correlation_id": str(correlation_id)},
-            exc_info=True,
-        )
-        raise_content_service_error(
-            service="content_service",
-            operation="load_legacy_content",
-            message=f"Failed to read legacy content: {exc}",
-            correlation_id=correlation_id,
-            content_id=content_id,
-        )
-
-    logger.info(
-        "Loaded legacy filesystem content for ID: %s",
-        content_id,
-        extra={"correlation_id": str(correlation_id)},
-    )
-    return legacy_bytes, LEGACY_FALLBACK_CONTENT_TYPE
-
-
-async def _backfill_legacy_content(
-    repository: ContentRepositoryProtocol,
-    content_id: str,
-    content_bytes: bytes,
-    content_type: str,
-    correlation_id: uuid.UUID,
-) -> None:
-    """Persist legacy payloads into the new table for seamless migration."""
-
-    try:
-        await repository.save_content(content_id, content_bytes, content_type, correlation_id)
-        logger.info(
-            "Backfilled legacy content for ID: %s",
-            content_id,
-            extra={"correlation_id": str(correlation_id)},
-        )
-    except Exception as exc:  # pragma: no cover - best-effort backfill
-        logger.warning(
-            "Failed to backfill legacy content for ID %s: %s",
-            content_id,
-            exc,
-            extra={"correlation_id": str(correlation_id)},
-        )
 
 
 def _build_download_response(content_bytes: bytes, content_type: str | None) -> Response:

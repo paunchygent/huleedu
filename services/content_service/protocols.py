@@ -7,61 +7,11 @@ must implement, enabling dependency injection and testability.
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Protocol, runtime_checkable
 from uuid import UUID
 
 from common_core.observability_enums import OperationType
 from common_core.status_enums import OperationStatus
-
-
-class ContentStoreProtocol(Protocol):
-    """Protocol for content storage operations."""
-
-    async def save_content(self, content_data: bytes, correlation_id: UUID) -> str:
-        """
-        Save content data and return storage identifier.
-
-        Args:
-            content_data: Raw bytes to store
-            correlation_id: Request correlation ID for tracing
-
-        Returns:
-            Storage identifier (UUID hex string)
-
-        Raises:
-            HuleEduError: If storage operation fails
-        """
-        ...
-
-    async def get_content_path(self, content_id: str, correlation_id: UUID) -> Path:
-        """
-        Get file path for content identifier.
-
-        Args:
-            content_id: Storage identifier
-            correlation_id: Request correlation ID for tracing
-
-        Returns:
-            Path to content file
-
-        Raises:
-            HuleEduError: If content not found
-        """
-        ...
-
-    async def content_exists(self, content_id: str, correlation_id: UUID) -> bool:
-        """
-        Check if content exists for given identifier.
-
-        Args:
-            content_id: Storage identifier
-            correlation_id: Request correlation ID for tracing
-
-        Returns:
-            True if content exists, False otherwise
-        """
-        ...
 
 
 class ContentRepositoryProtocol(Protocol):

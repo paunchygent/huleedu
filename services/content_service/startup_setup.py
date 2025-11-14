@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from dishka import AsyncContainer, make_async_container
 from huleedu_service_libs.logging_utils import create_service_logger
 from prometheus_client import CollectorRegistry, Counter, Histogram
@@ -29,14 +27,9 @@ def create_di_container() -> AsyncContainer:
 
 
 async def initialize_services(app: Quart, settings: Settings, container: AsyncContainer) -> None:
-    """Initialize content store and metrics using the provided DI container."""
+    """Initialize metrics using the provided DI container."""
 
     try:
-        # Initialize content store directory
-        store_root = Path(settings.CONTENT_STORE_ROOT_PATH)
-        store_root.mkdir(parents=True, exist_ok=True)
-        logger.info(f"Content store initialized at: {store_root.resolve()}")
-
         # Initialize metrics with DI registry and store in app context
         # The container is now passed in, and QuartDishka is initialized in app.py
         async with container() as request_container:
@@ -47,7 +40,7 @@ async def initialize_services(app: Quart, settings: Settings, container: AsyncCo
             app.extensions = getattr(app, "extensions", {})
             app.extensions["metrics"] = metrics
 
-            logger.info("Content Service content store and metrics initialized successfully.")
+            logger.info("Content Service metrics initialized successfully.")
     except Exception as e:
         logger.critical(f"Failed to initialize Content Service: {e}", exc_info=True)
         raise

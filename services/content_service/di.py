@@ -4,8 +4,6 @@ Content Service dependency injection configuration.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from dishka import Provider, Scope, provide
 from prometheus_client import CollectorRegistry, Counter
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
@@ -14,14 +12,12 @@ from services.content_service.config import Settings, settings
 from services.content_service.implementations.content_repository_impl import (
     ContentRepository,
 )
-from services.content_service.implementations.filesystem_content_store import FileSystemContentStore
 from services.content_service.implementations.prometheus_content_metrics import (
     PrometheusContentMetrics,
 )
 from services.content_service.protocols import (
     ContentMetricsProtocol,
     ContentRepositoryProtocol,
-    ContentStoreProtocol,
 )
 
 
@@ -62,16 +58,6 @@ class ContentServiceProvider(Provider):
             max_overflow=10,
             pool_pre_ping=True,
         )
-
-    @provide(scope=Scope.APP)
-    def provide_store_root(self) -> Path:
-        """Provide content store root path."""
-        return Path(settings.CONTENT_STORE_ROOT_PATH)
-
-    @provide(scope=Scope.APP)
-    def provide_content_store(self, store_root: Path) -> ContentStoreProtocol:
-        """Provide content store implementation."""
-        return FileSystemContentStore(store_root)
 
     @provide(scope=Scope.APP)
     def provide_content_repository(

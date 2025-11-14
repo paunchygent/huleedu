@@ -2,12 +2,10 @@
 Configuration module for the HuleEdu Content Service.
 
 This module defines the settings and configuration for the Content Service,
-including storage paths, logging levels, and service ports.
+including database connections, logging levels, and service ports.
 """
 
 from __future__ import annotations
-
-from pathlib import Path
 
 from common_core.config_enums import Environment
 from huleedu_service_libs.config import SecureServiceSettings
@@ -32,7 +30,6 @@ class Settings(SecureServiceSettings):
         validation_alias="ENVIRONMENT",  # Read from global ENVIRONMENT var
         description="Runtime environment for the service",
     )
-    CONTENT_STORE_ROOT_PATH: Path = Path("./.local_content_store_mvp")
     HOST: str = "0.0.0.0"
     PORT: int = 8001  # Default port, matches docker-compose and pdm dev script for content_service
     WEB_CONCURRENCY: int = 4  # Increased from 1 to handle concurrent batch requests
