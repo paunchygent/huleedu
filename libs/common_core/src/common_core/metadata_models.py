@@ -71,7 +71,10 @@ class SystemProcessingMetadata(BaseModel):
     )
     error_info: dict[str, Any] = Field(
         default_factory=dict,
-        description="Error details on failure: error_code, error_message, error_type, context. See docs/error-patterns.md",
+        description=(
+            "Error details on failure: error_code, error_message, error_type, context. "
+            "See docs/error-patterns.md"
+        ),
     )
     model_config = {"populate_by_name": True}
 
@@ -87,7 +90,9 @@ class StorageReferenceMetadata(BaseModel):
 
     Usage:
         storage_ref = StorageReferenceMetadata()
-        storage_ref.add_reference(ContentType.CJ_RESULTS_JSON, storage_id, "cj/batch_123/results.json")
+        storage_ref.add_reference(
+            ContentType.CJ_RESULTS_JSON, storage_id, "cj/batch_123/results.json"
+        )
         event_data.results_ref = storage_ref
 
     Retrieval:
@@ -99,7 +104,10 @@ class StorageReferenceMetadata(BaseModel):
 
     references: dict[ContentType, dict[str, str]] = Field(
         default_factory=dict,
-        description='ContentType to {"storage_id": str, "path": str} mapping. storage_id required, path optional.',
+        description=(
+            'ContentType to {"storage_id": str, "path": str} mapping. '
+            "storage_id required, path optional."
+        ),
     )
 
     def add_reference(
@@ -121,8 +129,9 @@ class StorageReferenceMetadata(BaseModel):
 class EssayProcessingInputRefV1(BaseModel):
     """Standard essay reference for processing service requests.
 
-    Minimal general-purpose contract used across ALL processing services (CJ, NLP, Spellcheck, AI Feedback).
-    Contains essay_id and text_storage_id (Content Service reference).
+    Minimal general-purpose contract used across ALL processing services
+    (CJ, NLP, Spellcheck, AI Feedback). Contains essay_id and text_storage_id
+    (Content Service reference).
 
     Specialized services define extended contracts when additional metadata needed
     (e.g., AIFeedbackInputDataV1 adds student_id, class_context).
@@ -135,7 +144,10 @@ class EssayProcessingInputRefV1(BaseModel):
     text_storage_id: str = Field(description="Content Service storage_id for essay text")
     spellcheck_metrics: "SpellcheckMetricsV1 | None" = Field(
         default=None,
-        description="Spellcheck metrics from Phase 2 (error_count, correction_count). Available for downstream services after spellcheck completes.",
+        description=(
+            "Spellcheck metrics from Phase 2 (error_count, correction_count). "
+            "Available for downstream services after spellcheck completes."
+        ),
     )
 
 

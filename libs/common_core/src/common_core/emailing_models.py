@@ -33,12 +33,18 @@ class NotificationEmailRequestedV1(BaseModel):
         description="Unique message identifier for idempotency and tracking. Generate with uuid4()."
     )
     template_id: str = Field(
-        description="Email template identifier recognized by Email Service. Templates define subject, HTML body, and variable placeholders."
+        description=(
+            "Email template identifier recognized by Email Service. "
+            "Templates define subject, HTML body, and variable placeholders."
+        )
     )
     to: EmailStr = Field(description="Recipient email address. Validated by Pydantic EmailStr.")
     variables: Dict[str, str] = Field(
         default_factory=dict,
-        description="Template variables for email personalization (e.g., user_name, verification_link). Keys match template placeholders.",
+        description=(
+            "Template variables for email personalization (e.g., user_name, verification_link). "
+            "Keys match template placeholders."
+        ),
     )
     category: Literal[
         "verification",
@@ -47,10 +53,16 @@ class NotificationEmailRequestedV1(BaseModel):
         "teacher_notification",
         "system",
     ] = Field(
-        description="Email category for analytics and filtering. Determines email priority and handling rules."
+        description=(
+            "Email category for analytics and filtering. "
+            "Determines email priority and handling rules."
+        )
     )
     correlation_id: str = Field(
-        description="Distributed tracing ID. MUST propagate from originating request for end-to-end correlation."
+        description=(
+            "Distributed tracing ID. "
+            "MUST propagate from originating request for end-to-end correlation."
+        )
     )
 
 
@@ -66,10 +78,16 @@ class EmailSentV1(BaseModel):
     """
 
     message_id: str = Field(
-        description="Message identifier from original NotificationEmailRequestedV1. Links request to delivery confirmation."
+        description=(
+            "Message identifier from original NotificationEmailRequestedV1. "
+            "Links request to delivery confirmation."
+        )
     )
     provider: str = Field(
-        description="External email provider used (e.g., resend, sendgrid). For analytics and provider reliability tracking."
+        description=(
+            "External email provider used (e.g., resend, sendgrid). "
+            "For analytics and provider reliability tracking."
+        )
     )
     sent_at: datetime = Field(
         description="Timestamp when email was successfully sent by provider. UTC timezone."
@@ -91,17 +109,29 @@ class EmailDeliveryFailedV1(BaseModel):
     """
 
     message_id: str = Field(
-        description="Message identifier from original NotificationEmailRequestedV1. Links request to failure event."
+        description=(
+            "Message identifier from original NotificationEmailRequestedV1. "
+            "Links request to failure event."
+        )
     )
     provider: str = Field(
-        description="External email provider that failed (e.g., resend, sendgrid). For provider reliability analysis."
+        description=(
+            "External email provider that failed (e.g., resend, sendgrid). "
+            "For provider reliability analysis."
+        )
     )
     failed_at: datetime = Field(
         description="Timestamp when delivery failure occurred. UTC timezone."
     )
     reason: str = Field(
-        description="Failure reason from provider (e.g., invalid email, rate limit, provider error). For error analysis and retry logic."
+        description=(
+            "Failure reason from provider (e.g., invalid email, rate limit, provider error). "
+            "For error analysis and retry logic."
+        )
     )
     correlation_id: str = Field(
-        description="Distributed tracing ID from original request. Enables end-to-end error correlation."
+        description=(
+            "Distributed tracing ID from original request. "
+            "Enables end-to-end error correlation."
+        )
     )

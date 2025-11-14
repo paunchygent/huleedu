@@ -27,36 +27,64 @@ class EventEnvelope(BaseModel, Generic[T_EventData]):
 
     event_id: UUID = Field(
         default_factory=uuid4,
-        description="Unique identifier for this event instance. For idempotency, generate deterministically from business data using uuid5().",
+        description=(
+            "Unique identifier for this event instance. "
+            "For idempotency, generate deterministically from business data using uuid5()."
+        ),
     )
     event_type: str = Field(
-        description="Kafka topic name from topic_name(ProcessingEvent). Format: 'huleedu.service.event.v1'. Use topic_name() not hardcoded strings.",
+        description=(
+            "Kafka topic name from topic_name(ProcessingEvent). "
+            "Format: 'huleedu.service.event.v1'. "
+            "Use topic_name() not hardcoded strings."
+        ),
     )
     event_timestamp: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
         description="Event creation timestamp in UTC. Auto-generated.",
     )
     source_service: str = Field(
-        description="Service that published this event. Match SERVICE_NAME from service settings.",
+        description=(
+            "Service that published this event. "
+            "Match SERVICE_NAME from service settings."
+        ),
     )
     schema_version: int = Field(
         default=1,
-        description="Envelope structure version. Always 1 in current architecture. Reserved for future envelope evolution (not event data versioning).",
+        description=(
+            "Envelope structure version. Always 1 in current architecture. "
+            "Reserved for future envelope evolution (not event data versioning)."
+        ),
     )
     correlation_id: UUID = Field(
         default_factory=uuid4,
-        description="Distributed tracing ID. MUST propagate through entire request chain. Extract from received envelope, include in published events.",
+        description=(
+            "Distributed tracing ID. MUST propagate through entire request chain. "
+            "Extract from received envelope, include in published events."
+        ),
     )
     data_schema_uri: str | None = Field(
         default=None,
-        description="Optional JSON Schema URI for event data model. Currently unused, reserved for future schema registry integration.",
+        description=(
+            "Optional JSON Schema URI for event data model. "
+            "Currently unused, reserved for future schema registry integration."
+        ),
     )
     data: Any = Field(
-        description="Event-specific data payload. Type T_EventData when creating envelope, dict when deserializing. CRITICAL: Any type prevents Pydantic v2 malformed BaseModel bug. Two-phase deserialization required: envelope=EventEnvelope[Any].model_validate_json(bytes), typed_data=MyEventV1.model_validate(envelope.data).",
+        description=(
+            "Event-specific data payload. Type T_EventData when creating envelope, "
+            "dict when deserializing. CRITICAL: Any type prevents Pydantic v2 malformed BaseModel bug. "  # noqa: E501
+            "Two-phase deserialization required: envelope=EventEnvelope[Any].model_validate_json(bytes), "  # noqa: E501
+            "typed_data=MyEventV1.model_validate(envelope.data)."
+        ),
     )
     metadata: Optional[Dict[str, Any]] = Field(
         default=None,
-        description="Optional cross-cutting metadata (retry_count, original_timestamp, batch_context). Not for business data.",
+        description=(
+            "Optional cross-cutting metadata "
+            "(retry_count, original_timestamp, batch_context). "
+            "Not for business data."
+        ),
     )
     model_config = ConfigDict(
         populate_by_name=True,

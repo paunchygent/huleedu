@@ -34,19 +34,31 @@ class BaseEventData(BaseModel):
     """
 
     event_name: ProcessingEvent = Field(
-        description="Specific event name from ProcessingEvent enum. Pydantic coerces from string during deserialization."
+        description=(
+            "Specific event name from ProcessingEvent enum. "
+            "Pydantic coerces from string during deserialization."
+        )
     )
     entity_id: str | None = Field(
         default=None,
-        description="Business entity ID this event relates to (essay_id, batch_id, user_id). For correlation and tracing across service boundaries.",
+        description=(
+            "Business entity ID this event relates to (essay_id, batch_id, user_id). "
+            "For correlation and tracing across service boundaries."
+        ),
     )
     entity_type: str | None = Field(
         default=None,
-        description="Type of business entity (essay, batch, user). Clarifies entity_id context when multiple entity types share ID space.",
+        description=(
+            "Type of business entity (essay, batch, user). "
+            "Clarifies entity_id context when multiple entity types share ID space."
+        ),
     )
     parent_id: str | None = Field(
         default=None,
-        description="Parent entity ID for hierarchical relationships (batch_id for essay events). Enables workflow correlation across parent-child boundaries.",
+        description=(
+            "Parent entity ID for hierarchical relationships (batch_id for essay events). "
+            "Enables workflow correlation across parent-child boundaries."
+        ),
     )
     timestamp: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
@@ -68,10 +80,17 @@ class ProcessingUpdate(BaseEventData):
     """
 
     status: EssayStatus | BatchStatus = Field(
-        description="New status of the entity after this state machine transition. Use EssayStatus for essay entities, BatchStatus for batch entities."
+        description=(
+            "New status of the entity after this state machine transition. "
+            "Use EssayStatus for essay entities, BatchStatus for batch entities."
+        )
     )
     system_metadata: SystemProcessingMetadata = Field(
-        description="Operational context of THIS event's creation (service, correlation_id, error_info). Includes tracing and error tracking data."
+        description=(
+            "Operational context of THIS event's creation "
+            "(service, correlation_id, error_info). "
+            "Includes tracing and error tracking data."
+        )
     )
 
 
@@ -87,7 +106,11 @@ class EventTracker(BaseEventData):
     """
 
     system_metadata: SystemProcessingMetadata = Field(
-        description="Operational context of THIS event's creation (service, correlation_id, error_info). Includes tracing and error tracking data."
+        description=(
+            "Operational context of THIS event's creation "
+            "(service, correlation_id, error_info). "
+            "Includes tracing and error tracking data."
+        )
     )
 
 
