@@ -32,6 +32,7 @@ from services.cj_assessment_service.cj_core_logic.batch_retry_processor import (
 from services.cj_assessment_service.cj_core_logic.batch_submission import (
     BatchSubmissionResult,
     get_batch_state,
+    merge_batch_processing_metadata,
 )
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
@@ -576,6 +577,87 @@ class TestRetryMechanisms:
             # All entries should have incremented retry count
             assert all(entry.retry_count == 1 for entry in failed_pool.failed_comparison_pool)
             assert failed_pool.pool_statistics.retry_attempts == 1
+
+    async def test_retry_batch_uses_persisted_system_prompt(
+        self,
+        postgres_repository: CJRepositoryProtocol,
+        test_settings: Settings,
+    ) -> None:
+        """Regression guard: retry submissions reuse persisted LLM overrides."""
+        # Configure settings
+        test_settings.ENABLE_FAILED_COMPARISON_RETRY = True
+        test_settings.FAILED_COMPARISON_RETRY_THRESHOLD = 1
+        test_settings.RETRY_BATCH_SIZE = 2
+        test_settings.MAX_RETRY_ATTEMPTS = 1
+
+        batch_id, essays = await self._create_test_batch(postgres_repository)
+
+        pool_manager = BatchPoolManager(
+            database=postgres_repository,
+            settings=test_settings,
+        )
+
+        comparison_task = self._create_comparison_task(
+            essay_a_id=essays[0].els_essay_id,
+            essay_b_id=essays[1].els_essay_id,
+        )
+
+        await pool_manager.add_to_failed_pool(
+            cj_batch_id=batch_id,
+            comparison_task=comparison_task,
+            failure_reason="Guard failure",
+            correlation_id=uuid4(),
+        )
+
+        override_payload = {
+            "model_override": "guard-model",
+            "temperature_override": 0.25,
+            "max_tokens_override": 1200,
+            "system_prompt_override": "Persisted guard prompt",
+        }
+
+        async with postgres_repository.session() as session:
+            await merge_batch_processing_metadata(
+                session=session,
+                cj_batch_id=batch_id,
+                metadata_updates={"llm_overrides": override_payload},
+                correlation_id=uuid4(),
+            )
+
+        mock_llm_interaction = AsyncMock(spec=LLMInteractionProtocol)
+        mock_batch_submitter = AsyncMock(spec=BatchProcessorProtocol)
+
+        mock_batch_submitter.submit_comparison_batch.return_value = BatchSubmissionResult(
+            batch_id=batch_id,
+            total_submitted=1,
+            submitted_at=datetime.now(UTC),
+            all_submitted=True,
+            correlation_id=uuid4(),
+        )
+
+        retry_processor = BatchRetryProcessor(
+            database=postgres_repository,
+            llm_interaction=mock_llm_interaction,
+            settings=test_settings,
+            pool_manager=pool_manager,
+            batch_submitter=mock_batch_submitter,
+        )
+
+        result = await retry_processor.submit_retry_batch(
+            cj_batch_id=batch_id,
+            correlation_id=uuid4(),
+        )
+
+        assert result is not None
+        call_args = mock_batch_submitter.submit_comparison_batch.call_args
+        assert call_args is not None
+        called_kwargs = call_args.kwargs
+        assert called_kwargs["model_override"] == override_payload["model_override"]
+        assert called_kwargs["temperature_override"] == override_payload["temperature_override"]
+        assert called_kwargs["max_tokens_override"] == override_payload["max_tokens_override"]
+        assert (
+            called_kwargs["system_prompt_override"] == override_payload["system_prompt_override"]
+        )
 
     async def test_retry_batch_submission_flow(
         self,

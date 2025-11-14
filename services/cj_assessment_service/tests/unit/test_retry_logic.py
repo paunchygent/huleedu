@@ -220,7 +220,7 @@ class TestFailedComparisonPoolRetryBatch:
                 new_callable=AsyncMock,
             ) as mock_get_batch_state,
             patch(
-                "services.cj_assessment_service.cj_core_logic.batch_pool_manager.update_batch_processing_metadata",
+                "services.cj_assessment_service.cj_core_logic.batch_pool_manager.merge_batch_processing_metadata",
                 new_callable=AsyncMock,
             ) as mock_update_metadata,
         ):
@@ -595,7 +595,7 @@ class TestRetryBatchSizing:
                 new_callable=AsyncMock,
             ) as mock_get_batch_state,
             patch(
-                "services.cj_assessment_service.cj_core_logic.batch_pool_manager.update_batch_processing_metadata",
+                "services.cj_assessment_service.cj_core_logic.batch_pool_manager.merge_batch_processing_metadata",
                 new_callable=AsyncMock,
             ) as mock_update_metadata,
         ):

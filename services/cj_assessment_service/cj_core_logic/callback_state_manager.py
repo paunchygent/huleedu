@@ -435,12 +435,12 @@ async def handle_successful_retry(
                         )
 
                     # Update batch state
-                    from .batch_submission import update_batch_processing_metadata
+                    from .batch_submission import merge_batch_processing_metadata
 
-                    await update_batch_processing_metadata(
+                    await merge_batch_processing_metadata(
                         session=session,
                         cj_batch_id=comparison_pair.cj_batch_id,
-                        metadata=failed_pool.model_dump(mode="json"),
+                        metadata_updates=failed_pool.model_dump(mode="json"),
                         correlation_id=correlation_id,
                     )
 

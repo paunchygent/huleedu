@@ -148,27 +148,35 @@ Always respond with valid JSON."""
     async def test_cj_assessment_error_handling(
         self, llm_client: LLMProviderServiceClient, integration_settings: Settings
     ) -> None:
-        """Test error handling for invalid prompts."""
+        """Test that requests are accepted and queued even with minimal prompts.
+
+        In the async-only architecture, all requests are accepted (202) and queued
+        for async processing. Validation errors are reported via Kafka callbacks,
+        not synchronous HTTP exceptions.
+        """
         # Check if LLM Provider Service is available
         if not await check_service_availability(integration_settings.LLM_PROVIDER_SERVICE_URL):
             pytest.skip("LLM Provider Service not available")
 
-        # Test with a prompt that doesn't contain the expected essay format
-        invalid_prompt = "This is not a valid essay comparison prompt"
+        # Test with a minimal prompt - should still be accepted and queued
+        minimal_prompt = "This is not a valid essay comparison prompt"
 
         correlation_id = uuid4()
-        with assert_raises_huleedu_error(
-            error_code=ErrorCode.VALIDATION_ERROR,
-            service="cj_assessment_service",
-            operation="generate_comparison",
-            message_contains="Invalid prompt format",
-        ) as captured:
-            await llm_client.generate_comparison(
-                user_prompt=invalid_prompt,
-                correlation_id=correlation_id,
-            )
 
-        print(f"\nError handling test passed: {captured.error}")
+        # In async-only architecture, this should return None (queued), not raise an error
+        result = await llm_client.generate_comparison(
+            user_prompt=minimal_prompt,
+            correlation_id=correlation_id,
+        )
+
+        # Verify async-only behavior: request accepted and queued
+        assert result is None, "Expected None result for async-only architecture"
+
+        print("\n✅ Async-only architecture verified:")
+        print("- Request accepted and queued (202)")
+        print("- No synchronous validation errors")
+        print(f"- Correlation ID: {correlation_id}")
+        print("- Validation errors (if any) will be delivered via Kafka callbacks")
 
     async def test_cj_assessment_with_mock_provider(
         self, integration_settings: Settings, http_session: Any, retry_manager: RetryManagerImpl

@@ -22,7 +22,7 @@ from services.cj_assessment_service.protocols import CJRepositoryProtocol
 
 from .batch_submission import (
     get_batch_state,
-    update_batch_processing_metadata,
+    merge_batch_processing_metadata,
 )
 
 logger = create_service_logger("cj_assessment_service.batch_pool_manager")
@@ -344,10 +344,10 @@ class BatchPoolManager:
                         pool_size_metric.labels(batch_id=str(cj_batch_id)).set(len(remaining_pool))
 
                 # Update batch state
-                await update_batch_processing_metadata(
+                await merge_batch_processing_metadata(
                     session=session,
                     cj_batch_id=cj_batch_id,
-                    metadata=failed_pool.model_dump(mode="json"),
+                    metadata_updates=failed_pool.model_dump(mode="json"),
                     correlation_id=correlation_id,
                 )
 

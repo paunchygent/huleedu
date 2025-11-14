@@ -16,6 +16,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from services.cj_assessment_service.cj_core_logic import pair_generation, scoring_ranking
 from services.cj_assessment_service.cj_core_logic.batch_config import BatchConfigOverrides
 from services.cj_assessment_service.cj_core_logic.batch_processor import BatchProcessor
+from services.cj_assessment_service.cj_core_logic.batch_submission import (
+    merge_batch_processing_metadata,
+)
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
 from services.cj_assessment_service.models_api import (
@@ -42,6 +45,29 @@ class ComparisonIterationResult(BaseModel):
     )
     updated_scores: dict[str, float] = Field(
         description="Updated Bradley-Terry scores mapped by essay ID", default_factory=dict
+    )
+
+
+async def _persist_llm_overrides_if_present(
+    session,
+    cj_batch_id: int,
+    llm_config_overrides: Any | None,
+    correlation_id: UUID,
+) -> None:
+    """Store caller-supplied LLM overrides in the batch metadata."""
+
+    if not llm_config_overrides:
+        return
+
+    overrides_payload = llm_config_overrides.model_dump(exclude_none=True)
+    if not overrides_payload:
+        return
+
+    await merge_batch_processing_metadata(
+        session=session,
+        cj_batch_id=cj_batch_id,
+        metadata_updates={"llm_overrides": overrides_payload},
+        correlation_id=correlation_id,
     )
 
 
@@ -129,6 +155,13 @@ async def submit_comparisons_for_async_processing(
         if "batch_config_overrides" in request_data:
             batch_config_overrides = BatchConfigOverrides(**request_data["batch_config_overrides"])
 
+        await _persist_llm_overrides_if_present(
+            session=session,
+            cj_batch_id=cj_batch_id,
+            llm_config_overrides=llm_config_overrides,
+            correlation_id=correlation_id,
+        )
+
         # Submit batch for async processing - this will set state to WAITING_CALLBACKS
         submission_result = await batch_processor.submit_comparison_batch(
             cj_batch_id=cj_batch_id,
@@ -199,6 +232,13 @@ async def _process_comparison_iteration(
     batch_config_overrides = None
     if "batch_config_overrides" in request_data:
         batch_config_overrides = BatchConfigOverrides(**request_data["batch_config_overrides"])
+
+    await _persist_llm_overrides_if_present(
+        session=session,
+        cj_batch_id=cj_batch_id,
+        llm_config_overrides=llm_config_overrides,
+        correlation_id=correlation_id,
+    )
 
     # Extract system_prompt_override from request_data if available
     system_prompt_override = None

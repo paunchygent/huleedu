@@ -10,6 +10,8 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
+from sqlalchemy import select
+
 from common_core.status_enums import CJBatchStateEnum
 from huleedu_service_libs.error_handling import raise_external_service_error
 from huleedu_service_libs.logging_utils import create_service_logger
@@ -320,6 +322,43 @@ async def update_batch_processing_metadata(
         raise
 
 
+async def merge_batch_processing_metadata(
+    session: AsyncSession,
+    cj_batch_id: int,
+    metadata_updates: dict[str, Any],
+    correlation_id: UUID,
+) -> None:
+    """Merge new metadata entries into the existing batch processing metadata."""
+
+    from services.cj_assessment_service.models_db import CJBatchState
+
+    try:
+        stmt = select(CJBatchState.processing_metadata).where(CJBatchState.batch_id == cj_batch_id)
+        result = await session.execute(stmt)
+        existing_metadata = result.scalar_one_or_none()
+        if not isinstance(existing_metadata, dict):
+            existing_metadata = {}
+        updated_metadata = {**existing_metadata, **metadata_updates}
+
+        await update_batch_processing_metadata(
+            session=session,
+            cj_batch_id=cj_batch_id,
+            metadata=updated_metadata,
+            correlation_id=correlation_id,
+        )
+    except Exception as e:
+        logger.error(
+            f"Failed to merge processing metadata: {e}",
+            extra={
+                "correlation_id": str(correlation_id),
+                "cj_batch_id": cj_batch_id,
+                "error": str(e),
+            },
+            exc_info=True,
+        )
+        raise
+
+
 async def append_to_failed_pool_atomic(
     session: AsyncSession,
     cj_batch_id: int,
@@ -345,61 +384,49 @@ async def append_to_failed_pool_atomic(
     try:
         # Use raw SQL for atomic JSONB operations
         # The -> operator extracts as json, so cast back to jsonb for concatenation
-        stmt = text("""
+        stmt = text(
+            """
             UPDATE cj_batch_states
             SET processing_metadata =
-                CASE
-                    WHEN processing_metadata IS NULL THEN
-                        CAST(:initial_pool AS jsonb)
-                    ELSE
+                (
+                    COALESCE(processing_metadata::jsonb, '{}'::jsonb)
+                    || jsonb_build_object(
+                        'failed_comparison_pool',
+                        (
+                            COALESCE((processing_metadata->'failed_comparison_pool')::jsonb, '[]'::jsonb)
+                            || CAST(:entry AS jsonb)
+                        ),
+                        'pool_statistics',
                         jsonb_build_object(
-                            'failed_comparison_pool',
-                            CASE
-                                WHEN processing_metadata->'failed_comparison_pool' IS NULL
-                                THEN CAST(:entry AS jsonb)
-                                ELSE (processing_metadata->'failed_comparison_pool')::jsonb
-                                     || CAST(:entry AS jsonb)
-                            END,
-                            'pool_statistics',
-                            jsonb_build_object(
-                                'total_failed',
-                                COALESCE((processing_metadata->
-                                          'pool_statistics'->>'total_failed')::int, 0) + 1,
-                                'retry_attempts',
-                                COALESCE((processing_metadata->
-                                          'pool_statistics'->>'retry_attempts')::int, 0),
-                                'last_retry_batch',
-                                processing_metadata->'pool_statistics'->>'last_retry_batch',
-                                'successful_retries',
-                                COALESCE((processing_metadata->
-                                          'pool_statistics'->>'successful_retries')::int, 0),
-                                'permanently_failed',
-                                COALESCE((processing_metadata->
-                                          'pool_statistics'->>'permanently_failed')::int, 0)
+                            'total_failed',
+                            COALESCE((processing_metadata->'pool_statistics'->>'total_failed')::int, 0)
+                            + 1,
+                            'retry_attempts',
+                            COALESCE((processing_metadata->'pool_statistics'->>'retry_attempts')::int, 0),
+                            'last_retry_batch',
+                            processing_metadata->'pool_statistics'->>'last_retry_batch',
+                            'successful_retries',
+                            COALESCE(
+                                (processing_metadata->'pool_statistics'->>'successful_retries')::int,
+                                0
+                            ),
+                            'permanently_failed',
+                            COALESCE(
+                                (processing_metadata->'pool_statistics'->>'permanently_failed')::int,
+                                0
                             )
                         )
-                END
+                    )
+                )::json
             WHERE batch_id = :batch_id
-        """)
-
-        # Create initial pool structure if metadata is null
-        initial_pool = {
-            "failed_comparison_pool": [failed_entry_json],
-            "pool_statistics": {
-                "total_failed": 1,
-                "retry_attempts": 0,
-                "last_retry_batch": None,
-                "successful_retries": 0,
-                "permanently_failed": 0,
-            },
-        }
+            """
+        )
 
         await session.execute(
             stmt,
             {
                 "batch_id": cj_batch_id,
                 "entry": json.dumps([failed_entry_json]),
-                "initial_pool": json.dumps(initial_pool),
             },
         )
         await session.commit()

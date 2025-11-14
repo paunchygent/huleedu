@@ -228,9 +228,11 @@ def mock_llm_interaction_async() -> AsyncMock:
         tasks: list[Any],
         correlation_id: Any,
         tracking_map: dict[tuple[str, str], Any] | None = None,
+        bos_batch_id: str | None = None,
         model_override: str | None = None,
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,
+        system_prompt_override: str | None = None,
     ) -> list[None]:
         """Return None for all tasks to simulate async processing."""
         # Store the tasks for the callback simulator to use
@@ -259,9 +261,12 @@ def mock_llm_interaction() -> AsyncMock:
     async def perform_comparisons(
         tasks: list[Any],
         correlation_id: Any,
+        tracking_map: dict[tuple[str, str], Any] | None = None,
+        bos_batch_id: str | None = None,
         model_override: str | None = None,
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,
+        system_prompt_override: str | None = None,
     ) -> list[ComparisonResult]:
         """Generate realistic comparison results using provided parameters."""
         results = []

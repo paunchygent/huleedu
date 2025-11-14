@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 from uuid import uuid4
 
@@ -40,7 +41,12 @@ class TestBatchRetryProcessor:
     @pytest.fixture
     def mock_database(self) -> AsyncMock:
         """Create mock database protocol."""
-        return AsyncMock(spec=CJRepositoryProtocol)
+        mock_db = AsyncMock(spec=CJRepositoryProtocol)
+        session_cm = AsyncMock()
+        session_cm.__aenter__.return_value = AsyncMock()
+        session_cm.__aexit__.return_value = AsyncMock()
+        mock_db.session.return_value = session_cm
+        return mock_db
 
     @pytest.fixture
     def mock_llm_interaction(self) -> AsyncMock:
@@ -60,6 +66,17 @@ class TestBatchRetryProcessor:
     def mock_batch_submitter(self) -> AsyncMock:
         """Create mock batch submitter protocol."""
         return AsyncMock(spec=BatchProcessorProtocol)
+
+    @pytest.fixture(autouse=True)
+    def mock_get_batch_state(self, monkeypatch) -> AsyncMock:
+        """Patch get_batch_state to avoid hitting the database."""
+        mock = AsyncMock()
+        mock.return_value = SimpleNamespace(processing_metadata=None)
+        monkeypatch.setattr(
+            "services.cj_assessment_service.cj_core_logic.batch_submission.get_batch_state",
+            mock,
+        )
+        return mock
 
     @pytest.fixture
     def retry_processor(
@@ -158,6 +175,62 @@ class TestBatchRetryProcessor:
 
             # Verify metrics
             mock_metric.inc.assert_called_once()
+
+    async def test_submit_retry_batch_uses_persisted_overrides(
+        self,
+        retry_processor: BatchRetryProcessor,
+        mock_pool_manager: AsyncMock,
+        mock_batch_submitter: AsyncMock,
+        mock_get_batch_state: AsyncMock,
+        sample_comparison_task: ComparisonTask,
+    ) -> None:
+        """Ensure retry submits reuse persisted LLM overrides when they exist."""
+        # Arrange
+        cj_batch_id = 123
+        correlation_id = uuid4()
+        retry_tasks = [sample_comparison_task]
+
+        submission_result = BatchSubmissionResult(
+            batch_id=cj_batch_id,
+            total_submitted=1,
+            submitted_at=datetime.now(),
+            all_submitted=True,
+            correlation_id=correlation_id,
+        )
+
+        overrides_metadata = {
+            "model_override": "persisted-model",
+            "temperature_override": 0.2,
+            "max_tokens_override": 1500,
+            "system_prompt_override": "Persisted system prompt",
+        }
+
+        mock_pool_manager.form_retry_batch.return_value = retry_tasks
+        mock_batch_submitter.submit_comparison_batch.return_value = submission_result
+        mock_get_batch_state.return_value = SimpleNamespace(
+            processing_metadata={"llm_overrides": overrides_metadata}
+        )
+
+        # Mock metrics
+        with patch(
+            "services.cj_assessment_service.metrics.get_business_metrics"
+        ) as mock_get_metrics:
+            mock_metric = Mock()
+            mock_get_metrics.return_value = {"cj_retry_batches_submitted_total": mock_metric}
+
+            # Act
+            result = await retry_processor.submit_retry_batch(
+                cj_batch_id=cj_batch_id,
+                correlation_id=correlation_id,
+            )
+
+            # Assert
+            assert result is not None
+            call_args = mock_batch_submitter.submit_comparison_batch.call_args
+            assert call_args[1]["model_override"] == overrides_metadata["model_override"]
+            assert call_args[1]["temperature_override"] == overrides_metadata["temperature_override"]
+            assert call_args[1]["max_tokens_override"] == overrides_metadata["max_tokens_override"]
+            assert call_args[1]["system_prompt_override"] == overrides_metadata["system_prompt_override"]
 
     async def test_submit_retry_batch_disabled(
         self,

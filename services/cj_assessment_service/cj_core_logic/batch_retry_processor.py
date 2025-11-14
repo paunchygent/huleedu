@@ -6,7 +6,7 @@ fairness processing and failed comparison pool coordination.
 
 from __future__ import annotations
 
-from typing import cast
+from typing import Any, cast
 from uuid import UUID
 
 from huleedu_service_libs.error_handling import raise_processing_error
@@ -50,6 +50,35 @@ class BatchRetryProcessor:
         self.settings = settings
         self.pool_manager = pool_manager
         self.batch_submitter = batch_submitter
+
+    async def _load_persisted_llm_overrides(
+        self,
+        cj_batch_id: int,
+        correlation_id: UUID,
+    ) -> dict[str, Any]:
+        """Load persisted LLM overrides from batch metadata."""
+
+        async with self.database.session() as session:
+            from .batch_submission import get_batch_state
+
+            batch_state = await get_batch_state(
+                session=session,
+                cj_batch_id=cj_batch_id,
+                correlation_id=correlation_id,
+            )
+
+        if not batch_state:
+            return {}
+
+        metadata = batch_state.processing_metadata
+        if not metadata or not isinstance(metadata, dict):
+            return {}
+
+        overrides = metadata.get("llm_overrides")
+        if isinstance(overrides, dict):
+            return overrides
+
+        return {}
 
     async def submit_retry_batch(
         self,
@@ -104,6 +133,26 @@ class BatchRetryProcessor:
                 )
                 return None
 
+            # Resolve overrides by falling back to persisted metadata
+            persisted_overrides = await self._load_persisted_llm_overrides(
+                cj_batch_id=cj_batch_id,
+                correlation_id=correlation_id,
+            )
+
+            def _resolve_override(value: Any, key: str) -> Any:
+                return value if value is not None else persisted_overrides.get(key)
+
+            final_model_override = _resolve_override(model_override, "model_override")
+            final_temperature_override = _resolve_override(
+                temperature_override, "temperature_override"
+            )
+            final_max_tokens_override = _resolve_override(
+                max_tokens_override, "max_tokens_override"
+            )
+            final_system_prompt_override = _resolve_override(
+                system_prompt_override, "system_prompt_override"
+            )
+
             # Submit retry batch using core submitter
             result = cast(
                 BatchSubmissionResult,
@@ -112,10 +161,10 @@ class BatchRetryProcessor:
                     comparison_tasks=retry_tasks,
                     correlation_id=correlation_id,
                     config_overrides=None,  # Use defaults for retry
-                    model_override=model_override,
-                    temperature_override=temperature_override,
-                    max_tokens_override=max_tokens_override,
-                    system_prompt_override=system_prompt_override,
+                    model_override=final_model_override,
+                    temperature_override=final_temperature_override,
+                    max_tokens_override=final_max_tokens_override,
+                    system_prompt_override=final_system_prompt_override,
                 ),
             )
 
