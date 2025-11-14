@@ -31,6 +31,7 @@ async def test_register_anchor_essays_success(tmp_path: Path, unused_tcp_port: i
     async def handler(request: web.Request) -> web.Response:
         payload = await request.json()
         assert payload["grade"] == "A"
+        assert payload["anchor_label"] == "A1"
         assert payload["assignment_id"] == "11111111-1111-1111-1111-111111111111"
         assert payload["essay_text"] == "Anchor text"
         return web.json_response(

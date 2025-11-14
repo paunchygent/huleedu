@@ -182,6 +182,25 @@ class CJRepositoryProtocol(Protocol):
         """Get CJ batch upload by ID."""
         ...
 
+    async def upsert_anchor_reference(
+        self,
+        session: AsyncSession,
+        *,
+        assignment_id: str,
+        anchor_label: str,
+        grade: str,
+        grade_scale: str,
+        text_storage_id: str,
+    ) -> int:
+        """Create or update anchor for (assignment_id, anchor_label, grade_scale).
+
+        Implementations MUST rely on the database-level uniqueness guarantee on
+        ``(assignment_id, anchor_label, grade_scale)`` so that repeated registrations
+        for the same triple are idempotent and always return the same anchor ID
+        while updating ``text_storage_id`` (and grade) to the latest values.
+        """
+        ...
+
     async def get_anchor_essay_references(
         self,
         session: AsyncSession,

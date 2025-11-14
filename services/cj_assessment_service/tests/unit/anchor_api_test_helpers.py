@@ -104,6 +104,10 @@ class MockCJRepository(CJRepositoryProtocol):
         self.assignment_contexts: dict[str, dict[str, Any]] = {}
         self.register_assignment_context("default-assignment")
         self._instruction_store = AssessmentInstructionStore()
+        # In-memory anchor storage keyed by (assignment_id, anchor_label, grade_scale)
+        self._anchors: dict[tuple[str, str, str], AnchorEssayReference] = {}
+        self._next_anchor_id: int = 42
+        self.upsert_calls: list[dict[str, Any]] = []
 
     def register_assignment_context(
         self,
@@ -141,6 +145,58 @@ class MockCJRepository(CJRepositoryProtocol):
     ) -> dict[str, Any] | None:
         """Return stored assignment context for tests."""
         return self.assignment_contexts.get(assignment_id)
+
+    async def upsert_anchor_reference(
+        self,
+        session: AsyncSession,
+        *,
+        assignment_id: str,
+        anchor_label: str,
+        grade: str,
+        grade_scale: str,
+        text_storage_id: str,
+    ) -> int:
+        """Mock anchor upsert using in-memory store.
+
+        Simulates PostgreSQL ``INSERT .. ON CONFLICT DO UPDATE`` on
+        (assignment_id, anchor_label, grade_scale): first call creates an
+        anchor with a deterministic ID; subsequent calls for the same triple
+        reuse the ID and update ``text_storage_id``. When ``behavior`` is
+        "database_failure", this method raises to exercise API error paths.
+        """
+        self.upsert_calls.append(
+            {
+                "assignment_id": assignment_id,
+                "anchor_label": anchor_label,
+                "grade": grade,
+                "grade_scale": grade_scale,
+                "text_storage_id": text_storage_id,
+            }
+        )
+
+        if self.behavior == "database_failure":
+            raise RuntimeError("Database operation failed")
+
+        key = (assignment_id, anchor_label, grade_scale)
+
+        anchor = self._anchors.get(key)
+        if anchor is None:
+            anchor = AnchorEssayReference(
+                assignment_id=assignment_id,
+                anchor_label=anchor_label,
+                grade=grade,
+                grade_scale=grade_scale,
+                text_storage_id=text_storage_id,
+            )
+            anchor.id = self._next_anchor_id
+            self._next_anchor_id += 1
+            self._anchors[key] = anchor
+        else:
+            anchor.text_storage_id = text_storage_id
+
+        # Track last created/updated anchor for existing assertions
+        self.created_anchor = anchor
+        return int(anchor.id)
 
     async def get_cj_batch_upload(
         self,

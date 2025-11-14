@@ -10,7 +10,6 @@ from quart import Blueprint, request
 from quart_dishka import inject
 
 from services.cj_assessment_service.models_api import RegisterAnchorRequest
-from services.cj_assessment_service.models_db import AnchorEssayReference
 from services.cj_assessment_service.protocols import CJRepositoryProtocol, ContentClientProtocol
 
 logger = create_service_logger("anchor_management")
@@ -74,6 +73,8 @@ async def register_anchor_essay(
 
             grade_scale = assignment_context.get("grade_scale", "swedish_8_anchor")
 
+            anchor_label = register_request.anchor_label or register_request.grade
+
             try:
                 grade_is_valid = validate_grade_for_scale(
                     register_request.grade,
@@ -105,21 +106,21 @@ async def register_anchor_essay(
                 logger.error("Content Service did not return storage_id")
                 return {"error": "Failed to store essay content"}, 500
 
-            anchor_ref = AnchorEssayReference(
+            anchor_id = await repository.upsert_anchor_reference(
+                session,
                 assignment_id=register_request.assignment_id,
+                anchor_label=anchor_label,
                 grade=register_request.grade,
                 grade_scale=grade_scale,
                 text_storage_id=storage_id,
             )
-            session.add(anchor_ref)
-            await session.flush()
 
             logger.info(
                 "Registered anchor essay %s for assignment %s",
-                anchor_ref.id,
+                anchor_id,
                 register_request.assignment_id,
                 extra={
-                    "anchor_id": anchor_ref.id,
+                    "anchor_id": anchor_id,
                     "assignment_id": register_request.assignment_id,
                     "grade": register_request.grade,
                     "grade_scale": grade_scale,
@@ -128,7 +129,7 @@ async def register_anchor_essay(
             )
 
             return {
-                "anchor_id": anchor_ref.id,
+                "anchor_id": anchor_id,
                 "storage_id": storage_id,
                 "grade_scale": grade_scale,
                 "status": "registered",

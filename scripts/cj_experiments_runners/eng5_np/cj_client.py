@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from pathlib import Path
 from typing import Sequence
 
 import aiohttp
@@ -37,7 +38,9 @@ async def register_anchor_essays(
     async with aiohttp.ClientSession(timeout=timeout) as session:
 
         async def _register(record: FileRecord) -> None:
-            grade = extract_grade_from_filename(record.path.name)
+            filename = record.path.name
+            grade = extract_grade_from_filename(filename)
+            anchor_label = Path(filename).stem
             try:
                 essay_text = await asyncio.to_thread(extract_text, record.path)
             except TextExtractionError as exc:
@@ -46,6 +49,7 @@ async def register_anchor_essays(
             payload = {
                 "assignment_id": str(assignment_id),
                 "grade": grade,
+                "anchor_label": anchor_label,
                 "essay_text": essay_text,
             }
 
@@ -56,9 +60,11 @@ async def register_anchor_essays(
                 ) as response:
                     if response.status != 201:
                         body = await response.text()
-                        raise AnchorRegistrationError(
-                            f"Anchor registration failed ({response.status}) for {record.path.name}: {body[:200]}"
+                        message = (
+                            f"Anchor registration failed ({response.status}) for "
+                            f"{record.path.name}: {body[:200]}"
                         )
+                        raise AnchorRegistrationError(message)
                     responses.append(await response.json())
 
         await asyncio.gather(*(_register(record) for record in valid_records))

@@ -74,6 +74,7 @@ class TestENG5ScaleFlows:
         # Create anchor essay references
         for grade in anchor_grades:
             anchor_ref = AnchorEssayReference(
+                anchor_label=f"{assignment_id}_{grade}",
                 grade=grade,
                 grade_scale=grade_scale,
                 text_storage_id=f"anchor_storage_{grade_scale}_{grade}",

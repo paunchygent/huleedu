@@ -173,6 +173,41 @@ class TestAnchorRegistrationEndpoint:
         assert response_data["status"] == "registered"
         assert "storage_id" in response_data
 
+    @pytest.mark.asyncio
+    async def test_register_anchor_essay_idempotent_upsert_updates_storage_id(
+        self,
+        client: QuartTestClient,
+        mock_content_client: ContentClientProtocol,
+        mock_repository: MockCJRepository,
+    ) -> None:
+        mock_repository.register_assignment_context("idempotent-assignment")
+
+        mock_content_client.storage_id = "content-first"
+        request_data = {
+            "assignment_id": "idempotent-assignment",
+            "grade": "A",
+            "essay_text": (
+                "First registration content with sufficient length to satisfy validation "
+                "requirements for anchor registration."
+            ),
+        }
+
+        response_first = await client.post("/api/v1/anchors/register", json=request_data)
+        assert response_first.status_code == 201
+        first_payload = await response_first.get_json()
+        first_anchor_id = first_payload["anchor_id"]
+        assert first_payload["storage_id"] == "content-first"
+
+        mock_content_client.storage_id = "content-second"
+        response_second = await client.post("/api/v1/anchors/register", json=request_data)
+        assert response_second.status_code == 201
+        second_payload = await response_second.get_json()
+
+        assert second_payload["anchor_id"] == first_anchor_id
+        assert second_payload["storage_id"] == "content-second"
+        assert mock_repository.created_anchor is not None
+        assert mock_repository.created_anchor.text_storage_id == "content-second"
+
 
 class TestAnchorAPIDependencyIntegration:
     """Test anchor API dependency integration via protocols."""

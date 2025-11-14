@@ -76,6 +76,7 @@ class TestAnchorEssayWorkflow:
 
         for grade, storage_id in anchor_grades:
             anchor_ref = AnchorEssayReference(
+                anchor_label=f"anchor_{grade}",
                 grade=grade,
                 text_storage_id=storage_id,
                 assignment_id=assignment_id,

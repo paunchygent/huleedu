@@ -14,6 +14,7 @@ from common_core.models.error_models import ErrorDetail as CanonicalErrorDetail
 from huleedu_service_libs.database import DatabaseMetrics, setup_database_monitoring
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import func, select, update
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from services.cj_assessment_service.config import Settings
@@ -559,6 +560,48 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
     ) -> CJBatchUpload | None:
         """Get CJ batch upload by ID."""
         return await session.get(CJBatchUpload, cj_batch_id)
+
+    async def upsert_anchor_reference(
+        self,
+        session: AsyncSession,
+        *,
+        assignment_id: str,
+        anchor_label: str,
+        grade: str,
+        grade_scale: str,
+        text_storage_id: str,
+    ) -> int:
+        """Create/update an anchor for an assignment/anchor-label/scale triple.
+
+        Uses PostgreSQL ``INSERT .. ON CONFLICT DO UPDATE`` keyed on the
+        ``(assignment_id, anchor_label, grade_scale)`` unique constraint so
+        each label is unique per assignment + scale, while allowing multiple
+        anchors to share the same grade. Re-upserting the same label keeps the
+        anchor ID stable and updates ``text_storage_id``/``grade`` in place.
+
+        Note:
+            PostgreSQL's unique constraint semantics allow multiple rows with
+            ``assignment_id IS NULL``. This method is intended for
+            assignment-scoped anchors where ``assignment_id`` is non-null.
+        """
+        from services.cj_assessment_service.models_db import AnchorEssayReference
+
+        stmt = insert(AnchorEssayReference).values(
+            assignment_id=assignment_id,
+            anchor_label=anchor_label,
+            grade=grade,
+            grade_scale=grade_scale,
+            text_storage_id=text_storage_id,
+        )
+
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["assignment_id", "anchor_label", "grade_scale"],
+            set_={"text_storage_id": text_storage_id, "grade": grade},
+        ).returning(AnchorEssayReference.id)
+
+        result = await session.execute(stmt)
+        anchor_id = result.scalar_one()
+        return int(anchor_id)
 
     async def get_anchor_essay_references(
         self,

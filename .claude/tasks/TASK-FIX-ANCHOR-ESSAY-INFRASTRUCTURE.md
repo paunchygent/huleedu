@@ -187,21 +187,28 @@ This task is implemented in three phases. The parent document stays **architectu
 
 **Key outcomes**:
 
-- `anchor_essay_references` contains exactly one row per `(assignment_id, grade, grade_scale)` combination.
+- `anchor_essay_references` enforces uniqueness per `(assignment_id, anchor_label, grade_scale)`
+  combination, allowing multiple anchors at the same grade as long as their labels differ.
 - ENG5 dev data is cleaned so only the post-restart anchor set (IDs 49–60) remains for the test assignment.
 - A unique constraint enforces the invariant for all future writes.
 
 **Design points**:
 
 - Anchors are **assignment-scoped** today and use `assignment_id` as the join key to `AssessmentInstruction`.
-- The unique constraint is defined on `(assignment_id, grade, grade_scale)` and is meant to capture the **assignment-level** invariant only.
+- The database uniqueness invariant is ultimately defined on `(assignment_id, anchor_label, grade_scale)`
+  so that identity is filename/label-based, not grade-based. This permits multiple anchors per grade
+  while still giving a stable key for idempotent registration.
 - Cleanup for ENG5 is explicitly scoped to the known test assignment and grade scale to avoid touching any future/production data.
 
 **Implementation guidance**:
 
-- Add a CJ Alembic migration that:
-  - Deletes stale ENG5 duplicates created before the Content Service persistence fix.
-  - Adds the unique constraint `uq_anchor_assignment_grade_scale`.
+- Add CJ Alembic migrations that:
+  - Delete stale ENG5 duplicates created before the Content Service persistence fix (dev-only cleanup).
+  - Introduce a transitional unique constraint `uq_anchor_assignment_grade_scale` on
+    `(assignment_id, grade, grade_scale)` for the cleaned ENG5 data set.
+  - Add an `anchor_label` column, backfill existing rows with deterministic synthetic labels, and
+    replace the grade-based constraint with `uq_anchor_assignment_label_scale` on
+    `(assignment_id, anchor_label, grade_scale)`.
 - Add migration tests to exercise:
   - Upgrade from a clean database.
   - Duplicate-prevention behaviour.
@@ -210,11 +217,13 @@ This task is implemented in three phases. The parent document stays **architectu
 
 ### Phase 3: Anchor upsert and ENG5 runner verification
 
-**Goal**: Make anchor registration idempotent at the assignment/grade/scale level and prove that ENG5 execute flows run cleanly end-to-end.
+**Goal**: Make anchor registration idempotent at the `(assignment_id, anchor_label, grade_scale)` key
+and prove that ENG5 execute flows run cleanly end-to-end while supporting multiple anchors per grade.
 
 **Key outcomes**:
 
-- Registering anchors for the same `(assignment_id, grade, grade_scale)` updates the existing row instead of creating duplicates.
+- Registering anchors for the same `(assignment_id, anchor_label, grade_scale)` updates the existing
+  row instead of creating duplicates.
 - The CJ anchor registration API remains stable (still returns `anchor_id`, `storage_id`, and `grade_scale`).
 - ENG5 runner execute-mode uses the corrected anchor set without `RESOURCE_NOT_FOUND` errors from Content Service.
 
@@ -227,6 +236,12 @@ This task is implemented in three phases. The parent document stays **architectu
   - Resolve `grade_scale` via `AssessmentInstruction` using `assignment_id`.
   - Store essay text via Content Service (storage-by-reference, no inline text).
   - Delegate anchor persistence to the repository’s upsert method.
+
+**ENG5 filename convention (for anchors)**:
+
+- ENG5 anchor essays are named like `anchor_essay_0001_F+.txt`.
+- `anchor_label` is the filename stem (e.g. `anchor_essay_0001_F+`).
+- `grade` is inferred from the last underscore-separated token in the stem (e.g. `F+`).
 
 **Implementation guidance**:
 
@@ -269,111 +284,6 @@ This task is implemented in three phases. The parent document stays **architectu
 - The unique constraint `UNIQUE (assignment_id, grade, grade_scale)` is intentionally defined for **assignment-level anchors only**.
 - We do **not** rely on PostgreSQL's `NULL` semantics here; real anchors always have `assignment_id` set.
 - When/if we add course-level anchors, we will do so via a dedicated schema change (e.g. adding `course_id` to the anchor table and defining explicit uniqueness rules), not by overloading NULL `assignment_id` rows.
-
----
-
-### Phase 2: Add Database Unique Constraint with Cleanup
-
-**Objective**: Prevent future duplicate anchor uploads and clean up existing stale data
-
-**File**: `services/cj_assessment_service/alembic/versions/20251113_HHMM_add_anchor_unique_constraint.py`
-
-**Pattern Reference**: Based on `20250719_0003_add_content_idempotency_constraints.py` (cleanup before constraint)
-
-**Migration Content**:
-
-```python
-"""Add unique constraint to anchor_essay_references
-
-Prevents duplicate anchor essays for same assignment/grade/scale combination.
-Includes cleanup of existing duplicates before constraint application.
-
-Revision ID: <generated>
-Revises: <previous_revision>
-Create Date: 2025-11-13
-"""
-
-import sqlalchemy as sa
-from alembic import op
-
-revision: str = "<generated>"
-down_revision: str = "<previous_revision>"
-branch_labels = None
-depends_on = None
-
-
-def upgrade() -> None:
-    """Add unique constraint and clean up duplicate anchors."""
-
-    # Step 1: Clean up stale anchor references before adding constraint.
-    # This is a **development-only** cleanup for ENG5 test data created before the
-    # Content Service persistence fix. It is deliberately scoped to the known
-    # ENG5 assignment and grade scale to avoid touching any future data.
-    op.execute("""
-        DELETE FROM anchor_essay_references
-        WHERE assignment_id = '00000000-0000-0000-0000-000000000001'
-          AND grade_scale = 'swedish_8_anchor'
-          AND id < 49
-    """)
-
-    # Step 2: Add unique constraint to prevent future duplicates.
-    # This constraint captures the intended invariant for **assignment-level**
-    # anchors (one anchor per assignment/grade/scale combination). Any future
-    # course-level anchor design will be implemented via a separate schema
-    # change rather than overloading NULL assignment IDs.
-    op.create_unique_constraint(
-        "uq_anchor_assignment_grade_scale",
-        "anchor_essay_references",
-        ["assignment_id", "grade", "grade_scale"]
-    )
-
-
-def downgrade() -> None:
-    """Remove unique constraint (does not restore deleted records)."""
-    op.drop_constraint(
-        "uq_anchor_assignment_grade_scale",
-        "anchor_essay_references",
-        type_="unique"
-    )
-```
-
-**Commands**:
-
-```bash
-# Create migration
-cd services/cj_assessment_service
-../../.venv/bin/alembic revision -m "Add unique constraint to anchor_essay_references"
-# Then manually edit the generated file to include the cleanup and constraint logic above
-
-# Apply migration
-pdm run dev-restart cj_assessment_service
-../../.venv/bin/alembic upgrade head
-
-# Verify migration applied
-../../.venv/bin/alembic current
-```
-
-**Verification**:
-
-```bash
-# Check constraint exists
-docker exec huleedu_cj_assessment_db psql -U "$HULEEDU_DB_USER" -d huleedu_cj_assessment -c "
-SELECT constraint_name, constraint_type
-FROM information_schema.table_constraints
-WHERE table_name = 'anchor_essay_references'
-AND constraint_type = 'UNIQUE';"
-
-# Verify cleanup worked
-docker exec huleedu_cj_assessment_db psql -U "$HULEEDU_DB_USER" -d huleedu_cj_assessment -c "
-SELECT COUNT(*), MIN(id), MAX(id)
-FROM anchor_essay_references
-WHERE assignment_id = '00000000-0000-0000-0000-000000000001';"
-```
-
-Expected:
-
-- Constraint `uq_anchor_assignment_grade_scale` exists
-- `COUNT=12, MIN=49, MAX=60`
 
 ---
 

@@ -117,6 +117,7 @@ class RegisterAnchorRequest(BaseModel):
 
     assignment_id: str
     grade: str
+    anchor_label: str | None = None
     essay_text: str
 
     @field_validator("assignment_id", "grade")
