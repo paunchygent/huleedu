@@ -9,7 +9,7 @@ metadata-complete artefacts that power Phase 3.3 confidence analysis.
 
 1. **Repo setup**: `pdm install` with `monorepo-tools` extras.
 2. **Assets**: `test_uploads/ANCHOR ESSAYS/ROLE_MODELS_ENG5_NP_2016/**` present with instructions,
-   prompt, anchor essays, and student essays.
+   prompt, anchor essays, and student essays. Anchors must be registered with CJ; the CLI now performs registration automatically during EXECUTE and aborts if the CJ endpoint is unreachable.
 3. **Docker stack**: `pdm run dev-build-start cj_assessment_service llm_provider_service`
    (or `pdm run dev-start ...`) so CJ + LLM Provider are reachable.
 4. **Environment**: `source .env` to fill Kafka/bootstrap credentials. Confirm
@@ -31,15 +31,17 @@ metadata-complete artefacts that power Phase 3.3 confidence analysis.
    pdm run eng5-np-run --mode dry-run --batch-id dev-batch --no-kafka
    ```
 
-3. Execute with Kafka + await completion.
+3. Execute with Kafka + await completion (ensure `CJ_SERVICE_URL` or `--cj-service-url` points at the active CJ instance; missing/invalid URLs now cause an immediate runner error).
 
-   ```bash
-   pdm run eng5-np-run \
-     --mode execute \
-     --batch-id dev-batch-$(date +%Y%m%d-%H%M) \
-     --await-completion \
-     --completion-timeout 1800
-   ```
+```bash
+pdm run eng5-np-run \
+  --mode execute \
+  --batch-id dev-batch-$(date +%Y%m%d-%H%M) \
+  --await-completion \
+  --completion-timeout 1800
+```
+
+> Optional: `--max-comparisons N` is now published as metadata for CJ to interpret (the runner no longer slices essays locally). Set it only when you need downstream observability/cost limits.
 
 4. On success the CLI prints a comparison/cost summary and the artefact lives under
    `.claude/research/data/eng5_np_2016/assessment_run.execute.json`.
@@ -212,3 +214,7 @@ Use `jq` to spot-check the execute artefact after a run:
 - Summary JSON: `.claude/research/data/eng5_np_2016/assessment_run.execute.json`
 
 Keep this runbook updated as ENG5 tooling evolves (e.g., new overrides, different cost reporting).
+- **Anchor registration failure**
+
+  - *Cause*: `CJ_SERVICE_URL` missing/incorrect, CJ admin auth expired, or anchor API down.
+  - *Action*: Fix configuration or CJ availability and rerun; EXECUTE mode now intentionally aborts rather than falling back to uploading anchors inline.

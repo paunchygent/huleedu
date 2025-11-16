@@ -257,19 +257,11 @@ Expected output:
 ...
 ```
 
-### Persistent vs Ephemeral Anchors
+### Anchor Registration is Mandatory
 
-**Persistent Anchors (Recommended):**
-- Registered once via `register-anchors` command
-- Stored in `anchor_essay_references` table
-- Automatically loaded for all batches using this `assignment_id`
-- More efficient (no redundant uploads)
-
-**Ephemeral Anchors (Fallback):**
-- Used when anchor registration fails or is skipped
-- Uploaded with each batch execution
-- Not persisted in database
-- Runner treats them like student essays but marks as anchors
+- Register anchors once via `register-anchors` or the ENG5 CLI `--mode execute` bootstrap.
+- Anchors are stored in `anchor_essay_references` and automatically loaded for every batch referencing the assignment.
+- **EXECUTE runs now abort if anchor registration fails or if `--cj-service-url` is missing.** There is no longer a fallback path that uploads anchors with the batch payload.
 
 ## Step 5: Run the ENG5 NP Runner
 
@@ -289,9 +281,11 @@ docker compose -f docker-compose.yml -f docker-compose.eng5-runner.yml run --rm 
 - `--assignment-id`: Must match the `assignment_id` created in Step 1
 - `--course-id`: Course identifier for metadata
 
-### System Prompt Override
+### System Prompt Override & Comparison Budget Metadata
 
 The runner now exposes `--cj-system-prompt/--no-cj-system-prompt`. Keep the default (`--cj-system-prompt`) to inject the canonical Comparative Judgement system instructions defined in `scripts/cj_experiments_runners/eng5_np/system_prompt.py`. Disable it only if you plan to supply a different override downstream; otherwise the provider falls back to the generic “LLM comparison engine” prompt.
+
+`--max-comparisons` is forwarded to CJ as envelope metadata for observability/cost control. It no longer slices essays locally; CJ configuration (`COMPARISONS_PER_STABILITY_CHECK_ITERATION` / `MAX_PAIRWISE_COMPARISONS`) determines actual comparison counts.
 
 ## What Happens During Execution
 
@@ -317,20 +311,7 @@ The runner now exposes `--cj-system-prompt/--no-cj-system-prompt`. Keep the defa
    - Bradley-Terry model uses anchor grades for calibration
    - Grade projections generated for student essays
 
-### Without Registered Anchors (Fallback Path)
-
-1. **Ephemeral Mode Detection**:
-   - Runner detects no registered anchors for `assignment_id`
-   - Falls back to ephemeral anchor mode
-
-2. **Content Upload**:
-   - Runner uploads **both anchors and student essays** to Content Service
-   - Anchors treated as temporary references for this batch only
-
-3. **Assessment**:
-   - Both anchors and students included in comparison pool
-   - Anchors not persisted (no `anchor_essay_references` records)
-   - Still functions but less efficient for repeated batches
+> ⚠️  If the runner cannot find registered anchors for the `assignment_id`, EXECUTE mode now aborts immediately so CJ never receives unvetted “ephemeral” anchors. Fix the underlying registration issue before rerunning.
 
 ## Verification
 
@@ -493,7 +474,7 @@ pdm run python -m scripts.cj_experiments_runners.eng5_np.cli \
 - 4 student essays uploaded to Content Service
 - 12 anchor essays loaded from database (no re-upload)
 - Total: 16 essays in comparison pool
-- 5 comparison tasks generated (limited by `--max-comparisons 2` means 2 per essay)
+- Envelope metadata includes `max_comparisons=2`; CJ uses `COMPARISONS_PER_STABILITY_CHECK_ITERATION` / `MAX_PAIRWISE_COMPARISONS` to determine actual pair counts
 - All comparison tasks queued to LLM Provider Service (HTTP 202)
 - LLM callbacks received via Kafka
 - Grade projections calculated

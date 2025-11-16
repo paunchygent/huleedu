@@ -248,29 +248,53 @@ class GradeProjector:
         First tries to get grade from ranking metadata (if anchors were properly
         seeded with grades). Falls back to matching via context anchor references.
         """
-        anchor_grades = {}
+        anchor_grades: dict[str, str] = {}
 
-        # Build lookup from context anchor references
-        context_grades = {}
+        # Build lookups from context anchor references for multiple identifiers
+        context_grades_by_storage: dict[str, str] = {}
+        context_grades_by_ref: dict[str, str] = {}
         for ref in context.anchor_essay_refs:
-            # Anchor refs use text_storage_id, need to map to essay_id somehow
-            # This assumes anchor essays store text_storage_id in their metadata
-            context_grades[ref.text_storage_id] = ref.grade
+            context_grades_by_storage[ref.text_storage_id] = ref.grade
+            if getattr(ref, "id", None) is not None:
+                context_grades_by_ref[str(ref.id)] = ref.grade
 
         for anchor in anchors:
             essay_id = anchor["els_essay_id"]
+            metadata = anchor.get("processing_metadata") or {}
 
-            # First try: get grade from ranking metadata (preferred)
-            if "anchor_grade" in anchor and anchor["anchor_grade"]:
-                anchor_grades[essay_id] = anchor["anchor_grade"]
+            # Primary: explicit anchor grade on ranking metadata
+            explicit_grade = anchor.get("anchor_grade") or metadata.get("anchor_grade")
+            if explicit_grade:
+                anchor_grades[essay_id] = explicit_grade
                 continue
 
-            # Second try: match via content_id if available
-            # This assumes anchors have content_id in their processing metadata
-            # In practice, this mapping should be established when seeding anchors
+            # Secondary: some ingest paths store the grade as known_grade
+            known_grade = metadata.get("known_grade")
+            if known_grade:
+                anchor_grades[essay_id] = known_grade
+                continue
+
+            # Fallbacks: resolve via identifiers matched against context data
+            text_storage_id = anchor.get("text_storage_id") or metadata.get("text_storage_id")
+            if text_storage_id and text_storage_id in context_grades_by_storage:
+                anchor_grades[essay_id] = context_grades_by_storage[text_storage_id]
+                continue
+
+            anchor_ref_id = metadata.get("anchor_ref_id")
+            if anchor_ref_id and anchor_ref_id in context_grades_by_ref:
+                anchor_grades[essay_id] = context_grades_by_ref[anchor_ref_id]
+                continue
+
             self.logger.warning(
-                f"Anchor {essay_id} missing grade in metadata, calibration may be incomplete",
-                extra={"essay_id": essay_id},
+                "Anchor %s missing resolvable grade; skipping for projection",
+                essay_id,
+                extra={
+                    "essay_id": essay_id,
+                    "available_metadata": {
+                        "text_storage_id": text_storage_id,
+                        "anchor_ref_id": anchor_ref_id,
+                    },
+                },
             )
 
         return anchor_grades

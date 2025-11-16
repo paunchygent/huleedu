@@ -7,11 +7,13 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator
+from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
 
 import pytest
 
 from services.cj_assessment_service.cj_core_logic import workflow_continuation as wc
+from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.models_db import AssessmentInstruction, CJBatchState
 from services.cj_assessment_service.protocols import CJRepositoryProtocol
 from services.cj_assessment_service.tests.unit.instruction_store import AssessmentInstructionStore
@@ -25,6 +27,9 @@ class _FakeSession:
         class _Res:
             def __init__(self, n: int) -> None:
                 self._n = n
+
+            def scalar_one(self) -> int:
+                return self._n
 
             def scalars(self) -> Any:
                 class _Scalars:
@@ -236,3 +241,183 @@ async def test_check_continuation_false(monkeypatch: Any) -> None:
 
     # Assert
     assert should_continue is False
+
+
+@pytest.mark.parametrize(
+    "metadata,max_pairs_expected,enforce_full_budget",
+    [
+        (
+            {"comparison_budget": {"max_pairs_requested": 120, "source": "runner_override"}},
+            120,
+            True,
+        ),
+        (
+            {"comparison_budget": {"max_pairs_requested": 75, "source": "service_default"}},
+            75,
+            False,
+        ),
+        (None, 350, False),
+        (
+            {"comparison_budget": {"max_pairs_requested": 0, "source": "service_default"}},
+            350,
+            False,
+        ),
+    ],
+)
+def test_resolve_comparison_budget(
+    metadata: dict[str, Any] | None, max_pairs_expected: int, enforce_full_budget: bool
+) -> None:
+    settings = Mock(spec=Settings)
+    settings.MAX_PAIRWISE_COMPARISONS = 350
+
+    max_pairs, enforce_budget = wc._resolve_comparison_budget(metadata, settings)
+
+    assert max_pairs == max_pairs_expected
+    assert enforce_budget is enforce_full_budget
+
+
+@pytest.mark.asyncio
+async def test_trigger_continuation_enqueues_additional_pairs(monkeypatch: Any) -> None:
+    settings = Mock(spec=Settings)
+    settings.MAX_PAIRWISE_COMPARISONS = 500
+    repo = _Repo(_FakeSession(completed_count=15))
+    event_publisher = AsyncMock()
+    content_client = AsyncMock()
+    llm_interaction = AsyncMock()
+
+    async def fake_completion_conditions(*_args: Any, **_kwargs: Any) -> bool:
+        return False
+
+    monkeypatch.setattr(wc, "check_batch_completion_conditions", fake_completion_conditions)
+
+    batch_state = Mock()
+    batch_state.total_comparisons = 40
+    batch_state.completion_threshold_pct = 95
+    batch_state.processing_metadata = {
+        "comparison_budget": {"max_pairs_requested": 100, "source": "runner_override"},
+        "config_overrides": {"batch_size": 25},
+        "llm_overrides": {"model_override": "claude"},
+        "original_request": {
+            "assignment_id": "assignment-123",
+            "language": "en",
+            "course_code": "ENG5",
+            "max_comparisons_override": 175,
+        },
+    }
+
+    async def fake_get_batch_state(*_args: Any, **_kwargs: Any) -> Any:
+        return batch_state
+
+    monkeypatch.setattr(wc, "get_batch_state", fake_get_batch_state)
+
+    class _Checker:
+        def __init__(self, *_args: Any, **_kwargs: Any) -> None:
+            pass
+
+        async def check_batch_completion(self, *_args: Any, **_kwargs: Any) -> bool:
+            return False
+
+    monkeypatch.setattr(wc, "BatchCompletionChecker", _Checker)
+
+    finalizer_called = AsyncMock()
+
+    class _Finalizer:
+        def __init__(self, *_args: Any, **_kwargs: Any) -> None:
+            pass
+
+        async def finalize_scoring(self, *_args: Any, **_kwargs: Any) -> None:
+            await finalizer_called()
+
+    monkeypatch.setattr(wc, "BatchFinalizer", _Finalizer)
+
+    request_additional = AsyncMock(return_value=True)
+    monkeypatch.setattr(
+        wc.comparison_processing,
+        "request_additional_comparisons_for_batch",
+        request_additional,
+    )
+
+    await wc.trigger_existing_workflow_continuation(
+        batch_id=7,
+        database=repo,
+        event_publisher=event_publisher,
+        settings=settings,
+        content_client=content_client,
+        correlation_id=uuid4(),
+        llm_interaction=llm_interaction,
+    )
+
+    request_additional.assert_awaited_once()
+    assert request_additional.await_args is not None
+    _, kwargs = request_additional.await_args
+    assert kwargs["config_overrides_payload"] == {"batch_size": 25}
+    assert kwargs["llm_overrides_payload"] == {"model_override": "claude"}
+    assert kwargs["original_request_payload"] == batch_state.processing_metadata["original_request"]
+    finalizer_called.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_trigger_continuation_finalizes_when_budget_exhausted(monkeypatch: Any) -> None:
+    settings = Mock(spec=Settings)
+    settings.MAX_PAIRWISE_COMPARISONS = 200
+    repo = _Repo(_FakeSession(completed_count=50))
+    event_publisher = AsyncMock()
+    content_client = AsyncMock()
+    llm_interaction = AsyncMock()
+
+    async def fake_completion_conditions(*_args: Any, **_kwargs: Any) -> bool:
+        return False
+
+    monkeypatch.setattr(wc, "check_batch_completion_conditions", fake_completion_conditions)
+
+    batch_state = Mock()
+    batch_state.total_comparisons = 200
+    batch_state.completion_threshold_pct = 95
+    batch_state.processing_metadata = {
+        "comparison_budget": {"max_pairs_requested": 200, "source": "service_default"},
+    }
+
+    async def fake_get_batch_state(*_args: Any, **_kwargs: Any) -> Any:
+        return batch_state
+
+    monkeypatch.setattr(wc, "get_batch_state", fake_get_batch_state)
+
+    class _Checker:
+        def __init__(self, *_args: Any, **_kwargs: Any) -> None:
+            pass
+
+        async def check_batch_completion(self, *_args: Any, **_kwargs: Any) -> bool:
+            return False
+
+    monkeypatch.setattr(wc, "BatchCompletionChecker", _Checker)
+
+    finalize_called = AsyncMock()
+
+    class _Finalizer:
+        def __init__(self, *_args: Any, **_kwargs: Any) -> None:
+            pass
+
+        async def finalize_scoring(self, *_args: Any, **_kwargs: Any) -> None:
+            await finalize_called()
+
+    monkeypatch.setattr(wc, "BatchFinalizer", _Finalizer)
+
+    request_additional = AsyncMock(return_value=False)
+    monkeypatch.setattr(
+        wc.comparison_processing,
+        "request_additional_comparisons_for_batch",
+        request_additional,
+    )
+
+    await wc.trigger_existing_workflow_continuation(
+        batch_id=9,
+        database=repo,
+        event_publisher=event_publisher,
+        settings=settings,
+        content_client=content_client,
+        correlation_id=uuid4(),
+        llm_interaction=llm_interaction,
+    )
+
+    request_additional.assert_not_awaited()
+    finalize_called.assert_awaited_once()

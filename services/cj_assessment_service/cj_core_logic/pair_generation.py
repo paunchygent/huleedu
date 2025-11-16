@@ -29,7 +29,8 @@ async def generate_comparison_tasks(
     essays_for_comparison: list[EssayForComparison],
     db_session: AsyncSession,
     cj_batch_id: int,
-    existing_pairs_threshold: int = 5,
+    existing_pairs_threshold: int,
+    max_pairwise_comparisons: int | None = None,
     correlation_id: UUID | None = None,
 ) -> list[ComparisonTask]:
     """Generate comparison tasks for essays, avoiding duplicate comparisons.
@@ -62,7 +63,29 @@ async def generate_comparison_tasks(
     # Get existing comparison pairs to avoid duplicates
     existing_comparison_ids = await _fetch_existing_comparison_ids(db_session, cj_batch_id)
 
-    logger.debug(f"Found {len(existing_comparison_ids)} existing comparison pairs")
+    existing_count = len(existing_comparison_ids)
+    logger.debug(f"Found {existing_count} existing comparison pairs")
+
+    # Enforce optional global cap on total comparison pairs for this batch
+    if max_pairwise_comparisons is not None and existing_count >= max_pairwise_comparisons:
+        logger.warning(
+            "Global comparison cap reached; no new pairs will be generated",
+            extra={
+                "cj_batch_id": cj_batch_id,
+                "existing_pairs": existing_count,
+                "max_pairwise_comparisons": max_pairwise_comparisons,
+                "correlation_id": str(correlation_id) if correlation_id else None,
+            },
+        )
+        return []
+
+    # Respect remaining budget under global cap when deciding how many new pairs
+    remaining_budget = (
+        max_pairwise_comparisons - existing_count
+        if max_pairwise_comparisons is not None
+        else existing_pairs_threshold
+    )
+    effective_threshold = min(existing_pairs_threshold, remaining_budget)
 
     comparison_tasks = []
     new_pairs_count = 0
@@ -82,9 +105,9 @@ async def generate_comparison_tasks(
                 continue
 
             # Stop if we've generated too many new pairs in this round
-            if new_pairs_count >= existing_pairs_threshold:
+            if new_pairs_count >= effective_threshold:
                 logger.info(
-                    f"Reached new pairs threshold ({existing_pairs_threshold}), "
+                    f"Reached new pairs threshold ({effective_threshold}), "
                     f"stopping pair generation",
                 )
                 break
@@ -103,7 +126,7 @@ async def generate_comparison_tasks(
             new_pairs_count += 1
 
         # Break outer loop if threshold reached
-        if new_pairs_count >= existing_pairs_threshold:
+        if new_pairs_count >= effective_threshold:
             break
 
     logger.info(

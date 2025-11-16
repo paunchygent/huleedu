@@ -13,6 +13,8 @@ from huleedu_service_libs.logging_utils import create_service_logger
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from common_core.events.cj_assessment_events import LLMConfigOverrides
+
 from services.cj_assessment_service.cj_core_logic import pair_generation, scoring_ranking
 from services.cj_assessment_service.cj_core_logic.batch_config import BatchConfigOverrides
 from services.cj_assessment_service.cj_core_logic.batch_processor import BatchProcessor
@@ -22,8 +24,10 @@ from services.cj_assessment_service.cj_core_logic.batch_submission import (
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
 from services.cj_assessment_service.models_api import (
+    CJAssessmentRequestData,
     ComparisonTask,
     EssayForComparison,
+    OriginalCJRequestMetadata,
 )
 from services.cj_assessment_service.protocols import (
     CJRepositoryProtocol,
@@ -71,16 +75,50 @@ async def _persist_llm_overrides_if_present(
     )
 
 
+def _resolve_requested_max_pairs(settings: Settings, request_data: CJAssessmentRequestData) -> int:
+    """Determine the effective comparison budget for this batch."""
+
+    configured_cap = settings.MAX_PAIRWISE_COMPARISONS
+    override_value = request_data.max_comparisons_override
+
+    try:
+        override_int = int(override_value) if override_value is not None else None
+    except (TypeError, ValueError):
+        override_int = None
+
+    if override_int and override_int > 0:
+        return min(configured_cap, override_int) if configured_cap else override_int
+
+    return configured_cap
+
+
+def _build_budget_metadata(
+    *,
+    max_pairs_cap: int,
+    source: str,
+    batch_config_overrides: BatchConfigOverrides | None,
+) -> dict[str, Any]:
+    metadata: dict[str, Any] = {
+        "comparison_budget": {
+            "max_pairs_requested": max_pairs_cap,
+            "source": source,
+        }
+    }
+    if batch_config_overrides:
+        metadata["config_overrides"] = batch_config_overrides.model_dump(exclude_none=True)
+    return metadata
+
+
 async def submit_comparisons_for_async_processing(
     essays_for_api_model: list[EssayForComparison],
     cj_batch_id: int,
     database: CJRepositoryProtocol,
     llm_interaction: LLMInteractionProtocol,
-    request_data: dict[str, Any],
+    request_data: CJAssessmentRequestData,
     settings: Settings,
     correlation_id: UUID,
     log_extra: dict[str, Any],
-) -> None:
+) -> bool:
     """Submit essay comparisons for async LLM processing.
 
     This function submits all comparison tasks and transitions the batch to
@@ -98,23 +136,44 @@ async def submit_comparisons_for_async_processing(
         log_extra: Logging context data
     """
     # Extract LLM config overrides from request data
-    llm_config_overrides = request_data.get("llm_config_overrides")
+    llm_config_overrides = request_data.llm_config_overrides
     model_override = None
     temperature_override = None
     max_tokens_override = None
-    system_prompt_override = None
+    # Use CJ's canonical system prompt as default (can be overridden by event)
+    system_prompt_override = settings.SYSTEM_PROMPT
 
     if llm_config_overrides:
         model_override = llm_config_overrides.model_override
         temperature_override = llm_config_overrides.temperature_override
         max_tokens_override = llm_config_overrides.max_tokens_override
-        system_prompt_override = llm_config_overrides.system_prompt_override
+        # Only override system prompt if explicitly provided (not None)
+        if llm_config_overrides.system_prompt_override is not None:
+            system_prompt_override = llm_config_overrides.system_prompt_override
 
         logger.info(
             f"Using LLM overrides - model: {model_override}, "
             f"temperature: {temperature_override}, max_tokens: {max_tokens_override}",
             extra=log_extra,
         )
+
+    batch_config_overrides = None
+    if request_data.batch_config_overrides is not None:
+        batch_config_overrides = BatchConfigOverrides(**request_data.batch_config_overrides)
+
+    max_pairs_cap = _resolve_requested_max_pairs(settings, request_data)
+    budget_source = (
+        "runner_override" if request_data.max_comparisons_override else "service_default"
+    )
+
+    logger.info(
+        "Resolved comparison budget",
+        extra={
+            **log_extra,
+            "comparison_budget": max_pairs_cap,
+            "comparison_budget_source": budget_source,
+        },
+    )
 
     # Generate initial comparison tasks
     async with database.session() as session:
@@ -125,14 +184,25 @@ async def submit_comparisons_for_async_processing(
             status=CJBatchStatusEnum.PERFORMING_COMPARISONS,
         )
 
+        metadata_updates = _build_budget_metadata(
+            max_pairs_cap=max_pairs_cap,
+            source=budget_source,
+            batch_config_overrides=batch_config_overrides,
+        )
+        await merge_batch_processing_metadata(
+            session=session,
+            cj_batch_id=cj_batch_id,
+            metadata_updates=metadata_updates,
+            correlation_id=correlation_id,
+        )
+
         # Generate comparison tasks for the batch
         comparison_tasks = await pair_generation.generate_comparison_tasks(
             essays_for_comparison=essays_for_api_model,
             db_session=session,
             cj_batch_id=cj_batch_id,
-            existing_pairs_threshold=getattr(
-                settings, "comparisons_per_stability_check_iteration", 5
-            ),
+            existing_pairs_threshold=settings.COMPARISONS_PER_STABILITY_CHECK_ITERATION,
+            max_pairwise_comparisons=max_pairs_cap,
             correlation_id=correlation_id,
         )
 
@@ -141,7 +211,7 @@ async def submit_comparisons_for_async_processing(
                 f"No comparison tasks generated for batch {cj_batch_id}",
                 extra=log_extra,
             )
-            return
+            return False
 
         # Create batch processor and submit all comparisons
         batch_processor = BatchProcessor(
@@ -149,11 +219,6 @@ async def submit_comparisons_for_async_processing(
             llm_interaction=llm_interaction,
             settings=settings,
         )
-
-        # Extract batch config overrides if available
-        batch_config_overrides = None
-        if "batch_config_overrides" in request_data:
-            batch_config_overrides = BatchConfigOverrides(**request_data["batch_config_overrides"])
 
         await _persist_llm_overrides_if_present(
             session=session,
@@ -186,6 +251,152 @@ async def submit_comparisons_for_async_processing(
 
         # Workflow pauses here - batch is now in WAITING_CALLBACKS state
         # Callbacks will handle scoring and additional iterations if needed
+        return True
+
+
+async def _load_essays_for_batch(
+    database: CJRepositoryProtocol,
+    cj_batch_id: int,
+) -> list[EssayForComparison]:
+    """Load prepared essays (students + anchors) from the database."""
+
+    async with database.session() as session:
+        processed_essays = await database.get_essays_for_cj_batch(session=session, cj_batch_id=cj_batch_id)
+
+    essays_for_api_model: list[EssayForComparison] = []
+    for processed in processed_essays:
+        essays_for_api_model.append(
+            EssayForComparison(
+                id=processed.els_essay_id,
+                text_content=processed.assessment_input_text,
+                current_bt_score=processed.current_bt_score or 0.0,
+            )
+        )
+
+    return essays_for_api_model
+
+
+async def request_additional_comparisons_for_batch(
+    *,
+    cj_batch_id: int,
+    database: CJRepositoryProtocol,
+    llm_interaction: LLMInteractionProtocol,
+    settings: Settings,
+    correlation_id: UUID,
+    log_extra: dict[str, Any],
+    llm_overrides_payload: dict[str, Any] | None,
+    config_overrides_payload: dict[str, Any] | None,
+    original_request_payload: dict[str, Any] | None,
+) -> bool:
+    """Enqueue another comparison iteration using stored essays."""
+
+    essays_for_api_model = await _load_essays_for_batch(database=database, cj_batch_id=cj_batch_id)
+
+    if not essays_for_api_model:
+        logger.warning(
+            "No prepared essays found for continuation",
+            extra={**log_extra, "cj_batch_id": cj_batch_id},
+        )
+        return False
+
+    # Fetch batch metadata to build request_data
+    async with database.session() as session:
+        batch = await database.get_cj_batch_upload(session, cj_batch_id)
+        if not batch:
+            logger.error(
+                "CJ batch not found for continuation",
+                extra={**log_extra, "cj_batch_id": cj_batch_id},
+            )
+            return False
+
+    # Build minimal request_data for continuation
+    # Convert essays to EssayToProcess format
+    from services.cj_assessment_service.models_api import EssayToProcess
+
+    essays_to_process = [
+        EssayToProcess(
+            els_essay_id=essay.id,
+            text_storage_id="",  # Not needed for continuation
+        )
+        for essay in essays_for_api_model
+    ]
+
+    original_request = None
+    if original_request_payload:
+        try:
+            original_request = OriginalCJRequestMetadata(**original_request_payload)
+        except Exception as exc:  # Validation errors shouldn't block continuation
+            logger.warning(
+                "Failed to deserialize stored original_request payload; falling back to batch defaults",
+                extra={**log_extra, "error": str(exc)},
+            )
+
+    llm_config_override = None
+    if original_request and original_request.llm_config_overrides:
+        llm_config_override = original_request.llm_config_overrides
+    elif llm_overrides_payload:
+        try:
+            llm_config_override = LLMConfigOverrides(**llm_overrides_payload)
+        except Exception as exc:  # Validation errors shouldn't block continuation
+            logger.warning(
+                "Failed to deserialize stored LLM overrides; continuing with defaults",
+                extra={**log_extra, "error": str(exc)},
+            )
+
+    config_overrides = None
+    if original_request and original_request.batch_config_overrides:
+        config_overrides = original_request.batch_config_overrides
+    elif isinstance(config_overrides_payload, dict):
+        config_overrides = config_overrides_payload
+
+    prompt_context = batch.processing_metadata if isinstance(batch.processing_metadata, dict) else {}
+
+    request_data = CJAssessmentRequestData(
+        bos_batch_id=batch.bos_batch_id,
+        assignment_id=original_request.assignment_id if original_request else batch.assignment_id,
+        essays_to_process=essays_to_process,
+        language=original_request.language if original_request else batch.language,
+        course_code=original_request.course_code if original_request else batch.course_code,
+        student_prompt_text=(
+            original_request.student_prompt_text if original_request else prompt_context.get("student_prompt_text")
+        ),
+        student_prompt_storage_id=(
+            original_request.student_prompt_storage_id
+            if original_request
+            else prompt_context.get("student_prompt_storage_id")
+        ),
+        judge_rubric_text=(
+            original_request.judge_rubric_text if original_request else prompt_context.get("judge_rubric_text")
+        ),
+        judge_rubric_storage_id=(
+            original_request.judge_rubric_storage_id
+            if original_request
+            else prompt_context.get("judge_rubric_storage_id")
+        ),
+        llm_config_overrides=llm_config_override,
+        batch_config_overrides=config_overrides,
+        max_comparisons_override=(
+            original_request.max_comparisons_override if original_request else None
+        ),
+        user_id=original_request.user_id if original_request else batch.user_id,
+        org_id=original_request.org_id if original_request else batch.org_id,
+    )
+
+    logger.info(
+        "Requesting additional comparisons for batch",
+        extra={**log_extra, "cj_batch_id": cj_batch_id},
+    )
+
+    return await submit_comparisons_for_async_processing(
+        essays_for_api_model=essays_for_api_model,
+        cj_batch_id=cj_batch_id,
+        database=database,
+        llm_interaction=llm_interaction,
+        request_data=request_data,
+        settings=settings,
+        correlation_id=correlation_id,
+        log_extra={**log_extra, "iteration": "continuation"},
+    )
 
 
 async def _process_comparison_iteration(
@@ -194,7 +405,7 @@ async def _process_comparison_iteration(
     session: AsyncSession,
     llm_interaction: LLMInteractionProtocol,
     database: CJRepositoryProtocol,
-    request_data: dict[str, Any],
+    request_data: CJAssessmentRequestData,
     settings: Settings,
     model_override: str | None,
     temperature_override: float | None,
@@ -214,7 +425,8 @@ async def _process_comparison_iteration(
         essays_for_comparison=essays_for_api_model,
         db_session=session,
         cj_batch_id=cj_batch_id,
-        existing_pairs_threshold=getattr(settings, "comparisons_per_stability_check_iteration", 5),
+        existing_pairs_threshold=settings.COMPARISONS_PER_STABILITY_CHECK_ITERATION,
+        max_pairwise_comparisons=settings.MAX_PAIRWISE_COMPARISONS,
         correlation_id=correlation_id,
     )
 
@@ -230,14 +442,17 @@ async def _process_comparison_iteration(
 
     # Extract batch config overrides from request_data if available
     batch_config_overrides = None
-    if "batch_config_overrides" in request_data:
-        batch_config_overrides = BatchConfigOverrides(**request_data["batch_config_overrides"])
+    if request_data.batch_config_overrides is not None:
+        batch_config_overrides = BatchConfigOverrides(**request_data.batch_config_overrides)
 
     # Extract LLM config overrides and system_prompt_override from request_data if available
-    llm_config_overrides = request_data.get("llm_config_overrides")
-    system_prompt_override = None
+    llm_config_overrides = request_data.llm_config_overrides
+    # Use CJ's canonical system prompt as default (can be overridden by event)
+    system_prompt_override = settings.SYSTEM_PROMPT
     if llm_config_overrides:
-        system_prompt_override = llm_config_overrides.system_prompt_override
+        # Only override system prompt if explicitly provided (not None)
+        if llm_config_overrides.system_prompt_override is not None:
+            system_prompt_override = llm_config_overrides.system_prompt_override
 
     await _persist_llm_overrides_if_present(
         session=session,

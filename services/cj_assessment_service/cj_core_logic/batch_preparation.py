@@ -13,8 +13,21 @@ from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
+from services.cj_assessment_service.cj_core_logic.batch_submission import (
+    merge_batch_processing_metadata,
+    merge_batch_upload_metadata,
+    merge_essay_processing_metadata,
+)
 from services.cj_assessment_service.metrics import get_business_metrics
-from services.cj_assessment_service.models_api import CJProcessingMetadata, EssayForComparison
+from services.cj_assessment_service.models_api import (
+    CJAnchorMetadata,
+    CJAssessmentRequestData,
+    CJEessayMetadata,
+    CJProcessingMetadata,
+    EssayForComparison,
+    EssayToProcess,
+    OriginalCJRequestMetadata,
+)
 from services.cj_assessment_service.models_db import CJBatchUpload
 from services.cj_assessment_service.protocols import (
     CJRepositoryProtocol,
@@ -25,7 +38,7 @@ logger = create_service_logger("cj_assessment_service.batch_preparation")
 
 
 async def create_cj_batch(
-    request_data: dict[str, Any],
+    request_data: CJAssessmentRequestData,
     correlation_id: UUID,
     database: CJRepositoryProtocol,
     content_client: ContentClientProtocol,
@@ -52,18 +65,18 @@ async def create_cj_batch(
         prompt_failure_metric = business_metrics.get("prompt_fetch_failures")
 
         # Extract data from request
-        bos_batch_id = request_data.get("bos_batch_id")
-        language = request_data.get("language", "en")
-        course_code = request_data.get("course_code", "")
-        essays_to_process = request_data.get("essays_to_process", [])
-        assignment_id = request_data.get("assignment_id")  # For anchor essay lookup
-        prompt_storage_id = request_data.get("student_prompt_storage_id")
-        prompt_text = request_data.get("student_prompt_text")
-        judge_rubric_storage_id = request_data.get("judge_rubric_storage_id")
-        judge_rubric_text = request_data.get("judge_rubric_text")
+        bos_batch_id = request_data.bos_batch_id
+        language = request_data.language
+        course_code = request_data.course_code
+        essays_to_process = request_data.essays_to_process
+        assignment_id = request_data.assignment_id  # For anchor essay lookup
+        prompt_storage_id = request_data.student_prompt_storage_id
+        prompt_text = request_data.student_prompt_text
+        judge_rubric_storage_id = request_data.judge_rubric_storage_id
+        judge_rubric_text = request_data.judge_rubric_text
         # Identity fields for credit attribution (Phase 3: Entitlements integration)
-        user_id = request_data.get("user_id")
-        org_id = request_data.get("org_id")
+        user_id = request_data.user_id
+        org_id = request_data.org_id
 
         if not bos_batch_id or not essays_to_process:
             raise ValueError("Missing required fields: bos_batch_id or essays_to_process")
@@ -170,17 +183,50 @@ async def create_cj_batch(
                             exc_info=True,
                         )
 
-        # Use typed metadata with permissive merge
+        # Use typed metadata with merge helpers
         typed_metadata = CJProcessingMetadata(
             student_prompt_storage_id=prompt_storage_id,
             student_prompt_text=prompt_text,
             judge_rubric_storage_id=judge_rubric_storage_id,
             judge_rubric_text=judge_rubric_text,
         ).model_dump(exclude_none=True)
+
+        original_request_payload = OriginalCJRequestMetadata(
+            assignment_id=assignment_id,
+            language=request_data.language,
+            course_code=request_data.course_code,
+            student_prompt_text=request_data.student_prompt_text,
+            student_prompt_storage_id=request_data.student_prompt_storage_id,
+            judge_rubric_text=request_data.judge_rubric_text,
+            judge_rubric_storage_id=request_data.judge_rubric_storage_id,
+            llm_config_overrides=request_data.llm_config_overrides,
+            batch_config_overrides=request_data.batch_config_overrides,
+            max_comparisons_override=request_data.max_comparisons_override,
+            user_id=request_data.user_id,
+            org_id=request_data.org_id,
+        ).model_dump(exclude_none=True)
+
+        metadata_updates: dict[str, Any] = {}
         if typed_metadata:
-            existing = cj_batch.processing_metadata or {}
-            cj_batch.processing_metadata = {**existing, **typed_metadata}
-            await session.flush()
+            metadata_updates.update(typed_metadata)
+        if original_request_payload:
+            metadata_updates["original_request"] = original_request_payload
+
+        if metadata_updates:
+            await merge_batch_upload_metadata(
+                session=session,
+                cj_batch_id=cj_batch.id,
+                metadata_updates=metadata_updates,
+                correlation_id=correlation_id,
+            )
+
+        if original_request_payload:
+            await merge_batch_processing_metadata(
+                session=session,
+                cj_batch_id=cj_batch.id,
+                metadata_updates={"original_request": original_request_payload},
+                correlation_id=correlation_id,
+            )
 
         # Store assignment_id if provided
         if assignment_id:
@@ -193,7 +239,7 @@ async def create_cj_batch(
 
 
 async def prepare_essays_for_assessment(
-    request_data: dict[str, Any],
+    request_data: CJAssessmentRequestData,
     cj_batch_id: int,
     database: CJRepositoryProtocol,
     content_client: ContentClientProtocol,
@@ -221,11 +267,11 @@ async def prepare_essays_for_assessment(
         )
 
         essays_for_api_model: list[EssayForComparison] = []
-        essays_to_process = request_data.get("essays_to_process", [])
+        essays_to_process = request_data.essays_to_process
 
         for essay_info in essays_to_process:
-            els_essay_id = essay_info.get("els_essay_id")
-            text_storage_id = essay_info.get("text_storage_id")
+            els_essay_id = essay_info.els_essay_id
+            text_storage_id = essay_info.text_storage_id
 
             if not els_essay_id or not text_storage_id:
                 logger.warning(f"Skipping essay with missing IDs: {essay_info}")
@@ -244,8 +290,16 @@ async def prepare_essays_for_assessment(
                     els_essay_id=els_essay_id,
                     text_storage_id=text_storage_id,
                     assessment_input_text=assessment_input_text,
-                    processing_metadata={"is_anchor": False},  # Mark as student essay
                 )
+
+                student_metadata = CJEessayMetadata(is_anchor=False).model_dump(exclude_none=True)
+                if student_metadata:
+                    await merge_essay_processing_metadata(
+                        session=session,
+                        els_essay_id=els_essay_id,
+                        metadata_updates=student_metadata,
+                        correlation_id=correlation_id,
+                    )
 
                 # Create EssayForComparison for the comparison loop
                 essay_for_api = EssayForComparison(
@@ -347,15 +401,26 @@ async def _fetch_and_add_anchors(
                 els_essay_id=synthetic_id,
                 text_storage_id=ref.text_storage_id,
                 assessment_input_text=content,
-                processing_metadata={
-                    "is_anchor": True,
-                    "known_grade": ref.grade,
-                    "anchor_ref_id": str(ref.id),
-                },
+                processing_metadata={"is_anchor": True},
             )
 
             # Ensure anchor is persisted before creating comparisons
             await session.flush()
+
+            anchor_meta = CJAnchorMetadata(
+                known_grade=ref.grade,
+                anchor_ref_id=str(ref.id) if getattr(ref, "id", None) is not None else None,
+                text_storage_id=ref.text_storage_id,
+                anchor_label=getattr(ref, "anchor_label", None),
+            ).model_dump(exclude_none=True)
+
+            if anchor_meta:
+                await merge_essay_processing_metadata(
+                    session=session,
+                    els_essay_id=synthetic_id,
+                    metadata_updates=anchor_meta,
+                    correlation_id=correlation_id,
+                )
 
             # Create API model
             anchor_for_api = EssayForComparison(

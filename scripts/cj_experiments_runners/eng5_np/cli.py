@@ -28,7 +28,6 @@ from scripts.cj_experiments_runners.eng5_np.hydrator import AssessmentRunHydrato
 from scripts.cj_experiments_runners.eng5_np.inventory import (
     ComparisonValidationError,
     FileRecord,
-    apply_comparison_limit,
     build_essay_refs,
     collect_inventory,
     ensure_comparison_capacity,
@@ -480,6 +479,12 @@ def main(
         )
         raise typer.Exit(code=1)
 
+    if settings.max_comparisons is not None:
+        logger.info(
+            "runner_max_comparisons_requested",
+            max_comparisons=settings.max_comparisons,
+        )
+
     if mode is RunnerMode.PLAN:
         logger.info(
             "runner_plan_inventory",
@@ -543,47 +548,45 @@ def main(
 
     if mode is RunnerMode.EXECUTE:
         ensure_execute_requirements(inventory)
-        limited_anchors, limited_students, _ = apply_comparison_limit(
-            anchors=inventory.anchor_docs.files,
-            students=inventory.student_docs.files,
-            max_comparisons=settings.max_comparisons,
-            emit_notice=False,
-        )
-        anchors_for_registration = inventory.anchor_docs.files
-        anchor_registration_used = False
-        if settings.cj_service_url and anchors_for_registration:
-            try:
-                registration_results = asyncio.run(
-                    register_anchor_essays(
-                        anchors=anchors_for_registration,
-                        assignment_id=settings.assignment_id,
-                        cj_service_url=settings.cj_service_url,
-                    )
-                )
-                if registration_results:
-                    anchor_registration_used = True
-                    typer.echo(
-                        f"Registered {len(registration_results)} anchors via CJ service",
-                        err=True,
-                    )
-                    logger.info(
-                        "anchor_registration_succeeded",
-                        registered=len(registration_results),
-                    )
-            except AnchorRegistrationError as exc:
-                typer.echo(
-                    f"⚠ Anchor registration failed: {exc}. Falling back to ephemeral anchors.",
-                    err=True,
-                )
-                logger.warning(
-                    "anchor_registration_failed",
-                    error=str(exc),
-                )
+        anchors_for_registration = list(inventory.anchor_docs.files)
+        students_for_upload = list(inventory.student_docs.files)
+        if not anchors_for_registration:
+            raise RuntimeError(
+                "Anchor essays are required for ENG5 execute runs; populate anchors directory."
+            )
+        if not settings.cj_service_url:
+            raise RuntimeError(
+                "CJ service URL is required to register anchors in EXECUTE mode. "
+                "Set --cj-service-url or CJ_SERVICE_URL env var."
+            )
 
-        if anchor_registration_used:
-            upload_targets = limited_students
-        else:
-            upload_targets = [*limited_anchors, *limited_students]
+        try:
+            registration_results = asyncio.run(
+                register_anchor_essays(
+                    anchors=anchors_for_registration,
+                    assignment_id=settings.assignment_id,
+                    cj_service_url=settings.cj_service_url,
+                )
+            )
+        except AnchorRegistrationError as exc:
+            logger.error("anchor_registration_failed", error=str(exc))
+            raise RuntimeError(
+                "Anchor registration failed; aborting EXECUTE run so CJ only uses DB-owned anchors."
+            ) from exc
+
+        if not registration_results:
+            raise RuntimeError("Anchor registration returned no results; aborting EXECUTE run.")
+
+        typer.echo(
+            f"Registered {len(registration_results)} anchors via CJ service",
+            err=True,
+        )
+        logger.info(
+            "anchor_registration_succeeded",
+            registered=len(registration_results),
+        )
+
+        upload_targets = students_for_upload
         if not upload_targets:
             raise RuntimeError("No essays available for upload; ensure dataset is populated")
         typer.echo(
@@ -599,12 +602,8 @@ def main(
                 content_service_url=settings.content_service_url,
             )
         )
-        if anchor_registration_used:
-            essay_ref_anchors: list[FileRecord] = []
-            essay_ref_students = limited_students
-        else:
-            essay_ref_anchors = limited_anchors
-            essay_ref_students = limited_students
+        essay_ref_anchors: list[FileRecord] = []
+        essay_ref_students = students_for_upload
 
         essay_refs = build_essay_refs(
             anchors=essay_ref_anchors,

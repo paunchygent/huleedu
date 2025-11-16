@@ -29,6 +29,7 @@ from services.cj_assessment_service.protocols import (
 
 # Import shared fixtures (includes mock_get_batch_state)
 pytest_plugins = ["services.cj_assessment_service.tests.unit.conftest_pool"]
+pytestmark = pytest.mark.usefixtures("mock_get_batch_state")
 
 
 class TestBatchRetryProcessor:

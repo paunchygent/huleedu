@@ -8,6 +8,7 @@ from uuid import uuid4
 
 import pytest
 from common_core import EssayComparisonWinner
+from common_core.events.cj_assessment_events import LLMConfigOverrides
 from common_core.status_enums import CJBatchStateEnum
 from huleedu_service_libs.error_handling import HuleEduError
 
@@ -18,9 +19,11 @@ from services.cj_assessment_service.cj_core_logic.batch_processor import (
 )
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.models_api import (
+    CJAssessmentRequestData,
     ComparisonResult,
     ComparisonTask,
     EssayForComparison,
+    EssayToProcess,
     LLMAssessmentResponseSchema,
 )
 from services.cj_assessment_service.models_db import CJBatchState
@@ -255,18 +258,25 @@ class TestBatchProcessor:
         # Arrange
         cj_batch_id = 1
         correlation_id = uuid4()
-        request_data = {
-            "batch_config_overrides": {
+        request_data = CJAssessmentRequestData(
+            bos_batch_id="test-batch",
+            assignment_id="test-assign",
+            essays_to_process=[
+                EssayToProcess(els_essay_id="essay1", text_storage_id="storage1"),
+            ],
+            language="en",
+            course_code="ENG5",
+            batch_config_overrides={
                 "batch_size": 25,
                 "partial_completion_threshold": 0.9,
             },
-            "llm_config_overrides": Mock(
+            llm_config_overrides=LLMConfigOverrides(
                 model_override="gpt-4",
                 temperature_override=0.2,
                 max_tokens_override=1000,
                 system_prompt_override="CJ prompt",
             ),
-        }
+        )
         mock_llm_interaction.perform_comparisons.return_value = sample_comparison_results
 
         # Act

@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 if TYPE_CHECKING:
     from services.cj_assessment_service.cj_core_logic.batch_submission import BatchSubmissionResult
+    from services.cj_assessment_service.models_api import CJAssessmentRequestData
 
 T = TypeVar("T")
 
@@ -400,7 +401,7 @@ class BatchProcessorProtocol(Protocol):
         cj_batch_id: int,
         comparison_tasks: list[Any],
         correlation_id: UUID,
-        request_data: dict[str, Any],
+        request_data: "CJAssessmentRequestData",
     ) -> "BatchSubmissionResult":
         """Handle batch submission with state tracking."""
         ...

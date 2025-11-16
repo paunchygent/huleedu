@@ -242,6 +242,8 @@ command: ["pdm", "run", "-p", "/app", "python", "-m", "hypercorn", "services.con
 **Architecture Notes**:
 - Result monad used for internal control flow, exceptions for boundary operations
 - Typed metadata overlay balances type safety with extensibility (forbids unknown fields in model, preserves them in dict merge)
+- `original_request` payloads (language, overrides, prompt refs, identity) are now persisted to both `cj_batch_uploads` and `cj_batch_states` via merge-only helpers so continuation can faithfully rehydrate `CJAssessmentRequestData`.
+- Anchor processing writes must use `CJAnchorMetadata` + `merge_essay_processing_metadata` to append metadata; never reassign JSON blobs (`processing_metadata = {...}`) because that clobbers diagnostic fields and comparison budget state.
 - Content client initially threaded explicitly for testability, pending DI re-alignment
 
 **Ref**: `TASKS/CJ_PROMPT_CONTEXT_PERSISTENCE_PLAN.md` (completed 2025-11-12)
@@ -256,6 +258,15 @@ command: ["pdm", "run", "-p", "/app", "python", "-m", "hypercorn", "services.con
 
 - Phase 3.3 section in `TASKS/TASK-CJ-CONFIDENCE-PHASE3-GRADE-SCALE-DATA-PIPELINE.md` now details the ENG5 NP runner/CLI (`pdm run eng5-np-run ...`), modes (`plan`, `dry-run`, `execute`), preflight expectations, and validation strategy aligned with rules 070/075.
 - Data-source mapping enumerates ENG5 instructions, prompt references, anchor metadata, and student essay folders under `test_uploads/ANCHOR ESSAYS/ROLE_MODELS_ENG5_NP_2016`, plus dependency on `DEFAULT_ANCHOR_ORDER` from `scripts/bayesian_consensus_model/d_optimal_workflow/models.py`.
+
+## Current Session Notes (2025-11-16)
+
+- Phase 1 analysis complete: reviewed the continuation validation checklist, traced relevant `ComparisonPair` queries in `workflow_continuation.py`, and outlined the query optimization plus metadata documentation work before coding begins.
+- Phase 2 optimization: `workflow_continuation.py` now counts completed/valid comparisons with `select(func.count())`, the unit tests' fake session exposes `scalar_one()` for the new query pattern, and typecheck plus `test_workflow_continuation.py` were rerun successfully.
+- Batch 21 is currently in `SCORING` (10 submitted, 100 completed) with the `runner_override` budget intact, which matches the persisted metadata verified via the `cj_batch_states` query.
+- Phase 3 documentation/validation: Added a “Metadata & Budget Semantics” section to `services/cj_assessment_service/README.md` covering `comparison_budget.source`, `max_comparisons_override`, merge-helper requirements, anchor metadata invariants, and continuation rehydration; reran `typecheck-all` and `test_workflow_continuation.py` afterward per validation rules.
+- Document review: Confirmed all touched docs align with current CJ continuation budget behavior and Rule 090’s expectations; no divergences or infractions were detected during this verification.
+- Phase 4 observability/tests: Verified the running CJ service emits the new `Valid comparisons found` logs for batch 21 (counts 96–100) and reran `typecheck-all`, `test_batch_finalizer_scoring_state.py`, and `test_prompt_metrics.py` so the gating checklist covers logging, metrics, and DB state transitions.
 - JSON artefact schema draft lives at `Documentation/schemas/eng5_np/assessment_run.schema.json`, covering metadata, inputs, comparisons, Bradley–Terry stats, grade projections, cost tracking, and manifest validation for reproducible research bundles.
 
 ### 13. Documentation Taxonomy Restructure (2025-11-08)
@@ -334,6 +345,48 @@ command: ["pdm", "run", "-p", "/app", "python", "-m", "hypercorn", "services.con
 - ⏸️ Remove 11 docker-compose `*_DATABASE_URL` overrides
 
 **Architecture Decision**: Uppercase `DATABASE_URL` enforced per Rule 043 for all services during migration.
+
+### 22. ENG5 Grade Projector Fix & Validation (Nov 2025)
+
+**Status**: ✅ Implemented and validated with batch a93253f7
+
+**Problem**: Grade projector failed to resolve anchor grades, producing 0 grade projections (required for score band visualization and student grade assignment).
+
+**Solution**: 4-tier anchor grade fallback mechanism in `grade_projector.py:_map_anchor_grades()`:
+1. Direct `anchor_grade` field in anchor dict or metadata
+2. `known_grade` in processing_metadata
+3. Lookup by `text_storage_id` in anchor references
+4. Lookup by `anchor_ref_id` in anchor references
+
+**Implementation**:
+- `grade_projector.py` lines 241-297: 4-tier fallback logic
+- `scoring_ranking.py` lines 307-308: Emit text_storage_id and processing_metadata for Tier 3
+- Test coverage: `test_grade_projector_anchor_mapping.py` (unit tests for all fallback tiers)
+
+**Validation Results** (Batch a93253f7-9dd2-4d14-a452-034f91f3e7dc):
+
+| Metric | Pre-Fix | Post-Fix | Status |
+|--------|---------|----------|--------|
+| Grade Projections | 0 | 12 | ✅ Fixed |
+| BT-Scores Computed | 24/24 | 24/24 | ✅ Preserved |
+| Anchor Grades Resolved | 0/12 | 12/12 | ✅ Fixed |
+| Comparison Pairs | 100 | 100 | ✅ Stable |
+
+**Technical Details**:
+- BT-score calculation: choix.ilsr_pairwise with alpha=0.01 regularization, mean-centered
+- Standard errors: Fisher Information matrix via Moore-Penrose pseudoinverse
+- Grade projection: Gaussian mixture calibration with resolved anchor grades
+- Mock LLM: Probabilistic (45% A, 55% B, seed=42) for technical validation only
+
+**Architecture**: Anchors (known grades) and students (projected grades) stored separately by design for downstream service flexibility. BT-scores preserved in `cj_processed_essays.current_bt_score` for all 24 essays.
+
+**Ref**: `.claude/research/2025-11-15_eng5_grade_projector_validation_batch_a93253f7.md` (comprehensive technical report)
+
+### 23. Pydantic Request Data Migration (Nov 2025)
+
+**Status**: ✅ Complete
+
+Migrated CJ Assessment `request_data` from `dict[str, Any]` to `CJAssessmentRequestData` Pydantic model for type safety (IDE autocomplete, mypy validation, runtime checks).
 
 ## Configuration Files
 

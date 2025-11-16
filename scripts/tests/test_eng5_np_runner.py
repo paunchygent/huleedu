@@ -255,8 +255,57 @@ def test_compose_cj_request_generates_envelope(tmp_path: Path) -> None:
 
     assert envelope.data.user_id == "user-42"
     assert envelope.data.language == Language.ENGLISH.value
+    assert envelope.metadata["runner_mode"] == RunnerMode.EXECUTE.value
+    assert envelope.metadata["batch_label"] == "batch-42"
     path = write_cj_request_envelope(envelope=envelope, output_dir=settings.output_dir)
     assert path.exists()
+
+
+def test_compose_cj_request_passes_max_comparisons_metadata(tmp_path: Path) -> None:
+    prompt = tmp_path / "prompt.md"
+    prompt.write_text("prompt text", encoding="utf-8")
+    student_file = tmp_path / "student.docx"
+    student_file.write_text("essay", encoding="utf-8")
+    anchor_file = tmp_path / "anchor.docx"
+    anchor_file.write_text("anchor", encoding="utf-8")
+
+    essay_refs = build_essay_refs(
+        anchors=[FileRecord.from_path(anchor_file)],
+        students=[FileRecord.from_path(student_file)],
+    )
+
+    settings = RunnerSettings(
+        assignment_id=uuid.UUID(int=10),
+        course_id=uuid.UUID(int=11),
+        grade_scale="eng5_np_legacy_9_step",
+        mode=RunnerMode.EXECUTE,
+        use_kafka=False,
+        output_dir=tmp_path / "out",
+        runner_version="0.1.0",
+        git_sha="deadbeef",
+        batch_uuid=uuid.UUID(int=12),
+        batch_id="batch-max",
+        user_id="user-max",
+        org_id="org-max",
+        course_code=CourseCode.ENG5,
+        language=Language.ENGLISH,
+        correlation_id=uuid.uuid4(),
+        kafka_bootstrap="kafka:9092",
+        kafka_client_id="test-client",
+        content_service_url="http://localhost:8001/v1/content",
+        llm_overrides=None,
+        max_comparisons=42,
+        await_completion=False,
+        completion_timeout=1.0,
+    )
+
+    envelope = compose_cj_assessment_request(
+        settings=settings,
+        essay_refs=essay_refs,
+        prompt_reference=None,
+    )
+
+    assert envelope.metadata["max_comparisons"] == 42
 
 
 def test_build_essay_refs_prefers_uploaded_storage_ids(tmp_path: Path) -> None:

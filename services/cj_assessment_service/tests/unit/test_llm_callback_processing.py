@@ -20,6 +20,7 @@ from services.cj_assessment_service.protocols import (
     CJEventPublisherProtocol,
     CJRepositoryProtocol,
     ContentClientProtocol,
+    LLMInteractionProtocol,
 )
 
 
@@ -42,6 +43,12 @@ def mock_database() -> AsyncMock:
 def mock_event_publisher() -> AsyncMock:
     """Create mock event publisher protocol."""
     return AsyncMock(spec=CJEventPublisherProtocol)
+
+
+@pytest.fixture
+def mock_llm_interaction() -> AsyncMock:
+    """Create mock LLM interaction protocol."""
+    return AsyncMock(spec=LLMInteractionProtocol)
 
 
 def create_llm_callback_message(
@@ -140,6 +147,7 @@ class TestLLMCallbackProcessing:
         mock_database: AsyncMock,
         mock_event_publisher: AsyncMock,
         mock_settings: Settings,
+        mock_llm_interaction: AsyncMock,
     ) -> None:
         """Test successful processing of LLM comparison result."""
         # Arrange
@@ -165,6 +173,7 @@ class TestLLMCallbackProcessing:
             database=mock_database,
             event_publisher=mock_event_publisher,
             content_client=mock_content_client,
+            llm_interaction=mock_llm_interaction,
             settings_obj=mock_settings,
             tracer=None,
         )
@@ -192,6 +201,7 @@ class TestLLMCallbackProcessing:
         mock_database: AsyncMock,
         mock_event_publisher: AsyncMock,
         mock_settings: Settings,
+        mock_llm_interaction: AsyncMock,
     ) -> None:
         """Test processing of error callback from LLM provider."""
         # Arrange
@@ -214,6 +224,7 @@ class TestLLMCallbackProcessing:
             database=mock_database,
             event_publisher=mock_event_publisher,
             content_client=mock_content_client,
+            llm_interaction=mock_llm_interaction,
             settings_obj=mock_settings,
             tracer=None,
         )
@@ -239,6 +250,7 @@ class TestLLMCallbackProcessing:
         mock_database: AsyncMock,
         mock_event_publisher: AsyncMock,
         mock_settings: Settings,
+        mock_llm_interaction: AsyncMock,
     ) -> None:
         """Test handling of invalid callback messages."""
         # Create invalid message (not proper JSON)
@@ -265,6 +277,7 @@ class TestLLMCallbackProcessing:
             database=mock_database,
             event_publisher=mock_event_publisher,
             content_client=mock_content_client,
+            llm_interaction=mock_llm_interaction,
             settings_obj=mock_settings,
             tracer=None,
         )
@@ -284,6 +297,7 @@ class TestLLMCallbackProcessing:
         mock_database: AsyncMock,
         mock_event_publisher: AsyncMock,
         mock_settings: Settings,
+        mock_llm_interaction: AsyncMock,
     ) -> None:
         """Test handling when workflow processing fails."""
         # Arrange
@@ -309,6 +323,7 @@ class TestLLMCallbackProcessing:
             database=mock_database,
             event_publisher=mock_event_publisher,
             content_client=mock_content_client,
+            llm_interaction=mock_llm_interaction,
             settings_obj=mock_settings,
             tracer=None,
         )
@@ -326,6 +341,7 @@ class TestLLMCallbackProcessing:
         mock_database: AsyncMock,
         mock_event_publisher: AsyncMock,
         mock_settings: Settings,
+        mock_llm_interaction: AsyncMock,
     ) -> None:
         """Test processing multiple callbacks in sequence."""
         # Arrange
@@ -349,6 +365,7 @@ class TestLLMCallbackProcessing:
                 database=mock_database,
                 event_publisher=mock_event_publisher,
                 content_client=mock_content_client,
+                llm_interaction=mock_llm_interaction,
                 settings_obj=mock_settings,
                 tracer=None,
             )

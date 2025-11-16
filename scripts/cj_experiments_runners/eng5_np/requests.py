@@ -86,12 +86,19 @@ def compose_cj_assessment_request(
         org_id=settings.org_id,
     )
 
+    metadata = {
+        "runner_mode": settings.mode.value,
+        "batch_label": settings.batch_id,
+    }
+    if settings.max_comparisons is not None:
+        metadata["max_comparisons"] = settings.max_comparisons
+
     envelope = EventEnvelope[ELS_CJAssessmentRequestV1](
         event_type=topic_name(ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED),
         source_service="eng5_np_batch_runner",
         correlation_id=settings.correlation_id,
         data=event_data,
-        metadata={"runner_mode": settings.mode.value, "batch_label": settings.batch_id},
+        metadata=metadata,
     )
     return envelope
 

@@ -174,6 +174,13 @@ prompt storage references end-to-end:
   `{service="cj_assessment_service"} | json | request_path="/admin/v1/assessment-instructions"`
 - Traces: every request carries `CorrelationContext.uuid` so you can stitch admin activity to downstream anchor/grade actions.
 
+### Metadata & Budget Semantics
+
+- `comparison_budget.source` captures whether the runner set a hard limit (`"runner_override"`) or the service fell back to `MAX_PAIRWISE_COMPARISONS` (`"service_default"`); only runner overrides persist `max_comparisons_override`, and continuations rehydrate that value from `OriginalCJRequestMetadata` so analytics never infer budgets from `max_pairs_cap`.
+- All metadata writes (batch-level or essay-level) must use the merge helpers in `cj_core_logic/batch_submission.py` rather than assigning `processing_metadata = {...}` so existing flags like `original_request`, `comparison_budget`, or anchor diagnostics are preserved.
+- Anchor metadata in `cj_processed_essays.processing_metadata` is layered through `merge_essay_processing_metadata` and always includes `is_anchor: true`, any authored `known_grade`, `anchor_ref_id`, and, when available, the runner-submitted `anchor_grade` so the grade projector can apply the 4-tier fallback (ranking `anchor_grade` → essay `known_grade` → `text_storage_id` matches → `anchor_ref_id` matches).
+- Continuations reuse the stored `OriginalCJRequestMetadata` snapshot from `cj_batch_states.processing_metadata` to preserve identity fields (`assignment_id`, `course_code`, `language`, `user_id`), `llm_config_overrides`, `batch_config_overrides`, and the `comparison_budget` payload without deriving overrides from `max_pairs_cap`.
+
 Examples:
 
 ```bash
@@ -310,6 +317,8 @@ METRICS_PORT=9090          # Port for health and metrics endpoints
 LOG_LEVEL=INFO
 ```
 
+`COMPARISONS_PER_STABILITY_CHECK_ITERATION` defines the number of new pairs generated per stability iteration; `MAX_PAIRWISE_COMPARISONS` is an absolute guardrail on the batch. Both values are applied directly by `pair_generation.generate_comparison_tasks`, so adjust them via environment variables rather than hard-coding limits elsewhere.
+
 ## Database Schema
 
 ### Core Tables
@@ -322,7 +331,7 @@ LOG_LEVEL=INFO
   - `bos_batch_id` (str): Reference to originating BOS batch
   - `status` (enum): Current processing state
   - `expected_essay_count` (int): Number of essays to process
-  - `processing_metadata`: Includes `student_prompt_storage_id` and optional `student_prompt_text` populated after hydration; additional keys (e.g., retry metadata) are preserved when new prompt data merges in
+  - `processing_metadata`: Includes `student_prompt_storage_id` / `student_prompt_text` from hydration **and** an `original_request` snapshot capturing the runner payload (language, overrides, identity). Writes use merge helpers so later updates (e.g., diagnostics) never clobber previously persisted prompt or request context.
 
 #### `cj_processed_essays`
 
@@ -342,6 +351,12 @@ LOG_LEVEL=INFO
   - `winner` (str): Comparison result ("essay_a", "essay_b", "error")
   - `confidence` (float): LLM confidence rating (1-5)
   - `from_cache` (bool): Whether result came from cache
+
+#### `cj_batch_states`
+
+- **Purpose**: Tracks live workflow progress, retry pools, and continuation budgets per batch
+- **Key Fields**:
+  - `processing_metadata`: Stores `comparison_budget`, `config_overrides`, optional `llm_overrides`, and the canonical `original_request` snapshot copied from `cj_batch_uploads`. Continuation logic rehydrates `CJAssessmentRequestData` directly from this payload, so all writers must call the merge helpers in `cj_core_logic.batch_submission` instead of reassigning JSON blobs.
 
 ## Database Migrations
 

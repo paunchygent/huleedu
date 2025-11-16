@@ -78,7 +78,7 @@ ensure_deps_image() {
         if [ "$mode" = "clean" ]; then
             build_cmd+=(--no-cache)
         fi
-        build_cmd+=(-f "$REPO_ROOT/Dockerfile.deps" -t "$DEPS_IMAGE_TAG" "$REPO_ROOT")
+        build_cmd+=(-f "$REPO_ROOT/Dockerfile.deps" -t "$DEPS_IMAGE_TAG" -t "huledu-deps:dev" "$REPO_ROOT")
         "${build_cmd[@]}"
     else
         echo_info "Using cached dependency image ${DEPS_IMAGE_TAG}"

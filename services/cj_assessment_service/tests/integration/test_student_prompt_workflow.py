@@ -26,6 +26,7 @@ from services.cj_assessment_service.api.admin import common as admin_common
 from services.cj_assessment_service.api.admin import student_prompts_bp
 from services.cj_assessment_service.cj_core_logic.batch_preparation import create_cj_batch
 from services.cj_assessment_service.config import Settings
+from services.cj_assessment_service.models_api import CJAssessmentRequestData, EssayToProcess
 from services.cj_assessment_service.protocols import CJRepositoryProtocol, ContentClientProtocol
 
 
@@ -143,17 +144,17 @@ async def test_student_prompt_workflow_end_to_end(
         assert "Fetched prompt text for assignment" in result.stdout
 
     # --- Batch auto-hydration: omit student_prompt_storage_id and expect copy from instruction ---
-    request_data_hydrate = {
-        "bos_batch_id": "bos-batch-hydrate-1",
-        "language": "en",
-        "course_code": "ENG5",
-        "essays_to_process": [
-            {"els_essay_id": "essay-1", "text_storage_id": "storage-1"},
-            {"els_essay_id": "essay-2", "text_storage_id": "storage-2"},
+    request_data_hydrate = CJAssessmentRequestData(
+        bos_batch_id="bos-batch-hydrate-1",
+        language="en",
+        course_code="ENG5",
+        essays_to_process=[
+            EssayToProcess(els_essay_id="essay-1", text_storage_id="storage-1"),
+            EssayToProcess(els_essay_id="essay-2", text_storage_id="storage-2"),
         ],
-        "assignment_id": assignment_id,
+        assignment_id=assignment_id,
         # IMPORTANT: student_prompt_storage_id omitted to trigger hydration
-    }
+    )
 
     cj_batch_id_hydrated = await create_cj_batch(
         request_data=request_data_hydrate,
@@ -177,18 +178,18 @@ async def test_student_prompt_workflow_end_to_end(
 
     # --- Explicit storage ID should bypass hydration and remain intact ---
     explicit_storage_id = "explicit-storage-999"
-    request_data_explicit = {
-        "bos_batch_id": "bos-batch-explicit-1",
-        "language": "en",
-        "course_code": "ENG5",
-        "essays_to_process": [
-            {"els_essay_id": "essay-3", "text_storage_id": "storage-3"},
-            {"els_essay_id": "essay-4", "text_storage_id": "storage-4"},
+    request_data_explicit = CJAssessmentRequestData(
+        bos_batch_id="bos-batch-explicit-1",
+        language="en",
+        course_code="ENG5",
+        essays_to_process=[
+            EssayToProcess(els_essay_id="essay-3", text_storage_id="storage-3"),
+            EssayToProcess(els_essay_id="essay-4", text_storage_id="storage-4"),
         ],
-        "assignment_id": assignment_id,  # present, but explicit prompt provided should win
-        "student_prompt_storage_id": explicit_storage_id,
-        "student_prompt_text": "Explicit prompt provided by client",
-    }
+        assignment_id=assignment_id,  # present, but explicit prompt provided should win
+        student_prompt_storage_id=explicit_storage_id,
+        student_prompt_text="Explicit prompt provided by client",
+    )
 
     cj_batch_id_explicit = await create_cj_batch(
         request_data=request_data_explicit,

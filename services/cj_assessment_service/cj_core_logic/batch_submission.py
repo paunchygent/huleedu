@@ -358,6 +358,94 @@ async def merge_batch_processing_metadata(
         raise
 
 
+async def merge_batch_upload_metadata(
+    session: AsyncSession,
+    cj_batch_id: int,
+    metadata_updates: dict[str, Any],
+    correlation_id: UUID,
+) -> None:
+    """Merge metadata for CJ batch uploads without overwriting existing keys."""
+
+    from sqlalchemy import update
+
+    from services.cj_assessment_service.models_db import CJBatchUpload
+
+    try:
+        stmt = select(CJBatchUpload.processing_metadata).where(CJBatchUpload.id == cj_batch_id)
+        result = await session.execute(stmt)
+        existing_metadata = result.scalar_one_or_none()
+        if not isinstance(existing_metadata, dict):
+            existing_metadata = {}
+        updated_metadata = {**existing_metadata, **metadata_updates}
+
+        await session.execute(
+            update(CJBatchUpload)
+                .where(CJBatchUpload.id == cj_batch_id)
+                .values(processing_metadata=updated_metadata)
+        )
+        await session.commit()
+
+        logger.debug(
+            "Merged batch upload metadata",
+            extra={
+                "correlation_id": str(correlation_id),
+                "cj_batch_id": cj_batch_id,
+                "keys": list(metadata_updates.keys()),
+            },
+        )
+    except Exception as e:
+        logger.error(
+            f"Failed to merge batch upload metadata: {e}",
+            extra={
+                "correlation_id": str(correlation_id),
+                "cj_batch_id": cj_batch_id,
+                "error": str(e),
+            },
+            exc_info=True,
+        )
+        raise
+
+
+async def merge_essay_processing_metadata(
+    session: AsyncSession,
+    els_essay_id: str,
+    metadata_updates: dict[str, Any],
+    correlation_id: UUID,
+) -> None:
+    """Merge metadata for a processed essay record."""
+
+    from services.cj_assessment_service.models_db import ProcessedEssay
+
+    try:
+        essay = await session.get(ProcessedEssay, els_essay_id)
+        if not essay:
+            raise ValueError(f"Processed essay {els_essay_id} not found for metadata merge")
+
+        existing_metadata = essay.processing_metadata or {}
+        essay.processing_metadata = {**existing_metadata, **metadata_updates}
+        await session.flush()
+
+        logger.debug(
+            "Merged essay metadata",
+            extra={
+                "correlation_id": str(correlation_id),
+                "els_essay_id": els_essay_id,
+                "keys": list(metadata_updates.keys()),
+            },
+        )
+    except Exception as e:
+        logger.error(
+            f"Failed to merge essay metadata: {e}",
+            extra={
+                "correlation_id": str(correlation_id),
+                "els_essay_id": els_essay_id,
+                "error": str(e),
+            },
+            exc_info=True,
+        )
+        raise
+
+
 async def append_to_failed_pool_atomic(
     session: AsyncSession,
     cj_batch_id: int,

@@ -4,9 +4,12 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
+from uuid import uuid4
 
 import pytest
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from services.cj_assessment_service.cj_core_logic import pair_generation
 from services.cj_assessment_service.cj_core_logic.pair_generation import (
     _build_comparison_prompt,
     _fetch_assessment_context,
@@ -149,3 +152,78 @@ async def test_fetch_assessment_context_warns_when_instruction_missing() -> None
         "judge_rubric_text": None,
     }
     assert session.execute.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_generate_comparison_tasks_respects_thresholds_and_global_cap(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Validate interplay between per-call threshold and global max comparisons."""
+
+    per_call_threshold = 3
+    global_cap = 4
+    essays = [
+        EssayForComparison(id="essay-a", text_content="Essay content A"),
+        EssayForComparison(id="essay-b", text_content="Essay content B"),
+        EssayForComparison(id="essay-c", text_content="Essay content C"),
+        EssayForComparison(id="essay-d", text_content="Essay content D"),
+    ]
+    existing_pairs_store: set[tuple[str, str]] = set()
+
+    async def fake_fetch_context(*_: object, **__: object) -> dict[str, str | None]:
+        return {
+            "assessment_instructions": "Assess clarity and structure.",
+            "student_prompt_text": "Explain your argument.",
+            "judge_rubric_text": None,
+        }
+
+    async def fake_fetch_existing_pairs(
+        *_: object,
+        **__: object,
+    ) -> set[tuple[str, str]]:
+        return set(existing_pairs_store)
+
+    monkeypatch.setattr(pair_generation, "_fetch_assessment_context", fake_fetch_context)
+    monkeypatch.setattr(
+        pair_generation,
+        "_fetch_existing_comparison_ids",
+        fake_fetch_existing_pairs,
+    )
+
+    def record_pairs(tasks: list) -> None:
+        for task in tasks:
+            existing_pairs_store.add(tuple(sorted((task.essay_a.id, task.essay_b.id))))
+
+    session = AsyncMock(spec=AsyncSession)
+    correlation_id = uuid4()
+
+    tasks_first_call = await pair_generation.generate_comparison_tasks(
+        essays_for_comparison=essays,
+        db_session=session,
+        cj_batch_id=123,
+        existing_pairs_threshold=per_call_threshold,
+        max_pairwise_comparisons=global_cap,
+        correlation_id=correlation_id,
+    )
+    assert len(tasks_first_call) == per_call_threshold
+    record_pairs(tasks_first_call)
+
+    tasks_second_call = await pair_generation.generate_comparison_tasks(
+        essays_for_comparison=essays,
+        db_session=session,
+        cj_batch_id=123,
+        existing_pairs_threshold=per_call_threshold,
+        max_pairwise_comparisons=global_cap,
+        correlation_id=correlation_id,
+    )
+    assert len(tasks_second_call) == 1  # Only remaining global slot should be used
+    record_pairs(tasks_second_call)
+
+    tasks_third_call = await pair_generation.generate_comparison_tasks(
+        essays_for_comparison=essays,
+        db_session=session,
+        cj_batch_id=123,
+        existing_pairs_threshold=per_call_threshold,
+        max_pairwise_comparisons=global_cap,
+        correlation_id=correlation_id,
+    )
+    assert tasks_third_call == []
+    assert len(existing_pairs_store) == global_cap

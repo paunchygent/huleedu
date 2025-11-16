@@ -17,10 +17,31 @@ Use this rule whenever you need to locate or update the text that reaches Anthro
 - **Essays A/B**: instances of `EssayForComparison` (`services/cj_assessment_service/models_api.py:21-34`) whose `text_content` is appended under `**Essay A (ID: …)**` / `**Essay B (ID: …)**` in `_build_comparison_prompt()` (`pair_generation.py:312-320`).
 - **Response Instructions**: the final paragraph inside `_build_comparison_prompt()` (`pair_generation.py:320-327`) describes the JSON contract (winner/justification/confidence) that must be honored by downstream providers.
 
-## System Prompt Handling (LLM Provider Service)
-- Default Anthropic message lives in `services/llm_provider_service/implementations/anthropic_provider_impl.py:82-124` (same pattern for OpenAI/Google/OpenRouter implementations).
-- CJ can override this by setting `system_prompt_override` in the payload; the HTTP client forwards it via `services/cj_assessment_service/implementations/llm_provider_service_client.py:70-111`. If `None`, providers fall back to their hard-coded defaults.
-- ENG5 runner now ships its own override helper in `scripts/cj_experiments_runners/eng5_np/system_prompt.py`; enable/disable via the `--cj-system-prompt/--no-cj-system-prompt` flag wired up in `scripts/cj_experiments_runners/eng5_np/cli.py`. The helper emits the impartial-judge role, neutrality guardrails, decisive ≤50-word justification requirement, confidence scale, and tool-schema reminder.
+## System Prompt Hierarchy
+The system prompt follows a three-tier hierarchy:
+
+1. **Event-Level Override (Highest Priority)**: Explicit override via `llm_config_overrides.system_prompt_override` in Kafka events
+2. **CJ Assessment Default (Middle Priority)**: Canonical CJ prompt from `services/cj_assessment_service/config.py:194-210` (SYSTEM_PROMPT)
+3. **LLM Provider Fallback (Lowest Priority)**: Minimal generic prompt (unreachable for CJ workflows)
+
+### CJ Assessment Default System Prompt
+- **Location**: `services/cj_assessment_service/config.py:194-210`
+- **Content**: Impartial Comparative Judgement assessor role with neutrality constraints, rubric adherence, 50-word justification limit, 0-5 confidence scale, and tool schema requirements
+- **Applied**: Automatically used by all CJ workflows unless explicitly overridden via event
+- **Injection Points**:
+  - `services/cj_assessment_service/cj_core_logic/comparison_processing.py:106` (main batch entry)
+  - `services/cj_assessment_service/cj_core_logic/comparison_processing.py:242` (iteration processing)
+  - `services/cj_assessment_service/cj_core_logic/batch_processor.py:249` (alternative entry)
+
+### ENG5 Runner Override Behavior
+- **With `--cj-system-prompt` (default)**: ENG5 custom prompt from `scripts/cj_experiments_runners/eng5_np/system_prompt.py` overrides CJ default
+- **With `--no-cj-system-prompt`**: Falls back to CJ Assessment default (NOT LLM Provider minimal)
+- **Integration**: ENG5 runner builds `LLMConfigOverrides` in `scripts/cj_experiments_runners/eng5_np/cli.py:431-437`, flowing through event schema `libs/common_core/src/common_core/events/cj_assessment_events.py:78-108`
+
+### LLM Provider Fallback
+- **Location**: `services/llm_provider_service/implementations/anthropic_provider_impl.py:112-115` (and other providers)
+- **Content**: "You are an LLM comparison engine. Follow the caller-supplied instructions..."
+- **Status**: Unreachable for CJ workflows (CJ always provides a prompt)
 
 ## ENG5 Runner Overrides
 - The ENG5 runner builds `LLMConfigOverrides` in `scripts/cj_experiments_runners/eng5_np/cli.py:208-244`, covering provider/model/temperature/max-tokens plus the `--cj-system-prompt` flag that injects the canonical CJ system prompt (sourced from `scripts/cj_experiments_runners/eng5_np/system_prompt.py`).

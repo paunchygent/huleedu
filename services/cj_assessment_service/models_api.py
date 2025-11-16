@@ -10,10 +10,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 from common_core import EssayComparisonWinner
 from common_core.error_enums import ErrorCode
+from common_core.events.cj_assessment_events import LLMConfigOverrides
 from common_core.models.error_models import ErrorDetail as CanonicalErrorDetail
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -161,3 +163,94 @@ class CJProcessingMetadata(BaseModel):
     student_prompt_text: str | None = None
     judge_rubric_storage_id: str | None = None
     judge_rubric_text: str | None = None
+
+
+class OriginalCJRequestMetadata(BaseModel):
+    """Persisted snapshot of the runner-supplied CJ request payload."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    assignment_id: str | None = None
+    language: str
+    course_code: str
+    student_prompt_text: str | None = None
+    student_prompt_storage_id: str | None = None
+    judge_rubric_text: str | None = None
+    judge_rubric_storage_id: str | None = None
+    llm_config_overrides: LLMConfigOverrides | None = None
+    batch_config_overrides: dict[str, Any] | None = None
+    max_comparisons_override: int | None = Field(None, ge=1)
+    user_id: str | None = None
+    org_id: str | None = None
+
+
+class CJEessayMetadata(BaseModel):
+    """Base metadata overlay for essays stored inside CJ processing tables."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    is_anchor: bool | None = None
+    anchor_grade: str | None = None
+    known_grade: str | None = None
+    anchor_ref_id: str | None = None
+    text_storage_id: str | None = None
+
+
+class CJAnchorMetadata(CJEessayMetadata):
+    """Typed metadata overlay used for anchor essays."""
+
+    is_anchor: bool = True
+    anchor_label: str | None = None
+
+
+class EssayToProcess(BaseModel):
+    """Reference to an essay for CJ processing."""
+
+    els_essay_id: str = Field(description="ELS essay identifier")
+    text_storage_id: str = Field(description="Content Service storage ID")
+
+
+class CJAssessmentRequestData(BaseModel):
+    """Typed request data for CJ assessment workflow.
+
+    This model replaces the untyped dict[str, Any] used throughout the
+    CJ assessment workflow, providing runtime validation and better type safety.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    # Required fields (always present)
+    bos_batch_id: str = Field(description="BOS batch identifier")
+    assignment_id: str | None = Field(None, description="Assignment identifier")
+    essays_to_process: list[EssayToProcess] = Field(
+        description="Essays to process in this batch"
+    )
+    language: str = Field(description="Language code (e.g., 'en', 'sv')")
+    course_code: str = Field(description="Course code enum value")
+
+    # Optional prompt context fields
+    student_prompt_text: str | None = Field(
+        None, description="Hydrated student assignment prompt text"
+    )
+    student_prompt_storage_id: str | None = Field(
+        None, description="Content Service storage ID for student prompt"
+    )
+    judge_rubric_text: str | None = Field(None, description="Hydrated judge rubric text")
+    judge_rubric_storage_id: str | None = Field(
+        None, description="Content Service storage ID for judge rubric"
+    )
+
+    # Optional configuration overrides
+    llm_config_overrides: LLMConfigOverrides | None = Field(
+        None, description="LLM parameter overrides for this batch"
+    )
+    batch_config_overrides: dict[str, Any] | None = Field(
+        None, description="Batch processing configuration overrides"
+    )
+    max_comparisons_override: int | None = Field(
+        None, ge=1, description="Runner-specified comparison limit"
+    )
+
+    # Optional identity fields (Phase 3: Entitlements)
+    user_id: str | None = Field(None, description="User ID for credit attribution")
+    org_id: str | None = Field(None, description="Organization ID for credit attribution")

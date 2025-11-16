@@ -169,8 +169,12 @@ class Settings(SecureServiceSettings, JWTValidationSettings):
     ]  # Explicit defaults for transient network/API issues
 
     # CJ assessment parameters
-    MAX_PAIRWISE_COMPARISONS: int = 1000
+    MAX_PAIRWISE_COMPARISONS: int = 350
     COMPARISONS_PER_STABILITY_CHECK_ITERATION: int = 10
+    MIN_COMPARISONS_FOR_STABILITY_CHECK: int = Field(
+        default=10,
+        description="Minimum successful comparisons required before checking score stability",
+    )
     SCORE_STABILITY_THRESHOLD: float = 0.05
 
     # Failed Comparison Pool Configuration
@@ -188,28 +192,26 @@ class Settings(SecureServiceSettings, JWTValidationSettings):
         default=True, description="Enable automatic retry of failed comparisons"
     )
 
-    # Assessment prompt template
-    ASSESSMENT_PROMPT_TEMPLATE: str = """
-Compare these two essays and determine which is better written.
-Essay A (ID: {essay_a_id}):
-{essay_a_text}
-
-Essay B (ID: {essay_b_id}):
-{essay_b_text}
-
-Please respond with a JSON object containing:
-- 'winner': 'Essay A' or 'Essay B'
-- 'justification': Brief explanation of your decision
-- 'confidence': Rating from 1-5 (5 = very confident)
-Based on clarity, structure, argument quality, and writing mechanics.
-Always respond with valid JSON.
-"""
-
-    # System prompt for LLM
-    SYSTEM_PROMPT: str = """
-You are an expert essay evaluator. Compare essays based on clarity, structure,
-argument quality, and writing mechanics. Always respond with valid JSON.
-"""
+    # System prompt for LLM - CJ Assessment canonical prompt
+    # This is the default for all CJ comparative judgement workflows
+    # Can be overridden via llm_config_overrides.system_prompt_override in events
+    SYSTEM_PROMPT: str = (
+        "You are an impartial Comparative Judgement assessor for "
+        "upper-secondary student essays.\n"
+        "\n"
+        "Constraints:\n"
+        "- Maintain complete neutrality. Do not favor any topic stance, moral "
+        "position, essay length, or writing style.\n"
+        "- Judge strictly against the provided Student Assignment and Assessment "
+        "Rubric; never invent additional criteria.\n"
+        "- Return a justification of 50 words or fewer that highlights the "
+        "decisive factor that made the winning essay outperform the other.\n"
+        "- Report confidence as a numeric value from 0 to 5 (0 = no confidence, "
+        "5 = extremely confident).\n"
+        "- Respond via the comparison_result tool with fields {winner, "
+        "justification, confidence}. Make sure the payload satisfies that schema "
+        "exactly."
+    )
 
     # Metrics configuration
     METRICS_PORT: int = 9090
@@ -261,7 +263,7 @@ argument quality, and writing mechanics. Always respond with valid JSON.
 
     # Grade Projection Configuration (NO FEATURE FLAGS)
     MIN_ANCHORS_REQUIRED: int = Field(
-        default=3,
+        default=9,
         description="Minimum anchor essays required for projection",
     )
     MAX_HESSIAN_BATCH_SIZE: int = Field(

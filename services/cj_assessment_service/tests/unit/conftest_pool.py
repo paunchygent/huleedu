@@ -44,13 +44,10 @@ from services.cj_assessment_service.protocols import (
 )
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture
 def mock_get_batch_state(monkeypatch: pytest.MonkeyPatch) -> AsyncMock:
-    """Patch get_batch_state to avoid hitting the database.
+    """Opt-in patch for get_batch_state so only requesting tests are affected."""
 
-    This fixture is autouse=True so it applies to all tests that use batch_retry_processor.
-    Tests can override the return_value if they need custom metadata.
-    """
     mock = AsyncMock()
     mock.return_value = SimpleNamespace(processing_metadata=None)
     monkeypatch.setattr(

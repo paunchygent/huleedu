@@ -1,3 +1,80 @@
+## CJ comparison submission modes and LLM batching
+
+CJ has two **comparison submission shapes**:
+
+- **Batched (all comparisons at once)**  
+  - CJ generates *all* comparison pairs for a batch in one call to [generate_comparison_tasks](cci:1://file:///Users/olofs_mba/Documents/Repos/huledu-reboot/services/cj_assessment_service/cj_core_logic/pair_generation.py:27:0-139:27), up to `MAX_PAIRWISE_COMPARISONS`.  
+  - Call pattern (conceptual):
+
+    ```python
+    comparison_tasks = await generate_comparison_tasks(
+        essays_for_comparison=essays_for_api_model,
+        db_session=session,
+        cj_batch_id=cj_batch_id,
+        existing_pairs_threshold=settings.MAX_PAIRWISE_COMPARISONS,
+        max_pairwise_comparisons=settings.MAX_PAIRWISE_COMPARISONS,
+        correlation_id=correlation_id,
+    )
+    ```
+
+  - Intended when we want to hand the *full* comparison workload to the LLM Provider in one go
+    (e.g. to align with a provider-level batch/discount API).
+
+- **Bundled (iterative, stability-driven)**  
+  - CJ generates comparison pairs in **small bundles** per iteration, recomputes Bradley–Terry
+    scores, and checks for stability between iterations.
+  - Bundle size is controlled by `COMPARISONS_PER_STABILITY_CHECK_ITERATION`; total budget is
+    capped by `MAX_PAIRWISE_COMPARISONS`.
+  - Call pattern (per iteration):
+
+    ```python
+    comparison_tasks_for_llm = await generate_comparison_tasks(
+        essays_for_comparison=essays_for_api_model,
+        db_session=session,
+        cj_batch_id=cj_batch_id,
+        existing_pairs_threshold=settings.COMPARISONS_PER_STABILITY_CHECK_ITERATION,
+        max_pairwise_comparisons=settings.MAX_PAIRWISE_COMPARISONS,
+        correlation_id=correlation_id,
+    )
+    ```
+
+  - After each bundle is processed, CJ:
+    - recomputes scores,
+    - applies the stability check (`MIN_COMPARISONS_FOR_STABILITY_CHECK` and
+      `SCORE_STABILITY_THRESHOLD`), and
+    - either requests another bundle or finalizes the batch.
+
+### Relationship to `LLMBatchingMode`
+
+The `LLMBatchingMode` enum in CJ config (values: `PER_REQUEST`, `PROVIDER_SERIAL_BUNDLE`,
+`PROVIDER_BATCH_API`) is treated as a **hint** that shapes *both*:
+
+- how CJ structures comparison submission (batched vs bundled), and  
+- how the LLM Provider Service is expected to choose its internal batching strategy.
+
+A typical mapping is:
+
+- `LLMBatchingMode.PER_REQUEST`  
+  - CJ may still use the **bundled, stability-driven** mode, but each comparison or small
+    bundle is expected to be sent as individual provider calls.
+
+- `LLMBatchingMode.PROVIDER_SERIAL_BUNDLE`  
+  - CJ uses the **bundled** mode and hands small comparison bundles to the provider, which may
+    group them into its own serial bundles.
+
+- `LLMBatchingMode.PROVIDER_BATCH_API`  
+  - CJ prefers the **batched** mode, generating all comparisons up front (within
+    `MAX_PAIRWISE_COMPARISONS`) so the provider can call its batch/discount API efficiently.
+
+In all cases, the LLM Provider Service remains the **source of truth** for physical batching;
+CJ only controls *when* and *how many* `ComparisonTask`s are generated and handed off.
+
+---
+
+For the full implementation plan and checklist, see  
+[LLM batch strategy implementation checklist](.claude/tasks/TASK-LLM-BATCH-STRATEGY-IMPLEMENTATION-CHECKLIST.md).
+
+
 # TASK-LLM-BATCH-STRATEGY-IMPLEMENTATION – Developer Checklist
 
 This checklist is a child document for `TASK-LLM-BATCH-STRATEGY-IMPLEMENTATION.md` and the high-level

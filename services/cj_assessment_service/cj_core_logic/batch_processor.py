@@ -16,7 +16,7 @@ from huleedu_service_libs.error_handling import raise_processing_error
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.cj_assessment_service.config import Settings
-from services.cj_assessment_service.models_api import ComparisonTask
+from services.cj_assessment_service.models_api import CJAssessmentRequestData, ComparisonTask
 from services.cj_assessment_service.protocols import (
     CJRepositoryProtocol,
     LLMInteractionProtocol,
@@ -219,7 +219,7 @@ class BatchProcessor:
         cj_batch_id: int,
         comparison_tasks: list[ComparisonTask],
         correlation_id: UUID,
-        request_data: dict[str, Any],
+        request_data: CJAssessmentRequestData,
     ) -> BatchSubmissionResult:
         """Handle batch submission with state tracking.
 
@@ -237,21 +237,24 @@ class BatchProcessor:
         """
         # Extract configuration overrides from request data
         config_overrides = None
-        if "batch_config_overrides" in request_data:
-            config_overrides = BatchConfigOverrides(**request_data["batch_config_overrides"])
+        if request_data.batch_config_overrides is not None:
+            config_overrides = BatchConfigOverrides(**request_data.batch_config_overrides)
 
         # Extract LLM overrides from request data
-        llm_config_overrides = request_data.get("llm_config_overrides")
+        llm_config_overrides = request_data.llm_config_overrides
         model_override = None
         temperature_override = None
         max_tokens_override = None
-        system_prompt_override = None
+        # Use CJ's canonical system prompt as default (can be overridden by event)
+        system_prompt_override = self.settings.SYSTEM_PROMPT
 
         if llm_config_overrides:
             model_override = llm_config_overrides.model_override
             temperature_override = llm_config_overrides.temperature_override
             max_tokens_override = llm_config_overrides.max_tokens_override
-            system_prompt_override = llm_config_overrides.system_prompt_override
+            # Only override system prompt if explicitly provided (not None)
+            if llm_config_overrides.system_prompt_override is not None:
+                system_prompt_override = llm_config_overrides.system_prompt_override
 
         return await self.submit_comparison_batch(
             cj_batch_id=cj_batch_id,

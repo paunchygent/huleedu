@@ -26,6 +26,7 @@ from services.cj_assessment_service.protocols import (
     CJEventPublisherProtocol,
     CJRepositoryProtocol,
     ContentClientProtocol,
+    LLMInteractionProtocol,
 )
 
 if TYPE_CHECKING:
@@ -49,6 +50,7 @@ async def continue_cj_assessment_workflow(
     event_publisher: CJEventPublisherProtocol,
     settings: Settings,
     content_client: ContentClientProtocol,
+    llm_interaction: LLMInteractionProtocol,
     retry_processor: BatchRetryProcessor | None = None,
 ) -> None:
     """Process LLM callback and continue existing workflow.
@@ -139,6 +141,7 @@ async def continue_cj_assessment_workflow(
                 settings=settings,
                 content_client=content_client,
                 correlation_id=correlation_id,
+                llm_interaction=llm_interaction,
                 retry_processor=retry_processor,
             )
         else:

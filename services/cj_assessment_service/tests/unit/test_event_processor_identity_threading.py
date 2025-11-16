@@ -174,16 +174,16 @@ class TestEventProcessorIdentityThreading:
         call_args = mock_workflow_function.call_args
         converted_request_data = call_args.kwargs["request_data"]
 
-        assert converted_request_data["user_id"] == expected_user_id
-        assert converted_request_data["org_id"] == expected_org_id
-        assert converted_request_data["student_prompt_text"] == PROMPT_TEXT
+        assert converted_request_data.user_id == expected_user_id
+        assert converted_request_data.org_id == expected_org_id
+        assert converted_request_data.student_prompt_text == PROMPT_TEXT
         assert (
-            converted_request_data["student_prompt_storage_id"] == "prompt-storage-with-overrides"
+            converted_request_data.student_prompt_storage_id == "prompt-storage-with-overrides"
         )
-        assert "judge_rubric_text" in converted_request_data
-        assert "judge_rubric_storage_id" in converted_request_data
-        assert converted_request_data["judge_rubric_text"] is None
-        assert converted_request_data["judge_rubric_storage_id"] is None
+        assert hasattr(converted_request_data, "judge_rubric_text")
+        assert hasattr(converted_request_data, "judge_rubric_storage_id")
+        assert converted_request_data.judge_rubric_text is None
+        assert converted_request_data.judge_rubric_storage_id is None
 
         mock_content_client.fetch_content.assert_any_await(
             "prompt-storage-with-overrides", envelope.correlation_id
@@ -255,24 +255,24 @@ class TestEventProcessorIdentityThreading:
         ]
 
         for field in required_fields:
-            assert field in converted_request_data, f"Missing required field: {field}"
+            assert hasattr(converted_request_data, field), f"Missing required field: {field}"
 
         # Verify identity fields have expected values
-        assert converted_request_data["user_id"] == test_user_id
-        assert converted_request_data["org_id"] == test_org_id
+        assert converted_request_data.user_id == test_user_id
+        assert converted_request_data.org_id == test_org_id
 
         # Verify other fields maintain correct types and values
-        assert isinstance(converted_request_data["bos_batch_id"], str)
-        assert isinstance(converted_request_data["essays_to_process"], list)
-        assert len(converted_request_data["essays_to_process"]) > 0
-        assert converted_request_data["language"] == event_data.language
-        assert converted_request_data["course_code"] == event_data.course_code
-        assert converted_request_data["student_prompt_text"] == PROMPT_TEXT
+        assert isinstance(converted_request_data.bos_batch_id, str)
+        assert isinstance(converted_request_data.essays_to_process, list)
+        assert len(converted_request_data.essays_to_process) > 0
+        assert converted_request_data.language == event_data.language
+        assert converted_request_data.course_code == event_data.course_code
+        assert converted_request_data.student_prompt_text == PROMPT_TEXT
         assert (
-            converted_request_data["student_prompt_storage_id"] == "prompt-storage-with-overrides"
+            converted_request_data.student_prompt_storage_id == "prompt-storage-with-overrides"
         )
-        assert converted_request_data["judge_rubric_text"] is None
-        assert converted_request_data["judge_rubric_storage_id"] is None
+        assert converted_request_data.judge_rubric_text is None
+        assert converted_request_data.judge_rubric_storage_id is None
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -340,9 +340,9 @@ class TestEventProcessorIdentityThreading:
             # Verify identity values are passed through as-is (including None)
             call_args = mock_workflow_function.call_args
             converted_request_data = call_args.kwargs["request_data"]
-            assert converted_request_data["user_id"] == user_id
-            assert converted_request_data["org_id"] == org_id
-            assert converted_request_data["student_prompt_text"] == PROMPT_TEXT
+            assert converted_request_data.user_id == user_id
+            assert converted_request_data.org_id == org_id
+            assert converted_request_data.student_prompt_text == PROMPT_TEXT
 
     @pytest.mark.asyncio
     async def test_prompt_fetch_failure_records_metric(
@@ -410,14 +410,14 @@ class TestEventProcessorIdentityThreading:
 
         mock_workflow_function.assert_called_once()
         converted_request_data = mock_workflow_function.call_args.kwargs["request_data"]
-        assert converted_request_data["student_prompt_text"] is None
+        assert converted_request_data.student_prompt_text is None
         assert (
-            converted_request_data["student_prompt_storage_id"] == "prompt-storage-with-overrides"
+            converted_request_data.student_prompt_storage_id == "prompt-storage-with-overrides"
         )
-        assert "judge_rubric_text" in converted_request_data
-        assert "judge_rubric_storage_id" in converted_request_data
-        assert converted_request_data["judge_rubric_text"] is None
-        assert converted_request_data["judge_rubric_storage_id"] is None
+        assert hasattr(converted_request_data, "judge_rubric_text")
+        assert hasattr(converted_request_data, "judge_rubric_storage_id")
+        assert converted_request_data.judge_rubric_text is None
+        assert converted_request_data.judge_rubric_storage_id is None
 
     @pytest.mark.asyncio
     async def test_correlation_id_preservation_with_identities(
@@ -472,8 +472,8 @@ class TestEventProcessorIdentityThreading:
 
         # Verify identity data is also preserved alongside trace context
         converted_request_data = call_args.kwargs["request_data"]
-        assert converted_request_data["user_id"] == test_user_id
-        assert converted_request_data["org_id"] == test_org_id
+        assert converted_request_data.user_id == test_user_id
+        assert converted_request_data.org_id == test_org_id
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -545,12 +545,12 @@ class TestEventProcessorIdentityThreading:
         converted_request_data = call_args.kwargs["request_data"]
 
         if expected_preserved:
-            assert converted_request_data["user_id"] == user_id_with_special
-            assert converted_request_data["org_id"] == org_id_with_special
+            assert converted_request_data.user_id == user_id_with_special
+            assert converted_request_data.org_id == org_id_with_special
 
             # Verify exact character preservation
-            assert special_characters in converted_request_data["user_id"]
-            assert special_characters in converted_request_data["org_id"]
+            assert special_characters in converted_request_data.user_id
+            assert special_characters in converted_request_data.org_id
 
     @pytest.mark.asyncio
     async def test_identity_threading_with_multiple_essays(
@@ -597,18 +597,18 @@ class TestEventProcessorIdentityThreading:
         converted_request_data = call_args.kwargs["request_data"]
 
         # Verify identity fields are present and match fixture values
-        assert converted_request_data["user_id"] == "test-user-456"
-        assert converted_request_data["org_id"] is None
+        assert converted_request_data.user_id == "test-user-456"
+        assert converted_request_data.org_id is None
 
         # Verify essays were processed correctly
-        assert "essays_to_process" in converted_request_data
-        essays = converted_request_data["essays_to_process"]
+        assert hasattr(converted_request_data, "essays_to_process")
+        essays = converted_request_data.essays_to_process
         assert len(essays) == 2  # Fixture has 2 essays
 
         # Verify essay structure is correct
         for essay in essays:
-            assert "els_essay_id" in essay
-            assert "text_storage_id" in essay
+            assert hasattr(essay, "els_essay_id")
+            assert hasattr(essay, "text_storage_id")
 
     @pytest.mark.asyncio
     async def test_workflow_call_parameters_with_identity_data(
@@ -670,5 +670,5 @@ class TestEventProcessorIdentityThreading:
 
         # Check request_data parameter includes identity fields
         request_data = call_args.kwargs["request_data"]
-        assert request_data["user_id"] == test_user_id
-        assert request_data["org_id"] == test_org_id
+        assert request_data.user_id == test_user_id
+        assert request_data.org_id == test_org_id

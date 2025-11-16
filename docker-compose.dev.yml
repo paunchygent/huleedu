@@ -34,6 +34,7 @@ services:
       - LOG_LEVEL=DEBUG
       - HULEEDU_DB_USER=${HULEEDU_DB_USER}
       - HULEEDU_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-dev-secret-key}
     # Override command for development with auto-reload if service supports it
     # command: ["pdm", "run", "dev"]  # Uncomment if you add a dev script
 

@@ -303,6 +303,9 @@ async def get_essay_rankings(
                 "bradley_terry_se": db_row.current_bt_se,
                 "comparison_count": db_row.comparison_count,
                 "is_anchor": bool(db_row.is_anchor),
+                # Provide metadata needed for downstream anchor-grade resolution
+                "text_storage_id": db_row.text_storage_id,
+                "processing_metadata": db_row.processing_metadata,
             },
         )
 

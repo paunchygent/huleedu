@@ -251,9 +251,14 @@ def apply_comparison_limit(
 ) -> tuple[list[FileRecord], list[FileRecord], int | None]:
     """Return slices respecting the requested comparison limit."""
 
-    if not anchors or not students:
+    # When max_comparisons=None, we're in DB-owned anchor mode (EXECUTE with CJ-managed anchors)
+    # In this case, empty anchors list is expected since CJ pulls them from the database
+    if not students:
+        raise ComparisonValidationError("At least one student essay is required.")
+
+    if max_comparisons is not None and not anchors:
         raise ComparisonValidationError(
-            "At least one anchor and one student essay are required to compute comparisons."
+            "At least one anchor essay is required when using --max-comparisons with local slicing."
         )
 
     if max_comparisons is None:

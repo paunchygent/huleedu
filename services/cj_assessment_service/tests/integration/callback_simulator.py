@@ -184,6 +184,7 @@ class CallbackSimulator:
                 event_publisher=event_publisher,
                 settings=settings,
                 content_client=content_client,
+                llm_interaction=mock_llm_interaction,
                 retry_processor=None,  # Not needed for successful callbacks
             )
 

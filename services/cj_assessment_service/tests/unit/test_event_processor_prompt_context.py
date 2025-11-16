@@ -217,8 +217,8 @@ async def test_process_message_increments_prompt_success_metric(
     assert failure_counter.count == 0
 
     converted_request_data = workflow_mock.call_args.kwargs["request_data"]
-    assert converted_request_data["assignment_id"] == "assignment-909"
-    assert converted_request_data["student_prompt_text"] == "Prompt body"
+    assert converted_request_data.assignment_id == "assignment-909"
+    assert converted_request_data.student_prompt_text == "Prompt body"
 
 
 @pytest.mark.asyncio
@@ -305,6 +305,6 @@ async def test_process_message_hydrates_judge_rubric_text(
     )
 
     converted_request_data = workflow_mock.call_args.kwargs["request_data"]
-    assert converted_request_data["student_prompt_storage_id"] == prompt_storage
-    assert converted_request_data["judge_rubric_storage_id"] == rubric_storage
-    assert converted_request_data["judge_rubric_text"] == "Judge rubric detailed guidance"
+    assert converted_request_data.student_prompt_storage_id == prompt_storage
+    assert converted_request_data.judge_rubric_storage_id == rubric_storage
+    assert converted_request_data.judge_rubric_text == "Judge rubric detailed guidance"

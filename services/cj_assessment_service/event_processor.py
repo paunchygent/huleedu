@@ -43,7 +43,11 @@ from services.cj_assessment_service.cj_core_logic.workflow_orchestrator import (
 )
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.metrics import get_business_metrics
-from services.cj_assessment_service.models_api import PromptHydrationFailure
+from services.cj_assessment_service.models_api import (
+    CJAssessmentRequestData,
+    EssayToProcess,
+    PromptHydrationFailure,
+)
 from services.cj_assessment_service.protocols import (
     CJEventPublisherProtocol,
     CJRepositoryProtocol,
@@ -291,34 +295,40 @@ async def _process_cj_assessment_impl(
             extra=log_extra,
         )
 
-        # Convert event data to format expected by core_assessment_logic
-        essays_to_process = []
-        for essay_ref in request_event_data.essays_for_cj:
-            essays_to_process.append(
-                {
-                    "els_essay_id": essay_ref.essay_id,
-                    "text_storage_id": essay_ref.text_storage_id,
-                },
+        # Convert event data to Pydantic model for type safety
+        essays_to_process = [
+            EssayToProcess(
+                els_essay_id=essay_ref.essay_id,
+                text_storage_id=essay_ref.text_storage_id,
             )
+            for essay_ref in request_event_data.essays_for_cj
+        ]
 
-        converted_request_data = {
-            "bos_batch_id": str(request_event_data.entity_id),
-            "assignment_id": request_event_data.assignment_id,
-            "essays_to_process": essays_to_process,
-            "language": request_event_data.language,
-            "course_code": request_event_data.course_code,
-            "student_prompt_text": prompt_text,
-            "student_prompt_storage_id": prompt_storage_id,
-            "judge_rubric_text": judge_rubric_text,
-            "judge_rubric_storage_id": judge_rubric_storage_id,
-            "llm_config_overrides": request_event_data.llm_config_overrides,
-            # Identity fields for credit attribution (Phase 3: Entitlements integration)
-            "user_id": request_event_data.user_id,
-            "org_id": request_event_data.org_id,
-        }
+        metadata_payload = envelope.metadata or {}
+        max_comparisons_override = None
+        if metadata_payload:
+            raw_max = metadata_payload.get("max_comparisons")
+            if isinstance(raw_max, int) and raw_max > 0:
+                max_comparisons_override = raw_max
+
+        converted_request_data = CJAssessmentRequestData(
+            bos_batch_id=str(request_event_data.entity_id),
+            assignment_id=request_event_data.assignment_id,
+            essays_to_process=essays_to_process,
+            language=request_event_data.language,
+            course_code=request_event_data.course_code,
+            student_prompt_text=prompt_text,
+            student_prompt_storage_id=prompt_storage_id,
+            judge_rubric_text=judge_rubric_text,
+            judge_rubric_storage_id=judge_rubric_storage_id,
+            llm_config_overrides=request_event_data.llm_config_overrides,
+            user_id=request_event_data.user_id,
+            org_id=request_event_data.org_id,
+            max_comparisons_override=max_comparisons_override,
+        )
 
         logger.info(
-            f"Starting CJ assessment workflow for batch {converted_request_data['bos_batch_id']}",
+            f"Starting CJ assessment workflow for batch {converted_request_data.bos_batch_id}",
             extra=log_extra,
         )
 
@@ -336,7 +346,7 @@ async def _process_cj_assessment_impl(
         # ALL workflows are async - comparisons submitted, results come via callbacks
         # The workflow_result.rankings will ALWAYS be empty at this point
         logger.info(
-            f"CJ assessment batch {converted_request_data['bos_batch_id']} "
+            f"CJ assessment batch {converted_request_data.bos_batch_id} "
             f"submitted for async processing. "
             "Results will be published when LLM callbacks complete.",
             extra={
@@ -354,7 +364,7 @@ async def _process_cj_assessment_impl(
             duration_metric.observe(submission_duration)
             logger.debug(
                 f"Recorded submission duration: {submission_duration:.2f}s for batch "
-                f"{converted_request_data['bos_batch_id']}",
+                f"{converted_request_data.bos_batch_id}",
                 extra=log_extra,
             )
 
@@ -749,6 +759,7 @@ async def process_llm_result(
     database: CJRepositoryProtocol,
     event_publisher: CJEventPublisherProtocol,
     content_client: ContentClientProtocol,
+    llm_interaction: LLMInteractionProtocol,
     settings_obj: Settings,
     tracer: "Tracer | None" = None,
 ) -> bool:
@@ -868,6 +879,7 @@ async def process_llm_result(
                         event_publisher=event_publisher,
                         settings=settings_obj,
                         content_client=content_client,
+                        llm_interaction=llm_interaction,
                     )
         else:
             # No parent context, process without it
@@ -882,6 +894,7 @@ async def process_llm_result(
                 event_publisher=event_publisher,
                 settings=settings_obj,
                 content_client=content_client,
+                llm_interaction=llm_interaction,
             )
 
         # Record callback processing metrics

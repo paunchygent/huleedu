@@ -25,9 +25,15 @@ from services.cj_assessment_service.protocols import (
     CJEventPublisherProtocol,
     CJRepositoryProtocol,
     ContentClientProtocol,
+    LLMInteractionProtocol,
 )
 
 # CJBatchState import removed - not used in this test file
+
+
+@pytest.fixture
+def mock_llm_interaction() -> AsyncMock:
+    return AsyncMock(spec=LLMInteractionProtocol)
 
 
 @pytest.mark.integration
@@ -159,6 +165,7 @@ class TestErrorHandlingIntegration:
         postgres_repository: CJRepositoryProtocol,
         mock_event_publisher: CJEventPublisherProtocol,
         test_settings: Settings,
+        mock_llm_interaction: AsyncMock,
     ) -> None:
         """Test handling of orphaned callbacks."""
         # Arrange - Use a correlation_id that has no corresponding comparison pair in database
@@ -183,6 +190,7 @@ class TestErrorHandlingIntegration:
             postgres_repository,
             mock_event_publisher,
             mock_content_client,
+            mock_llm_interaction,
             test_settings,
         )
 
@@ -204,6 +212,7 @@ class TestErrorHandlingIntegration:
         postgres_repository: CJRepositoryProtocol,
         mock_event_publisher: CJEventPublisherProtocol,
         test_settings: Settings,
+        mock_llm_interaction: AsyncMock,
     ) -> None:
         """Test idempotent handling of duplicate callbacks."""
         # Arrange - Create real database setup with incomplete comparison pair
@@ -278,6 +287,7 @@ class TestErrorHandlingIntegration:
             postgres_repository,
             mock_event_publisher,
             mock_content_client,
+            mock_llm_interaction,
             test_settings,
         )
         result2 = await process_llm_result(
@@ -285,6 +295,7 @@ class TestErrorHandlingIntegration:
             postgres_repository,
             mock_event_publisher,
             mock_content_client,
+            mock_llm_interaction,
             test_settings,
         )
 
@@ -316,6 +327,7 @@ class TestErrorHandlingIntegration:
         postgres_repository: CJRepositoryProtocol,
         mock_event_publisher: CJEventPublisherProtocol,
         test_settings: Settings,
+        mock_llm_interaction: AsyncMock,
     ) -> None:
         """Test batch failure when error rate exceeds threshold."""
         # Arrange - Create real database setup with multiple comparison pairs
@@ -394,6 +406,7 @@ class TestErrorHandlingIntegration:
                 postgres_repository,
                 mock_event_publisher,
                 mock_content_client,
+                mock_llm_interaction,
                 test_settings,
             )
             success_results.append(result)
@@ -413,6 +426,7 @@ class TestErrorHandlingIntegration:
                 postgres_repository,
                 mock_event_publisher,
                 mock_content_client,
+                mock_llm_interaction,
                 test_settings,
             )
             error_results.append(result)
@@ -455,6 +469,7 @@ class TestErrorHandlingIntegration:
         postgres_repository: CJRepositoryProtocol,
         mock_event_publisher: CJEventPublisherProtocol,
         test_settings: Settings,
+        mock_llm_interaction: AsyncMock,
     ) -> None:
         """Test handling of malformed callback messages with real repository.
 
@@ -490,6 +505,7 @@ class TestErrorHandlingIntegration:
             postgres_repository,
             mock_event_publisher,
             mock_content_client,
+            mock_llm_interaction,
             test_settings,
         )
 
@@ -509,6 +525,7 @@ class TestErrorHandlingIntegration:
         postgres_repository: CJRepositoryProtocol,
         mock_event_publisher: CJEventPublisherProtocol,
         test_settings: Settings,
+        mock_llm_interaction: AsyncMock,
     ) -> None:
         """Test handling of database connection failures with real repository.
 
@@ -547,6 +564,7 @@ class TestErrorHandlingIntegration:
             postgres_repository,
             mock_event_publisher,
             mock_content_client,
+            mock_llm_interaction,
             test_settings,
         )
 
@@ -564,6 +582,7 @@ class TestErrorHandlingIntegration:
         postgres_repository: CJRepositoryProtocol,
         mock_event_publisher: CJEventPublisherProtocol,
         test_settings: Settings,
+        mock_llm_interaction: AsyncMock,
     ) -> None:
         """Test handling of event publishing failures with real database operations.
 
@@ -645,6 +664,7 @@ class TestErrorHandlingIntegration:
             postgres_repository,
             mock_event_publisher,
             mock_content_client,
+            mock_llm_interaction,
             test_settings,
         )
 

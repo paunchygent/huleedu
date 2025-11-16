@@ -178,7 +178,9 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
             existing_essay.cj_batch_id = cj_batch_id
             existing_essay.text_storage_id = text_storage_id
             existing_essay.assessment_input_text = assessment_input_text
-            existing_essay.processing_metadata = metadata
+            if metadata:
+                existing = existing_essay.processing_metadata or {}
+                existing_essay.processing_metadata = {**existing, **metadata}
             if anchor_flag is not None:
                 existing_essay.is_anchor = anchor_flag
             await session.flush()
@@ -190,8 +192,9 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
             "cj_batch_id": cj_batch_id,
             "text_storage_id": text_storage_id,
             "assessment_input_text": assessment_input_text,
-            "processing_metadata": metadata,
         }
+        if metadata:
+            essay_kwargs["processing_metadata"] = metadata
         if anchor_flag is not None:
             essay_kwargs["is_anchor"] = anchor_flag
 

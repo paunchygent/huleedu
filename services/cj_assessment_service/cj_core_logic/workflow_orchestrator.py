@@ -20,6 +20,7 @@ from services.cj_assessment_service.cj_core_logic import (
 )
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
+from services.cj_assessment_service.models_api import CJAssessmentRequestData
 from services.cj_assessment_service.protocols import (
     CJEventPublisherProtocol,
     CJRepositoryProtocol,
@@ -46,7 +47,7 @@ class CJAssessmentWorkflowResult(BaseModel):
 
 
 async def run_cj_assessment_workflow(
-    request_data: dict[str, Any],
+    request_data: CJAssessmentRequestData,
     correlation_id: UUID,
     database: CJRepositoryProtocol,
     content_client: ContentClientProtocol,
@@ -68,7 +69,7 @@ async def run_cj_assessment_workflow(
     Raises:
         Exception: If the workflow encounters an unrecoverable error
     """
-    log_extra = {"correlation_id": correlation_id, "bos_batch_id": request_data.get("bos_batch_id")}
+    log_extra = {"correlation_id": correlation_id, "bos_batch_id": request_data.bos_batch_id}
     logger.info("Starting CJ assessment workflow.", extra=log_extra)
 
     cj_batch_id = None

@@ -34,6 +34,7 @@ from services.cj_assessment_service.models_db import CJBatchState
 
 # Import shared fixtures
 pytest_plugins = ["services.cj_assessment_service.tests.unit.conftest_pool"]
+pytestmark = pytest.mark.usefixtures("mock_get_batch_state")
 
 
 class TestDualModeRetryLogic:
@@ -386,6 +387,11 @@ class TestEndOfBatchFairnessScenarios:
         mock_session = AsyncMock()
         mock_database.session.return_value.__aenter__.return_value = mock_session
         mock_database.session.return_value.__aexit__.return_value = None
+
+        # Configure session.execute() to return proper result with scalar_one_or_none()
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = failed_pool.model_dump()
+        mock_session.execute.return_value = mock_result
 
         # Act - Simulate end-of-batch processing
         with patch(

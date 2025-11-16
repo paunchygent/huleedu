@@ -396,6 +396,7 @@ services:
       - CJ_ASSESSMENT_SERVICE_METRICS_PORT=9090
       - CJ_ASSESSMENT_SERVICE_REDIS_URL=redis://redis:6379
       - CJ_ASSESSMENT_SERVICE_LLM_PROVIDER_SERVICE_URL=http://llm_provider_service:8080/api/v1
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-secret-key-here}
       # Database configuration
       - HULEEDU_DB_USER=${HULEEDU_DB_USER}
       - HULEEDU_DB_PASSWORD=${HULEEDU_DB_PASSWORD}

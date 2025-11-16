@@ -93,6 +93,7 @@ class CJAssessmentKafkaConsumer:
                 database=self.database,
                 event_publisher=self.event_publisher,
                 content_client=self.content_client,
+                llm_interaction=self.llm_interaction,
                 settings_obj=self.settings,
                 tracer=self.tracer,
             )

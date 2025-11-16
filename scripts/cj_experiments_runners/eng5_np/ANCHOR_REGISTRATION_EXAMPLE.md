@@ -180,36 +180,25 @@ docker compose -f docker-compose.yml -f docker-compose.eng5-runner.yml run --rm 
 **What Happens:**
 
 1. **Content Upload Phase**:
-   - Runner detects anchors already registered for `eng5-role-models-2025`
-   - **Only uploads student essays** to Content Service (not anchors)
-   - Logs: `✓ Anchor registration used: skipping anchor upload`
+   - Runner validates that anchors exist and that `--cj-service-url` is provided.
+   - `register_anchor_essays` is invoked automatically; if it fails, the CLI aborts before any uploads occur.
+   - On success, **only student essays** are uploaded to Content Service (anchors stay DB-owned).
 
 2. **Assessment Request Phase**:
-   - Runner builds CJ assessment request with student essay references
-   - Publishes to Kafka topic `huleedu.els.cj_assessment.requested.v1`
+   - Runner builds the CJ assessment request with student essay references and publishes to `huleedu.els.cj_assessment.requested.v1`.
+   - Envelope metadata now includes `max_comparisons` when specified (here `50`) so CJ can apply the hint without the runner slicing essays.
 
 3. **CJ Service Processing**:
-   - CJ service receives assessment request
-   - Queries `anchor_essay_references` WHERE `assignment_id = 'eng5-role-models-2025'`
-   - Fetches 12 anchor essays from Content Service
-   - Creates synthetic IDs: `ANCHOR_1_a3f2b8c9`, `ANCHOR_2_b4c5d6e7`, etc.
-   - Adds anchors to comparison pool with metadata:
-     ```json
-     {
-       "is_anchor": true,
-       "anchor_grade": "A"
-     }
-     ```
+   - CJ service receives the request, queries `anchor_essay_references` for `assignment_id = 'eng5-role-models-2025'`, and fetches the 12 stored anchors.
+   - Creates synthetic IDs (e.g., `ANCHOR_1_a3f2b8c9`) and adds them to the comparison pool with `{"is_anchor": true, "anchor_grade": "A"}` metadata.
 
 4. **Comparative Judgment**:
-   - LLM performs pairwise comparisons
-   - Mix of student-student, student-anchor, and anchor-anchor pairs
-   - Logs judgments with winner selections
+   - LLM performs pairwise comparisons across student-student, student-anchor, and anchor-anchor pairs.
+   - `COMPARISONS_PER_STABILITY_CHECK_ITERATION` and `MAX_PAIRWISE_COMPARISONS` from CJ’s settings determine how many pairs are generated per iteration and globally.
 
 5. **Grade Projection**:
-   - Bradley-Terry model calibrated using anchor grades
-   - Projected grades calculated for student essays
-   - Results published to `huleedu.cj_assessment.completed.v1`
+   - Bradley-Terry modelling uses the registered anchors for calibration.
+   - Projected grades are emitted for student essays, and results publish to `huleedu.cj_assessment.completed.v1`.
 
 **Expected Log Output (excerpt):**
 ```
@@ -297,18 +286,21 @@ curl -X POST http://localhost:9095/admin/v1/assessment-instructions \
 - Rename file with valid grade (e.g., `X1.docx` → `F+1.docx`)
 - Or verify grade scale is correct for your anchors
 
-### Anchors Not Loaded During Batch
+### Anchor Registration Fails During Execute Mode
 
 **Symptom:**
 ```
-[warning] No anchors found for assignment eng5-role-models-2025
-[info] Falling back to ephemeral anchor mode
+[error] anchor_registration_failed error="401 Unauthorized"
+Traceback (most recent call last):
+  ...
+RuntimeError: Anchor registration failed; aborting EXECUTE run so CJ only uses DB-owned anchors.
 ```
 
 **Possible Causes:**
-1. Anchors not registered (check database)
+1. Anchors not registered yet (check database)
 2. `assignment_id` mismatch
 3. `grade_scale` filter mismatch
+4. `CJ_SERVICE_URL` or admin auth misconfigured
 
 **Solution:**
 ```bash
@@ -321,6 +313,10 @@ docker exec huleedu_cj_assessment_db psql -U huleedu_user -d huleedu_cj_assessme
 # Verify grade_scale matches
 docker exec huleedu_cj_assessment_db psql -U huleedu_user -d huleedu_cj_assessment \
   -c "SELECT DISTINCT grade_scale FROM anchor_essay_references WHERE assignment_id = 'eng5-role-models-2025';"
+
+# Confirm CJ service URL / credentials
+echo $CJ_SERVICE_URL
+cat ~/.huleedu/cj_admin_token.json
 ```
 
 ---

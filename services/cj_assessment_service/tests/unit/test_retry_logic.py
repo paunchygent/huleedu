@@ -33,6 +33,7 @@ from services.cj_assessment_service.models_db import CJBatchState
 
 # Import shared fixtures
 pytest_plugins = ["services.cj_assessment_service.tests.unit.conftest_pool"]
+pytestmark = pytest.mark.usefixtures("mock_get_batch_state")
 
 
 class TestFailedComparisonPoolRetryCheck:
