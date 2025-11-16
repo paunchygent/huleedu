@@ -13,10 +13,6 @@ Tests use:
 - Mocked HTTP calls to LLM Provider Service (captures actual request payloads)
 """
 
-pytest_plugins = [
-    "services.cj_assessment_service.tests.integration.llm_payload_fixtures",
-]
-
 import uuid
 from typing import TYPE_CHECKING, Any
 
@@ -40,6 +36,10 @@ from services.cj_assessment_service.protocols import (
     ContentClientProtocol,
     LLMInteractionProtocol,
 )
+
+pytest_plugins = [
+    "services.cj_assessment_service.tests.integration.llm_payload_fixtures",
+]
 
 if TYPE_CHECKING:
     from .llm_payload_fixtures import CapturedRequestExtractor

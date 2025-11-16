@@ -75,7 +75,7 @@ class TestEventProcessorIdentityThreading:
         workflow_mock = AsyncMock()
         workflow_mock.return_value = Mock(rankings=[], batch_id=12345)
         monkeypatch.setattr(
-            "services.cj_assessment_service.event_processor.run_cj_assessment_workflow",
+            "services.cj_assessment_service.message_handlers.cj_request_handler.run_cj_assessment_workflow",
             workflow_mock,
         )
         return workflow_mock
@@ -177,9 +177,7 @@ class TestEventProcessorIdentityThreading:
         assert converted_request_data.user_id == expected_user_id
         assert converted_request_data.org_id == expected_org_id
         assert converted_request_data.student_prompt_text == PROMPT_TEXT
-        assert (
-            converted_request_data.student_prompt_storage_id == "prompt-storage-with-overrides"
-        )
+        assert converted_request_data.student_prompt_storage_id == "prompt-storage-with-overrides"
         assert hasattr(converted_request_data, "judge_rubric_text")
         assert hasattr(converted_request_data, "judge_rubric_storage_id")
         assert converted_request_data.judge_rubric_text is None
@@ -268,9 +266,7 @@ class TestEventProcessorIdentityThreading:
         assert converted_request_data.language == event_data.language
         assert converted_request_data.course_code == event_data.course_code
         assert converted_request_data.student_prompt_text == PROMPT_TEXT
-        assert (
-            converted_request_data.student_prompt_storage_id == "prompt-storage-with-overrides"
-        )
+        assert converted_request_data.student_prompt_storage_id == "prompt-storage-with-overrides"
         assert converted_request_data.judge_rubric_text is None
         assert converted_request_data.judge_rubric_storage_id is None
 
@@ -376,7 +372,7 @@ class TestEventProcessorIdentityThreading:
         prompt_counter.labels.return_value = label_mock
 
         monkeypatch.setattr(
-            "services.cj_assessment_service.event_processor.get_business_metrics",
+            "services.cj_assessment_service.message_handlers.cj_request_handler.get_business_metrics",
             lambda: {
                 "cj_comparisons_made": None,
                 "cj_assessment_duration_seconds": None,
@@ -411,9 +407,7 @@ class TestEventProcessorIdentityThreading:
         mock_workflow_function.assert_called_once()
         converted_request_data = mock_workflow_function.call_args.kwargs["request_data"]
         assert converted_request_data.student_prompt_text is None
-        assert (
-            converted_request_data.student_prompt_storage_id == "prompt-storage-with-overrides"
-        )
+        assert converted_request_data.student_prompt_storage_id == "prompt-storage-with-overrides"
         assert hasattr(converted_request_data, "judge_rubric_text")
         assert hasattr(converted_request_data, "judge_rubric_storage_id")
         assert converted_request_data.judge_rubric_text is None

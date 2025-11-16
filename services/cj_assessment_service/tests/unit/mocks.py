@@ -167,6 +167,9 @@ class MockDatabase(CJRepositoryProtocol):
             def first(self) -> Any:
                 return self.data[0] if self.data else None
 
+            def scalar_one_or_none(self) -> Any:
+                return self.data[0] if self.data else None
+
         class MockScalars:
             def __init__(self, data: list[Any] | None = None):
                 self.data = data or []

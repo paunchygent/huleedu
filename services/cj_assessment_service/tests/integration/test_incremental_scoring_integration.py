@@ -790,3 +790,9 @@ class TestIncrementalScoring:
         # Verify actual percentage
         actual_percentage = (target_comparisons / total_comparisons) * 100
         assert actual_percentage >= 80, f"Actual percentage {actual_percentage}% should be >= 80%"
+
+
+# TODO[TASK-LLM-BATCH-STRATEGY-IMPLEMENTATION]:
+# Add a workflow-level test that drives iterative convergence via
+# callbacks and _check_iteration_stability, not just math-level
+# stability via check_score_stability().

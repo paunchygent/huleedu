@@ -171,6 +171,13 @@ class Settings(SecureServiceSettings, JWTValidationSettings):
     # CJ assessment parameters
     MAX_PAIRWISE_COMPARISONS: int = 350
     COMPARISONS_PER_STABILITY_CHECK_ITERATION: int = 10
+
+    # NOTE:
+    # These BT convergence parameters are already used in pure math
+    # helpers (e.g. scoring_ranking.check_score_stability) but are
+    # **not yet** part of a full iterative convergence loop.
+    # See TASK-LLM-BATCH-STRATEGY-IMPLEMENTATION*.md for the planned
+    # bundled, stability-driven workflow that will consume them.
     MIN_COMPARISONS_FOR_STABILITY_CHECK: int = Field(
         default=10,
         description="Minimum successful comparisons required before checking score stability",

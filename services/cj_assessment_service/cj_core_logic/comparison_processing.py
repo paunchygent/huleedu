@@ -9,11 +9,10 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
+from common_core.events.cj_assessment_events import LLMConfigOverrides
 from huleedu_service_libs.logging_utils import create_service_logger
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from common_core.events.cj_assessment_events import LLMConfigOverrides
 
 from services.cj_assessment_service.cj_core_logic import pair_generation, scoring_ranking
 from services.cj_assessment_service.cj_core_logic.batch_config import BatchConfigOverrides
@@ -261,7 +260,9 @@ async def _load_essays_for_batch(
     """Load prepared essays (students + anchors) from the database."""
 
     async with database.session() as session:
-        processed_essays = await database.get_essays_for_cj_batch(session=session, cj_batch_id=cj_batch_id)
+        processed_essays = await database.get_essays_for_cj_batch(
+            session=session, cj_batch_id=cj_batch_id
+        )
 
     essays_for_api_model: list[EssayForComparison] = []
     for processed in processed_essays:
@@ -327,7 +328,8 @@ async def request_additional_comparisons_for_batch(
             original_request = OriginalCJRequestMetadata(**original_request_payload)
         except Exception as exc:  # Validation errors shouldn't block continuation
             logger.warning(
-                "Failed to deserialize stored original_request payload; falling back to batch defaults",
+                "Failed to deserialize stored original_request payload; "
+                "falling back to batch defaults",
                 extra={**log_extra, "error": str(exc)},
             )
 
@@ -349,7 +351,9 @@ async def request_additional_comparisons_for_batch(
     elif isinstance(config_overrides_payload, dict):
         config_overrides = config_overrides_payload
 
-    prompt_context = batch.processing_metadata if isinstance(batch.processing_metadata, dict) else {}
+    prompt_context = (
+        batch.processing_metadata if isinstance(batch.processing_metadata, dict) else {}
+    )
 
     request_data = CJAssessmentRequestData(
         bos_batch_id=batch.bos_batch_id,
@@ -358,7 +362,9 @@ async def request_additional_comparisons_for_batch(
         language=original_request.language if original_request else batch.language,
         course_code=original_request.course_code if original_request else batch.course_code,
         student_prompt_text=(
-            original_request.student_prompt_text if original_request else prompt_context.get("student_prompt_text")
+            original_request.student_prompt_text
+            if original_request
+            else prompt_context.get("student_prompt_text")
         ),
         student_prompt_storage_id=(
             original_request.student_prompt_storage_id
@@ -366,7 +372,9 @@ async def request_additional_comparisons_for_batch(
             else prompt_context.get("student_prompt_storage_id")
         ),
         judge_rubric_text=(
-            original_request.judge_rubric_text if original_request else prompt_context.get("judge_rubric_text")
+            original_request.judge_rubric_text
+            if original_request
+            else prompt_context.get("judge_rubric_text")
         ),
         judge_rubric_storage_id=(
             original_request.judge_rubric_storage_id
@@ -414,10 +422,24 @@ async def _process_comparison_iteration(
     correlation_id: UUID,
     log_extra: dict[str, Any],
 ) -> ComparisonIterationResult | None:
-    """Process a single comparison iteration.
+    """Submit one bundled comparison iteration for a CJ batch.
+
+    NOTE:
+    - Prepared infrastructure for bundled, stability-driven BT convergence.
+    - Currently **unused** and not wired into workflow_continuation; it does
+      submission only (no score recomputation or stability decision yet).
+    - Target behavior is defined in
+      .claude/tasks/TASK-LLM-BATCH-STRATEGY-IMPLEMENTATION*.md
+      under the "bundled (iterative, stability-driven)" mode.
+
+    TODO[TASK-LLM-BATCH-STRATEGY-IMPLEMENTATION]:
+    Wire this into the callback/continuation path so that each bundle:
+      1) recomputes BT scores,
+      2) runs a stability check, and
+      3) decides whether to request another bundle or finalize.
 
     Returns:
-        Tuple of (valid_results_count, updated_scores) or None if no tasks generated
+        ComparisonIterationResult or None if no tasks generated
     """
     # Generate comparison tasks
     generate_comparison_tasks_coro = pair_generation.generate_comparison_tasks
@@ -495,7 +517,23 @@ def _check_iteration_stability(
     current_iteration: int,
     log_extra: dict[str, Any],
 ) -> bool:
-    """Check if scores have stabilized between iterations."""
+    """Evaluate BT score stability between iterations.
+
+    Uses MIN_COMPARISONS_FOR_STABILITY_CHECK and
+    SCORE_STABILITY_THRESHOLD from Settings to determine whether the
+    Bradley-Terry scores have 'converged enough' to stop requesting
+    more comparisons.
+
+    NOTE:
+    - Prepared for the iterative bundled mode described in
+      TASK-LLM-BATCH-STRATEGY-IMPLEMENTATION*.md.
+    - Not currently called from any production workflow.
+
+    TODO[TASK-LLM-BATCH-STRATEGY-IMPLEMENTATION]:
+    Call this from the continuation/iteration loop once iterative
+    convergence is wired into workflow_continuation instead of relying
+    solely on completion thresholds.
+    """
     if (
         total_comparisons_performed >= getattr(settings, "MIN_COMPARISONS_FOR_STABILITY_CHECK", 10)
         and previous_bt_scores

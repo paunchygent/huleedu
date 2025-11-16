@@ -44,9 +44,15 @@ async def check_workflow_continuation(
     database: CJRepositoryProtocol,
     correlation_id: UUID,
 ) -> bool:
-    """Check if this callback enables workflow continuation.
+    """Determine whether this callback should trigger continuation.
 
-    Uses both periodic thresholds and configured completion thresholds.
+    CURRENT:
+    - Uses completed comparison counts and completion thresholds only.
+
+    FUTURE:
+    - For bundled, stability-driven mode, continuation should factor in
+      BT score stability via comparison_processing._check_iteration_stability.
+    - See TASK-LLM-BATCH-STRATEGY-IMPLEMENTATION*.md.
     """
     async with database.session() as session:
         # Get batch state to check total expected comparisons
@@ -189,13 +195,21 @@ async def trigger_existing_workflow_continuation(
             logger.error("Batch state not found", extra=log_extra)
             return
 
-        metadata = batch_state.processing_metadata if isinstance(batch_state.processing_metadata, dict) else {}
-        config_overrides_payload = metadata.get("config_overrides") if isinstance(metadata, dict) else None
+        metadata = (
+            batch_state.processing_metadata
+            if isinstance(batch_state.processing_metadata, dict)
+            else {}
+        )
+        config_overrides_payload = (
+            metadata.get("config_overrides") if isinstance(metadata, dict) else None
+        )
         config_overrides = None
         if isinstance(config_overrides_payload, dict):
             config_overrides = BatchConfigOverrides(**config_overrides_payload)
 
-        llm_overrides_payload = metadata.get("llm_overrides") if isinstance(metadata, dict) else None
+        llm_overrides_payload = (
+            metadata.get("llm_overrides") if isinstance(metadata, dict) else None
+        )
 
         max_pairs_cap, enforce_full_budget = _resolve_comparison_budget(metadata, settings)
         pairs_submitted = batch_state.total_comparisons or 0
@@ -212,6 +226,11 @@ async def trigger_existing_workflow_continuation(
         )
 
         should_request_more = pairs_remaining > 0 and (not is_complete or enforce_full_budget)
+
+        # TODO[TASK-LLM-BATCH-STRATEGY-IMPLEMENTATION]:
+        # For bundled, stability-driven mode, replace or augment this
+        # completion-rate logic with a stability-based decision using
+        # BT scores and _check_iteration_stability().
 
         if should_request_more:
             submitted = await comparison_processing.request_additional_comparisons_for_batch(
@@ -230,7 +249,8 @@ async def trigger_existing_workflow_continuation(
             if submitted:
                 return
             logger.info(
-                "No additional comparisons enqueued despite remaining budget; proceeding to finalization check",
+                "No additional comparisons enqueued despite remaining budget; "
+                "proceeding to finalization check",
                 extra={**log_extra, "pairs_remaining": pairs_remaining},
             )
 

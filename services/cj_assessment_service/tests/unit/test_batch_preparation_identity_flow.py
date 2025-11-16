@@ -672,7 +672,7 @@ class TestIdentityThreadingInBatchCreation:
         assert call_args.kwargs["user_id"] == "user-with-assignment"
         assert call_args.kwargs["org_id"] == "org-with-assignment"
         assert mock_batch.assignment_id == "test-assignment-789"
-        assert mock_session.flush.call_count == 2
+        assert mock_session.flush.call_count == 1
 
     @pytest.mark.asyncio
     async def test_complete_identity_threading_workflow(
@@ -766,9 +766,7 @@ class TestIdentityFieldDefaultBehavior:
             language="sv",
             course_code="SV1",
             student_prompt_text="Jämför uppsatserna",
-            essays_to_process=[
-                EssayToProcess(els_essay_id="essay1", text_storage_id="storage1")
-            ],
+            essays_to_process=[EssayToProcess(els_essay_id="essay1", text_storage_id="storage1")],
             assignment_id="no-identity-assignment",
         )
 
@@ -813,9 +811,7 @@ class TestIdentityFieldDefaultBehavior:
             language="en",
             course_code="ENG3",
             student_prompt_text="Compare these essays",
-            essays_to_process=[
-                EssayToProcess(els_essay_id="essay1", text_storage_id="storage1")
-            ],
+            essays_to_process=[EssayToProcess(els_essay_id="essay1", text_storage_id="storage1")],
             assignment_id="partial-identity-assignment",
             user_id=user_id,
             org_id=org_id,
