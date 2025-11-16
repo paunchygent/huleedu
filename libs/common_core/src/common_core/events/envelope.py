@@ -45,8 +45,7 @@ class EventEnvelope(BaseModel, Generic[T_EventData]):
     )
     source_service: str = Field(
         description=(
-            "Service that published this event. "
-            "Match SERVICE_NAME from service settings."
+            "Service that published this event. Match SERVICE_NAME from service settings."
         ),
     )
     schema_version: int = Field(

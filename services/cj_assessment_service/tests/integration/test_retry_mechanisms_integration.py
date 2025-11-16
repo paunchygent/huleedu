@@ -655,9 +655,7 @@ class TestRetryMechanisms:
         assert called_kwargs["model_override"] == override_payload["model_override"]
         assert called_kwargs["temperature_override"] == override_payload["temperature_override"]
         assert called_kwargs["max_tokens_override"] == override_payload["max_tokens_override"]
-        assert (
-            called_kwargs["system_prompt_override"] == override_payload["system_prompt_override"]
-        )
+        assert called_kwargs["system_prompt_override"] == override_payload["system_prompt_override"]
 
     async def test_retry_batch_submission_flow(
         self,

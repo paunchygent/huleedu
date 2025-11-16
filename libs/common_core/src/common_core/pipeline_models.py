@@ -105,8 +105,7 @@ class PipelineStateDetail(BaseModel):
     essay_counts: EssayProcessingCounts = Field(
         default_factory=EssayProcessingCounts,
         description=(
-            "Essay-level processing counts within this phase. "
-            "Updated as essays complete."
+            "Essay-level processing counts within this phase. Updated as essays complete."
         ),
     )
     started_at: datetime | None = Field(
@@ -170,10 +169,7 @@ class ProcessingPipelineState(BaseModel):
     )
     nlp: PipelineStateDetail | None = Field(
         default_factory=PipelineStateDetail,
-        description=(
-            "NLP phase execution state. "
-            "Only populated if 'nlp' in requested_pipelines."
-        ),
+        description=("NLP phase execution state. Only populated if 'nlp' in requested_pipelines."),
     )
     ai_feedback: PipelineStateDetail | None = Field(
         default_factory=PipelineStateDetail,

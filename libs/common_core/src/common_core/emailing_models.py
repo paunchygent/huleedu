@@ -151,7 +151,6 @@ class EmailDeliveryFailedV1(BaseModel):
     )
     correlation_id: str = Field(
         description=(
-            "Distributed tracing ID from original request. "
-            "Enables end-to-end error correlation."
+            "Distributed tracing ID from original request. Enables end-to-end error correlation."
         )
     )

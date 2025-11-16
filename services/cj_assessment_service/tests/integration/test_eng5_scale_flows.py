@@ -338,9 +338,7 @@ class TestENG5ScaleFlows:
 
         # Verify correct scale in calibration info
         actual_scale = projection_summary.calibration_info["grade_scale"]
-        assert actual_scale == grade_scale, (
-            f"Expected scale {grade_scale}, got {actual_scale}"
-        )
+        assert actual_scale == grade_scale, f"Expected scale {grade_scale}, got {actual_scale}"
 
         # Verify all students got grades
         student_ids = [s["els_essay_id"] for s in student_essays]
@@ -479,9 +477,7 @@ class TestENG5ScaleFlows:
 
         # Verify correct scale in calibration info
         actual_scale = projection_summary.calibration_info["grade_scale"]
-        assert actual_scale == grade_scale, (
-            f"Expected scale {grade_scale}, got {actual_scale}"
-        )
+        assert actual_scale == grade_scale, f"Expected scale {grade_scale}, got {actual_scale}"
 
         # Verify all students got grades
         student_ids = [s["els_essay_id"] for s in student_essays]

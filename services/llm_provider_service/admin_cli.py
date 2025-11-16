@@ -169,9 +169,7 @@ def show_capabilities_cmd(
         console.print(f"  Frequency Penalty: {freq_status}")
         pres_status = "✓" if config.supports_presence_penalty else "✗"
         console.print(f"  Presence Penalty:  {pres_status}")
-        token_param = (
-            "max_completion_tokens" if config.uses_max_completion_tokens else "max_tokens"
-        )
+        token_param = "max_completion_tokens" if config.uses_max_completion_tokens else "max_tokens"
         console.print(f"  Token Parameter:   {token_param}")
 
         console.print("\n[bold]Capabilities:[/bold]")

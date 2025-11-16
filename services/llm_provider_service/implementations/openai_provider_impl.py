@@ -94,11 +94,9 @@ class OpenAIProviderImpl(LLMProviderProtocol):
         prompt_sha256 = hashlib.sha256(full_prompt.encode("utf-8")).hexdigest()
 
         # Use system prompt from override or default comparison prompt
-        system_prompt = (
-            system_prompt_override or (
-                "You are an LLM comparison engine. Follow the caller-supplied "
-                "instructions and ensure your output satisfies the required tool schema."
-            )
+        system_prompt = system_prompt_override or (
+            "You are an LLM comparison engine. Follow the caller-supplied "
+            "instructions and ensure your output satisfies the required tool schema."
         )
 
         # Execute with retry

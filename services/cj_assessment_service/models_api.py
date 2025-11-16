@@ -222,9 +222,7 @@ class CJAssessmentRequestData(BaseModel):
     # Required fields (always present)
     bos_batch_id: str = Field(description="BOS batch identifier")
     assignment_id: str | None = Field(None, description="Assignment identifier")
-    essays_to_process: list[EssayToProcess] = Field(
-        description="Essays to process in this batch"
-    )
+    essays_to_process: list[EssayToProcess] = Field(description="Essays to process in this batch")
     language: str = Field(description="Language code (e.g., 'en', 'sv')")
     course_code: str = Field(description="Course code enum value")
 

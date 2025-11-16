@@ -14,10 +14,10 @@ from common_core.events.cj_assessment_events import ELS_CJAssessmentRequestV1
 from common_core.events.envelope import EventEnvelope
 from common_core.models.error_models import ErrorDetail
 
-from services.cj_assessment_service.event_processor import (
-    _hydrate_prompt_text,
-    process_single_message,
+from services.cj_assessment_service.cj_core_logic.content_hydration import (
+    hydrate_prompt_text,
 )
+from services.cj_assessment_service.event_processor import process_single_message
 from services.cj_assessment_service.models_api import PromptHydrationFailure
 from services.cj_assessment_service.protocols import (
     CJEventPublisherProtocol,
@@ -120,7 +120,7 @@ async def test_hydrate_prompt_text_result_contract(
 
     failure_counter = DummyCounter()
 
-    result = await _hydrate_prompt_text(
+    result = await hydrate_prompt_text(
         storage_id=storage_id,
         content_client=content_client,
         correlation_id=uuid4(),
@@ -178,7 +178,7 @@ async def test_process_message_increments_prompt_success_metric(
     workflow_mock = AsyncMock(return_value=Mock(rankings=[], batch_id="1"))
 
     monkeypatch.setattr(
-        "services.cj_assessment_service.event_processor.run_cj_assessment_workflow",
+        "services.cj_assessment_service.message_handlers.cj_request_handler.run_cj_assessment_workflow",
         workflow_mock,
     )
 
@@ -186,7 +186,7 @@ async def test_process_message_increments_prompt_success_metric(
     failure_counter = DummyCounter()
 
     monkeypatch.setattr(
-        "services.cj_assessment_service.event_processor.get_business_metrics",
+        "services.cj_assessment_service.message_handlers.cj_request_handler.get_business_metrics",
         lambda: {
             "cj_comparisons_made": None,
             "cj_assessment_duration_seconds": None,
@@ -273,7 +273,7 @@ async def test_process_message_hydrates_judge_rubric_text(
     llm_interaction = AsyncMock(spec=LLMInteractionProtocol)
     workflow_mock = AsyncMock(return_value=Mock(rankings=[], batch_id="1"))
     monkeypatch.setattr(
-        "services.cj_assessment_service.event_processor.run_cj_assessment_workflow",
+        "services.cj_assessment_service.message_handlers.cj_request_handler.run_cj_assessment_workflow",
         workflow_mock,
     )
 
@@ -285,7 +285,7 @@ async def test_process_message_hydrates_judge_rubric_text(
         "prompt_fetch_success": DummyCounter(),
     }
     monkeypatch.setattr(
-        "services.cj_assessment_service.event_processor.get_business_metrics",
+        "services.cj_assessment_service.message_handlers.cj_request_handler.get_business_metrics",
         lambda: metrics,
     )
 

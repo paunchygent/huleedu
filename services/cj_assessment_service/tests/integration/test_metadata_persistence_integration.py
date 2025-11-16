@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
-from unittest.mock import AsyncMock
-
 from common_core.events.cj_assessment_events import LLMConfigOverrides
 
 from services.cj_assessment_service.cj_core_logic import comparison_processing
 from services.cj_assessment_service.cj_core_logic.workflow_orchestrator import (
     run_cj_assessment_workflow,
 )
+from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.models_api import CJAssessmentRequestData, EssayToProcess
 from services.cj_assessment_service.models_db import CJBatchState, CJBatchUpload
 from services.cj_assessment_service.protocols import (
@@ -21,7 +21,6 @@ from services.cj_assessment_service.protocols import (
     ContentClientProtocol,
     LLMInteractionProtocol,
 )
-from services.cj_assessment_service.config import Settings
 
 
 @pytest.mark.integration
@@ -39,8 +38,7 @@ async def test_original_request_metadata_persists_and_rehydrates(
     test_settings.MAX_PAIRWISE_COMPARISONS = 500
 
     essays = [
-        EssayToProcess(els_essay_id=f"essay-{i}", text_storage_id=f"storage-{i}")
-        for i in range(4)
+        EssayToProcess(els_essay_id=f"essay-{i}", text_storage_id=f"storage-{i}") for i in range(4)
     ]
 
     request_data = CJAssessmentRequestData(

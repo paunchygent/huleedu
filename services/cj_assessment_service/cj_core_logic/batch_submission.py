@@ -380,8 +380,8 @@ async def merge_batch_upload_metadata(
 
         await session.execute(
             update(CJBatchUpload)
-                .where(CJBatchUpload.id == cj_batch_id)
-                .values(processing_metadata=updated_metadata)
+            .where(CJBatchUpload.id == cj_batch_id)
+            .values(processing_metadata=updated_metadata)
         )
         await session.commit()
 

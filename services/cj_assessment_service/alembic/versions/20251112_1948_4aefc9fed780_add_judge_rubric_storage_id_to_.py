@@ -81,8 +81,7 @@ def upgrade() -> None:
     op.drop_table_comment(
         "assessment_instructions",
         existing_comment=(
-            "Stores assessment instructions for AI judges, linked to "
-            "assignment or course"
+            "Stores assessment instructions for AI judges, linked to assignment or course"
         ),
         schema=None,
     )

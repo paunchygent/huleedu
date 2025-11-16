@@ -193,7 +193,10 @@ async def test_request_additional_comparisons_submits_new_iteration(
     assert submit_kwargs["llm_interaction"] is llm_interaction
 
     request_data = submit_kwargs["request_data"]
-    assert request_data.max_comparisons_override == original_request_payload["max_comparisons_override"]
+    assert (
+        request_data.max_comparisons_override
+        == original_request_payload["max_comparisons_override"]
+    )
     assert isinstance(request_data.llm_config_overrides, cp.LLMConfigOverrides)
     assert request_data.batch_config_overrides == config_overrides_payload
     assert request_data.assignment_id == original_request_payload["assignment_id"]

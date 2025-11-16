@@ -155,7 +155,9 @@ async def test_fetch_assessment_context_warns_when_instruction_missing() -> None
 
 
 @pytest.mark.asyncio
-async def test_generate_comparison_tasks_respects_thresholds_and_global_cap(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_generate_comparison_tasks_respects_thresholds_and_global_cap(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Validate interplay between per-call threshold and global max comparisons."""
 
     per_call_threshold = 3

@@ -117,8 +117,9 @@ def register_anchors_command(
 def verify_auth_command() -> None:
     """Verify JWT authentication configuration and production safety."""
     try:
-        from scripts.cj_experiments_runners.eng5_np.cj_client import build_admin_headers
         import jwt
+
+        from scripts.cj_experiments_runners.eng5_np.cj_client import build_admin_headers
 
         headers = build_admin_headers()
         token = headers["Authorization"].replace("Bearer ", "")
@@ -442,8 +443,7 @@ def main(
     logger = setup_cli_logger(settings=settings)
 
     typer.echo(
-        "Canonical batch UUID: "
-        f"{settings.batch_uuid} (label: {settings.batch_id})",
+        f"Canonical batch UUID: {settings.batch_uuid} (label: {settings.batch_id})",
         err=True,
     )
 

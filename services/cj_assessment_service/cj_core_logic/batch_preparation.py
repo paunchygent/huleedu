@@ -12,12 +12,12 @@ from uuid import UUID, uuid4
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from services.cj_assessment_service.enums_db import CJBatchStatusEnum
 from services.cj_assessment_service.cj_core_logic.batch_submission import (
     merge_batch_processing_metadata,
     merge_batch_upload_metadata,
     merge_essay_processing_metadata,
 )
+from services.cj_assessment_service.enums_db import CJBatchStatusEnum
 from services.cj_assessment_service.metrics import get_business_metrics
 from services.cj_assessment_service.models_api import (
     CJAnchorMetadata,
@@ -25,7 +25,6 @@ from services.cj_assessment_service.models_api import (
     CJEessayMetadata,
     CJProcessingMetadata,
     EssayForComparison,
-    EssayToProcess,
     OriginalCJRequestMetadata,
 )
 from services.cj_assessment_service.models_db import CJBatchUpload

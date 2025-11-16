@@ -220,18 +220,11 @@ class TestBatchRetryProcessor:
             # Assert
             assert result is not None
             call_args = mock_batch_submitter.submit_comparison_batch.call_args
+            assert call_args[1]["model_override"] == overrides_metadata["model_override"]
             assert (
-                call_args[1]["model_override"]
-                == overrides_metadata["model_override"]
+                call_args[1]["temperature_override"] == overrides_metadata["temperature_override"]
             )
-            assert (
-                call_args[1]["temperature_override"]
-                == overrides_metadata["temperature_override"]
-            )
-            assert (
-                call_args[1]["max_tokens_override"]
-                == overrides_metadata["max_tokens_override"]
-            )
+            assert call_args[1]["max_tokens_override"] == overrides_metadata["max_tokens_override"]
             assert (
                 call_args[1]["system_prompt_override"]
                 == overrides_metadata["system_prompt_override"]

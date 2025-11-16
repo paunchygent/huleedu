@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 import importlib
-import os
 import sys
 from datetime import datetime
-from unittest import mock
 
 import jwt
 import pytest
@@ -15,7 +13,9 @@ import pytest
 class TestProductionSafetyGates:
     """Test that dev_auth module is blocked in production environments."""
 
-    def test_import_blocked_in_production_environment(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_import_blocked_in_production_environment(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Gate 1: Module import fails when ENVIRONMENT=production."""
         # Set production environment BEFORE import
         monkeypatch.setenv("ENVIRONMENT", "production")

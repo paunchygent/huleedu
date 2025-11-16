@@ -8,7 +8,6 @@ Completion checking and retry processing are handled by dedicated modules.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
 from uuid import UUID
 
 from common_core.status_enums import CJBatchStateEnum

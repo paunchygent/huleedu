@@ -133,10 +133,7 @@ class ConfigValidator:
             )
             self.error(
                 service_name,
-                (
-                    f"Inherits JWTValidationSettings but missing {required_var} "
-                    "in docker-compose"
-                ),
+                (f"Inherits JWTValidationSettings but missing {required_var} in docker-compose"),
                 fix,
             )
 

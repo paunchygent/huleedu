@@ -122,15 +122,15 @@ async def capture_snapshot(engine: AsyncEngine, batch_id: int) -> BatchSnapshot:
 
 
 def format_snapshot(snapshot: BatchSnapshot) -> str:
-    total = snapshot.totals.get('total')
-    submitted = snapshot.totals.get('submitted')
-    completed = snapshot.totals.get('completed')
-    failed = snapshot.totals.get('failed')
-    threshold = snapshot.totals.get('threshold_pct')
-    partial_flag = snapshot.totals.get('partial_scoring_triggered')
-    anchors_by_flag = snapshot.anchor_counts['anchors_by_flag']
-    total_essays = snapshot.anchor_counts['total_essays']
-    anchors_by_id = snapshot.anchor_counts['anchors_by_id']
+    total = snapshot.totals.get("total")
+    submitted = snapshot.totals.get("submitted")
+    completed = snapshot.totals.get("completed")
+    failed = snapshot.totals.get("failed")
+    threshold = snapshot.totals.get("threshold_pct")
+    partial_flag = snapshot.totals.get("partial_scoring_triggered")
+    anchors_by_flag = snapshot.anchor_counts["anchors_by_flag"]
+    total_essays = snapshot.anchor_counts["total_essays"]
+    anchors_by_id = snapshot.anchor_counts["anchors_by_id"]
 
     lines = [
         f"CJ Batch {snapshot.batch_id}",
