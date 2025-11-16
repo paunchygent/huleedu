@@ -403,6 +403,22 @@ Migrated CJ Assessment `request_data` from `dict[str, Any]` to `CJAssessmentRequ
 
 **Validation**: All tests passing, typecheck clean
 
+### 25. CJ/LPS Contract Hardening (Nov 2025)
+
+**Status**: ✅ Complete
+
+- Introduced `CJLLMComparisonMetadata` (see `services/cj_assessment_service/models_api.py`) so every `ComparisonTask` now emits typed metadata for the LLM Provider client.
+- Added README contract tables describing required correlation fields vs additive batching hints (`services/cj_assessment_service/README.md`, `services/llm_provider_service/README.md`).
+- Locked behaviour with pre-tests:
+  - `services/cj_assessment_service/tests/unit/test_llm_metadata_adapter.py`
+  - `services/cj_assessment_service/tests/unit/test_llm_interaction_impl_unit.py::test_metadata_includes_bos_batch_id_when_available`
+  - `services/cj_assessment_service/tests/unit/test_llm_callback_processing.py::test_process_llm_result_preserves_request_metadata`
+  - `services/llm_provider_service/tests/unit/test_callback_publishing.py::test_success_callback_preserves_client_metadata` + `test_error_callback_preserves_existing_metadata`
+- Extended `LLMComparisonResultV1.request_metadata` docs to spell out the additive-only policy (must always contain `essay_a_id`/`essay_b_id`, optional `bos_batch_id`, prompt hash added downstream).
+- Added `_build_llm_config_override_payload` so CJ→LPS override mapping is centralized and validates provider strings, plus `BatchComparisonItem/process_comparison_batch` scaffolding inside LPS (current implementation loops sequentially to maintain behaviour). Added `services/cj_assessment_service/tests/integration/test_llm_metadata_roundtrip_integration.py` to prove metadata echo end-to-end.
+
+This work freezes today’s CJ ↔ LLM Provider boundary ahead of the batching implementation so future metadata fields can be added without breaking ENG5 runners or callback handling.
+
 ## Configuration Files
 
 - `.env` - Environment variables (not in git)

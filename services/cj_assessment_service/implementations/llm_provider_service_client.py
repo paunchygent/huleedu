@@ -11,6 +11,7 @@ from typing import Any
 from uuid import UUID
 
 import aiohttp
+from common_core import LLMProviderType
 from huleedu_service_libs.error_handling import (
     HuleEduError,
     raise_authentication_error,
@@ -27,8 +28,44 @@ from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.protocols import LLMProviderProtocol, RetryManagerProtocol
+from services.llm_provider_service.api_models import (
+    LLMConfigOverrides as ProviderLLMConfigOverrides,
+)
 
 logger = create_service_logger("cj_assessment_service.llm_provider_service_client")
+
+
+def _build_llm_config_override_payload(
+    *,
+    provider_override: str | LLMProviderType | None = None,
+    model_override: str | None = None,
+    temperature_override: float | None = None,
+    system_prompt_override: str | None = None,
+    max_tokens_override: int | None = None,
+) -> dict[str, Any] | None:
+    """Convert CJ overrides into the provider service payload."""
+    provider_enum: LLMProviderType | None = None
+    if isinstance(provider_override, LLMProviderType):
+        provider_enum = provider_override
+    elif isinstance(provider_override, str):
+        normalized = provider_override.strip().lower()
+        try:
+            provider_enum = LLMProviderType(normalized)
+        except ValueError:
+            logger.warning(
+                "Unknown provider_override supplied; default provider will be used",
+                extra={"provider_override": provider_override},
+            )
+
+    overrides_model = ProviderLLMConfigOverrides(
+        provider_override=provider_enum,
+        model_override=model_override,
+        temperature_override=temperature_override,
+        system_prompt_override=system_prompt_override,
+        max_tokens_override=max_tokens_override,
+    )
+    payload = overrides_model.model_dump(exclude_none=True)
+    return payload or None
 
 
 class LLMProviderServiceClient(LLMProviderProtocol):
@@ -82,20 +119,22 @@ class LLMProviderServiceClient(LLMProviderProtocol):
         """
         # Build request body for LLM Provider Service
         # Note: user_prompt now contains the complete prompt with essays embedded
+        overrides_payload = _build_llm_config_override_payload(
+            provider_override=provider_override or self.settings.DEFAULT_LLM_PROVIDER.value,
+            model_override=model_override or self.settings.DEFAULT_LLM_MODEL,
+            temperature_override=temperature_override or self.settings.DEFAULT_LLM_TEMPERATURE,
+            system_prompt_override=system_prompt_override,
+            max_tokens_override=max_tokens_override,
+        )
+
         request_body = {
             "user_prompt": user_prompt,
             "metadata": request_metadata or {},
-            "llm_config_overrides": {
-                "provider_override": provider_override or self.settings.DEFAULT_LLM_PROVIDER.value,
-                "model_override": model_override or self.settings.DEFAULT_LLM_MODEL,
-                "temperature_override": temperature_override
-                or self.settings.DEFAULT_LLM_TEMPERATURE,
-                "system_prompt_override": system_prompt_override,
-                "max_tokens_override": max_tokens_override,
-            },
             "correlation_id": str(correlation_id),
             "callback_topic": self.settings.LLM_PROVIDER_CALLBACK_TOPIC,  # Required field
         }
+        if overrides_payload:
+            request_body["llm_config_overrides"] = overrides_payload
 
         logger.info(
             f"Sending LLM comparison request with correlation_id: {correlation_id}",

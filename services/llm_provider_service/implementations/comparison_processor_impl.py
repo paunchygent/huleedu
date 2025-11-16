@@ -12,7 +12,10 @@ from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.llm_provider_service.config import Settings
 from services.llm_provider_service.exceptions import HuleEduError
-from services.llm_provider_service.internal_models import LLMOrchestratorResponse
+from services.llm_provider_service.internal_models import (
+    BatchComparisonItem,
+    LLMOrchestratorResponse,
+)
 from services.llm_provider_service.protocols import (
     ComparisonProcessorProtocol,
     LLMEventPublisherProtocol,
@@ -142,6 +145,23 @@ class ComparisonProcessorImpl(ComparisonProcessorProtocol):
                 correlation_id=correlation_id,
                 details={"provider": provider.value, "processing_context": "domain_processor"},
             )
+
+    async def process_comparison_batch(
+        self,
+        items: list[BatchComparisonItem],
+    ) -> list[LLMOrchestratorResponse]:
+        """Process a batch of comparisons sequentially to preserve behaviour."""
+        results: list[LLMOrchestratorResponse] = []
+        for item in items:
+            overrides = item.overrides or {}
+            result = await self.process_comparison(
+                provider=item.provider,
+                user_prompt=item.user_prompt,
+                correlation_id=item.correlation_id,
+                **overrides,
+            )
+            results.append(result)
+        return results
 
     def _estimate_cost(self, provider: str, token_usage: Dict[str, int]) -> float:
         """Estimate cost based on provider and token usage."""

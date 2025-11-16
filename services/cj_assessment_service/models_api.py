@@ -47,6 +47,61 @@ class ComparisonTask(BaseModel):
     prompt: str
 
 
+class CJLLMComparisonMetadata(BaseModel):
+    """Typed metadata adapter for CJ → LLM Provider comparison requests.
+
+    This model centralizes the metadata schema that gets serialized into
+    `LLMComparisonRequest.metadata` so we can lock the contract with tests.
+    The adapter captures the identifiers CJ needs to round-trip callbacks
+    and provides extension hooks for future batching metadata.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    essay_a_id: str = Field(description="Source essay identifier for comparison slot A")
+    essay_b_id: str = Field(description="Source essay identifier for comparison slot B")
+    bos_batch_id: str | None = Field(
+        default=None,
+        description="Optional BOS batch identifier (stringified UUID)",
+    )
+    comparison_iteration: int | None = Field(
+        default=None,
+        ge=0,
+        description="Optional CJ iteration counter when batching comparisons",
+    )
+    cj_llm_batching_mode: str | None = Field(
+        default=None,
+        description="Planned CJ batching mode hint (per_request|provider_serial_bundle|provider_batch_api)",
+    )
+
+    @classmethod
+    def from_comparison_task(
+        cls,
+        task: ComparisonTask,
+        *,
+        bos_batch_id: str | None = None,
+    ) -> "CJLLMComparisonMetadata":
+        """Build metadata for a single comparison task."""
+        return cls(
+            essay_a_id=task.essay_a.id,
+            essay_b_id=task.essay_b.id,
+            bos_batch_id=bos_batch_id,
+        )
+
+    def to_request_metadata(self, extra: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Serialize metadata for outbound LLM Provider requests."""
+        metadata = self.model_dump(exclude_none=True)
+        if extra:
+            metadata.update(extra)
+        return metadata
+
+    def with_additional_context(self, **context: Any) -> "CJLLMComparisonMetadata":
+        """Create a copy with additive metadata while preserving typed fields."""
+        payload = self.model_dump(exclude_none=False)
+        payload.update(context)
+        return CJLLMComparisonMetadata(**payload)
+
+
 class ComparisonResult(BaseModel):
     """The result of a comparison task."""
 

@@ -1,5 +1,6 @@
 """Unit tests for LLM callback processing in CJ Assessment Service."""
 
+from typing import Any
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID, uuid4
@@ -59,6 +60,7 @@ def create_llm_callback_message(
     justification: str | None = "Better structure",
     confidence: float = 4.5,
     error_detail: ErrorDetail | None = None,
+    request_metadata: dict[str, Any] | None = None,
 ) -> ConsumerRecord:
     """Create a mock Kafka message with LLM callback data."""
     # Create the LLM comparison result
@@ -87,6 +89,7 @@ def create_llm_callback_message(
             requested_at=now,
             completed_at=now,
             trace_id=None,
+            request_metadata=request_metadata or {},
         )
     else:
         winner_enum = EssayComparisonWinner.ESSAY_A
@@ -108,6 +111,7 @@ def create_llm_callback_message(
             completed_at=now,
             trace_id=None,
             error_detail=None,
+            request_metadata=request_metadata or {},
         )
 
     # Wrap in event envelope
@@ -240,6 +244,43 @@ class TestLLMCallbackProcessing:
         assert comparison_result.request_id == request_id
         assert comparison_result.is_error is True
         assert comparison_result.error_detail is not None
+
+    @patch(
+        "services.cj_assessment_service.message_handlers.llm_callback_handler.continue_cj_assessment_workflow"
+    )
+    async def test_process_llm_result_preserves_request_metadata(
+        self,
+        mock_continue_workflow: AsyncMock,
+        mock_database: AsyncMock,
+        mock_event_publisher: AsyncMock,
+        mock_settings: Settings,
+        mock_llm_interaction: AsyncMock,
+    ) -> None:
+        """Ensure additive metadata is available to downstream workflow logic."""
+        request_metadata = {
+            "essay_a_id": "essay-a",
+            "essay_b_id": "essay-b",
+            "cj_llm_batching_mode": "per_request",
+        }
+        msg = create_llm_callback_message(
+            request_id=str(uuid4()),
+            correlation_id=str(uuid4()),
+            request_metadata=request_metadata,
+        )
+
+        mock_content_client = AsyncMock(spec=ContentClientProtocol)
+        await process_llm_result(
+            msg=msg,
+            database=mock_database,
+            event_publisher=mock_event_publisher,
+            content_client=mock_content_client,
+            llm_interaction=mock_llm_interaction,
+            settings_obj=mock_settings,
+            tracer=None,
+        )
+
+        comparison_result = mock_continue_workflow.call_args[1]["comparison_result"]
+        assert comparison_result.request_metadata == request_metadata
 
     @patch(
         "services.cj_assessment_service.message_handlers.llm_callback_handler.continue_cj_assessment_workflow"

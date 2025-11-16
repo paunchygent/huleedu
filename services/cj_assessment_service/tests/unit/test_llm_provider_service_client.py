@@ -13,6 +13,7 @@ from huleedu_service_libs.error_handling import HuleEduError, assert_raises_hule
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.implementations.llm_provider_service_client import (
     LLMProviderServiceClient,
+    _build_llm_config_override_payload,
 )
 
 
@@ -151,10 +152,11 @@ Please respond with a JSON object."""
         # Verify no separate essay fields exist
         assert "essay_a" not in request_body
         assert "essay_b" not in request_body
-        assert request_body["llm_config_overrides"]["provider_override"] == "anthropic"
-        assert request_body["llm_config_overrides"]["model_override"] == "claude-3-5-haiku"
-        assert request_body["llm_config_overrides"]["temperature_override"] == 0.1
-        assert request_body["llm_config_overrides"]["system_prompt_override"] is None
+        overrides = request_body["llm_config_overrides"]
+        assert overrides["provider_override"] == "anthropic"
+        assert overrides["model_override"] == "claude-3-5-haiku"
+        assert overrides["temperature_override"] == 0.1
+        assert "system_prompt_override" not in overrides
         assert "callback_topic" in request_body
         assert request_body["callback_topic"] == client.settings.LLM_PROVIDER_CALLBACK_TOPIC
         assert request_body["metadata"] == metadata
@@ -205,6 +207,43 @@ Please respond with a JSON object."""
 
         request_body = mock_session.post.call_args[1]["json"]
         assert request_body["metadata"] == metadata
+
+
+class TestOverrideAdapter:
+    """Unit tests for the override payload adapter."""
+
+    def test_returns_none_when_all_fields_none(self) -> None:
+        payload = _build_llm_config_override_payload()
+        assert payload is None
+
+    def test_converts_string_provider_to_enum_value(self) -> None:
+        payload = _build_llm_config_override_payload(
+            provider_override="ANTHROPIC",
+            model_override="claude",
+        )
+        assert payload is not None
+        assert payload["provider_override"] == "anthropic"
+        assert payload["model_override"] == "claude"
+
+    def test_unknown_provider_omits_provider_override_but_preserves_other_fields(self) -> None:
+        payload = _build_llm_config_override_payload(
+            provider_override="unknown-provider",
+            model_override="claude",
+            temperature_override=0.7,
+        )
+        assert payload == {
+            "model_override": "claude",
+            "temperature_override": 0.7,
+        }
+
+    def test_preserves_none_fields_without_defaults(self) -> None:
+        payload = _build_llm_config_override_payload(
+            provider_override=None,
+            model_override=None,
+            temperature_override=None,
+            system_prompt_override="prompt",
+        )
+        assert payload == {"system_prompt_override": "prompt"}
 
     async def test_generate_comparison_rejects_sync_response(
         self, client: LLMProviderServiceClient, mock_session: AsyncMock

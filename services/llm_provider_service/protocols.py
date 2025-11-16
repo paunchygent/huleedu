@@ -7,6 +7,7 @@ from common_core import LLMProviderType, QueueStatus
 from common_core.events.envelope import EventEnvelope
 
 from services.llm_provider_service.internal_models import (
+    BatchComparisonItem,
     LLMOrchestratorResponse,
     LLMProviderResponse,
     LLMQueuedResult,
@@ -394,4 +395,11 @@ class ComparisonProcessorProtocol(Protocol):
         Raises:
             HuleEduError: On any failure to process comparison
         """
+        ...
+
+    async def process_comparison_batch(
+        self,
+        items: list[BatchComparisonItem],
+    ) -> list[LLMOrchestratorResponse]:
+        """Process a batch of LLM comparisons (default: sequential per-request)."""
         ...

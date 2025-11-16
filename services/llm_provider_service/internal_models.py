@@ -1,6 +1,6 @@
 """Internal Pydantic models for LLM Provider Service."""
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from uuid import UUID
 
 from common_core import EssayComparisonWinner, LLMProviderType
@@ -85,3 +85,15 @@ class LLMQueuedResult(BaseModel):
     estimated_wait_minutes: int | None = Field(default=None, description="Estimated wait time")
     priority: int = Field(description="Request priority")
     queued_at: str = Field(description="ISO timestamp when queued")
+
+
+class BatchComparisonItem(BaseModel):
+    """Container for batch comparison processing input."""
+
+    provider: LLMProviderType = Field(description="Provider requested for each comparison")
+    user_prompt: str = Field(description="Fully rendered comparison prompt")
+    correlation_id: UUID = Field(description="Per-comparison correlation identifier")
+    overrides: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Optional override kwargs forwarded to process_comparison",
+    )

@@ -253,6 +253,48 @@ class LLMConfigOverrides(BaseModel):
 }
 ```
 
+## CJ ↔ LLM Provider Contract
+
+The CJ service treats `libs/common_core/src/common_core/events/cj_assessment_events.py::ELS_CJAssessmentRequestV1`
+and `libs/common_core/src/common_core/events/llm_provider_events.py::LLMComparisonResultV1`
+as the canonical request/response boundary. The following invariants are now
+documented and locked down with unit tests (`tests/unit/test_llm_metadata_adapter.py`,
+`tests/unit/test_llm_interaction_impl_unit.py`, and `tests/unit/test_llm_callback_processing.py`):
+
+| Field | Source of Truth | Required? | Purpose |
+|-------|-----------------|-----------|---------|
+| `request_id` | `QueuedRequest.queue_id` (LPS) | ✅ | 1:1 mapping between queued items and callbacks |
+| `correlation_id` | CJ per-comparison UUID | ✅ | Links callbacks to CJ comparison rows |
+| `request_metadata.essay_a_id` | `CJLLMComparisonMetadata` | ✅ | Correlates results to essay A |
+| `request_metadata.essay_b_id` | `CJLLMComparisonMetadata` | ✅ | Correlates results to essay B |
+| `request_metadata.bos_batch_id` | `CJLLMComparisonMetadata` | Optional | BOS/ELS batch identifier when available |
+| `request_metadata.prompt_sha256` | LPS queue processor | Optional | Deterministic hash of rendered prompt for replay/debug |
+| `request_metadata.cj_llm_batching_mode` | `CJLLMComparisonMetadata` | Optional hint | Planned batching mode (`per_request`, `provider_serial_bundle`, etc.) |
+
+### Metadata construction
+
+- `ComparisonTask` objects feed `CJLLMComparisonMetadata`, the typed adapter that
+  serializes metadata into the `LLMComparisonRequest.metadata` dict. The adapter
+  enforces the required keys and only emits optional fields when explicitly set,
+  keeping the contract additive-only.
+- Future batching flags (e.g., `cj_llm_batching_mode`, `comparison_iteration`) are added
+  via `CJLLMComparisonMetadata.with_additional_context(...)` so new keys never
+  mutate legacy ones.
+
+### Callback expectations
+
+- The LLM Provider Service **echoes** the metadata dictionary it receives and only
+  appends additive keys (`prompt_sha256`). Tests under
+  `services/llm_provider_service/tests/unit/test_callback_publishing.py`
+  verify the success and error paths preserve CJ metadata.
+- Every queued request produces exactly one callback: `_publish_callback_event*`
+  always uses the queue id for `request_id` and removes the queue entry once the
+  callback is published, which is exercised by the queue processor integration tests.
+
+This contract ensures that the future batching modes can introduce new metadata fields
+without breaking existing CJ or ENG5 consumers while guaranteeing the identifiers
+needed for correlation remain present.
+
 ## Event Architecture
 
 ### Events Consumed

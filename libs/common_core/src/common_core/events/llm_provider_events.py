@@ -148,7 +148,12 @@ class LLMComparisonResultV1(BaseModel):
     # Tracing
     trace_id: Optional[str] = Field(None, description="Distributed trace ID")
     request_metadata: dict[str, Any] = Field(
-        default_factory=dict, description="Original request metadata"
+        default_factory=dict,
+        description=(
+            "Opaque CJ-supplied metadata echoed back in callbacks. "
+            "Must always include `essay_a_id`/`essay_b_id` for correlation; "
+            "`bos_batch_id`, `prompt_sha256`, and future batching hints are additive."
+        ),
     )
 
     @model_validator(mode="after")

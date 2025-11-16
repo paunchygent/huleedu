@@ -251,6 +251,25 @@ CLI/Service → validate_llm_overrides() → ELS_CJAssessmentRequestV1(llm_confi
 - CLI validation: `scripts/cj_experiments_runners/eng5_np/cli.py:45-169`
 - Tests: `services/cj_assessment_service/tests/integration/test_llm_provider_manifest_integration.py`
 
+## Callback Contract & Metadata Echo
+
+- Every queued comparison request becomes exactly one callback:
+  `_publish_callback_event()` and `_publish_callback_event_error()` set
+  `LLMComparisonResultV1.request_id = str(queue_id)` and remove the queue entry
+  immediately after publishing. Queue completion/removal behaviour is exercised by
+  `tests/integration/test_queue_processor_completion_removal.py`.
+- The queue processor **never mutates** CJ metadata. `request_data.metadata` is copied
+  into `LLMComparisonResultV1.request_metadata` verbatim and only receives additive keys:
+  - `prompt_sha256` is appended on success (from provider metadata) or recomputed on error.
+  - Future batching hints (e.g., `cj_llm_batching_mode`, `comparison_iteration`) are passed
+    straight through because `CJLLMComparisonMetadata` marks them as additive.
+- Tests in `tests/unit/test_callback_publishing.py` lock this behaviour by asserting
+  that `essay_a_id`, `essay_b_id`, and `bos_batch_id` survive success/error callbacks.
+
+Use this section when wiring new batching fields: as long as the caller adds them to
+`LLMComparisonRequest.metadata`, the queue processor will echo them back without altering
+the existing contract.
+
 ## Updating LLM Models
 
 ### Manual Update Workflow

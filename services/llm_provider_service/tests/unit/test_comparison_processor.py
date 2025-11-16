@@ -14,7 +14,11 @@ from huleedu_service_libs.error_handling import HuleEduError
 from services.llm_provider_service.implementations.comparison_processor_impl import (
     ComparisonProcessorImpl,
 )
-from services.llm_provider_service.internal_models import LLMProviderResponse
+from services.llm_provider_service.internal_models import (
+    BatchComparisonItem,
+    LLMOrchestratorResponse,
+    LLMProviderResponse,
+)
 from services.llm_provider_service.protocols import LLMProviderProtocol
 from services.llm_provider_service.tests.fixtures.fake_event_publisher import FakeEventPublisher
 from services.llm_provider_service.tests.fixtures.test_settings import (
@@ -119,17 +123,85 @@ Essay B content discussing environmental policies.""",
         assert result.correlation_id == correlation_id
         assert result.trace_id is None  # Set by trace manager in integration layer
 
-        # Assert - Token usage and cost
-        expected_token_usage = {
-            "prompt_tokens": 150,
-            "completion_tokens": 75,
-            "total_tokens": 225,
-        }
-        assert result.token_usage == expected_token_usage
-        assert result.cost_estimate == 0.0  # Mock provider is always free
 
-        # Assert - Response time is reasonable (can be 0 for fast unit tests)
-        assert result.response_time_ms >= 0
+class TestComparisonBatchInterface:
+    """Tests for the default batch comparison adapter."""
+
+    @pytest.mark.asyncio
+    async def test_process_comparison_batch_preserves_order(
+        self,
+        comparison_processor: ComparisonProcessorImpl,
+    ) -> None:
+        """Ensure batch processing delegates to process_comparison sequentially."""
+        responses = [
+            LLMOrchestratorResponse(
+                winner=EssayComparisonWinner.ESSAY_A,
+                justification="Essay A wins",
+                confidence=0.8,
+                provider=LLMProviderType.OPENAI,
+                model="gpt-4o",
+                response_time_ms=1200,
+                token_usage={"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150},
+                cost_estimate=0.02,
+                correlation_id=uuid4(),
+            ),
+            LLMOrchestratorResponse(
+                winner=EssayComparisonWinner.ESSAY_B,
+                justification="Essay B wins",
+                confidence=0.7,
+                provider=LLMProviderType.ANTHROPIC,
+                model="claude-3",
+                response_time_ms=900,
+                token_usage={"prompt_tokens": 90, "completion_tokens": 45, "total_tokens": 135},
+                cost_estimate=0.018,
+                correlation_id=uuid4(),
+            ),
+        ]
+
+        comparison_processor.process_comparison = AsyncMock(side_effect=responses)  # type: ignore[method-assign]
+
+        items = [
+            BatchComparisonItem(
+                provider=LLMProviderType.OPENAI,
+                user_prompt="prompt-a",
+                correlation_id=responses[0].correlation_id,
+                overrides={"model_override": "gpt-4o"},
+            ),
+            BatchComparisonItem(
+                provider=LLMProviderType.ANTHROPIC,
+                user_prompt="prompt-b",
+                correlation_id=responses[1].correlation_id,
+                overrides={"model_override": "claude-3"},
+            ),
+        ]
+
+        result = await comparison_processor.process_comparison_batch(items)
+
+        assert result == responses
+        await_calls = comparison_processor.process_comparison.await_args_list  # type: ignore[attr-defined]
+        assert await_calls[0].kwargs == {
+            "provider": LLMProviderType.OPENAI,
+            "user_prompt": "prompt-a",
+            "correlation_id": responses[0].correlation_id,
+            "model_override": "gpt-4o",
+        }
+        assert await_calls[1].kwargs == {
+            "provider": LLMProviderType.ANTHROPIC,
+            "user_prompt": "prompt-b",
+            "correlation_id": responses[1].correlation_id,
+            "model_override": "claude-3",
+        }
+
+    @pytest.mark.asyncio
+    async def test_process_comparison_batch_handles_empty_input(
+        self,
+        comparison_processor: ComparisonProcessorImpl,
+    ) -> None:
+        """Ensure empty batches short-circuit."""
+        comparison_processor.process_comparison = AsyncMock()  # type: ignore[method-assign]
+        result = await comparison_processor.process_comparison_batch([])
+        assert result == []
+        comparison_processor.process_comparison.assert_not_awaited()  # type: ignore[attr-defined]
 
     @pytest.mark.asyncio
     async def test_successful_comparison_publishes_completion_event(

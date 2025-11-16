@@ -23,6 +23,7 @@ from huleedu_service_libs.logging_utils import create_service_logger
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.metrics import get_business_metrics
 from services.cj_assessment_service.models_api import (
+    CJLLMComparisonMetadata,
     ComparisonResult,
     ComparisonTask,
     ErrorDetail,
@@ -156,12 +157,11 @@ class LLMInteractionImpl(LLMInteractionProtocol):
 
                 # Make direct LLM API request - no caching
                 try:
-                    request_metadata = {
-                        "essay_a_id": task.essay_a.id,
-                        "essay_b_id": task.essay_b.id,
-                    }
-                    if bos_batch_id:
-                        request_metadata["bos_batch_id"] = bos_batch_id
+                    metadata_adapter = CJLLMComparisonMetadata.from_comparison_task(
+                        task,
+                        bos_batch_id=bos_batch_id,
+                    )
+                    request_metadata = metadata_adapter.to_request_metadata()
                     response_data = await provider.generate_comparison(
                         user_prompt=task.prompt,
                         correlation_id=task_correlation_id,  # Use unique correlation ID

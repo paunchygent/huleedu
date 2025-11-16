@@ -299,6 +299,29 @@ class TestSuccessCallbackPublishing:
         assert event_data.request_metadata["test"] == "metadata"
         assert event_data.request_metadata["prompt_sha256"] == "abc123"
 
+    @pytest.mark.asyncio
+    async def test_success_callback_preserves_client_metadata(
+        self,
+        queue_processor: QueueProcessorImpl,
+        sample_request: QueuedRequest,
+        successful_llm_response: LLMOrchestratorResponse,
+        mock_event_publisher: AsyncMock,
+    ) -> None:
+        """Original CJ metadata must survive round-trip back to callbacks."""
+        sample_request.request_data.metadata = {
+            "essay_a_id": "essay-a",
+            "essay_b_id": "essay-b",
+            "bos_batch_id": "bos-001",
+        }
+
+        await queue_processor._publish_callback_event(sample_request, successful_llm_response)
+
+        event_data = mock_event_publisher.publish_to_topic.call_args[1]["envelope"].data
+        assert event_data.request_metadata["essay_a_id"] == "essay-a"
+        assert event_data.request_metadata["essay_b_id"] == "essay-b"
+        assert event_data.request_metadata["bos_batch_id"] == "bos-001"
+        assert "prompt_sha256" in event_data.request_metadata
+
 
 class TestErrorCallbackPublishing:
     """Test error LLM comparison callback publishing."""
@@ -492,6 +515,37 @@ class TestErrorCallbackPublishing:
         )
 
         assert event_data.request_metadata["prompt_sha256"] == expected_hash
+
+    @pytest.mark.asyncio
+    async def test_error_callback_preserves_existing_metadata(
+        self,
+        queue_processor: QueueProcessorImpl,
+        sample_request: QueuedRequest,
+        mock_event_publisher: AsyncMock,
+    ) -> None:
+        """Existing CJ metadata should flow through on failure callbacks as well."""
+        sample_request.request_data.metadata = {
+            "essay_a_id": "essay-a",
+            "essay_b_id": "essay-b",
+            "bos_batch_id": "bos-001",
+        }
+        error_detail = ErrorDetail(
+            error_code=ErrorCode.TIMEOUT,
+            message="Provider timed out",
+            correlation_id=uuid4(),
+            timestamp=datetime.now(timezone.utc),
+            service="llm_provider_service",
+            operation="generate_comparison",
+            details={"provider": "openai"},
+        )
+        sample_error = HuleEduError(error_detail=error_detail)
+
+        await queue_processor._publish_callback_event_error(sample_request, sample_error)
+
+        event_data = mock_event_publisher.publish_to_topic.call_args[1]["envelope"].data
+        assert event_data.request_metadata["essay_a_id"] == "essay-a"
+        assert event_data.request_metadata["essay_b_id"] == "essay-b"
+        assert event_data.request_metadata["bos_batch_id"] == "bos-001"
 
 
 class TestCallbackTopicValidation:

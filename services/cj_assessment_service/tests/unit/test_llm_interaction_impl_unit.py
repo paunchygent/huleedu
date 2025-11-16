@@ -208,6 +208,28 @@ class TestLLMInteractionImplProtocolCompliance:
         }
 
     @pytest.mark.asyncio
+    async def test_metadata_includes_bos_batch_id_when_available(
+        self,
+        providers_dict_success: dict[LLMProviderType, LLMProviderProtocol],
+        test_settings: Settings,
+        sample_comparison_task: ComparisonTask,
+        successful_provider: MockLLMProvider,
+    ) -> None:
+        """Ensure BOS batch identifiers flow through the metadata adapter."""
+        llm_impl = LLMInteractionImpl(providers=providers_dict_success, settings=test_settings)
+
+        await llm_impl.perform_comparisons(
+            tasks=[sample_comparison_task],
+            correlation_id=uuid4(),
+            bos_batch_id="bos-batch-001",
+        )
+
+        metadata = successful_provider.last_call_params["request_metadata"]
+        assert metadata["bos_batch_id"] == "bos-batch-001"
+        assert metadata["essay_a_id"] == sample_comparison_task.essay_a.id
+        assert metadata["essay_b_id"] == sample_comparison_task.essay_b.id
+
+    @pytest.mark.asyncio
     async def test_error_handling_creates_structured_results(
         self,
         providers_dict_failure: dict[LLMProviderType, LLMProviderProtocol],
