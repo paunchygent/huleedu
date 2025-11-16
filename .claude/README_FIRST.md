@@ -388,6 +388,21 @@ command: ["pdm", "run", "-p", "/app", "python", "-m", "hypercorn", "services.con
 
 Migrated CJ Assessment `request_data` from `dict[str, Any]` to `CJAssessmentRequestData` Pydantic model for type safety (IDE autocomplete, mypy validation, runtime checks).
 
+### 24. Event Processor Refactoring (Nov 2025)
+
+**Status**: ✅ Complete
+
+**Objective**: Decompose `event_processor.py` from 952 LoC to comply with <400-500 LoC clean code standards (78% reduction to 202 LoC).
+
+**Implementation**:
+- Created focused modules in `cj_core_logic/`: `content_hydration.py` (238 LoC), `request_transformer.py` (70 LoC), `error_categorization.py` (81 LoC)
+- Created handler modules in `message_handlers/`: `cj_request_handler.py` (340 LoC), `llm_callback_handler.py` (228 LoC)
+- Refactored `event_processor.py` to thin router pattern (202 LoC) - routes messages to handlers, envelope parsing and trace context only
+- Clear separation of concerns: routing vs orchestration vs domain logic
+- All modules <400 LoC, all existing functionality preserved
+
+**Validation**: All tests passing, typecheck clean
+
 ## Configuration Files
 
 - `.env` - Environment variables (not in git)

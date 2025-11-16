@@ -140,6 +140,11 @@ For the full implementation plan and design rationale, see
     - `cj_request_type: str` – e.g. `"cj_comparison"`, `"cj_retry"`.
   - Confirm that these keys are present in `LLMComparisonRequest.metadata` in the provider service
     (via a small integration or unit test).
+  - Ensure `request_metadata` is built via `CJLLMComparisonMetadata`
+    only, and that this model remains **strictly additive**:
+    existing keys (`"essay_a_id"`, `"essay_b_id"`,
+    `"bos_batch_id"`) must keep their current names and semantics so
+    that legacy consumers continue to work.
 
 ### 4. CJ-side tests & validation
 
@@ -209,6 +214,11 @@ For the full implementation plan and design rationale, see
     - Implement as a simple loop calling `process_comparison` per request.
     - This gives a single code path for both serial-bundle and per-request modes without changing
       external behaviour.
+  - **During the pre-task phase, `QueueProcessorImpl._process_queue_loop`
+    must continue to use the existing per-request path only.** The
+    switch to use `QueueProcessingMode.SERIAL_BUNDLE` and the
+    corresponding serial-bundle dispatch is part of the main batching
+    implementation task, not the pre-contract hardening.
 
 - [ ] **Map batch results back to queue handlers**
   - For each `(QueuedRequest, LLMOrchestratorResponse)` pair in the batch:

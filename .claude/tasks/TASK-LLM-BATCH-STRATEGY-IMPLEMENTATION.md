@@ -145,7 +145,26 @@ In `LLMInteractionImpl.perform_comparisons`, extend `request_metadata` for each 
 - `cj_llm_batching_mode: str`  `effective_mode.value`.
 - `cj_request_type: str`  e.g. `"cj_comparison"`, `"cj_retry"`.
 
-These flow into `LLMComparisonRequest.metadata` and then into `QueuedRequest.request_data.metadata` on the provider side.
+These flow into `LLMComparisonRequest.metadata` and then into
+`QueuedRequest.request_data.metadata` on the provider side.
+
+> **Important:** The metadata shape is owned by the
+> `CJLLMComparisonMetadata` model introduced in the pre-task
+> (`TASK-LLM-BATCH-STRATEGY-PRE-CONTRACTS-AND-TESTS`). Any new keys
+> added here **must be strictly additive**:
+>
+> - Existing key names and semantics (at minimum `"essay_a_id"`,
+>   `"essay_b_id"`, `"bos_batch_id"`) must remain unchanged.
+> - No existing consumer may start treating new fields as required.
+>   The legacy metadata shape must continue to validate and behave as
+>   before.
+
+Override mapping from CJ to LLM Provider Service must use the
+`to_lps_overrides(...)` adapter defined in the pre-task. That adapter is
+responsible for bridging `provider_override: str | None` from CJ into
+`LLMProviderType | None` expected by the LPS API models, and for
+handling unknown provider strings by logging and clearing the override
+so that existing default provider resolution stays behaviour-preserving.
 
 ## LLM Provider Service Configuration
 

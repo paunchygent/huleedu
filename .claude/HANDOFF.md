@@ -44,7 +44,3 @@ Migrated CJ Assessment `request_data` from dict to Pydantic model for type safet
 - **Phase 4 (observability + tests)**: Confirmed log entries exist for `Valid comparisons found` (batch 21 hits 96–100 comparisons) via `docker logs huleedu_cj_assessment_service | grep -i "Valid comparisons found" | tail -n 5`, and reran `typecheck-all` plus `test_batch_finalizer_scoring_state.py` and `test_prompt_metrics.py` to exercise DB state transitions and metrics coverage per the gating checklist.
 - **Phase 3 (documentation + validation)**: Documented budget/metadata semantics + anchor metadata contract in `services/cj_assessment_service/README.md`, reran `typecheck-all`, and reran `services/cj_assessment_service/tests/unit/test_workflow_continuation.py` to satisfy the phase-end validation requirement.
 - **Doc compliance check**: Reviewed each touched document (README, README_FIRST, HANDOFF) against Rule 090; ensured the descriptions match the implemented behavior and found no infractions to correct.
-
----
-
-See **README_FIRST.md** section #23 for architectural details.
