@@ -1,9 +1,21 @@
+# TASK-LLM-BATCH-STRATEGY-IMPLEMENTATION – Developer Checklist
+
+This checklist is a child document for `TASK-LLM-BATCH-STRATEGY-IMPLEMENTATION.md` and the high-level
+planning task `TASK-LLM-BATCH-STRATEGY.md`.
+
+It is intended for the engineer implementing the CJ + LLM Provider Service batching strategy and
+verifying that both normal BOS/ELS flows and ENG5 runner flows behave correctly under the new
+configuration.
+
+---
+
 ## CJ comparison submission modes and LLM batching
 
 CJ has two **comparison submission shapes**:
 
-- **Batched (all comparisons at once)**  
-  - CJ generates *all* comparison pairs for a batch in one call to [generate_comparison_tasks](cci:1://file:///Users/olofs_mba/Documents/Repos/huledu-reboot/services/cj_assessment_service/cj_core_logic/pair_generation.py:27:0-139:27), up to `MAX_PAIRWISE_COMPARISONS`.  
+- **Batched (all comparisons at once, future optional)**  
+  - *Planned* mode for workloads that should hand the full comparison budget to LLM Provider in one go (e.g. for provider-level batch/discount APIs).
+  - CJ would generate *all* remaining comparison pairs for a batch in one call to [generate_comparison_tasks](cci:1://file:///Users/olofs_mba/Documents/Repos/huledu-reboot/services/cj_assessment_service/cj_core_logic/pair_generation.py:27:0-139:27), up to `MAX_PAIRWISE_COMPARISONS`.  
   - Call pattern (conceptual):
 
     ```python
@@ -17,14 +29,16 @@ CJ has two **comparison submission shapes**:
     )
     ```
 
-  - Intended when we want to hand the *full* comparison workload to the LLM Provider in one go
-    (e.g. to align with a provider-level batch/discount API).
+  - Intended only when `LLMBatchingMode.PROVIDER_BATCH_API` is enabled and the LLM Provider
+    Service has batch APIs configured for the target provider.
 
-- **Bundled (iterative, stability-driven)**  
+- **Bundled (iterative, stability-driven, current default)**  
+  - **Current behaviour** in CJ Assessment for both initial submissions and continuation runs.
   - CJ generates comparison pairs in **small bundles** per iteration, recomputes Bradley–Terry
     scores, and checks for stability between iterations.
   - Bundle size is controlled by `COMPARISONS_PER_STABILITY_CHECK_ITERATION`; total budget is
-    capped by `MAX_PAIRWISE_COMPARISONS`.
+    capped by `MAX_PAIRWISE_COMPARISONS` via the comparison budget logic in
+    `comparison_processing._resolve_requested_max_pairs`.
   - Call pattern (per iteration):
 
     ```python
@@ -71,18 +85,8 @@ CJ only controls *when* and *how many* `ComparisonTask`s are generated and hande
 
 ---
 
-For the full implementation plan and checklist, see  
-[LLM batch strategy implementation checklist](.claude/tasks/TASK-LLM-BATCH-STRATEGY-IMPLEMENTATION-CHECKLIST.md).
-
-
-# TASK-LLM-BATCH-STRATEGY-IMPLEMENTATION – Developer Checklist
-
-This checklist is a child document for `TASK-LLM-BATCH-STRATEGY-IMPLEMENTATION.md` and the high-level
-planning task `TASK-LLM-BATCH-STRATEGY.md`.
-
-It is intended for the engineer implementing the CJ + LLM Provider Service batching strategy and
-verifying that both normal BOS/ELS flows and ENG5 runner flows behave correctly under the new
-configuration.
+For the full implementation plan and design rationale, see  
+`TASK-LLM-BATCH-STRATEGY-IMPLEMENTATION.md`.
 
 ---
 

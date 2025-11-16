@@ -15,18 +15,37 @@ This document builds on:
   - CJ Assessment Service decides *whether* to use advanced batching modes via configuration and per‑request overrides.
   - LLM Provider Service implements the *how* (serial bundling, async batch APIs) and owns all provider‑specific details.
 - **Default behaviour:**
-  - Keep todays semantics as the default: one queued request per comparison, one provider call per request.
+  - At the CJ → LLM Provider boundary, keep todays semantics as the default: one queued request per comparison, one provider call per request.
+  - Inside CJ, comparison *generation* already uses a **stability‑driven bundling** pattern:
+    - `generate_comparison_tasks` is called with `existing_pairs_threshold=settings.COMPARISONS_PER_STABILITY_CHECK_ITERATION`.
+    - A global cap is enforced via `MAX_PAIRWISE_COMPARISONS` (see `comparison_processing._resolve_requested_max_pairs`).
+    - New comparisons are generated in small bundles per iteration until either the cap or stability criteria are met.
 - **Feature flags:**
-  - Introduce explicit batching mode enums in both CJ and LPS `Settings` so behaviour can be flipped per environment without code changes.
-- **Rollout order:**
-  1. Baseline metrics and configuration enums (no behaviour change).
-  2. `QueueProcessingMode.SERIAL_BUNDLE` in LLM Provider Service.
-  3. Provider async batch APIs (OpenAI JSONL batches, Anthropic Message Batches) behind separate flags.
+  - Introduce explicit batching mode enums in both CJ and LPS `Settings` so behaviour can be flipped per environment without code changes, while keeping CJs existing bundling logic as the canonical default.
+- **Comparison submission shapes (CJ → LLM Provider):**
+  - **Bundled, stability‑driven (current default):**
+    - CJ generates comparisons in bundles of up to `COMPARISONS_PER_STABILITY_CHECK_ITERATION` new pairs per call to `generate_comparison_tasks`, respecting `MAX_PAIRWISE_COMPARISONS` as a hard cap.
+    - This applies both to the initial submission (`submit_comparisons_for_async_processing`) and to continuation iterations (`request_additional_comparisons_for_batch` / `_process_comparison_iteration`).
+  - **Batched, all‑at‑once (future optional):**
+    - CJ would generate *all* remaining pairs in a single call (still respecting `MAX_PAIRWISE_COMPARISONS`) so the LLM Provider can use provider‑level batch/discount APIs efficiently.
+    - This shape is reserved for a future `LLMBatchingMode.PROVIDER_BATCH_API` path and is **not** the current default.
+- **Rollout order (bundling first, batch later):**
+  1. **Codify current CJ bundling semantics** as the canonical baseline (no change in behaviour): keep `COMPARISONS_PER_STABILITY_CHECK_ITERATION` + `MAX_PAIRWISE_COMPARISONS` as the way CJ decides *when* and *how many* comparisons to generate per iteration.
+  2. **Add configuration enums and metadata wiring** in CJ and LPS (`LLMBatchingMode`, `QueueProcessingMode`, provider batch flags) without changing runtime behaviour: still bundled comparisons in CJ, still per‑request calls in LLM Provider.
+  3. **Implement `QueueProcessingMode.SERIAL_BUNDLE` in LLM Provider Service** so multiple queued comparison requests (from CJs bundled submissions) can be handled in a single provider API call, with full metrics and diagnostics.
+  4. **Only after serial bundling is stable and observable**, introduce an optional `PROVIDER_BATCH_API` path where:
+     - CJ can opt‑in specific workloads to the *batched, all‑at‑once* submission shape, and
+     - LLM Provider Service can use provider async batch APIs (OpenAI JSONL batches, Anthropic message batches) behind explicit, environment‑scoped flags.
 
 ## Environment Defaults
 
 Unless explicitly overridden, the following defaults should be used for both development and
 production environments:
+
+> **Note:** These defaults describe the *target* configuration once
+> `QueueProcessingMode.SERIAL_BUNDLE` is implemented and rolled out in LLM Provider Service.
+> Existing deployments may still run with `QUEUE_PROCESSING_MODE=per_request` until Phase 2 of
+> this task is completed and validated.
 
 - **CJ Assessment Service:**
   - `LLM_BATCHING_MODE = provider_serial_bundle` – signal that provider-side serial bundling is
