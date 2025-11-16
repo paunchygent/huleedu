@@ -61,7 +61,7 @@ Each README should include:
 - [x] content_service - Added error handling, testing sections ✅
 - [x] essay_lifecycle_service - Added testing, migration sections ✅
 - [x] file_service - Added error handling, testing, migration sections ✅
-- [ ] identity_service - Add error handling, migration, enhance testing
+- [x] identity_service - Added error handling, testing, migration sections ✅ (2025-11-16)
 - [ ] language_tool_service - Add error handling, enhance testing
 - [x] nlp_service - Added error handling, migration, enhance testing ✅
 - [ ] result_aggregator_service - Add error handling, migration, enhance testing
@@ -71,7 +71,8 @@ Each README should include:
 - [ ] email_service
 - [ ] class_management_service
 - [ ] file_service
-- [ ] identity_service
+- [x] identity_service - Added migration workflow guidance (2025-11-16)
+- [ ] nlp_service
 - [ ] result_aggregator_service
 - [ ] batch_conductor_service (LOW PRIORITY - already excellent)
 
@@ -125,10 +126,11 @@ Following `.claude/rules/090-documentation-standards.mdc`:
 **Services Completed**: 8/13 (62%)
 **Services Remaining**: 5/13 (38%)
 
-**Last Updated**: 2025-11-11
+**Last Updated**: 2025-11-16
 
 **Commits**:
 - Commit 1 (13650e7): 6 services (entitlements, email, api_gateway, class_management, content, essay_lifecycle)
 - Commit 2 (c0cb0cf): 1 service (file_service)
+- Commit 3 (pending): 1 service (identity_service)
 
 Working on: Session paused - handoff for next session
