@@ -1,4 +1,12 @@
-"""common_core.pipeline_models – Fine-grained batch pipeline state machine"""
+"""Fine-grained batch pipeline state machine contracts.
+
+This module hosts typed contracts consumed by the Batch Orchestrator Service
+(BOS), Batch Conductor Service (BCS), Result Aggregator Service (RAS), and
+WebSocket Service. The models document how orchestration phases progress across
+the ``PhaseName`` enum and :class:`PipelineExecutionStatus` state machine. They
+complement the diagrams in ``libs/common_core/docs/status-state-machines.md`` and
+should be kept in sync whenever orchestration semantics evolve.
+"""
 
 from __future__ import annotations
 
@@ -10,12 +18,11 @@ from pydantic import BaseModel, Field
 
 
 class PhaseName(str, Enum):
-    """
-    Enum defining all valid pipeline phase names for type-safe orchestration.
+    """All valid pipeline phase names for BOS/BCS orchestration.
 
-    This enum is used as keys in the phase_initiators_map, within ProcessingPipelineState,
-    and for validating requested_pipelines values, eliminating magic strings and
-    providing compile-time safety.
+    The enum provides type-safe keys for ``phase_initiators_map`` definitions and
+    :class:`ProcessingPipelineState` attributes, eliminating magic strings when
+    publishing pipeline events or storing requested pipelines in BOS.
     """
 
     SPELLCHECK = "spellcheck"
@@ -134,15 +141,17 @@ class ProcessingPipelineState(BaseModel):
     """Batch-level aggregate of all requested pipeline phase states.
 
     Provides whole-batch perspective tracking granular state for each pipeline
-    phase (spellcheck, NLP, CJ assessment, etc.). Persisted in BOS database and
-    updated per phase completion event. Used for orchestration decisions, WebSocket
-    notifications, and Result Aggregator batch completion logic.
+    phase (spellcheck, NLP, CJ assessment, etc.). Persisted in the BOS database
+    and updated by BCS as ``ProcessingPipelineStatusUpdatedV1`` events arrive.
 
-    Relationship to BatchStatus:
-    - BatchStatus: Coarse batch lifecycle state (ACTIVE, READY_FOR_PIPELINE, PROCESSING, COMPLETED)
-    - ProcessingPipelineState: Fine-grained phase-by-phase execution tracking
+    Relationship to :class:`~common_core.status_enums.BatchStatus`:
+    - ``BatchStatus``: Coarse batch lifecycle state (ACTIVE, READY_FOR_PIPELINE,
+      PROCESSING, COMPLETED)
+    - ``ProcessingPipelineState``: Fine-grained phase-by-phase execution tracking
 
-    Storage: BOS database, updated by BCS via ProcessingPipelineStatusUpdatedV1 events
+    Storage: BOS database, materialized to WebSocket clients, and queried by the
+    Result Aggregator when determining if all requested pipelines reached terminal
+    states.
     """
 
     batch_id: str = Field(description="Batch identifier this pipeline state belongs to")
@@ -189,5 +198,6 @@ class ProcessingPipelineState(BaseModel):
     )
 
     def get_pipeline(self, name: str) -> PipelineStateDetail | None:
+        """Return the :class:`PipelineStateDetail` for ``name`` if it exists."""
         pipeline_name_attr = name.lower().replace("-", "_")
         return getattr(self, pipeline_name_attr, None)

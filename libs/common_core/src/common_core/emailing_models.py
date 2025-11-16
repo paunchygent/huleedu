@@ -1,11 +1,18 @@
 """Email Service event contracts for notification and delivery tracking.
 
-Defines event models for the email workflow: request → sent → delivery status.
-Used by Identity Service, Class Management Service, Batch Orchestrator Service,
-and other services that need to send transactional emails.
+The models in this module formalize the email workflow contract documented in
+`libs/common_core/docs/event-registry.md`. They describe the full lifecycle of
+a transactional email across three events:
 
-Producer: Identity, CMS, BOS, other services
-Consumer: Email Service (for NotificationEmailRequestedV1), Analytics/Audit (for sent/failed)
+1. :class:`NotificationEmailRequestedV1` – upstream service request published to
+   ``huleedu.email.notification.requested.v1``
+2. :class:`EmailSentV1` – confirmation from Email Service that the provider
+   accepted the message
+3. :class:`EmailDeliveryFailedV1` – delivery failure emitted with provider
+   diagnostics
+
+These events are consumed by the Email Service, analytics pipelines, and audit
+subsystems to keep student/teacher notifications reliable and traceable.
 """
 
 from __future__ import annotations
@@ -19,14 +26,19 @@ from pydantic import BaseModel, EmailStr, Field
 class NotificationEmailRequestedV1(BaseModel):
     """Email send request event for transactional notifications.
 
-    Producer: Identity Service, Class Management Service, Batch Orchestrator Service
-    Consumer: Email Service
-    Topic: huleedu.email.notification.requested.v1
+    **Producer services**: Identity Service, Class Management Service,
+    Batch Orchestrator Service, or any service that needs transactional email.
+
+    **Consumer service**: Email Service.
+
+    **Topic**: ``huleedu.email.notification.requested.v1``
 
     Workflow:
-    1. Service publishes NotificationEmailRequestedV1 event to Kafka
-    2. Email Service consumes event and sends via external provider (Resend, SendGrid)
-    3. Email Service publishes EmailSentV1 or EmailDeliveryFailedV1 based on result
+    1. Service publishes :class:`NotificationEmailRequestedV1` to Kafka.
+    2. Email Service consumes the event and sends via external provider (Resend,
+       SendGrid, etc.).
+    3. Email Service publishes :class:`EmailSentV1` or
+       :class:`EmailDeliveryFailedV1` based on provider response.
     """
 
     message_id: str = Field(
@@ -69,12 +81,17 @@ class NotificationEmailRequestedV1(BaseModel):
 class EmailSentV1(BaseModel):
     """Email successfully sent confirmation event.
 
-    Producer: Email Service
-    Consumer: Analytics, Audit logging
-    Topic: huleedu.email.sent.v1
+    **Producer service**: Email Service.
 
-    Published after Email Service successfully delivers email via external provider.
-    Used for analytics, billing tracking, and audit trails.
+    **Consumer services**: Analytics, Audit logging, Result Aggregator
+    pipelines that track notification SLAs.
+
+    **Topic**: ``huleedu.email.sent.v1``
+
+    Published after Email Service receives success confirmation from the external
+    provider. Used for analytics, billing tracking, and audit trails, and it
+    allows clients to correlate request-to-delivery using ``message_id`` and
+    ``correlation_id``.
     """
 
     message_id: str = Field(
@@ -100,12 +117,15 @@ class EmailSentV1(BaseModel):
 class EmailDeliveryFailedV1(BaseModel):
     """Email delivery failure event for error handling and monitoring.
 
-    Producer: Email Service
-    Consumer: Analytics, Error handling systems, Monitoring/Alerting
-    Topic: huleedu.email.delivery.failed.v1
+    **Producer service**: Email Service.
 
-    Published when Email Service fails to deliver email via external provider.
-    Triggers error handling workflows and provider reliability monitoring.
+    **Consumer services**: Analytics, error handling systems,
+    Monitoring/Alerting pipelines.
+
+    **Topic**: ``huleedu.email.delivery.failed.v1``
+
+    Published when Email Service fails to deliver via the configured provider.
+    Triggers retry logic, alerting, and provider reliability monitoring.
     """
 
     message_id: str = Field(
