@@ -154,6 +154,101 @@ Comprehensive test suite with:
 - Authentication and rate limiting tests
 - Error handling and edge case validation
 
+## Error Handling
+
+Uses `libs/huleedu_service_libs/error_handling` for structured error responses.
+
+### ErrorCode Usage
+
+- **Base ErrorCode**: Service uses base `ErrorCode` from `common_core.error_enums`:
+  - `VALIDATION_ERROR` - Invalid request data, batch ID mismatch
+  - `AUTHENTICATION_ERROR` - Invalid JWT token, missing credentials
+  - `RESOURCE_NOT_FOUND` - Batch not found
+  - `EXTERNAL_SERVICE_ERROR` - File Service, BOS, CMS proxy failures
+  - `RATE_LIMIT` - Rate limit exceeded
+
+- No service-specific ErrorCode enum (uses base errors only)
+
+### Error Propagation
+
+- **HTTP Endpoints**: FastAPI exception handlers convert `HuleEduError` to HTTP responses
+- **Proxy Routes**: Preserve upstream error responses from File Service, BOS, CMS
+- **JWT Validation**: Authentication failures return 401 with correlation_id
+- **Rate Limiting**: SlowAPI middleware returns 429 with rate limit headers
+
+### Error Response Structure
+
+All errors follow standard structure:
+
+```python
+from huleedu_service_libs.error_handling import HuleEduError
+from common_core.error_enums import ErrorCode
+
+raise HuleEduError(
+    error_code=ErrorCode.VALIDATION_ERROR,
+    message="Batch ID in path must match batch_id in request body",
+    correlation_id=correlation_context.uuid
+)
+```
+
+FastAPI response format:
+
+```json
+{
+  "error_code": "VALIDATION_ERROR",
+  "message": "Batch ID in path must match batch_id in request body",
+  "correlation_id": "123e4567-e89b-12d3-a456-426614174000"
+}
+```
+
+Reference: `libs/common_core/docs/error-patterns.md`
+
+## Testing
+
+### Test Structure
+
+```
+tests/
+├── test_auth.py                      # JWT authentication tests
+├── test_auth_org.py                  # Org-level authentication tests
+├── test_batch_routes.py              # Batch pipeline command tests
+├── test_batch_registration_proxy.py  # BOS proxy tests
+├── test_batch_preflight.py           # Validation status tests
+├── test_status_routes.py             # Status mapping tests
+├── test_file_routes.py               # File upload proxy tests
+├── test_class_routes.py              # Class Management proxy tests
+├── test_health_routes.py             # Health check tests
+├── test_provider.py                  # DI provider tests
+└── conftest.py                       # Shared fixtures
+```
+
+### Running Tests
+
+```bash
+# All tests
+pdm run pytest-root services/api_gateway_service/tests/ -v
+
+# Specific test files
+pdm run pytest-root services/api_gateway_service/tests/test_auth.py -v
+pdm run pytest-root services/api_gateway_service/tests/test_batch_routes.py -v
+```
+
+### Common Test Markers
+
+- `@pytest.mark.asyncio` - Async tests
+- `@pytest.mark.unit` - Unit tests with mocked dependencies
+- `@pytest.mark.integration` - Integration tests requiring Redis, Kafka
+
+### Test Patterns
+
+- **FastAPI test client**: Use `httpx.AsyncClient` with app
+- **JWT fixtures**: Mock JWT tokens in conftest.py
+- **Service mocking**: Mock File Service, BOS, CMS HTTP responses
+- **Rate limit testing**: Mock Redis backend for SlowAPI
+- **Correlation context**: Test correlation_id propagation through requests
+
+Reference: `.claude/rules/075-test-creation-methodology.mdc`
+
 ## Configuration
 
 Environment variables (prefix: `API_GATEWAY_`):

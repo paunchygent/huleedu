@@ -464,3 +464,180 @@ METRICS = {
 - No blocking I/O in request handlers
 - Event Relay Worker runs as background task
 - Outbox repository uses connection pooling for optimal performance
+
+## Error Handling
+
+Uses `libs/huleedu_service_libs/error_handling` for structured error responses with service-specific error codes.
+
+### ErrorCode Usage
+
+- **Service-Specific**: `FileValidationErrorCode` enum for file processing errors:
+  - `ENCRYPTED_FILE_UNSUPPORTED` - Encrypted PDF files
+  - `CORRUPTED_FILE` - Malformed or corrupted files
+  - `EMPTY_CONTENT` - Whitespace-only or empty extracted text
+  - `CONTENT_TOO_SHORT` - Below MIN_CONTENT_LENGTH (50 chars)
+  - `CONTENT_TOO_LONG` - Above MAX_CONTENT_LENGTH (50,000 chars)
+  - `UNSUPPORTED_FILE_TYPE` - File extension not supported (.txt, .docx, .pdf only)
+
+- **Base ErrorCode**: Used for generic errors:
+  - `VALIDATION_ERROR` - Invalid request format
+  - `EXTERNAL_SERVICE_ERROR` - Content Service failures
+  - `PROCESSING_ERROR` - Extraction failures
+
+### Error Propagation
+
+- **HTTP Endpoints**: Raise `HuleEduError` with correlation_id and error code
+- **Event Publishing**: Validation failures publish `EssayValidationFailedV1` with error code
+- **Transactional Outbox**: Ensures failure events delivered reliably
+- **Strategy Pattern**: Each extraction strategy handles format-specific errors
+
+### Error Response Structure
+
+All errors follow standard structure:
+
+```python
+from huleedu_service_libs.error_handling import HuleEduError
+from services.file_service.error_codes import FileValidationErrorCode
+
+# Validation failure
+raise HuleEduError(
+    error_code=FileValidationErrorCode.EMPTY_CONTENT,
+    message="Extracted text is empty or whitespace-only",
+    correlation_id=correlation_id
+)
+
+# Unsupported file type
+raise HuleEduError(
+    error_code=FileValidationErrorCode.UNSUPPORTED_FILE_TYPE,
+    message=f"No extraction strategy for {file_extension}",
+    correlation_id=correlation_id
+)
+```
+
+Event failure publishing:
+
+```python
+failure_event = EssayValidationFailedV1(
+    batch_id=batch_id,
+    original_file_name=file_name,
+    raw_file_storage_id=raw_storage_id,
+    validation_error_code=FileValidationErrorCode.CONTENT_TOO_SHORT,
+    correlation_id=correlation_id
+)
+```
+
+Reference: `libs/common_core/docs/error-patterns.md`
+
+## Testing
+
+### Test Structure
+
+```
+tests/
+├── unit/                          # Unit tests with mocked dependencies
+│   ├── test_extraction_strategies.py
+│   ├── test_core_logic_*.py
+│   ├── test_content_validator.py
+│   ├── test_file_validators.py
+│   ├── test_event_relay_worker.py
+│   ├── test_outbox_manager_error_handling.py
+│   └── ...
+├── integration/                   # Integration tests with testcontainers
+│   ├── test_strategy_based_extractor_integration.py
+│   ├── test_outbox_pattern_integration.py
+│   ├── test_outbox_repository.py
+│   └── conftest.py
+└── conftest.py                   # Shared fixtures
+```
+
+### Running Tests
+
+```bash
+# All tests
+pdm run pytest-root services/file_service/tests/ -v
+
+# Unit tests only
+pdm run pytest-root services/file_service/tests/unit/ -v
+
+# Integration tests (requires testcontainers)
+pdm run pytest-root services/file_service/tests/integration/ -v -m integration
+
+# Strategy pattern tests specifically
+pdm run pytest-root services/file_service/tests/unit/test_extraction_strategies.py -v
+pdm run pytest-root services/file_service/tests/integration/test_strategy_based_extractor_integration.py -v
+
+# With coverage
+pdm run pytest-root services/file_service/tests/ --cov=services/file_service --cov-report=term-missing
+```
+
+### Common Test Markers
+
+- `@pytest.mark.asyncio` - Async unit tests
+- `@pytest.mark.integration` - Integration tests requiring external dependencies
+
+### Test Patterns
+
+- **Protocol-based mocking**: Use `AsyncMock(spec=ProtocolName)` for dependencies
+- **Strategy pattern testing**: Mock individual extraction strategies
+- **Testcontainers**: PostgreSQL containers for outbox integration tests
+- **Correlation tracking**: Verify correlation_id propagation through workflows
+- **Error scenarios**: Test all FileValidationErrorCode cases
+- **Transactional outbox**: Verify event persistence and relay worker behavior
+
+### Critical Test Scenarios
+
+- **File type support**: .txt, .docx, .pdf extraction strategies
+- **Validation boundaries**: MIN_CONTENT_LENGTH, MAX_CONTENT_LENGTH
+- **Encrypted PDFs**: ENCRYPTED_FILE_UNSUPPORTED error handling
+- **Empty files**: EMPTY_CONTENT error handling
+- **Corrupted files**: CORRUPTED_FILE error handling
+- **Content Service failures**: Retry and error handling
+- **Transactional outbox**: Event persistence and publishing
+- **Event Relay Worker**: Instant wake-up and batch publishing
+
+**Test Coverage**: >90% maintained across unit and integration tests
+
+Reference: `.claude/rules/075-test-creation-methodology.mdc`
+
+## Migration Workflow
+
+### Creating Migrations
+
+From service directory:
+
+```bash
+cd services/file_service/
+
+# Generate migration from model changes
+alembic revision --autogenerate -m "description_of_change"
+
+# Review generated migration in alembic/versions/
+# Edit if needed (constraints, indexes, data migrations)
+
+# Apply migration
+alembic upgrade head
+```
+
+### Migration Standards
+
+- **Naming**: `YYYYMMDD_HHMM_short_description.py`
+- **File Service tables**: file_uploads (user-facing file management)
+- **Outbox alignment**: Use shared `EventOutbox` model from `huleedu_service_libs.outbox.models`
+- **Indexes**: Add indexes for query patterns (batch_id, user_id, upload_timestamp)
+- **Verification**: Run `alembic history --verbose` after creating migrations
+
+### Existing Migrations
+
+- `20250725_0001_add_event_outbox_table.py` - Transactional outbox pattern
+- `20250807_0036_f3ce45362241_add_file_uploads_table_for_user_.py` - User-facing file tracking
+- `20250808_1151_4073c6627a50_add_explicit_topic_column_to_event_.py` - Outbox improvement
+
+### Critical Notes
+
+- File Service owns file_uploads table (user-facing file management)
+- Outbox table owned by shared library
+- No essay_states table (owned by Essay Lifecycle Service)
+- Never modify pushed migrations - create new migration to fix issues
+- Test migrations against testcontainer database before pushing
+
+Reference: `.claude/rules/085-database-migration-standards.md`

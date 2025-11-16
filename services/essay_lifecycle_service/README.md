@@ -460,3 +460,145 @@ Test infrastructure follows Rule 070 protocol-based patterns:
 - `assert_error_detail_structure()`: Contract validation for ErrorDetail model compliance
 
 14 comprehensive error contract tests ensure infrastructure reliability and cross-service compatibility.
+
+## Testing
+
+### Test Structure
+
+```
+tests/
+├── unit/                          # Unit tests with mocked dependencies
+│   ├── test_batch_command_handler_impl.py
+│   ├── test_spellcheck_command_handler.py
+│   ├── test_cj_assessment_command_handler.py
+│   ├── test_essay_state_machine_*.py
+│   ├── test_service_result_handler_*.py
+│   ├── test_kafka_circuit_breaker_*.py
+│   └── ...
+├── integration/                   # Integration tests with testcontainers
+│   ├── test_content_provisioned_flow.py
+│   ├── test_atomic_batch_creation_integration.py
+│   ├── test_database_slot_operations.py
+│   ├── test_consumer_self_healing.py
+│   └── ...
+├── distributed/                   # Distributed system tests (concurrency, race conditions)
+│   ├── test_concurrent_slot_assignment.py
+│   ├── event_generator.py
+│   ├── conftest.py
+│   └── ...
+├── contract/                      # Event and error contract tests
+│   ├── test_error_contracts.py
+│   └── ...
+├── test_essay_repository_integration.py  # Repository integration tests
+├── test_redis_integration.py    # Redis notification tests
+├── utils/                         # Test utilities and helpers
+│   └── helpers.py
+└── conftest.py                   # Shared fixtures and error testing utilities
+```
+
+### Running Tests
+
+```bash
+# All tests
+pdm run pytest-root services/essay_lifecycle_service/tests/ -v
+
+# Unit tests only
+pdm run pytest-root services/essay_lifecycle_service/tests/unit/ -v
+
+# Integration tests (requires testcontainers)
+pdm run pytest-root services/essay_lifecycle_service/tests/integration/ -v -m integration
+
+# Distributed tests (concurrency, race conditions)
+pdm run pytest-root services/essay_lifecycle_service/tests/distributed/ -v
+
+# Contract tests
+pdm run pytest-root services/essay_lifecycle_service/tests/contract/ -v
+```
+
+### Common Test Markers
+
+- `@pytest.mark.asyncio` - Async unit tests
+- `@pytest.mark.integration` - Integration tests requiring external dependencies (PostgreSQL, Redis)
+- `@pytest.mark.distributed` - Distributed system tests (concurrency, race conditions)
+- `@pytest.mark.contract` - Event and error contract validation tests
+
+### Test Patterns
+
+- **Protocol-based mocking**: Use `AsyncMock(spec=ProtocolName)` for dependencies
+- **MockEssayRepository**: In-memory repository for fast unit testing
+- **PostgreSQLEssayRepository**: Testcontainers PostgreSQL for integration tests
+- **Error contract testing**: `assert_huleedu_error()`, `expect_huleedu_error()` utilities
+- **State machine testing**: `essay_state_machine_utils.py` for transition validation
+- **Concurrent testing**: `distributed/` tests for race conditions and slot assignment
+- **Redis notifications**: Mock Redis for notification projection tests
+- **Kafka mocking**: Mock Kafka publishers for command/event testing
+
+### Critical Test Scenarios
+
+- **Slot assignment idempotency**: Concurrent `EssayContentProvisionedV1` events
+- **State machine transitions**: All valid/invalid transitions tested
+- **Error propagation**: HuleEduError correlation ID preservation
+- **Transactional outbox**: Event publishing reliability
+- **Batch coordination**: Count-based completion aggregation
+- **Phase 1 stateless routing**: Student matching without state updates
+- **Circuit breaker integration**: Kafka failure handling
+
+Reference: `.claude/rules/075-test-creation-methodology.mdc`
+
+## Migration Workflow
+
+### Creating Migrations
+
+From service directory:
+
+```bash
+cd services/essay_lifecycle_service/
+
+# Generate migration from model changes
+alembic revision --autogenerate -m "description_of_change"
+
+# Review generated migration in alembic/versions/
+# Edit if needed (constraints, indexes, data migrations)
+
+# Apply migration
+alembic upgrade head
+```
+
+### Migration Standards
+
+- **Naming**: `YYYYMMDD_HHMM_short_description.py`
+- **ELS tables**: essay_states, batch_essay_tracker, slot_assignments
+- **Outbox alignment**: Use shared `EventOutbox` model from `huleedu_service_libs.outbox.models`
+- **Indexes**: Add indexes for query patterns (batch_id, current_status, essay_id)
+- **Constraints**: Unique constraints for idempotency (batch_id + text_storage_id)
+- **Verification**: Run `alembic history --verbose` after creating migrations
+
+### Existing Migrations
+
+- `20250706_0001_initial_schema.py` - Initial tables (essay_states, batch_essay_tracker)
+- `20250713_0002_batch_expectations_persistence.py` - Batch expectation tracking
+- `20250719_0003_add_content_idempotency_constraints.py` - Slot assignment idempotency
+- `20250720_0004_fix_content_idempotency_constraint.py` - Constraint fix
+- `20250722_2256_c15f023f2624_update_timeout_to_24_hours_for_complex_.py` - Timeout adjustment
+- `20250724_0001_add_event_outbox_table.py` - Transactional outbox pattern
+- `20250801_1503_f0efbf460136_remove_legacy_fields_from_batch_essay_.py` - Cleanup
+- `20250802_1138_0fe611529ef2_add_student_association_fields_to_essays.py` - Phase 1 matching
+- `20250808_1045_106e57a84619_add_explicit_topic_column_to_event_.py` - Outbox improvement
+- `20250831_1126_d5a059a89aed_add_org_id_column_to_batch_essay_.py` - Org attribution
+- `20250902_2100_slot_inventory_via_slot_assignments.py` - Slot assignment table
+- `20250902_2210_db_failures_and_pending_content.py` - Error handling states
+- `20250903_0100_add_completed_at_to_batch_tracker.py` - Completion tracking
+- `20251105_2230_make_essay_instructions_nullable.py` - Schema flexibility
+- `20251106_2105_remove_essay_instructions.py` - Instructions moved to CJ Service
+
+### Critical Notes
+
+- ELS owns essay_states and batch_essay_tracker tables (core state machine)
+- slot_assignments table implements Option B assignment pattern
+- Outbox table owned by shared library
+- Content idempotency constraints critical for File Service coordination
+- Student association fields support Phase 1 matching
+- Never modify pushed migrations - create new migration to fix issues
+- Test migrations against testcontainer database before pushing
+
+Reference: `.claude/rules/085-database-migration-standards.md`

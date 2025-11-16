@@ -252,3 +252,100 @@ async def get_cached_content_path(self, content_id: str) -> Path:
 # HTTP caching headers for client-side caching
 response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
 response.headers['ETag'] = f'"{content_id}"'
+```
+
+## Error Handling
+
+Uses defensive error handling with appropriate HTTP status codes and Prometheus metrics.
+
+### ErrorCode Usage
+
+- **Base ErrorCode**: Service uses base `ErrorCode` from `common_core.error_enums`:
+  - `VALIDATION_ERROR` - Invalid content ID format, empty upload
+  - `RESOURCE_NOT_FOUND` - Content ID not found
+  - `EXTERNAL_SERVICE_ERROR` - Storage backend failures
+
+- No service-specific ErrorCode enum (uses base errors only)
+
+### Error Propagation
+
+- **HTTP Endpoints**: Direct HTTP error responses with JSON error messages
+- **Validation**: Content ID format validation (32 hex chars)
+- **Storage Operations**: File I/O exceptions converted to 500 errors
+- **Metrics**: All errors recorded via Prometheus counter with status labels
+
+### Error Response Structure
+
+All errors follow HTTP status + JSON format:
+
+```python
+# 400 Bad Request - Validation errors
+return jsonify({"error": "No data provided"}), 400
+return jsonify({"error": "Invalid content ID format"}), 400
+
+# 404 Not Found - Resource not found
+return jsonify({"error": "Content not found"}), 404
+
+# 500 Internal Server Error - Storage failures
+return jsonify({"error": "Failed to store content."}), 500
+```
+
+Error metrics tracked:
+
+```python
+metrics.record_operation(
+    operation=OperationType.UPLOAD,  # or DOWNLOAD
+    status=OperationStatus.FAILED    # or ERROR, NOT_FOUND
+)
+```
+
+Reference: `libs/common_core/docs/error-patterns.md`
+
+## Testing
+
+### Test Structure
+
+```
+tests/
+├── unit/                          # Unit tests with mocked dependencies
+│   ├── test_content_metrics.py
+│   ├── test_content_routes_metrics.py
+│   └── ...
+└── test_health_routes.py          # Health endpoint tests
+```
+
+### Running Tests
+
+```bash
+# All tests
+pdm run pytest-root services/content_service/tests/ -v
+
+# Unit tests only
+pdm run pytest-root services/content_service/tests/unit/ -v
+
+# Health check tests
+pdm run pytest-root services/content_service/tests/test_health_routes.py -v
+```
+
+### Common Test Markers
+
+- `@pytest.mark.asyncio` - Async unit tests
+
+### Test Patterns
+
+- **Protocol-based mocking**: Use `AsyncMock(spec=ProtocolName)` for dependencies
+- **Filesystem mocking**: Mock aiofiles operations for storage testing
+- **Metrics verification**: Assert Prometheus counter labels and values
+- **HTTP client testing**: Use Quart test client for endpoint testing
+- **UUID validation**: Test content ID format validation
+
+### Critical Test Scenarios
+
+- **Empty upload**: Reject with 400 Bad Request
+- **Invalid content ID format**: Reject with 400 Bad Request
+- **Content not found**: Return 404 Not Found
+- **Storage failures**: Return 500 Internal Server Error
+- **Concurrent uploads**: Verify UUID uniqueness and async behavior
+- **Health check**: Verify storage path accessibility
+
+Reference: `.claude/rules/075-test-creation-methodology.mdc`

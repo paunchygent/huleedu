@@ -145,3 +145,158 @@ pdm run logs email_service
 # Database access
 source .env && docker exec huleedu_email_db psql -U $HULEEDU_DB_USER -d huleedu_email -c "\dt"
 ```
+
+## Error Handling
+
+Uses `libs/huleedu_service_libs/error_handling` for structured error responses.
+
+### ErrorCode Usage
+
+- **Base ErrorCode**: Service uses base `ErrorCode` from `common_core.error_enums` for generic errors:
+  - `VALIDATION_ERROR` - Invalid template variables or email address
+  - `EXTERNAL_SERVICE_ERROR` - SMTP provider failures
+  - `PROCESSING_ERROR` - Template rendering failures
+  - `TIMEOUT` - Email delivery timeout
+
+- No service-specific ErrorCode enum (uses base errors only)
+
+### Error Propagation
+
+- **Event Processing**: Kafka consumer catches exceptions, publishes `EmailDeliveryFailedV1` via outbox
+- **HTTP Endpoints**: Raise `HuleEduError` with correlation_id and ErrorCode (dev routes only)
+- **Provider Failures**: Captured in EmailRecord status, published as failure events
+- **Transactional Outbox**: Ensures failure events published reliably
+
+### Error Response Structure
+
+Dev API errors follow standard structure:
+
+```python
+from huleedu_service_libs.error_handling import HuleEduError
+from common_core.error_enums import ErrorCode
+
+raise HuleEduError(
+    error_code=ErrorCode.EXTERNAL_SERVICE_ERROR,
+    message="SMTP provider unavailable",
+    correlation_id=correlation_context.uuid
+)
+```
+
+Event failures published via `EmailDeliveryFailedV1`:
+
+```python
+failure_event = EmailDeliveryFailedV1(
+    message_id=message_id,
+    to_address=to_address,
+    error_code=ErrorCode.EXTERNAL_SERVICE_ERROR,
+    error_message="SMTP connection timeout",
+    correlation_id=correlation_id
+)
+```
+
+Reference: `libs/common_core/docs/error-patterns.md`
+
+## Testing
+
+### Test Structure
+
+```
+tests/
+├── unit/                          # Unit tests with mocked dependencies
+│   ├── test_email_provider.py
+│   ├── test_template_renderer.py
+│   ├── test_event_processor.py
+│   ├── test_repository_basics.py
+│   ├── test_outbox_manager.py
+│   └── ...
+├── integration/                   # Integration tests with testcontainers
+│   ├── test_email_workflow.py
+│   ├── test_smtp_integration.py
+│   ├── test_kafka_integration.py
+│   ├── test_database_operations.py
+│   ├── test_outbox_publishing.py
+│   └── ...
+└── contract/                      # Event and model contract tests
+    ├── test_notification_email_contracts.py
+    ├── test_email_sent_contracts.py
+    ├── test_email_delivery_failed_contracts.py
+    ├── test_email_record_model_contracts.py
+    └── ...
+```
+
+### Running Tests
+
+```bash
+# All tests
+pdm run pytest-root services/email_service/tests/ -v
+
+# Unit tests only
+pdm run pytest-root services/email_service/tests/unit/ -v
+
+# Integration tests (requires testcontainers)
+pdm run pytest-root services/email_service/tests/integration/ -v -m integration
+
+# Contract tests
+pdm run pytest-root services/email_service/tests/contract/ -v
+
+# Skip SMTP integration tests (requires real SMTP credentials)
+pdm run pytest-root services/email_service/tests/ -v -m "not smtp"
+```
+
+### Common Test Markers
+
+- `@pytest.mark.asyncio` - Async unit tests
+- `@pytest.mark.integration` - Integration tests requiring external dependencies
+- `@pytest.mark.contract` - Event and model contract validation tests
+- `@pytest.mark.smtp` - SMTP provider integration tests (requires real credentials)
+
+### Test Patterns
+
+- **Protocol-based mocking**: Use `AsyncMock(spec=ProtocolName)` for dependencies
+- **Mock provider**: Use `MockEmailProvider` for testing without SMTP
+- **Testcontainers**: PostgreSQL containers for integration tests
+- **Template fixtures**: Load test templates from `tests/fixtures/templates/`
+- **Explicit fixtures**: Import test utilities explicitly (no conftest.py)
+
+Reference: `.claude/rules/075-test-creation-methodology.mdc`
+
+## Migration Workflow
+
+### Creating Migrations
+
+From service directory:
+
+```bash
+cd services/email_service/
+
+# Generate migration from model changes
+alembic revision --autogenerate -m "description_of_change"
+
+# Review generated migration in alembic/versions/
+# Edit if needed (constraints, indexes, data migrations)
+
+# Apply migration
+alembic upgrade head
+```
+
+### Migration Standards
+
+- **Naming**: `YYYYMMDD_HHMM_short_description.py`
+- **Outbox alignment**: Use shared `EventOutbox` model from `huleedu_service_libs.outbox.models`
+- **Email tables**: EmailRecord, EmailTemplate (future)
+- **Indexes**: Add indexes for query patterns (correlation_id, to_address, status, created_at)
+- **Verification**: Run `alembic history --verbose` after creating migrations
+
+### Existing Migrations
+
+- `20250823_1528_ce41648d3fde_initial_email_service_schema.py` - Initial schema (EmailRecord, EventOutbox)
+- `20250823_1545_32be4d7e70d0_replace_email_outbox_events_with_.py` - Outbox standardization
+
+### Critical Notes
+
+- Email service owns EmailRecord and EmailTemplate tables
+- Outbox table owned by shared library
+- Never modify pushed migrations - create new migration to fix issues
+- Test migrations against testcontainer database before pushing
+
+Reference: `.claude/rules/085-database-migration-standards.md`
