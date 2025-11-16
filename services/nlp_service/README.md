@@ -128,3 +128,118 @@ pdm run pytest tests/
 3. **Partial Failure Handling**: Failed essays included in response with error markers
 4. **Idempotency**: Uses batch_id as idempotency key throughout
 5. **Swedish Support**: Built-in Swedish name patterns and character handling
+
+## Error Handling
+
+The service relies on `libs/huleedu_service_libs/error_handling` helpers to guarantee
+structured errors with correlation IDs and typed `ErrorCode` mappings.
+
+- **Client helpers**: `DefaultContentClient` calls `raise_content_service_error(...)` for
+  Content Service failures while `DefaultClassManagementClient` uses
+  `raise_external_service_error(...)` for Class Management HTTP responses, timeouts, and
+  schema validation problems.【F:services/nlp_service/implementations/content_client_impl.py†L1-L113】【F:services/nlp_service/implementations/roster_client_impl.py†L1-L141】
+- **Language Tool client**: Retries transient HTTP errors and ultimately raises a
+  `HuleEduError` once retry budgets are exhausted so downstream handlers can surface
+  `ErrorCode.EXTERNAL_SERVICE_ERROR` without duplicating logic.【F:services/nlp_service/implementations/language_tool_client_impl.py†L1-L107】
+- **Command handlers**: Batch handlers catch `HuleEduError` instances to preserve the
+  structured payload, log the failure with `correlation_id`, and continue with partial
+  results so a single essay does not abort an entire batch.【F:services/nlp_service/command_handlers/essay_student_matching_handler.py†L197-L276】【F:services/nlp_service/command_handlers/batch_nlp_analysis_handler.py†L165-L307】
+- **ErrorCode coverage**: Runtime helpers emit standard `common_core.error_enums.ErrorCode`
+  values like `CONTENT_SERVICE_ERROR`, `EXTERNAL_SERVICE_ERROR`, and
+  `RESOURCE_NOT_FOUND`; tests assert those codes so contract regressions are caught early
+  (see `test_batch_nlp_analysis_handler.py` and `test_essay_student_matching_handler.py`).
+  Reference `libs/common_core/docs/error-patterns.md` for the response schema.
+
+## Testing
+
+### Layout
+
+```
+tests/
+├── unit/              # Pure-Python + AsyncMock coverage for handlers, matchers, clients
+├── integration/       # Testcontainers-backed Redis/PostgreSQL workflows and pipelines
+└── contract/          # Reserved for event/model contract checks
+```
+
+### Running Tests
+
+```bash
+# All service tests
+pdm run pytest-root services/nlp_service/tests -v
+
+# Unit tests only (safe in sandbox)
+pdm run pytest-root services/nlp_service/tests/unit -v
+
+# Integration tests (requires Docker + testcontainers for Postgres/Redis)
+pdm run pytest-root services/nlp_service/tests/integration -v -m integration
+
+# Focus on student matching handler
+pdm run pytest-root services/nlp_service/tests/unit/test_essay_student_matching_handler.py -v
+```
+
+### Common Markers & Patterns
+
+- `@pytest.mark.asyncio` for coroutine-heavy handlers, extractors, and feature pipeline
+  tests.【F:services/nlp_service/tests/unit/test_batch_nlp_analysis_handler.py†L1-L78】
+- `@pytest.mark.integration` for suites that spin up Redis/PostgreSQL testcontainers or
+  language tool sandboxes.【F:services/nlp_service/tests/integration/test_command_handler_outbox_integration.py†L1-L40】
+- `@pytest.mark.slow` on long-running NLP analyzer combinations that hydrate prompts and
+  run full feature pipelines.【F:services/nlp_service/tests/integration/test_nlp_analyzer_integration.py†L189-L216】
+- Fixtures are declared inline in each module (no `conftest.py`); tests rely on
+  `AsyncMock(spec=Protocol)` objects to satisfy Dishka protocol contracts and to verify
+  event publication semantics.【F:services/nlp_service/tests/unit/test_batch_nlp_analysis_handler.py†L1-L69】
+
+Reference `.claude/rules/075-test-creation-methodology.mdc` for additional guidance.
+
+## Migration Workflow
+
+The NLP Service owns PostgreSQL tables (`nlp_analysis_jobs`, `student_match_results`, and
+the shared `outbox_events`) and uses Alembic for schema management.
+
+### Creating Migrations
+
+```bash
+cd services/nlp_service
+
+# Autogenerate a revision after editing SQLAlchemy models
+alembic revision --autogenerate -m "describe_change"
+
+# Apply locally (development DB)
+alembic upgrade head
+```
+
+### Standards
+
+- Filename format `YYYYMMDD_HHMM_summary.py` in `alembic/versions/` in accordance with
+  `.claude/rules/085-database-migration-standards.md`.
+- Ensure outbox tables stay aligned with `huleedu_service_libs.outbox` metadata before
+  generating revisions.
+- Never edit applied migrations—add a corrective revision if schema adjustments are
+  required.
+- Validate revisions against a disposable database (testcontainers or local Postgres)
+  before pushing.
+
+### Existing Migrations
+
+- `4d0dba8c7053_initial_nlp_service_schema_with_event_.py` – bootstraps NLP job +
+  student match tables along with the transactional outbox.
+- `c07989e7bd66_add_explicit_topic_column_to_event_.py` – adds topic metadata to the
+  outbox for filtering downstream consumers.【F:services/nlp_service/alembic/versions/c07989e7bd66_add_explicit_topic_column_to_event_.py†L1-L26】
+
+## CLI Tools
+
+The NLP Service is a Kafka worker only and does not expose a Typer/Click CLI. Operational
+scripts run via PDM entry points instead:
+
+```bash
+# Start the worker locally with environment variables loaded
+source .env
+cd services/nlp_service && pdm run start-worker
+
+# Follow logs while reproducing events
+cd -
+pdm run dev-logs nlp_service
+```
+
+CLI utilities will be documented here if/when dedicated tooling (e.g., backfill
+commands) ships.
