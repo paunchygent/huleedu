@@ -114,6 +114,21 @@ The queue processor logs `queue_processing_mode` for every dequeued request and 
 callback payload is identical in all modes, so you can safely flip the flag in
 development to validate future batching paths.
 
+### Serial bundle observability
+
+When `LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE=serial_bundle` (or
+`provider_batch_api`) is enabled, the queue processor now emits dedicated metrics:
+
+- `llm_provider_queue_depth{queue_type="total"|"queued"}` — instantaneous queue size.
+- `llm_provider_queue_wait_time_seconds{queue_processing_mode="serial_bundle",result="success"|"failure"|"expired"}` — time spent waiting in the queue before a callback is published.
+- `llm_provider_comparison_callbacks_total{queue_processing_mode, result}` — processed comparison throughput split by outcome.
+
+In addition to the Prometheus metrics, a `queue_metrics_snapshot` log line is
+written every 30 seconds whenever a non-`per_request` mode is active. This log
+includes the queue depth, usage percentage, and whether the queue is still
+accepting new requests so you can correlate rollouts with Redis/local backlog
+changes.
+
 ## Development
 
 ### Local Setup

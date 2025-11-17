@@ -104,6 +104,19 @@ def _create_metrics() -> dict[str, Any]:
                 buckets=(0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0),
                 registry=REGISTRY,
             ),
+            "llm_queue_wait_time_seconds": Histogram(
+                "llm_provider_queue_wait_time_seconds",
+                "Time requests spend waiting in the queue before processing",
+                ["queue_processing_mode", "result"],
+                buckets=(0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0, 120.0, 300.0, 600.0),
+                registry=REGISTRY,
+            ),
+            "llm_comparison_callbacks_total": Counter(
+                "llm_provider_comparison_callbacks_total",
+                "Total callbacks published by the queue processor",
+                ["queue_processing_mode", "result"],
+                registry=REGISTRY,
+            ),
             "circuit_breaker_state_changes": Counter(
                 "llm_provider_circuit_breaker_state_changes_total",
                 "Total circuit breaker state changes",
@@ -205,6 +218,8 @@ def get_queue_metrics() -> dict[str, Any]:
         "llm_request_lifecycle_duration_seconds": all_metrics.get(
             "llm_request_lifecycle_duration_seconds"
         ),
+        "llm_queue_wait_time_seconds": all_metrics.get("llm_queue_wait_time_seconds"),
+        "llm_comparison_callbacks_total": all_metrics.get("llm_comparison_callbacks_total"),
     }
 
 
@@ -238,6 +253,8 @@ def _get_existing_metrics() -> dict[str, Any]:
         "llm_queue_overflow_total": "llm_provider_queue_overflow_total",
         "llm_request_lifecycle_duration_seconds": "llm_provider_request_lifecycle_duration_seconds",
         "llm_provider_availability_percentage": "llm_provider_availability_percentage",
+        "llm_queue_wait_time_seconds": "llm_provider_queue_wait_time_seconds",
+        "llm_comparison_callbacks_total": "llm_provider_comparison_callbacks_total",
     }
 
     existing: dict[str, Any] = {}

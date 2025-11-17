@@ -28,6 +28,7 @@ from services.llm_provider_service.internal_models import (
     LLMOrchestratorResponse,
     LLMQueuedResult,
 )
+from services.llm_provider_service.metrics import get_queue_metrics
 from services.llm_provider_service.prompt_utils import compute_prompt_sha256
 from services.llm_provider_service.protocols import (
     ComparisonProcessorProtocol,
@@ -41,6 +42,8 @@ logger = create_service_logger("llm_provider_service.queue_processor")
 
 class QueueProcessorImpl:
     """Processes queued LLM requests in the background."""
+
+    _QUEUE_METRICS_LOG_INTERVAL_SECONDS = 30.0
 
     def __init__(
         self,
@@ -75,6 +78,8 @@ class QueueProcessorImpl:
         self._requests_processed = 0
         self._last_cleanup_time = time.time()
         self._cleanup_interval = 300  # 5 minutes
+        self.queue_metrics = get_queue_metrics()
+        self._last_queue_metrics_log = 0.0
 
     async def start(self) -> None:
         """Start the queue processor."""
@@ -109,6 +114,7 @@ class QueueProcessorImpl:
             try:
                 # Cleanup expired requests periodically
                 await self._periodic_cleanup()
+                await self._record_queue_stats()
 
                 # Get next request from queue
                 request = await self.queue_manager.dequeue()
@@ -120,6 +126,13 @@ class QueueProcessorImpl:
                 # Check if request has expired
                 if self._is_expired(request):
                     await self._handle_expired_request(request)
+                    provider = self._resolve_provider_from_request(request)
+                    self._record_completion_metrics(
+                        provider=provider,
+                        result="expired",
+                        request=request,
+                        processing_started=time.perf_counter(),
+                    )
                     continue
 
                 # Process the request
@@ -138,6 +151,7 @@ class QueueProcessorImpl:
         Args:
             request: The request to process
         """
+        processing_started = time.perf_counter()
         logger.info(
             f"Processing queued request {request.queue_id}, "
             f"correlation_id: {request.request_data.correlation_id}",
@@ -155,13 +169,11 @@ class QueueProcessorImpl:
             req_data = request.request_data
 
             # Extract provider and overrides
-            provider = LLMProviderType.OPENAI  # Default provider
+            provider = self._resolve_provider_from_request(request)
             overrides: Dict[str, Any] = {}
 
             if req_data.llm_config_overrides:
                 config = req_data.llm_config_overrides
-                if config.provider_override:
-                    provider = config.provider_override
                 if config.model_override:
                     overrides["model_override"] = config.model_override
                 if config.temperature_override is not None:
@@ -221,6 +233,12 @@ class QueueProcessorImpl:
 
             if isinstance(result, LLMOrchestratorResponse):
                 await self._handle_request_success(request, result)
+                self._record_completion_metrics(
+                    provider=provider,
+                    result="success",
+                    request=request,
+                    processing_started=processing_started,
+                )
             elif isinstance(result, LLMQueuedResult):
                 # Shouldn't happen - queued request shouldn't return another queued result
                 logger.error(
@@ -251,18 +269,17 @@ class QueueProcessorImpl:
                 f"LLM service error processing request {request.queue_id}: {e}", exc_info=True
             )
             await self._handle_request_hule_error(request, e)
+            self._record_completion_metrics(
+                provider=provider,
+                result="failure",
+                request=request,
+                processing_started=processing_started,
+            )
         except Exception as e:
             logger.error(
                 f"Unexpected error processing request {request.queue_id}: {e}", exc_info=True
             )
             # Get provider from config or use default
-            req_provider = LLMProviderType.OPENAI
-            if (
-                request.request_data.llm_config_overrides
-                and request.request_data.llm_config_overrides.provider_override
-            ):
-                req_provider = request.request_data.llm_config_overrides.provider_override
-
             # Create a HuleEduError and handle it properly without re-raising
             try:
                 raise_processing_error(
@@ -270,10 +287,93 @@ class QueueProcessorImpl:
                     operation="queue_request_processing",
                     message=f"Processing failed: {str(e)}",
                     correlation_id=request.request_data.correlation_id or request.queue_id,
-                    details={"provider": req_provider.value, "queue_id": str(request.queue_id)},
+                    details={"provider": provider.value, "queue_id": str(request.queue_id)},
                 )
             except HuleEduError as processing_error:
                 await self._handle_request_hule_error(request, processing_error)
+                self._record_completion_metrics(
+                    provider=provider,
+                    result="failure",
+                    request=request,
+                    processing_started=processing_started,
+                )
+
+    def _resolve_provider_from_request(self, request: QueuedRequest) -> LLMProviderType:
+        """Determine which provider should service the request."""
+        overrides = request.request_data.llm_config_overrides
+        if overrides and overrides.provider_override:
+            return overrides.provider_override
+        return getattr(self.settings, "DEFAULT_LLM_PROVIDER", LLMProviderType.OPENAI)
+
+    async def _record_queue_stats(self) -> None:
+        """Update Prometheus gauges and emit periodic queue logs."""
+        if not self.queue_metrics:
+            return
+
+        depth_gauge = self.queue_metrics.get("llm_queue_depth")
+        if depth_gauge is None:
+            return
+
+        try:
+            stats = await self.queue_manager.get_queue_stats()
+        except Exception as exc:  # pragma: no cover - defensive logging only
+            logger.debug(f"Unable to collect queue stats: {exc}")
+            return
+
+        depth_gauge.labels(queue_type="total").set(stats.current_size)
+        depth_gauge.labels(queue_type="queued").set(stats.queued_count)
+
+        now = time.time()
+        if (
+            self.queue_processing_mode is not LLMBatchingMode.PER_REQUEST
+            and now - self._last_queue_metrics_log >= self._QUEUE_METRICS_LOG_INTERVAL_SECONDS
+        ):
+            logger.info(
+                "queue_metrics_snapshot",
+                extra={
+                    "queue_processing_mode": self.queue_processing_mode.value,
+                    "queue_current_size": stats.current_size,
+                    "queue_queued_count": stats.queued_count,
+                    "queue_usage_percent": round(stats.usage_percent, 2),
+                    "accepting_requests": stats.is_accepting_requests,
+                },
+            )
+            self._last_queue_metrics_log = now
+
+    def _record_completion_metrics(
+        self,
+        *,
+        provider: LLMProviderType,
+        result: str,
+        request: QueuedRequest,
+        processing_started: float,
+    ) -> None:
+        """Record per-request timing metrics for queue processing."""
+        if not self.queue_metrics:
+            return
+
+        wait_hist = self.queue_metrics.get("llm_queue_wait_time_seconds")
+        if wait_hist:
+            wait_seconds = max(
+                (datetime.now(timezone.utc) - request.queued_at).total_seconds(),
+                0.0,
+            )
+            wait_hist.labels(
+                queue_processing_mode=self.queue_processing_mode.value,
+                result=result,
+            ).observe(wait_seconds)
+
+        proc_hist = self.queue_metrics.get("llm_queue_processing_time_seconds")
+        if proc_hist:
+            duration = max(time.perf_counter() - processing_started, 0.0)
+            proc_hist.labels(provider=provider.value, status=result).observe(duration)
+
+        callbacks_counter = self.queue_metrics.get("llm_comparison_callbacks_total")
+        if callbacks_counter:
+            callbacks_counter.labels(
+                queue_processing_mode=self.queue_processing_mode.value,
+                result=result,
+            ).inc()
 
     async def _handle_request_success(
         self, request: QueuedRequest, result: LLMOrchestratorResponse
