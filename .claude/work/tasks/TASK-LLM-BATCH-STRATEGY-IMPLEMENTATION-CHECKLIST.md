@@ -11,16 +11,15 @@ configuration.
 
 ## Implementation Status (Updated 2025-11-17)
 
-**Overall Progress**: ~30% complete (9 items fully complete, 5 items partial, 16 items not started)
+**Overall Progress**: ~40% complete (Phase 1 ✅, Phase 2/3 pending)
 
 ### Phase Breakdown
 
-- **Phase 1 (CJ Configuration)**: 2 complete, 2 partial, 7 incomplete
-  - ✅ LLMBatchingMode enum exists
-  - ✅ LLM_BATCHING_MODE setting exists
-  - ⚠️ Metadata model partial (cj_llm_batching_mode field exists, missing cj_batch_id, cj_source, cj_request_type)
-  - ⚠️ Tests partial (metadata propagation tested for existing field)
-  - ❌ Missing: override mechanism, resolution function, allowed providers setting, config tests
+- **Phase 1 (CJ Configuration)**: ✅ COMPLETE
+  - `LLMBatchingMode` + `LLM_BATCHING_MODE` shipped
+  - `BatchConfigOverrides.llm_batching_mode_override` + `resolve_effective_llm_batching_mode()` in production with provider guardrails
+  - Metadata now includes `cj_batch_id`, `cj_source`, `cj_request_type`, and always reflects the effective batching mode
+  - Tests cover config resolution, metadata adapter behaviour, LLM interaction metadata, retry metadata, and continuation persistence
 
 - **Phase 2 (LPS Serial Bundling)**: 3 complete, 4 partial, 6 incomplete
   - ✅ process_comparison_batch method exists
@@ -35,14 +34,13 @@ configuration.
 
 ### Critical Gaps
 
-1. **CJ doesn't bundle multiple requests** - Current "serial bundle" mode only wraps single requests
-2. **No override mechanism** - Cannot set batching mode per-batch
-3. **Incomplete metadata** - Missing cj_batch_id, cj_source, cj_request_type fields
-4. **No observability** - No metrics for batching behavior
+1. **LPS still dequeues one request at a time** – "serial bundle" mode remains a thin wrapper
+2. **LLM Provider lacks batching metadata** – needs resolved provider/model + queue mode in metrics/logs
+3. **No observability** – CJ/LPS batching metrics still missing
 
 ### Next Steps
 
-Start with Phase 1 remaining items to complete CJ configuration before enhancing LPS bundling.
+Focus on Phase 2 (LLM Provider serial bundling) now that CJ configuration + metadata are complete.
 
 ---
 
@@ -127,7 +125,7 @@ For the full implementation plan and design rationale, see
 
 ---
 
-## Phase 1 – CJ configuration & feature flags
+## Phase 1 – CJ configuration & feature flags ✅ COMPLETE
 
 ### 1. Add CJ batching configuration enums & fields
 
@@ -143,19 +141,19 @@ For the full implementation plan and design rationale, see
     actual batching strategy.
   - Confirm env var mapping via `env_prefix="CJ_ASSESSMENT_SERVICE_"` still works as expected.
 
-- [ ] **Add `LLM_BATCH_API_ALLOWED_PROVIDERS` to CJ `Settings`**
+- [x] **Add `LLM_BATCH_API_ALLOWED_PROVIDERS` to CJ `Settings`**
   - Default: `[LLMProviderType.OPENAI, LLMProviderType.ANTHROPIC]`.
-  - Guardrail: CJ must not opt into provider batch APIs for providers not listed here.
-  - Verify that changing this set does not break existing non-batch flows.
+  - Guardrail: CJ now auto-falls back when a provider isn’t in the allow-list (empty list means "no restriction"; documented here for ops awareness).
+  - Verified via unit tests + manual inspection that non-batch flows are unaffected.
 
 ### 2. Wire per-request overrides (BatchConfigOverrides)
 
-- [ ] **Extend `BatchConfigOverrides` with `llm_batching_mode_override`**
+- [x] **Extend `BatchConfigOverrides` with `llm_batching_mode_override`**
   - File: `services/cj_assessment_service/cj_core_logic/batch_config.py`.
   - Field: `llm_batching_mode_override: LLMBatchingMode | None`.
   - Behaviour: when set, it must take precedence over `Settings.LLM_BATCHING_MODE`.
 
-- [ ] **Resolve effective batching mode in comparison processing**
+- [x] **Resolve effective batching mode in comparison processing**
   - File: `services/cj_assessment_service/cj_core_logic/comparison_processing.py`.
   - In `submit_comparisons_for_async_processing` (and any retry paths that submit batches):
     - Compute `effective_mode` from `batch_config_overrides.llm_batching_mode_override` or
@@ -166,14 +164,14 @@ For the full implementation plan and design rationale, see
 
 ### 3. Propagate batching metadata to LLM Provider Service
 
-- [~] **Extend metadata in `LLMInteractionImpl.perform_comparisons`** ⚠️ PARTIAL
+- [x] **Extend metadata in `LLMInteractionImpl.perform_comparisons`**
   - File: `services/cj_assessment_service/implementations/llm_interaction_impl.py`.
   - Status: `CJLLMComparisonMetadata` model exists in `models_api.py:52-77`
   - For each `ComparisonTask`, enrich `request_metadata` with:
-    - `cj_batch_id: str` – `str(cj_batch_id)`. ❌ MISSING
-    - `cj_source: str` – e.g. `"els"`, `"bos"`, `"eng5_runner"` (derived from request data). ❌ MISSING
-    - `cj_llm_batching_mode: str` – `effective_mode.value`. ✅ EXISTS (models_api.py:72-77, conditionally populated in llm_interaction_impl.py:170-173)
-    - `cj_request_type: str` – e.g. `"cj_comparison"`, `"cj_retry"`. ❌ MISSING
+    - `cj_batch_id: str` – forwarded via metadata_context + adapter.
+    - `cj_source: str` – derived from request data/continuations (`els` default, `cj_retry` path inherits snapshot data).
+    - `cj_llm_batching_mode: str` – now reflects the *effective* resolved mode.
+    - `cj_request_type: str` – distinguishes initial (`cj_comparison`) vs retry submissions.
   - Confirm that these keys are present in `LLMComparisonRequest.metadata` in the provider service
     (via a small integration or unit test).
   - Ensure `request_metadata` is built via `CJLLMComparisonMetadata`
@@ -184,7 +182,7 @@ For the full implementation plan and design rationale, see
 
 ### 4. CJ-side tests & validation
 
-- [ ] **Unit tests for `LLMBatchingMode` resolution** ❌ MISSING
+- [x] **Unit tests for `LLMBatchingMode` resolution**
   - Add a focused test module, e.g.
     `services/cj_assessment_service/tests/unit/test_llm_batching_config.py`.
   - Cover:
@@ -193,11 +191,11 @@ For the full implementation plan and design rationale, see
     - Invalid values are rejected at Pydantic validation time (enum enforcement).
   - NOTE: Cannot be tested until `resolve_effective_llm_batching_mode()` function exists
 
-- [~] **Unit tests for metadata propagation** ⚠️ PARTIAL
+- [x] **Unit tests for metadata propagation**
   - File: `services/cj_assessment_service/tests/unit/test_llm_metadata_adapter.py:35-46` ✅
   - Use a small test double for `LLMProviderProtocol` to capture `LLMComparisonRequest` objects.
   - Assertions:
-    - `metadata["cj_batch_id"]` matches the CJ batch id used in test. ❌ NOT TESTED (field doesn't exist)
+    - `metadata["cj_batch_id"]`, `metadata["cj_source"]`, `metadata["cj_request_type"]`, and `metadata["cj_llm_batching_mode"]` asserted in unit tests, plus integration coverage for persistence/continuation flows.
     - `metadata["cj_llm_batching_mode"]` matches the resolved `effective_mode`. ✅ TESTED
     - `metadata["cj_source"]` and `metadata["cj_request_type"]` are present and sensible. ❌ NOT TESTED (fields don't exist)
 

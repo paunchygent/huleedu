@@ -70,12 +70,10 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 
 ### Critical Missing Items
 
-**Phase 1 (7 items missing)**:
-1. ❌ `BatchConfigOverrides.llm_batching_mode_override` field
-2. ❌ `resolve_effective_llm_batching_mode()` function
-3. ❌ `LLM_BATCH_API_ALLOWED_PROVIDERS` setting
-4. ❌ Metadata fields: `cj_batch_id`, `cj_source`, `cj_request_type`
-5. ❌ Config resolution tests
+**Phase 1 (✅ complete)**:
+- `BatchConfigOverrides.llm_batching_mode_override`, `resolve_effective_llm_batching_mode()`, and `LLM_BATCH_API_ALLOWED_PROVIDERS` are in place with guardrail logging and docs.
+- CJ now emits `cj_batch_id`, `cj_source`, `cj_request_type`, and the effective `cj_llm_batching_mode` for both initial submissions and retry batches.
+- Config resolution + metadata propagation tests live in `tests/unit/test_llm_batching_config.py`, `test_llm_interaction_impl_unit.py`, and `test_batch_retry_processor.py`.
 
 **Phase 2 (6 items missing)**:
 1. ❌ `SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL` setting
@@ -106,9 +104,8 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 
 ### Next Steps
 
-1. Complete Phase 1 remaining items (CJ configuration and metadata)
-2. Implement actual multi-request bundling in Phase 2
-3. Add observability metrics in Phase 3
+1. Implement actual multi-request bundling in Phase 2
+2. Add observability metrics in Phase 3
 
 ---
 

@@ -82,6 +82,7 @@ Changes to `.py` files trigger automatic restart (~9-11 seconds). No manual rebu
 - `prompt_sha256` - Prompt hash for deduplication
 - `cj_llm_batching_mode` - Batching hint (when `CJ_ASSESSMENT_SERVICE_ENABLE_LLM_BATCHING_METADATA_HINTS=true`)
 - `comparison_iteration` - Stability loop iteration (when iterative batching enabled)
+- `cj_batch_id`, `cj_source`, `cj_request_type` - emitted by CJ for every request so retries and ENG5 tooling can correlate callbacks with CJ batches and upstream workflows without scraping logs.
 
 **Validation**: See `tests/integration/test_cj_lps_metadata_roundtrip.py`
 
@@ -92,7 +93,10 @@ Changes to `.py` files trigger automatic restart (~9-11 seconds). No manual rebu
 CJ_ASSESSMENT_SERVICE_LLM_BATCHING_MODE=per_request  # or serial_bundle
 CJ_ASSESSMENT_SERVICE_ENABLE_LLM_BATCHING_METADATA_HINTS=false  # emit cj_llm_batching_mode
 CJ_ASSESSMENT_SERVICE_ENABLE_ITERATIVE_BATCHING_LOOP=false  # emit comparison_iteration
+CJ_ASSESSMENT_SERVICE_LLM_BATCH_API_ALLOWED_PROVIDERS="openai,anthropic"  # guardrail provider_batch_api fallback
 ```
+
+`batch_config_overrides` now accepts `llm_batching_mode_override`, enabling ENG5 runner and admin tooling to request `per_request`, `serial_bundle`, or `provider_batch_api` per batch. CJ enforces `LLM_BATCH_API_ALLOWED_PROVIDERS` when resolving the effective mode and downgrades automatically when the provider is not approved.
 
 **LLM Provider Service**:
 ```bash
