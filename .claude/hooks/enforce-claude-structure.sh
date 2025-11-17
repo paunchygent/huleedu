@@ -49,10 +49,13 @@ contains() {
   return 1
 }
 
-# Extract the operation details based on tool type
-TOOL_NAME="${CLAUDE_TOOL_NAME:-}"
-FILE_PATH="${CLAUDE_TOOL_INPUT_file_path:-}"
-COMMAND="${CLAUDE_TOOL_INPUT_command:-}"
+# Read JSON input from stdin
+INPUT=$(cat)
+
+# Extract tool name and input using jq
+TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty')
+FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty')
+COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
 
 # Check Write operations
 if [[ "$TOOL_NAME" == "Write" ]] && [[ -n "$FILE_PATH" ]]; then
