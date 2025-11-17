@@ -1,0 +1,58 @@
+{
+  "output": {
+    "filePath": ".claude/repomix_packages/repomix-eng5-architect-phase3-review.xml",
+    "style": "xml",
+    "removeComments": false,
+    "showLineNumbers": true,
+    "topFilesLength": 10
+  },
+  "include": [
+    "TASKS/TASK-CJ-PHASE3-ARCHITECT-NEXT-SESSION.md",
+    "TASKS/TASK-CJ-CONFIDENCE-PHASE3-GRADE-SCALE-DATA-PIPELINE.md",
+    ".claude/HANDOFF.md",
+    ".claude/README_FIRST.md",
+    
+    "scripts/cj_experiments_runners/eng5_np/**/*.py",
+    "scripts/tests/test_eng5_np_runner.py",
+    
+    "Documentation/schemas/eng5_np/assessment_run.schema.json",
+    "Documentation/OPERATIONS/01-Grafana-Playbook.md",
+    
+    "services/cj_assessment_service/implementations/llm_interaction_impl.py",
+    "services/cj_assessment_service/implementations/callback_state_manager.py",
+    "services/cj_assessment_service/metrics.py",
+    "services/cj_assessment_service/config.py",
+    "services/cj_assessment_service/README.md",
+    
+    "services/llm_provider_service/implementations/queue_processor_impl.py",
+    "services/llm_provider_service/implementations/openai_provider.py",
+    "services/llm_provider_service/implementations/anthropic_provider.py",
+    "services/llm_provider_service/implementations/google_provider.py",
+    "services/llm_provider_service/implementations/openrouter_provider.py",
+    "services/llm_provider_service/implementations/mock_provider.py",
+    
+    "libs/common_core/src/common_core/events/cj_assessment_events.py",
+    "libs/common_core/src/common_core/events/llm_provider_events.py",
+    "libs/common_core/src/common_core/event_enums.py",
+    
+    "services/cj_assessment_service/tests/unit/test_callback_state_manager*.py",
+    "services/cj_assessment_service/tests/integration/test_llm_provider_manifest_integration.py",
+    
+    ".windsurf/rules/020-architectural-mandates.md",
+    ".windsurf/rules/020.7-cj-assessment-service.md",
+    ".windsurf/rules/037.1-cj-assessment-phase-processing-flow.md",
+    ".windsurf/rules/048-structured-error-handling-standards.md",
+    ".windsurf/rules/071-observability-index.md"
+  ],
+  "ignore": {
+    "useGitignore": true,
+    "useDefaultPatterns": true,
+    "customPatterns": [
+      "**/__pycache__/**",
+      "**/*.pyc",
+      "**/node_modules/**",
+      "**/.venv/**",
+      "**/alembic/versions/**"
+    ]
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/doc-standards-reminder.sh"
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(grep:*)",
+      "Bash(mv:*)",
+      "Bash(docker logs:*)",
+      "Bash(mkdir:*)",
+      "Bash(touch:*)",
+      "Bash(pdm run:*)",
+      "Bash(ls:*)",
+      "Bash(python:*)",
+      "Bash(curl:*)",
+      "Bash(docker compose:*)",
+      "Bash(find:*)",
+      "Bash(rm:*)",
+      "Bash(rg:*)",
+      "Bash(jq:*)",
+      "WebFetch(domain:localhost)",
+      "Bash(docker-compose logs:*)",
+      "Bash(docker inspect:*)",
+      "Bash(docker-compose:*)",
+      "Bash(mypy:*)",
+      "Bash(docker exec:*)",
+      "Bash(../../.venv/bin/alembic current)",
+      "Bash(docker ps:*)",
+      "WebFetch(domain:github.com)",
+      "mcp__ide__getDiagnostics",
+      "Bash(pdm list:*)",
+      "Bash(sed:*)",
+      "Bash(../../.venv/bin/alembic revision -m \"Remove legacy fields from batch_essay_trackers\")",
+      "Bash(source:*)",
+      "mcp__serena__list_dir",
+      "mcp__serena__check_onboarding_performed",
+      "mcp__serena__onboarding",
+      "mcp__serena__think_about_collected_information",
+      "mcp__serena__search_for_pattern",
+      "mcp__serena__find_symbol",
+      "mcp__serena__replace_regex",
+      "mcp__serena__replace_symbol_body",
+      "mcp__serena__get_symbols_overview",
+      "mcp__serena__find_file",
+      "mcp__serena__insert_after_symbol",
+      "Bash(docker build:*)",
+      "Bash(docker rmi:*)",
+      "Bash(docker:*)",
+      "Bash(cp:*)",
+      "Bash(../../.venv/bin/alembic stamp head)",
+      "Bash(ruff check:*)",
+      "mcp__serena__read_memory",
+      "mcp__serena__think_about_task_adherence",
+      "Bash(../../.venv/bin/alembic revision --autogenerate -m \"Initial email service schema\")",
+      "WebSearch",
+      "WebFetch(domain:languagetool.org)",
+      "WebFetch(domain:www.anthropic.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:claudecodeplugins.io)",
+      "WebFetch(domain:textual.textualize.io)",
+      "WebFetch(domain:pyinstaller.org)",
+      "WebFetch(domain:mathspp.com)",
+      "mcp__context7__resolve-library-id"
+    ]
+  },
+  "enableAllProjectMcpServers": false
+}
