@@ -61,8 +61,9 @@ No additional top-level documentation directories MAY be created without updatin
 ## 4. File and Directory Naming
 
 - Documentation files MUST use the `.md` extension.
-- Filenames MUST be `kebab-case` or `SCREAMING_SNAKE_CASE` and contain no spaces.
-  - Examples: `processing-flow-overview.md`, `API_PRODUCTIZATION_PLAN.md`.
+- New documentation file basenames (filename without extension) MUST be `kebab-case` (lowercase words separated by `-`) and contain no spaces.
+  - Example: `processing-flow-overview.md`.
+- Existing `SCREAMING_SNAKE_CASE` filenames (for example, `API_PRODUCTIZATION_PLAN.md`) are permitted for backward compatibility but SHOULD be migrated to `kebab-case` when the file is touched for other changes.
 - Directory names under `documentation/` and its subdirectories MUST be `kebab-case` or `lower_snake_case`.
 - No spaces are allowed in any documentation file or directory names.
 
