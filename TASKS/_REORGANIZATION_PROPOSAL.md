@@ -189,11 +189,11 @@ The following scripts MUST exist and be used for managing tasks. They MUST use o
 
 - All task files MUST use the `.md` extension.
 - Task file basenames (filename without extension) MUST be exactly equal to the `id` in frontmatter.
-  - Example: `TASK-LLM-MODEL-FAMILY-FILTERING.md` → `id: TASK-LLM-MODEL-FAMILY-FILTERING`.
+  - Example: `task-llm-model-family-filtering.md` → `id: task-llm-model-family-filtering`.
 - `id` MUST match the following constraints:
-  - Characters: `A-Z`, `0-9`, `_`, `-` only.
-  - MUST start with an uppercase letter or digit.
-  - No spaces or lowercase letters.
+  - Characters: `a-z`, `0-9`, `-` only (lowercase kebab-case).
+  - MUST start with a lowercase letter or digit.
+  - No spaces, uppercase letters, or underscores.
 - Programme hub files MUST be named `HUB.md` inside `programs/<name>/` and MUST use `type: programme`.
 - Subdirectory names under each domain or `programs/` MUST be `lower_snake_case`.
   - Example: `assessment/nlp_lang_tool/`, `programs/cj_confidence/`.

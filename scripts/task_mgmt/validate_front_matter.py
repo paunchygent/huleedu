@@ -53,8 +53,8 @@ EXCLUDED_FILES = {
     "HUB.md",
 }
 
-# ID validation pattern: A-Z, 0-9, _, - only; must start with uppercase letter or digit
-ID_PATTERN = re.compile(r"^[A-Z0-9][A-Z0-9_-]*$")
+# ID validation pattern: lowercase kebab-case (a-z, 0-9, - only)
+ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 
 # Subdirectory naming pattern: lower_snake_case
 SUBDIR_PATTERN = re.compile(r"^[a-z0-9_]+$")
@@ -138,7 +138,7 @@ def validate_filename_id_match(p: Path, fm: Dict[str, Any]) -> list[str]:
 
 def validate_id_format(fm: Dict[str, Any]) -> list[str]:
     """
-    Validate that id matches pattern: A-Z, 0-9, _, - only; starts with uppercase or digit.
+    Validate that id matches pattern: lowercase kebab-case (a-z, 0-9, - only).
 
     Args:
         fm: Parsed frontmatter dict
@@ -153,11 +153,11 @@ def validate_id_format(fm: Dict[str, Any]) -> list[str]:
 
     if not ID_PATTERN.match(fm_id):
         # Determine specific issue for better error message
-        if not fm_id[0].isupper() and not fm_id[0].isdigit():
-            errors.append(f"id '{fm_id}' must start with uppercase letter or digit")
+        if not fm_id[0].islower() and not fm_id[0].isdigit():
+            errors.append(f"id '{fm_id}' must start with lowercase letter or digit")
         else:
             errors.append(
-                f"id '{fm_id}' contains invalid characters (must be A-Z, 0-9, _, - only)"
+                f"id '{fm_id}' contains invalid characters (must be lowercase kebab-case: a-z, 0-9, - only)"
             )
     return errors
 
