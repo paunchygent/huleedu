@@ -6,7 +6,13 @@ HuleEdu Common Core Package.
 # in base_event_models.py and must be available when model_rebuild() is called
 from typing import Union
 
-from .api_models import BatchRegistrationRequestV1
+from .api_models import (
+    BatchRegistrationRequestV1,
+    LLMComparisonRequest,
+    LLMComparisonResponse,
+    LLMConfigOverridesHTTP,
+    LLMQueuedResponse,
+)
 from .batch_service_models import (
     BatchServiceAIFeedbackInitiateCommandDataV1,
     BatchServiceCJAssessmentInitiateCommandDataV1,
@@ -262,6 +268,10 @@ __all__ = [
     "EssayLifecycleAIFeedbackRequestV1",
     # API Models
     "BatchRegistrationRequestV1",
+    "LLMComparisonRequest",
+    "LLMComparisonResponse",
+    "LLMConfigOverridesHTTP",
+    "LLMQueuedResponse",
     # Grade Scales
     "GRADE_SCALES",
     "GradeScaleMetadata",
