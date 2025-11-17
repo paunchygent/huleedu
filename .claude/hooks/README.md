@@ -10,6 +10,7 @@ This directory contains hook scripts that intercept and validate operations in t
 **Purpose**: Shows documentation standards when creating files in `.claude/`, `docs/`, or `TASKS/` directories.
 
 **Behavior**:
+
 - Triggers once per session when writing to documentation directories
 - Displays the content of `.claude/rules/090-documentation-standards.md`
 - Always allows the operation (exit 0)
@@ -45,12 +46,14 @@ This directory contains hook scripts that intercept and validate operations in t
 ```
 
 **Allowed Operations**:
+
 - ✅ Creating files in any existing allowed directory
 - ✅ Creating subdirectories within `work/tasks/` for task organization
 - ✅ Creating subdirectories within skills for new skills (e.g., `skills/my-skill/`)
 - ✅ Normal file operations outside `.claude/`
 
 **Blocked Operations**:
+
 - 🚫 Creating new top-level directories in `.claude/`
 - 🚫 Creating new subdirectories in `work/` other than `tasks/`, `session/`, `audits/`
 - 🚫 Creating new subdirectories in `archive/` other than allowed ones
@@ -59,6 +62,7 @@ This directory contains hook scripts that intercept and validate operations in t
 - 🚫 Using `mv` or `rm` commands on core `.claude/` directories
 
 **Behavior**:
+
 - Validates Write operations for path compliance
 - Validates Bash operations for structure-modifying commands
 - Blocks non-compliant operations with clear error messages
@@ -83,6 +87,77 @@ To modify the .claude/ structure, you must:
   4. Get explicit approval
 
 Operation blocked.
+```
+
+### 3. docs/ Structure Enforcement (`enforce-docs-structure.sh`)
+
+**Type**: PreToolUse (Write, Bash)
+**Purpose**: Enforces the canonical `docs/` directory structure per `DOCS_STRUCTURE_SPEC.md`.
+
+**Allowed Top-Level Directories**:
+
+- `overview/`, `architecture/`, `services/`, `operations/`
+- `how-to/`, `reference/`, `decisions/`, `product/`, `research/`
+- `_archive/` (legacy)
+
+**Behavior**: Same as `.claude/` enforcement - blocks unauthorized directory creation.
+
+### 4. TASKS/ Structure Enforcement (`enforce-tasks-structure.sh`)
+
+**Type**: PreToolUse (Write, Bash)
+**Purpose**: Enforces the canonical `TASKS/` directory structure per `_REORGANIZATION_PROPOSAL.md`.
+
+**Allowed Top-Level Directories (Domains)**:
+
+- `programs/`, `assessment/`, `content/`, `identity/`
+- `frontend/`, `infrastructure/`, `security/`, `integrations/`
+- `architecture/`, `archive/`
+
+**Behavior**: Blocks creation of new domains without spec updates.
+
+### 5. TASKS Frontmatter Validation (`validate-tasks-frontmatter.sh`)
+
+**Type**: PreToolUse (Write)
+**Purpose**: Validates TASKS file frontmatter on creation and edits.
+
+**Validations**:
+
+1. **Required fields**: id, title, status, priority, domain, owner_team, created, last_updated
+2. **Status enum**: research, blocked, in_progress, completed, paused, archived
+3. **Priority enum**: low, medium, high, critical
+4. **Domain enum**: Must match allowed domains
+5. **ID format**: Lowercase kebab-case (a-z, 0-9, - only)
+6. **Filename match**: ID must match filename (without .md)
+7. **Last updated**: Warns if not today's date on edits (doesn't block)
+
+**Error Example**:
+
+```
+🚫 TASKS FRONTMATTER VIOLATION
+
+Missing required fields in frontmatter:
+  File: TASKS/assessment/my-task.md
+  Missing: status priority domain
+
+All task files must have these required fields:
+  id title status priority domain owner_team created last_updated
+
+Operation blocked.
+```
+
+**Warning Example**:
+
+```
+⚠️  TASKS FRONTMATTER WARNING
+
+The last_updated field should be updated to today's date when editing:
+  File: TASKS/assessment/my-task.md
+  Current last_updated: 2025-11-15
+  Expected: 2025-11-17
+
+Please update the last_updated field to: 2025-11-17
+
+Note: This is a warning. Operation will proceed, but please update the field.
 ```
 
 ## Testing the Enforcement Hook
