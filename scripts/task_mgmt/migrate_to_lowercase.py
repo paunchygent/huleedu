@@ -14,7 +14,7 @@ import argparse
 import re
 import sys
 from pathlib import Path
-from typing import Dict, Any, Tuple
+from typing import Any, Dict, Tuple
 
 ROOT = Path(__file__).resolve().parents[2]
 TASKS_DIR = ROOT / "TASKS"
@@ -115,9 +115,22 @@ def migrate_file(src: Path, tasks_root: Path, dry_run: bool = False) -> Dict[str
 
         # Rebuild frontmatter
         fm_lines = ["---"]
-        for key in ["id", "title", "type", "status", "priority", "domain",
-                    "service", "owner_team", "owner", "program", "created",
-                    "last_updated", "related", "labels"]:
+        for key in [
+            "id",
+            "title",
+            "type",
+            "status",
+            "priority",
+            "domain",
+            "service",
+            "owner_team",
+            "owner",
+            "program",
+            "created",
+            "last_updated",
+            "related",
+            "labels",
+        ]:
             if key not in fm:
                 continue
             value = fm[key]
@@ -128,7 +141,7 @@ def migrate_file(src: Path, tasks_root: Path, dry_run: bool = False) -> Dict[str
                 else:
                     fm_lines.append(f"{key}: []")
             else:
-                fm_lines.append(f'{key}: "{value}"' if value else f"{key}: \"\"")
+                fm_lines.append(f'{key}: "{value}"' if value else f'{key}: ""')
         fm_lines.append("---")
 
         new_content = "\n".join(fm_lines) + "\n" + body
@@ -157,9 +170,7 @@ def migrate_file(src: Path, tasks_root: Path, dry_run: bool = False) -> Dict[str
 
 def main(argv: list[str]) -> int:
     """Main CLI entry point."""
-    ap = argparse.ArgumentParser(
-        description="Migrate TASKS to lowercase kebab-case"
-    )
+    ap = argparse.ArgumentParser(description="Migrate TASKS to lowercase kebab-case")
     ap.add_argument("--dry-run", action="store_true", help="Preview changes without applying")
     ap.add_argument("--verbose", "-v", action="store_true")
     args = ap.parse_args(argv)

@@ -137,9 +137,7 @@ def migrate_directory_structure(
     return results
 
 
-def fix_filename_spaces(
-    docs_root: Path, dry_run: bool = False
-) -> List[Tuple[str, str]]:
+def fix_filename_spaces(docs_root: Path, dry_run: bool = False) -> List[Tuple[str, str]]:
     """
     Fix filenames containing spaces by converting to kebab-case.
 
@@ -312,9 +310,7 @@ last_updated: {date.today().isoformat()}
     return True
 
 
-def add_frontmatter(
-    docs_root: Path, dry_run: bool = False
-) -> Dict[str, int]:
+def add_frontmatter(docs_root: Path, dry_run: bool = False) -> Dict[str, int]:
     """
     Add frontmatter to runbooks and decisions.
 
@@ -360,25 +356,17 @@ def main(argv: list[str]) -> int:
     Returns:
         Exit code (0=success, 2=usage error)
     """
-    ap = argparse.ArgumentParser(
-        description="Migrate documentation/ to spec-compliant structure"
-    )
+    ap = argparse.ArgumentParser(description="Migrate documentation/ to spec-compliant structure")
     ap.add_argument("--root", default=str(DOCS_DIR), help="Docs root directory")
-    ap.add_argument(
-        "--dry-run", action="store_true", help="Show changes without applying"
-    )
-    ap.add_argument(
-        "--backup", action="store_true", help="Create backup before migration"
-    )
+    ap.add_argument("--dry-run", action="store_true", help="Show changes without applying")
+    ap.add_argument("--backup", action="store_true", help="Create backup before migration")
     ap.add_argument(
         "--add-frontmatter",
         action="store_true",
         help="Add frontmatter to runbooks/decisions",
     )
     ap.add_argument("--verbose", "-v", action="store_true", help="Detailed logging")
-    ap.add_argument(
-        "--force", action="store_true", help="Skip confirmation prompts"
-    )
+    ap.add_argument("--force", action="store_true", help="Skip confirmation prompts")
     args = ap.parse_args(argv)
 
     docs_root = Path(args.root)
@@ -389,9 +377,7 @@ def main(argv: list[str]) -> int:
 
     # Backup if requested
     if args.backup and not args.dry_run:
-        backup_dir = (
-            docs_root.parent / f"documentation_backup_{date.today().isoformat()}"
-        )
+        backup_dir = docs_root.parent / f"documentation_backup_{date.today().isoformat()}"
         if backup_dir.exists():
             print(f"Warning: Backup directory already exists: {backup_dir}")
             if not args.force:
@@ -417,9 +403,7 @@ def main(argv: list[str]) -> int:
         print(f"  Moved: {old}/ → {new}/")
     for old, new in dir_results["archived"]:
         print(f"  Archived: {old}/ → {new}/")
-    if not (
-        dir_results["renamed"] or dir_results["moved"] or dir_results["archived"]
-    ):
+    if not (dir_results["renamed"] or dir_results["moved"] or dir_results["archived"]):
         print("  (no directory migrations needed)")
     print()
 

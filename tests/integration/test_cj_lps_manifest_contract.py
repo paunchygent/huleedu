@@ -70,7 +70,9 @@ async def fetch_manifest(
         pytest.skip(f"Manifest endpoint unavailable: {exc}")
 
 
-def get_default_model_from_manifest(manifest: dict[str, Any], provider: LLMProviderType) -> dict[str, Any]:
+def get_default_model_from_manifest(
+    manifest: dict[str, Any], provider: LLMProviderType
+) -> dict[str, Any]:
     """Select the default model entry for the requested provider."""
 
     providers = manifest.get("providers", {})
@@ -218,7 +220,9 @@ class TestCJLPSManifestContract:
         _ = validated_services
         manifest = await fetch_manifest(http_session)
         default_model = get_default_model_from_manifest(manifest, LLMProviderType.ANTHROPIC)
-        override = build_overrides(default_model, provider=LLMProviderType.ANTHROPIC, temperature=0.3)
+        override = build_overrides(
+            default_model, provider=LLMProviderType.ANTHROPIC, temperature=0.3
+        )
 
         correlation_id = uuid4()
         prompt = "Compare Essay A and Essay B for writing quality. Respond with JSON."
@@ -243,7 +247,9 @@ class TestCJLPSManifestContract:
     ) -> None:
         """Gracefully skip when LPS is offline; otherwise ensure manifest-driven call succeeds."""
 
-        service_available = await check_service_availability(integration_settings.LLM_PROVIDER_SERVICE_URL)
+        service_available = await check_service_availability(
+            integration_settings.LLM_PROVIDER_SERVICE_URL
+        )
         if not service_available:
             pytest.skip("LLM Provider Service not available - skipping manifest test")
 

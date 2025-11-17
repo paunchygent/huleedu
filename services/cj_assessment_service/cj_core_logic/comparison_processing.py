@@ -80,9 +80,7 @@ def _build_iteration_metadata_context(
 ) -> dict[str, Any] | None:
     """Return additive metadata for downstream LLM requests when iteration loop is online."""
 
-    if not (
-        settings.ENABLE_LLM_BATCHING_METADATA_HINTS and is_iterative_batching_online(settings)
-    ):
+    if not (settings.ENABLE_LLM_BATCHING_METADATA_HINTS and is_iterative_batching_online(settings)):
         return None
 
     iteration_value = current_iteration if current_iteration is not None else 0

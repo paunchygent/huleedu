@@ -37,3 +37,19 @@ repos:
         files: \.(md|markdown)$
         additional_dependencies: ['markdownlint-cli@0.45.0']
         stages: [pre-commit]
+
+    -   id: format-python
+        name: Format Python files with ruff
+        entry: bash -c 'cd "$(git rev-parse --show-toplevel)" && pdm run format-all'
+        language: system
+        files: \.py$
+        pass_filenames: false
+        stages: [pre-commit]
+
+    -   id: lint-python
+        name: Lint Python files with ruff
+        entry: bash -c 'cd "$(git rev-parse --show-toplevel)" && pdm run lint-fix --unsafe-fixes'
+        language: system
+        files: \.py$
+        pass_filenames: false
+        stages: [pre-commit]

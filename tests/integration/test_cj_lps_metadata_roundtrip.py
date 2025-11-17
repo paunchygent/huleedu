@@ -125,9 +125,7 @@ class TestCJLPSMetadataRoundtrip:
                     timeout=aiohttp.ClientTimeout(total=10.0),
                     headers={"Content-Type": "application/json"},
                 ) as response:
-                    assert response.status == 202, (
-                        f"Expected 202 (queued), got {response.status}"
-                    )
+                    assert response.status == 202, f"Expected 202 (queued), got {response.status}"
 
                     # Validate HTTP response using Pydantic model
                     response_data = await response.json()
@@ -174,7 +172,7 @@ class TestCJLPSMetadataRoundtrip:
 
                             # Check correlation_id in event data as well
                             assert callback_result.correlation_id == correlation_id, (
-                                f"Event data correlation_id mismatch"
+                                "Event data correlation_id mismatch"
                             )
 
                             # 6. Validate LLMComparisonResultV1 success contract
@@ -234,11 +232,13 @@ class TestCJLPSMetadataRoundtrip:
 
                             callback_received = True
                             callback_data = callback_result
-                            print(f"✅ Callback received with preserved metadata")
+                            print("✅ Callback received with preserved metadata")
                             print(f"   essay_a_id: {req_metadata['essay_a_id']}")
                             print(f"   essay_b_id: {req_metadata['essay_b_id']}")
                             print(f"   bos_batch_id: {req_metadata['bos_batch_id']}")
-                            print(f"   cj_llm_batching_mode: {req_metadata['cj_llm_batching_mode']}")
+                            print(
+                                f"   cj_llm_batching_mode: {req_metadata['cj_llm_batching_mode']}"
+                            )
                             print(f"   prompt_sha256: {req_metadata['prompt_sha256'][:16]}...")
                             break
 

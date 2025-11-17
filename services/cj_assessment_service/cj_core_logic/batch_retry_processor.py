@@ -153,9 +153,7 @@ class BatchRetryProcessor:
             final_system_prompt_override = _resolve_override(
                 system_prompt_override, "system_prompt_override"
             )
-            final_provider_override = _resolve_override(
-                provider_override, "provider_override"
-            )
+            final_provider_override = _resolve_override(provider_override, "provider_override")
 
             # Submit retry batch using core submitter
             result = cast(

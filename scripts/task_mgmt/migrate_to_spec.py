@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
-import os
 import re
 import shutil
 import sys
@@ -95,7 +94,7 @@ def infer_domain(filepath: Path, content: str) -> str:
         Domain name (one of ALLOWED_DOMAINS)
     """
     filename_lower = filepath.stem.lower()
-    content_lower = content.lower()
+    content.lower()
 
     # Programs (multi-domain initiatives)
     if "cj_confidence" in str(filepath) or "phase3" in filename_lower:
@@ -340,9 +339,7 @@ def generate_frontmatter(
     return "\n".join(lines)
 
 
-def determine_target_path(
-    src: Path, fm: Dict[str, Any], tasks_root: Path
-) -> Path:
+def determine_target_path(src: Path, fm: Dict[str, Any], tasks_root: Path) -> Path:
     """
     Determine target path for a file based on its frontmatter.
 
@@ -390,8 +387,14 @@ def determine_target_path(
 
             # If file is already in a domain directory, just change domain if needed
             if current_top_level in {
-                "assessment", "content", "identity", "frontend",
-                "infrastructure", "security", "integrations", "architecture"
+                "assessment",
+                "content",
+                "identity",
+                "frontend",
+                "infrastructure",
+                "security",
+                "integrations",
+                "architecture",
             }:
                 # File is already in a domain, just update domain if different
                 if len(rel_path.parts) > 2:
@@ -586,9 +589,7 @@ def fix_filename_spaces(tasks_root: Path, dry_run: bool = False) -> list[Tuple[s
 
 def main(argv: list[str]) -> int:
     """Main CLI entry point."""
-    ap = argparse.ArgumentParser(
-        description="Migrate TASKS/ to spec-compliant structure"
-    )
+    ap = argparse.ArgumentParser(description="Migrate TASKS/ to spec-compliant structure")
     ap.add_argument(
         "--dry-run",
         action="store_true",
@@ -599,9 +600,7 @@ def main(argv: list[str]) -> int:
         action="store_true",
         help="Create backup of TASKS/ before migration",
     )
-    ap.add_argument(
-        "--verbose", "-v", action="store_true", help="Detailed logging"
-    )
+    ap.add_argument("--verbose", "-v", action="store_true", help="Detailed logging")
     ap.add_argument(
         "--force",
         action="store_true",
@@ -743,13 +742,13 @@ def main(argv: list[str]) -> int:
         print(f"  Moved: {len(struct_results['moved'])}")
         print(f"  Deleted: {len(struct_results['deleted'])}")
 
-    print(f"\nFile migrations:")
+    print("\nFile migrations:")
     print(f"  Generated frontmatter: {migrated_count}")
     print(f"  Already migrated: {skipped_count}")
     print(f"  Errors: {error_count}")
 
     if domain_counts:
-        print(f"\nFiles by domain:")
+        print("\nFiles by domain:")
         for domain in sorted(domain_counts.keys()):
             print(f"  {domain}: {domain_counts[domain]}")
 

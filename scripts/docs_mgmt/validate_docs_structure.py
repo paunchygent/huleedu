@@ -123,9 +123,7 @@ def validate_top_level_taxonomy(docs_root: Path) -> list[str]:
             continue
         if item.name not in ALLOWED_TOP_LEVEL_DIRS:
             allowed_str = ", ".join(sorted(ALLOWED_TOP_LEVEL_DIRS))
-            errors.append(
-                f"invalid top-level directory '{item.name}/' (allowed: {allowed_str})"
-            )
+            errors.append(f"invalid top-level directory '{item.name}/' (allowed: {allowed_str})")
     return errors
 
 
@@ -157,9 +155,7 @@ def validate_filename_format(p: Path) -> list[str]:
 
     # Check against patterns
     if not KEBAB_CASE_PATTERN.match(stem) and not SCREAMING_SNAKE_CASE_PATTERN.match(stem):
-        errors.append(
-            f"filename '{filename}' must be kebab-case or SCREAMING_SNAKE_CASE"
-        )
+        errors.append(f"filename '{filename}' must be kebab-case or SCREAMING_SNAKE_CASE")
     return errors
 
 
@@ -180,9 +176,7 @@ def validate_directory_naming(p: Path, docs_root: Path) -> list[str]:
 
     # Check all directory components (excluding filename)
     for dirname in parts[:-1]:
-        if not DIR_KEBAB_CASE_PATTERN.match(dirname) and not DIR_SNAKE_CASE_PATTERN.match(
-            dirname
-        ):
+        if not DIR_KEBAB_CASE_PATTERN.match(dirname) and not DIR_SNAKE_CASE_PATTERN.match(dirname):
             errors.append(f"directory '{dirname}' must be kebab-case or lower_snake_case")
     return errors
 
@@ -246,9 +240,7 @@ def validate_runbook_frontmatter(p: Path, docs_root: Path) -> list[str]:
     severity = fm.get("severity")
     if severity and severity not in ALLOWED_RUNBOOK_SEVERITIES:
         valid_str = "|".join(sorted(ALLOWED_RUNBOOK_SEVERITIES))
-        warnings.append(
-            f"[WARNING] runbook severity '{severity}' invalid (expected: {valid_str})"
-        )
+        warnings.append(f"[WARNING] runbook severity '{severity}' invalid (expected: {valid_str})")
 
     # Validate last_reviewed date
     last_reviewed = fm.get("last_reviewed")
@@ -309,9 +301,7 @@ def validate_decision_frontmatter(p: Path, docs_root: Path) -> list[str]:
     status = fm.get("status")
     if status and status not in ALLOWED_DECISION_STATUSES:
         valid_str = "|".join(sorted(ALLOWED_DECISION_STATUSES))
-        warnings.append(
-            f"[WARNING] decision status '{status}' invalid (expected: {valid_str})"
-        )
+        warnings.append(f"[WARNING] decision status '{status}' invalid (expected: {valid_str})")
 
     # Validate dates
     for field in ["created", "last_updated"]:
@@ -395,9 +385,7 @@ def main(argv: list[str]) -> int:
     )
     ap.add_argument("--root", default=str(DOCS_DIR), help="Documentation root directory")
     ap.add_argument("--verbose", "-v", action="store_true", help="Show all files validated")
-    ap.add_argument(
-        "--strict", action="store_true", help="Treat warnings as errors"
-    )
+    ap.add_argument("--strict", action="store_true", help="Treat warnings as errors")
     args = ap.parse_args(argv)
 
     root = Path(args.root)

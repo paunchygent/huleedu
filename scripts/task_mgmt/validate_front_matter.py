@@ -188,9 +188,7 @@ def validate_path_structure(p: Path, tasks_root: Path) -> list[str]:
         top_level = parts[0]
         if top_level not in ALLOWED_TOP_LEVEL_DIRS:
             allowed_str = ", ".join(sorted(ALLOWED_TOP_LEVEL_DIRS))
-            errors.append(
-                f"invalid top-level directory '{top_level}/' (allowed: {allowed_str})"
-            )
+            errors.append(f"invalid top-level directory '{top_level}/' (allowed: {allowed_str})")
     return errors
 
 
@@ -293,9 +291,7 @@ def should_exclude_file(p: Path, tasks_root: Path, exclude_archive: bool) -> boo
 
 
 def main(argv: list[str]) -> int:
-    ap = argparse.ArgumentParser(
-        description="Validate TASKS frontmatter and structure compliance"
-    )
+    ap = argparse.ArgumentParser(description="Validate TASKS frontmatter and structure compliance")
     ap.add_argument("--root", default=str(TASKS_DIR), help="Tasks root directory")
     ap.add_argument("--exclude-archive", action="store_true", default=True)
     ap.add_argument("--verbose", "-v", action="store_true")
