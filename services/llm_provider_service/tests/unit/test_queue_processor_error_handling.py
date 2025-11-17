@@ -7,11 +7,19 @@ from datetime import datetime, timezone
 from unittest.mock import AsyncMock, Mock
 
 import pytest
-from common_core import EssayComparisonWinner, LLMBatchingMode, LLMProviderType, QueueStatus
+from common_core import (
+    EssayComparisonWinner,
+    LLMBatchingMode,
+    LLMComparisonRequest,
+    LLMProviderType,
+    QueueStatus,
+)
+from common_core import (
+    LLMConfigOverridesHTTP as LLMConfigOverrides,
+)
 from common_core.error_enums import ErrorCode
 from common_core.models.error_models import ErrorDetail
 
-from services.llm_provider_service.api_models import LLMComparisonRequest, LLMConfigOverrides
 from services.llm_provider_service.config import Settings
 from services.llm_provider_service.exceptions import HuleEduError
 from services.llm_provider_service.implementations.queue_processor_impl import QueueProcessorImpl
@@ -20,7 +28,7 @@ from services.llm_provider_service.implementations.trace_context_manager_impl im
 )
 from services.llm_provider_service.internal_models import LLMOrchestratorResponse
 from services.llm_provider_service.protocols import ComparisonProcessorProtocol
-from services.llm_provider_service.queue_models import QueuedRequest
+from services.llm_provider_service.queue_models import QueuedRequest, QueueStats
 
 
 class TestQueueProcessorErrorHandling:
@@ -34,7 +42,19 @@ class TestQueueProcessorErrorHandling:
     @pytest.fixture
     def mock_queue_manager(self) -> AsyncMock:
         """Create mock queue manager."""
-        return AsyncMock()
+        manager = AsyncMock()
+        manager.get_queue_stats = AsyncMock(
+            return_value=QueueStats(
+                current_size=0,
+                max_size=1000,
+                memory_usage_mb=0.0,
+                max_memory_mb=100.0,
+                usage_percent=0.0,
+                queued_count=0,
+                is_accepting_requests=True,
+            )
+        )
+        return manager
 
     @pytest.fixture
     def mock_event_publisher(self) -> AsyncMock:

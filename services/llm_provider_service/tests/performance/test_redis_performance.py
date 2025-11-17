@@ -12,11 +12,10 @@ from typing import Any, AsyncGenerator, Generator
 from uuid import uuid4
 
 import pytest
-from common_core import Environment, QueueStatus
+from common_core import Environment, LLMComparisonRequest, QueueStatus
 from dishka import Scope, make_async_container, provide
 from testcontainers.redis import RedisContainer
 
-from services.llm_provider_service.api_models import LLMComparisonRequest
 from services.llm_provider_service.config import Settings
 from services.llm_provider_service.di import LLMProviderServiceProvider
 from services.llm_provider_service.implementations.redis_queue_repository_impl import (

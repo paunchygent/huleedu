@@ -12,10 +12,16 @@ from datetime import datetime, timezone
 from typing import Any, AsyncGenerator, Dict, Optional
 
 import pytest
-from common_core import LLMProviderType, QueueStatus
+from common_core import (
+    LLMComparisonRequest,
+    LLMProviderType,
+    QueueStatus,
+)
+from common_core import (
+    LLMConfigOverridesHTTP as LLMConfigOverrides,
+)
 from dishka import AsyncContainer, Provider, Scope, make_async_container, provide
 
-from services.llm_provider_service.api_models import LLMComparisonRequest, LLMConfigOverrides
 from services.llm_provider_service.config import Settings
 from services.llm_provider_service.implementations.comparison_processor_impl import (
     ComparisonProcessorImpl,

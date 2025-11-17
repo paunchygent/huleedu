@@ -165,6 +165,7 @@ class TestBatchRetryProcessor:
                 max_tokens_override=None,
                 system_prompt_override=None,
                 provider_override=None,
+                metadata_context=None,
             )
 
             # Verify metrics

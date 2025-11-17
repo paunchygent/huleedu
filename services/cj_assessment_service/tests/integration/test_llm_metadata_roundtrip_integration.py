@@ -9,7 +9,14 @@ from uuid import uuid4
 
 import pytest
 from aiokafka import ConsumerRecord
-from common_core import LLMBatchingMode, LLMProviderType
+from common_core import (
+    LLMBatchingMode,
+    LLMComparisonRequest,
+    LLMProviderType,
+)
+from common_core import (
+    LLMConfigOverridesHTTP as ProviderOverrides,
+)
 from common_core.domain_enums import EssayComparisonWinner
 
 from services.cj_assessment_service.config import Settings as CJSettings
@@ -18,12 +25,6 @@ from services.cj_assessment_service.models_api import (
     CJLLMComparisonMetadata,
     ComparisonTask,
     EssayForComparison,
-)
-from services.llm_provider_service.api_models import (
-    LLMComparisonRequest,
-)
-from services.llm_provider_service.api_models import (
-    LLMConfigOverrides as ProviderOverrides,
 )
 from services.llm_provider_service.config import Settings as LPSSettings
 from services.llm_provider_service.implementations.queue_processor_impl import QueueProcessorImpl

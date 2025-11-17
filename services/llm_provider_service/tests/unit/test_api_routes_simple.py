@@ -3,12 +3,17 @@
 from uuid import uuid4
 
 import pytest
-from common_core import EssayComparisonWinner, LLMProviderType
-
-from services.llm_provider_service.api_models import (
+from common_core import (
+    EssayComparisonWinner,
     LLMComparisonRequest,
     LLMComparisonResponse,
-    LLMConfigOverrides,
+    LLMProviderType,
+)
+from common_core import (
+    LLMConfigOverridesHTTP as LLMConfigOverrides,
+)
+
+from services.llm_provider_service.api_models import (
     LLMProviderStatus,
 )
 from services.llm_provider_service.exceptions import HuleEduError

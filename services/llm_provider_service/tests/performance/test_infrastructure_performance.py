@@ -308,9 +308,8 @@ Infrastructure test essay B {request_id}""",
         """
         from datetime import datetime, timedelta, timezone
 
-        from common_core import QueueStatus
+        from common_core import LLMComparisonRequest, QueueStatus
 
-        from services.llm_provider_service.api_models import LLMComparisonRequest
         from services.llm_provider_service.queue_models import QueuedRequest
 
         async with infrastructure_di_container() as request_container:

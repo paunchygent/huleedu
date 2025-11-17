@@ -256,6 +256,29 @@ class TestLLMInteractionImplProtocolCompliance:
         assert metadata["cj_llm_batching_mode"] == LLMBatchingMode.SERIAL_BUNDLE.value
 
     @pytest.mark.asyncio
+    async def test_metadata_includes_iteration_when_context_provided(
+        self,
+        providers_dict_success: dict[LLMProviderType, LLMProviderProtocol],
+        test_settings: Settings,
+        sample_comparison_task: ComparisonTask,
+        successful_provider: MockLLMProvider,
+    ) -> None:
+        """Ensure iteration metadata flows through when provided by batch processor."""
+        test_settings.ENABLE_LLM_BATCHING_METADATA_HINTS = True
+        test_settings.LLM_BATCHING_MODE = LLMBatchingMode.SERIAL_BUNDLE
+
+        llm_impl = LLMInteractionImpl(providers=providers_dict_success, settings=test_settings)
+
+        await llm_impl.perform_comparisons(
+            tasks=[sample_comparison_task],
+            correlation_id=uuid4(),
+            metadata_context={"comparison_iteration": 3},
+        )
+
+        metadata = successful_provider.last_call_params["request_metadata"]
+        assert metadata["comparison_iteration"] == 3
+
+    @pytest.mark.asyncio
     async def test_error_handling_creates_structured_results(
         self,
         providers_dict_failure: dict[LLMProviderType, LLMProviderProtocol],

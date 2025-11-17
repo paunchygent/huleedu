@@ -13,10 +13,15 @@ from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
-from common_core import ErrorCode, EssayComparisonWinner, LLMProviderType, QueueStatus
+from common_core import (
+    ErrorCode,
+    EssayComparisonWinner,
+    LLMComparisonRequest,
+    LLMProviderType,
+    QueueStatus,
+)
 from huleedu_service_libs.error_handling import HuleEduError, create_test_error_detail
 
-from services.llm_provider_service.api_models import LLMComparisonRequest
 from services.llm_provider_service.config import Settings
 from services.llm_provider_service.implementations.queue_processor_impl import QueueProcessorImpl
 from services.llm_provider_service.implementations.trace_context_manager_impl import (

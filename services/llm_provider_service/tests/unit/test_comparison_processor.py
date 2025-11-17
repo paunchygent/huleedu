@@ -22,7 +22,7 @@ from services.llm_provider_service.internal_models import (
 from services.llm_provider_service.protocols import LLMProviderProtocol
 from services.llm_provider_service.tests.fixtures.fake_event_publisher import FakeEventPublisher
 from services.llm_provider_service.tests.fixtures.test_settings import (
-    TestSettings,
+    LLMProviderTestSettings,
 )
 
 
@@ -54,7 +54,7 @@ def providers_dict(mock_provider: AsyncMock) -> Dict[LLMProviderType, LLMProvide
 def comparison_processor(
     providers_dict: Dict[LLMProviderType, LLMProviderProtocol],
     fake_event_publisher: FakeEventPublisher,
-    unit_test_settings: TestSettings,
+    unit_test_settings: LLMProviderTestSettings,
 ) -> ComparisonProcessorImpl:
     """ComparisonProcessorImpl instance with test dependencies."""
     return ComparisonProcessorImpl(

@@ -9,9 +9,8 @@ from uuid import UUID
 
 import pytest
 from aioresponses import aioresponses
-from sqlalchemy import select
-
 from common_core.events.cj_assessment_events import LLMConfigOverrides
+from sqlalchemy import select
 
 from services.cj_assessment_service.cj_core_logic.comparison_processing import (
     submit_comparisons_for_async_processing,

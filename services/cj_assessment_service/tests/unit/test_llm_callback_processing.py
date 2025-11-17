@@ -1,7 +1,7 @@
 """Unit tests for LLM callback processing in CJ Assessment Service."""
 
-from typing import Any
 from datetime import UTC, datetime
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID, uuid4
 

@@ -420,9 +420,8 @@ class TestRedisOptimizations:
         from datetime import timedelta, timezone
         from uuid import uuid4
 
-        from common_core import QueueStatus
+        from common_core import LLMComparisonRequest, QueueStatus
 
-        from services.llm_provider_service.api_models import LLMComparisonRequest
         from services.llm_provider_service.queue_models import QueuedRequest
 
         # Create smaller batch to avoid timeout issues
