@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, Mock, patch
 from uuid import uuid4
 
 import pytest
+from common_core import LLMBatchingMode, LLMProviderType
 from huleedu_service_libs.error_handling import HuleEduError
 
 from services.cj_assessment_service.cj_core_logic.batch_retry_processor import (
@@ -40,6 +41,10 @@ class TestBatchRetryProcessor:
         """Create mock settings."""
         mock_settings = Mock(spec=Settings)
         mock_settings.ENABLE_FAILED_COMPARISON_RETRY = True
+        mock_settings.ENABLE_LLM_BATCHING_METADATA_HINTS = True
+        mock_settings.DEFAULT_LLM_PROVIDER = LLMProviderType.OPENAI
+        mock_settings.LLM_BATCHING_MODE = LLMBatchingMode.PER_REQUEST
+        mock_settings.LLM_BATCH_API_ALLOWED_PROVIDERS = [LLMProviderType.OPENAI]
         return mock_settings
 
     @pytest.fixture
@@ -155,18 +160,11 @@ class TestBatchRetryProcessor:
                 correlation_id=correlation_id,
                 force_retry_all=False,
             )
-            mock_batch_submitter.submit_comparison_batch.assert_called_once_with(
-                cj_batch_id=cj_batch_id,
-                comparison_tasks=retry_tasks,
-                correlation_id=correlation_id,
-                config_overrides=None,
-                model_override=None,
-                temperature_override=None,
-                max_tokens_override=None,
-                system_prompt_override=None,
-                provider_override=None,
-                metadata_context=None,
-            )
+            mock_batch_submitter.submit_comparison_batch.assert_called_once()
+            call_kwargs = mock_batch_submitter.submit_comparison_batch.call_args.kwargs
+            assert call_kwargs["cj_batch_id"] == cj_batch_id
+            assert call_kwargs["metadata_context"]["cj_batch_id"] == str(cj_batch_id)
+            assert call_kwargs["metadata_context"]["cj_request_type"] == "cj_retry"
 
             # Verify metrics
             mock_metric.inc.assert_called_once()
@@ -204,7 +202,10 @@ class TestBatchRetryProcessor:
         mock_pool_manager.form_retry_batch.return_value = retry_tasks
         mock_batch_submitter.submit_comparison_batch.return_value = submission_result
         mock_get_batch_state.return_value = SimpleNamespace(
-            processing_metadata={"llm_overrides": overrides_metadata}
+            processing_metadata={
+                "llm_overrides": overrides_metadata,
+                "original_request": {"cj_source": "eng5_runner"},
+            }
         )
 
         # Mock metrics
@@ -233,6 +234,9 @@ class TestBatchRetryProcessor:
                 == overrides_metadata["system_prompt_override"]
             )
             assert call_args[1]["provider_override"] == overrides_metadata["provider_override"]
+            metadata_context = call_args[1]["metadata_context"]
+            assert metadata_context["cj_source"] == "eng5_runner"
+            assert metadata_context["cj_request_type"] == "cj_retry"
 
     async def test_submit_retry_batch_disabled(
         self,

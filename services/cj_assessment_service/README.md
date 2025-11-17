@@ -268,6 +268,9 @@ documented and locked down with unit tests (`tests/unit/test_llm_metadata_adapte
 | `request_metadata.essay_a_id` | `CJLLMComparisonMetadata` | ✅ | Correlates results to essay A |
 | `request_metadata.essay_b_id` | `CJLLMComparisonMetadata` | ✅ | Correlates results to essay B |
 | `request_metadata.bos_batch_id` | `CJLLMComparisonMetadata` | Optional | BOS/ELS batch identifier when available |
+| `request_metadata.cj_batch_id` | `CJLLMComparisonMetadata` | Optional | Internal CJ batch identifier (stringified `cj_batch_uploads.id`) so downstream services can align callbacks with CJ persistence/logs. |
+| `request_metadata.cj_source` | `CJLLMComparisonMetadata` | Optional | Indicates the upstream workflow that initiated the batch (e.g., `els`, `eng5_runner`, future admin tooling). |
+| `request_metadata.cj_request_type` | `CJLLMComparisonMetadata` | Optional | Labels the submission context (`cj_comparison` for primary batches, `cj_retry` for failed-comparison retries) to make telemetry easier to group. |
 | `request_metadata.prompt_sha256` | LPS queue processor | Optional | Deterministic hash of rendered prompt for replay/debug |
 | `request_metadata.cj_llm_batching_mode` | `CJLLMComparisonMetadata` | Optional hint | Emitted when `CJ_ASSESSMENT_SERVICE_ENABLE_LLM_BATCHING_METADATA_HINTS=true`; records `per_request`, `serial_bundle`, or `provider_batch_api`. |
 | `request_metadata.comparison_iteration` | `CJLLMComparisonMetadata` | Optional hint | Emitted only when metadata hints **and** the iterative batching loop are enabled; carries the zero-based iteration index used by the stability-driven bundling loop. |
@@ -278,6 +281,10 @@ documented and locked down with unit tests (`tests/unit/test_llm_metadata_adapte
   serializes metadata into the `LLMComparisonRequest.metadata` dict. The adapter
   enforces the required keys and only emits optional fields when explicitly set,
   keeping the contract additive-only.
+- Base CJ context (`cj_batch_id`, `cj_source`, `cj_request_type`) is now injected
+  into every metadata payload so callbacks, ENG5 tooling, and the LLM Provider
+  metrics pipeline can correlate retries and upstream workflows without scraping
+  CJ logs.
 - Future batching flags (e.g., `cj_llm_batching_mode`, `comparison_iteration`) are added
   via `CJLLMComparisonMetadata.with_additional_context(...)` so new keys never
   mutate legacy ones. Once the iterative batching loop is online, CJ passes the
@@ -381,6 +388,20 @@ and `COMPARISONS_PER_STABILITY_CHECK_ITERATION > 1`). With both flags enabled th
 adapter also emits `comparison_iteration`, giving downstream services iteration
 numbers alongside the batching mode. Callbacks echo the metadata verbatim, so the
 flags are safe to toggle provided consumers tolerate additive keys.
+
+`CJ_ASSESSMENT_SERVICE_LLM_BATCH_API_ALLOWED_PROVIDERS` (comma-separated list
+matching `LLMProviderType` values) constrains the `provider_batch_api` mode to
+providers that expose a true batch API. If either the global setting or a
+per-request override selects `provider_batch_api` for a provider that is not in
+this allow-list, CJ logs the mismatch and automatically falls back to the
+next-safest mode (`serial_bundle`, then `per_request`). The default list covers
+`openai` and `anthropic`.
+
+Per-request overrides live under `batch_config_overrides`. In addition to
+`batch_size`, runners can now set `llm_batching_mode_override` to
+`per_request`, `serial_bundle`, or `provider_batch_api`. The new
+`resolve_effective_llm_batching_mode()` helper enforces the provider guardrail
+and exposes the final mode for logs, metadata, and downstream observability.
 
 The iterative loop is considered **online** only when all of the following are true:
 

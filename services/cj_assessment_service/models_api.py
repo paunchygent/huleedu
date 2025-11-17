@@ -64,6 +64,18 @@ class CJLLMComparisonMetadata(BaseModel):
         default=None,
         description="Optional BOS batch identifier (stringified UUID)",
     )
+    cj_batch_id: str | None = Field(
+        default=None,
+        description="Internal CJ batch identifier (stringified integer id)",
+    )
+    cj_source: str | None = Field(
+        default=None,
+        description="Upstream CJ request source (els, bos, eng5_runner, etc.)",
+    )
+    cj_request_type: str | None = Field(
+        default=None,
+        description="Classification for the CJ request (cj_comparison, cj_retry, ...)",
+    )
     comparison_iteration: int | None = Field(
         default=None,
         ge=0,
@@ -71,7 +83,9 @@ class CJLLMComparisonMetadata(BaseModel):
     )
     cj_llm_batching_mode: str | None = Field(
         default=None,
-        description="Planned CJ batching mode hint (per_request|provider_serial_bundle|provider_batch_api)",
+        description=(
+            "Planned CJ batching mode hint (per_request|provider_serial_bundle|provider_batch_api)"
+        ),
     )
 
     @classmethod
@@ -228,6 +242,8 @@ class OriginalCJRequestMetadata(BaseModel):
     assignment_id: str | None = None
     language: str
     course_code: str
+    cj_source: str | None = Field(default="els")
+    cj_request_type: str | None = Field(default="cj_comparison")
     student_prompt_text: str | None = None
     student_prompt_storage_id: str | None = None
     judge_rubric_text: str | None = None
@@ -280,6 +296,16 @@ class CJAssessmentRequestData(BaseModel):
     essays_to_process: list[EssayToProcess] = Field(description="Essays to process in this batch")
     language: str = Field(description="Language code (e.g., 'en', 'sv')")
     course_code: str = Field(description="Course code enum value")
+
+    # Request context fields
+    cj_source: str | None = Field(
+        default="els",
+        description="Originating system or tool for the CJ request",
+    )
+    cj_request_type: str | None = Field(
+        default="cj_comparison",
+        description="CJ request classification (e.g., cj_comparison, cj_retry)",
+    )
 
     # Optional prompt context fields
     student_prompt_text: str | None = Field(

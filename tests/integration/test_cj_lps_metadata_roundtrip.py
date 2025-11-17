@@ -75,9 +75,11 @@ class TestCJLPSMetadataRoundtrip:
 
         Validates:
         1. HTTP request/response contract (LLMComparisonRequest → LLMQueuedResponse)
-        2. Kafka EventEnvelope structure and metadata (event_type, source_service, correlation_id)
+        2. Kafka EventEnvelope structure and metadata (event_type, source_service,
+           correlation_id)
         3. LLMComparisonResultV1 callback schema and success contract
-        4. Complete CJ metadata preservation (essay_a_id, essay_b_id, bos_batch_id, cj_llm_batching_mode)
+        4. Complete CJ metadata preservation (essay_a_id, essay_b_id, bos_batch_id,
+           cj_llm_batching_mode)
         5. LPS metadata additions (prompt_sha256) without pollution
         6. Distributed tracing via correlation_id propagation
         """
@@ -177,10 +179,12 @@ class TestCJLPSMetadataRoundtrip:
 
                             # 6. Validate LLMComparisonResultV1 success contract
                             assert callback_result.is_success, (
-                                f"Expected success result, got error: {callback_result.error_detail}"
+                                f"Expected success result, "
+                                f"got error: {callback_result.error_detail}"
                             )
                             assert callback_result.winner is not None, "Missing winner"
                             assert callback_result.justification, "Missing justification"
+                            assert callback_result.confidence is not None, "Missing confidence"
                             assert 1.0 <= callback_result.confidence <= 5.0, (
                                 f"Invalid confidence: {callback_result.confidence}"
                             )

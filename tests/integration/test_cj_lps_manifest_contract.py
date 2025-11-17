@@ -65,7 +65,10 @@ async def fetch_manifest(
                     f"(provider={provider.value if provider else 'all'}): {body}"
                 )
 
-            return await response.json()
+            result = await response.json()
+            if not isinstance(result, dict):
+                pytest.fail(f"Expected dict from manifest endpoint, got {type(result).__name__}")
+            return result
     except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
         pytest.skip(f"Manifest endpoint unavailable: {exc}")
 
@@ -82,7 +85,10 @@ def get_default_model_from_manifest(
 
     # Prefer models flagged as default when available, otherwise use the first entry
     default_model = next((model for model in provider_models if model.get("is_default")), None)
-    return default_model or provider_models[0]
+    result = default_model or provider_models[0]
+    if not isinstance(result, dict):
+        pytest.fail(f"Expected dict for model entry, got {type(result).__name__}")
+    return result
 
 
 def build_overrides(
@@ -193,7 +199,10 @@ class TestCJLPSManifestContract:
             max_tokens=2000,
         )
 
-        prompt = """Compare these essays and respond with JSON including winner, justification, and confidence."""
+        prompt = (
+            "Compare these essays and respond with JSON "
+            "including winner, justification, and confidence."
+        )
         correlation_id = uuid4()
 
         result = await llm_client.generate_comparison(

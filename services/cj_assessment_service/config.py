@@ -122,6 +122,14 @@ class Settings(SecureServiceSettings, JWTValidationSettings):
             "provider_batch_api."
         ),
     )
+    LLM_BATCH_API_ALLOWED_PROVIDERS: list[LLMProviderType] = Field(
+        default_factory=lambda: [LLMProviderType.OPENAI, LLMProviderType.ANTHROPIC],
+        description=(
+            "Providers eligible for PROVIDER_BATCH_API mode. If a batch selects "
+            "provider_batch_api but the resolved provider is not listed here, CJ "
+            "automatically falls back to the next safest batching mode."
+        ),
+    )
     ENABLE_LLM_BATCHING_METADATA_HINTS: bool = Field(
         default=False,
         description=(

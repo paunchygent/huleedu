@@ -21,6 +21,10 @@ from services.cj_assessment_service.cj_core_logic.batch_processor import BatchPr
 from services.cj_assessment_service.cj_core_logic.batch_submission import (
     merge_batch_processing_metadata,
 )
+from services.cj_assessment_service.cj_core_logic.llm_batching import (
+    build_llm_metadata_context,
+    resolve_effective_llm_batching_mode,
+)
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
 from services.cj_assessment_service.models_api import (
@@ -198,15 +202,26 @@ async def submit_comparisons_for_async_processing(
     if request_data.batch_config_overrides is not None:
         batch_config_overrides = BatchConfigOverrides(**request_data.batch_config_overrides)
 
+    effective_batching_mode = resolve_effective_llm_batching_mode(
+        settings=settings,
+        batch_config_overrides=batch_config_overrides,
+        provider_override=provider_override,
+    )
+
     max_pairs_cap = _resolve_requested_max_pairs(settings, request_data)
     budget_source = (
         "runner_override" if request_data.max_comparisons_override else "service_default"
     )
 
+    log_extra_with_mode = {
+        **log_extra,
+        "effective_llm_batching_mode": effective_batching_mode.value,
+    }
+
     logger.info(
         "Resolved comparison budget",
         extra={
-            **log_extra,
+            **log_extra_with_mode,
             "comparison_budget": max_pairs_cap,
             "comparison_budget_source": budget_source,
         },
@@ -246,7 +261,7 @@ async def submit_comparisons_for_async_processing(
         if not comparison_tasks:
             logger.warning(
                 f"No comparison tasks generated for batch {cj_batch_id}",
-                extra=log_extra,
+                extra=log_extra_with_mode,
             )
             return False
 
@@ -260,6 +275,15 @@ async def submit_comparisons_for_async_processing(
         current_iteration = await _get_current_iteration(session, cj_batch_id)
         iteration_metadata_context = _build_iteration_metadata_context(
             settings, current_iteration=current_iteration
+        )
+
+        metadata_context = build_llm_metadata_context(
+            cj_batch_id=cj_batch_id,
+            cj_source=request_data.cj_source,
+            cj_request_type=request_data.cj_request_type,
+            settings=settings,
+            effective_mode=effective_batching_mode,
+            iteration_metadata_context=iteration_metadata_context,
         )
 
         await _persist_llm_overrides_if_present(
@@ -280,16 +304,16 @@ async def submit_comparisons_for_async_processing(
             max_tokens_override=max_tokens_override,
             system_prompt_override=system_prompt_override,
             provider_override=provider_override,
-            metadata_context=iteration_metadata_context,
+            metadata_context=metadata_context,
         )
 
         logger.info(
             f"Submitted {submission_result.total_submitted} comparisons for async processing",
             extra={
                 **(
-                    {**log_extra, "current_iteration": current_iteration}
+                    {**log_extra_with_mode, "current_iteration": current_iteration}
                     if current_iteration is not None
-                    else log_extra
+                    else log_extra_with_mode
                 ),
                 "cj_batch_id": cj_batch_id,
                 "total_submitted": submission_result.total_submitted,
@@ -410,6 +434,8 @@ async def request_additional_comparisons_for_batch(
         essays_to_process=essays_to_process,
         language=original_request.language if original_request else batch.language,
         course_code=original_request.course_code if original_request else batch.course_code,
+        cj_source=original_request.cj_source if original_request else "els",
+        cj_request_type="cj_retry",
         student_prompt_text=(
             original_request.student_prompt_text
             if original_request
@@ -531,6 +557,21 @@ async def _process_comparison_iteration(
             system_prompt_override = llm_config_overrides.system_prompt_override
         provider_override = llm_config_overrides.provider_override
 
+    effective_batching_mode = resolve_effective_llm_batching_mode(
+        settings=settings,
+        batch_config_overrides=batch_config_overrides,
+        provider_override=provider_override,
+    )
+
+    metadata_context = build_llm_metadata_context(
+        cj_batch_id=cj_batch_id,
+        cj_source=request_data.cj_source,
+        cj_request_type=request_data.cj_request_type,
+        settings=settings,
+        effective_mode=effective_batching_mode,
+        iteration_metadata_context=iteration_metadata_context,
+    )
+
     await _persist_llm_overrides_if_present(
         session=session,
         cj_batch_id=cj_batch_id,
@@ -549,7 +590,7 @@ async def _process_comparison_iteration(
         max_tokens_override=max_tokens_override,
         system_prompt_override=system_prompt_override,
         provider_override=provider_override,
-        metadata_context=iteration_metadata_context,
+        metadata_context=metadata_context,
     )
 
     logger.info(

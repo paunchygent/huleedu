@@ -19,14 +19,14 @@ def parse_frontmatter_and_content(content: str) -> Tuple[Optional[str], str, str
         (title_from_frontmatter, frontmatter_block, content_after_frontmatter)
     """
     # Match YAML frontmatter
-    fm_pattern = re.compile(r'^---\s*\n(.*?)\n---\s*\n', re.DOTALL)
+    fm_pattern = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
     match = fm_pattern.match(content)
 
     if not match:
         return None, "", content
 
     frontmatter = match.group(1)
-    content_after = content[match.end():]
+    content_after = content[match.end() :]
     frontmatter_block = match.group(0)
 
     # Extract title from frontmatter
@@ -49,7 +49,7 @@ def remove_duplicate_h1(content: str) -> Tuple[str, bool]:
         return content, False
 
     # Find first H1 in content
-    h1_pattern = re.compile(r'^#\s+(.+?)$', re.MULTILINE)
+    h1_pattern = re.compile(r"^#\s+(.+?)$", re.MULTILINE)
     h1_match = h1_pattern.search(content_after)
 
     if not h1_match:
@@ -58,7 +58,7 @@ def remove_duplicate_h1(content: str) -> Tuple[str, bool]:
     h1_text = h1_match.group(1).strip()
 
     # Normalize for comparison (remove quotes, extra spaces)
-    title_normalized = title.strip(' "\'')
+    title_normalized = title.strip(" \"'")
     h1_normalized = h1_text.strip()
 
     # Check if H1 matches title (exact or very close)
@@ -68,14 +68,14 @@ def remove_duplicate_h1(content: str) -> Tuple[str, bool]:
         end = h1_match.end()
 
         # Also remove trailing newlines after the H1
-        while end < len(content_after) and content_after[end] == '\n':
+        while end < len(content_after) and content_after[end] == "\n":
             end += 1
 
         # Reconstruct content without the duplicate H1
         new_content_after = content_after[:start] + content_after[end:]
 
         # Remove leading blank lines from content
-        new_content_after = new_content_after.lstrip('\n')
+        new_content_after = new_content_after.lstrip("\n")
 
         new_content = fm_block + new_content_after
         return new_content, True
@@ -89,7 +89,8 @@ def process_tasks_directory(tasks_dir: Path, dry_run: bool = True) -> None:
     """
     # Find all .md files, excluding special files and archive
     md_files = [
-        f for f in tasks_dir.rglob("*.md")
+        f
+        for f in tasks_dir.rglob("*.md")
         if f.name not in ("_REORGANIZATION_PROPOSAL.md", "INDEX.md", "README.md", "HUB.md")
         and "archive" not in f.parts
     ]
@@ -100,7 +101,7 @@ def process_tasks_directory(tasks_dir: Path, dry_run: bool = True) -> None:
     print(f"{'DRY RUN: ' if dry_run else ''}Processing {total_count} TASKS files...\n")
 
     for md_file in md_files:
-        content = md_file.read_text(encoding='utf-8')
+        content = md_file.read_text(encoding="utf-8")
         new_content, was_modified = remove_duplicate_h1(content)
 
         if was_modified:
@@ -110,7 +111,7 @@ def process_tasks_directory(tasks_dir: Path, dry_run: bool = True) -> None:
             if dry_run:
                 print(f"[DRY RUN] Would modify: {rel_path}")
             else:
-                md_file.write_text(new_content, encoding='utf-8')
+                md_file.write_text(new_content, encoding="utf-8")
                 print(f"✓ Modified: {rel_path}")
 
     print(f"\n{'Would modify' if dry_run else 'Modified'} {modified_count}/{total_count} files")
@@ -127,12 +128,10 @@ def main():
         "--tasks-dir",
         type=Path,
         default=Path("TASKS"),
-        help="Path to TASKS directory (default: TASKS)"
+        help="Path to TASKS directory (default: TASKS)",
     )
     parser.add_argument(
-        "--no-dry-run",
-        action="store_true",
-        help="Actually modify files (default is dry run)"
+        "--no-dry-run", action="store_true", help="Actually modify files (default is dry run)"
     )
 
     args = parser.parse_args()

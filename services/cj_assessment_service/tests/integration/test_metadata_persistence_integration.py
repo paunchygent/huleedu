@@ -121,3 +121,4 @@ async def test_original_request_metadata_persists_and_rehydrates(
     assert request_args.student_prompt_text == "Prompt from runner"
     assert request_args.llm_config_overrides is not None
     assert request_args.llm_config_overrides.model_override == "claude-3-sonnet"
+    assert request_args.cj_request_type == "cj_retry"

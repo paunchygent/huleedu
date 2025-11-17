@@ -194,6 +194,8 @@ async def create_cj_batch(
             assignment_id=assignment_id,
             language=request_data.language,
             course_code=request_data.course_code,
+            cj_source=request_data.cj_source,
+            cj_request_type=request_data.cj_request_type,
             student_prompt_text=request_data.student_prompt_text,
             student_prompt_storage_id=request_data.student_prompt_storage_id,
             judge_rubric_text=request_data.judge_rubric_text,

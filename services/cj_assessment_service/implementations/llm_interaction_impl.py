@@ -167,10 +167,6 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                         task,
                         bos_batch_id=bos_batch_id,
                     )
-                    if self.settings.ENABLE_LLM_BATCHING_METADATA_HINTS:
-                        metadata_adapter = metadata_adapter.with_additional_context(
-                            cj_llm_batching_mode=self.settings.LLM_BATCHING_MODE.value,
-                        )
                     if metadata_context:
                         metadata_adapter = metadata_adapter.with_additional_context(
                             **metadata_context

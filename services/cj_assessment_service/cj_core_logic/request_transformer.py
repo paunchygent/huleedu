@@ -59,6 +59,8 @@ def transform_cj_assessment_request(
         essays_to_process=essays_to_process,
         language=request_event_data.language,
         course_code=request_event_data.course_code,
+        cj_source="els",
+        cj_request_type="cj_comparison",
         student_prompt_text=prompt_text,
         student_prompt_storage_id=prompt_storage_id,
         judge_rubric_text=judge_rubric_text,

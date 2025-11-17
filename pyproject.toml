@@ -122,8 +122,8 @@ ignore = [
 "scripts/cj_verification/report_generator.py" = ["E501"]
 "scripts/cj_verification/visualization_generator.py" = ["E501"]
 "scripts/cj_verification/bayesian_model_verification.py" = ["E501"]
-"documentation/research/rapport_till_kollegor/create_corrected_figures.py" = ["E501"]
-"documentation/research/rapport_till_kollegor/ordinal_essay_scoring.py" = ["E722", "F401"]
+"docs/research/rapport_till_kollegor/create_corrected_figures.py" = ["E501"]
+"docs/research/rapport_till_kollegor/ordinal_essay_scoring.py" = ["E722", "F401"]
 
 # Note: Import restrictions would be enforced through custom linting rules
 # For now, rely on type system and code review to prevent standard library logging

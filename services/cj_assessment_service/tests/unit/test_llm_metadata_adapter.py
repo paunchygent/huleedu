@@ -37,12 +37,18 @@ class TestCJLLMComparisonMetadata:
         metadata = metadata.with_additional_context(
             cj_llm_batching_mode="per_request",
             comparison_iteration=0,
+            cj_batch_id="42",
+            cj_source="els",
+            cj_request_type="cj_comparison",
         )
 
         serialized = metadata.to_request_metadata()
         assert serialized["bos_batch_id"] == "bos-123"
         assert serialized["cj_llm_batching_mode"] == "per_request"
         assert serialized["comparison_iteration"] == 0
+        assert serialized["cj_batch_id"] == "42"
+        assert serialized["cj_source"] == "els"
+        assert serialized["cj_request_type"] == "cj_comparison"
 
     def test_additional_context_does_not_drop_known_fields(self) -> None:
         """Unknown keys remain additive while core ids stay intact."""

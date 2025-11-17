@@ -250,6 +250,9 @@ class TestLLMInteractionImplProtocolCompliance:
         await llm_impl.perform_comparisons(
             tasks=[sample_comparison_task],
             correlation_id=uuid4(),
+            metadata_context={
+                "cj_llm_batching_mode": LLMBatchingMode.SERIAL_BUNDLE.value,
+            },
         )
 
         metadata = successful_provider.last_call_params["request_metadata"]
@@ -277,6 +280,35 @@ class TestLLMInteractionImplProtocolCompliance:
 
         metadata = successful_provider.last_call_params["request_metadata"]
         assert metadata["comparison_iteration"] == 3
+
+    @pytest.mark.asyncio
+    async def test_metadata_merges_cj_context(
+        self,
+        providers_dict_success: dict[LLMProviderType, LLMProviderProtocol],
+        test_settings: Settings,
+        sample_comparison_task: ComparisonTask,
+        successful_provider: MockLLMProvider,
+    ) -> None:
+        """Ensure CJ batch context values are preserved in request metadata."""
+
+        llm_impl = LLMInteractionImpl(providers=providers_dict_success, settings=test_settings)
+
+        context = {
+            "cj_batch_id": "42",
+            "cj_source": "els",
+            "cj_request_type": "cj_retry",
+        }
+
+        await llm_impl.perform_comparisons(
+            tasks=[sample_comparison_task],
+            correlation_id=uuid4(),
+            metadata_context=context,
+        )
+
+        metadata = successful_provider.last_call_params["request_metadata"]
+        assert metadata["cj_batch_id"] == "42"
+        assert metadata["cj_source"] == "els"
+        assert metadata["cj_request_type"] == "cj_retry"
 
     @pytest.mark.asyncio
     async def test_error_handling_creates_structured_results(

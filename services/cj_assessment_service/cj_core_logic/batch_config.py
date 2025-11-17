@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from common_core.config_enums import LLMBatchingMode
 from pydantic import BaseModel, Field
 
 from services.cj_assessment_service.config import Settings
@@ -21,6 +22,10 @@ class BatchConfigOverrides(BaseModel):
     )
     partial_completion_threshold: float | None = Field(
         None, ge=0.5, le=1.0, description="Partial completion threshold"
+    )
+    llm_batching_mode_override: LLMBatchingMode | None = Field(
+        default=None,
+        description="Override for CJ→LPS batching strategy on a per-batch basis",
     )
 
 

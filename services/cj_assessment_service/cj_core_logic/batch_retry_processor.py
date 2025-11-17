@@ -12,6 +12,10 @@ from uuid import UUID
 from huleedu_service_libs.error_handling import raise_processing_error
 from huleedu_service_libs.logging_utils import create_service_logger
 
+from services.cj_assessment_service.cj_core_logic.llm_batching import (
+    build_llm_metadata_context,
+    resolve_effective_llm_batching_mode,
+)
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.protocols import (
     BatchProcessorProtocol,
@@ -51,12 +55,12 @@ class BatchRetryProcessor:
         self.pool_manager = pool_manager
         self.batch_submitter = batch_submitter
 
-    async def _load_persisted_llm_overrides(
+    async def _load_processing_metadata(
         self,
         cj_batch_id: int,
         correlation_id: UUID,
     ) -> dict[str, Any]:
-        """Load persisted LLM overrides from batch metadata."""
+        """Load stored processing metadata for a CJ batch."""
 
         async with self.database.session() as session:
             from .batch_submission import get_batch_state
@@ -67,18 +71,40 @@ class BatchRetryProcessor:
                 correlation_id=correlation_id,
             )
 
-        if not batch_state:
-            return {}
+        metadata = batch_state.processing_metadata if batch_state else None
+        return metadata if isinstance(metadata, dict) else {}
 
-        metadata = batch_state.processing_metadata
-        if not metadata or not isinstance(metadata, dict):
-            return {}
+    async def _load_persisted_llm_overrides(
+        self,
+        cj_batch_id: int,
+        correlation_id: UUID,
+    ) -> dict[str, Any]:
+        """Load persisted LLM overrides from batch metadata."""
+
+        metadata = await self._load_processing_metadata(
+            cj_batch_id=cj_batch_id,
+            correlation_id=correlation_id,
+        )
 
         overrides = metadata.get("llm_overrides")
         if isinstance(overrides, dict):
             return overrides
 
         return {}
+
+    async def _load_original_request_payload(
+        self,
+        cj_batch_id: int,
+        correlation_id: UUID,
+    ) -> dict[str, Any] | None:
+        """Return stored original CJ request metadata for context reuse."""
+
+        metadata = await self._load_processing_metadata(
+            cj_batch_id=cj_batch_id,
+            correlation_id=correlation_id,
+        )
+        original_request = metadata.get("original_request") if metadata else None
+        return original_request if isinstance(original_request, dict) else None
 
     async def submit_retry_batch(
         self,
@@ -139,6 +165,10 @@ class BatchRetryProcessor:
                 cj_batch_id=cj_batch_id,
                 correlation_id=correlation_id,
             )
+            original_request_payload = await self._load_original_request_payload(
+                cj_batch_id=cj_batch_id,
+                correlation_id=correlation_id,
+            )
 
             def _resolve_override(value: Any, key: str) -> Any:
                 return value if value is not None else persisted_overrides.get(key)
@@ -155,6 +185,21 @@ class BatchRetryProcessor:
             )
             final_provider_override = _resolve_override(provider_override, "provider_override")
 
+            effective_batching_mode = resolve_effective_llm_batching_mode(
+                settings=self.settings,
+                batch_config_overrides=None,
+                provider_override=final_provider_override,
+            )
+
+            metadata_context = build_llm_metadata_context(
+                cj_batch_id=cj_batch_id,
+                cj_source=(original_request_payload or {}).get("cj_source"),
+                cj_request_type="cj_retry",
+                settings=self.settings,
+                effective_mode=effective_batching_mode,
+                iteration_metadata_context=None,
+            )
+
             # Submit retry batch using core submitter
             result = cast(
                 BatchSubmissionResult,
@@ -168,7 +213,7 @@ class BatchRetryProcessor:
                     max_tokens_override=final_max_tokens_override,
                     system_prompt_override=final_system_prompt_override,
                     provider_override=final_provider_override,
-                    metadata_context=None,
+                    metadata_context=metadata_context,
                 ),
             )
 
