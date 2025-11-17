@@ -129,6 +129,13 @@ class Settings(SecureServiceSettings, JWTValidationSettings):
             "cj_llm_batching_mode and comparison_iteration into request_metadata."
         ),
     )
+    ENABLE_ITERATIVE_BATCHING_LOOP: bool = Field(
+        default=False,
+        description=(
+            "When true, stability-driven comparison iterations can submit bundled work"
+            " and emit comparison_iteration metadata once batching hints are enabled."
+        ),
+    )
 
     # LLM Provider Service configuration
     LLM_PROVIDER_SERVICE_URL: str = Field(

@@ -9,7 +9,7 @@ Cache system removed to preserve CJ Assessment methodology integrity.
 from __future__ import annotations
 
 import asyncio
-from typing import cast
+from typing import Any, cast
 from uuid import UUID
 
 from common_core import LLMProviderType
@@ -94,6 +94,7 @@ class LLMInteractionImpl(LLMInteractionProtocol):
         max_tokens_override: int | None = None,
         system_prompt_override: str | None = None,
         provider_override: str | LLMProviderType | None = None,
+        metadata_context: dict[str, Any] | None = None,
     ) -> list[ComparisonResult]:
         """Perform multiple comparison tasks using configured LLM providers.
 
@@ -107,6 +108,7 @@ class LLMInteractionImpl(LLMInteractionProtocol):
             max_tokens_override: Optional max tokens override
             system_prompt_override: Optional system prompt override per batch
             provider_override: Optional provider name override forwarded to LPS
+            metadata_context: Optional metadata fields merged into CJLLMComparisonMetadata
 
         Returns:
             List of comparison results corresponding to the input tasks.
@@ -168,6 +170,10 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                     if self.settings.ENABLE_LLM_BATCHING_METADATA_HINTS:
                         metadata_adapter = metadata_adapter.with_additional_context(
                             cj_llm_batching_mode=self.settings.LLM_BATCHING_MODE.value,
+                        )
+                    if metadata_context:
+                        metadata_adapter = metadata_adapter.with_additional_context(
+                            **metadata_context
                         )
                     request_metadata = metadata_adapter.to_request_metadata()
                     response_data = await provider.generate_comparison(

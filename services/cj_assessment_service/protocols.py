@@ -364,6 +364,7 @@ class LLMInteractionProtocol(Protocol):
         max_tokens_override: int | None = None,
         system_prompt_override: str | None = None,
         provider_override: str | LLMProviderType | None = None,
+        metadata_context: dict[str, Any] | None = None,
     ) -> list[Any]:
         """Perform comparative judgment on a list of comparison tasks.
 
@@ -377,6 +378,7 @@ class LLMInteractionProtocol(Protocol):
             max_tokens_override: Optional max tokens override
             system_prompt_override: Optional system prompt override
             provider_override: Optional provider name override forwarded to LPS
+            metadata_context: Optional metadata additions for downstream callbacks
 
         Returns:
             List of ComparisonResult objects
@@ -398,6 +400,7 @@ class BatchProcessorProtocol(Protocol):
         max_tokens_override: int | None = None,
         system_prompt_override: str | None = None,
         provider_override: str | LLMProviderType | None = None,
+        metadata_context: dict[str, Any] | None = None,
     ) -> "BatchSubmissionResult":
         """Submit comparison batch with configurable batch size."""
         ...

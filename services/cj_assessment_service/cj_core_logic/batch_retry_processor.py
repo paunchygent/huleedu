@@ -170,6 +170,7 @@ class BatchRetryProcessor:
                     max_tokens_override=final_max_tokens_override,
                     system_prompt_override=final_system_prompt_override,
                     provider_override=final_provider_override,
+                    metadata_context=None,
                 ),
             )
 

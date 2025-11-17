@@ -270,6 +270,7 @@ documented and locked down with unit tests (`tests/unit/test_llm_metadata_adapte
 | `request_metadata.bos_batch_id` | `CJLLMComparisonMetadata` | Optional | BOS/ELS batch identifier when available |
 | `request_metadata.prompt_sha256` | LPS queue processor | Optional | Deterministic hash of rendered prompt for replay/debug |
 | `request_metadata.cj_llm_batching_mode` | `CJLLMComparisonMetadata` | Optional hint | Emitted when `CJ_ASSESSMENT_SERVICE_ENABLE_LLM_BATCHING_METADATA_HINTS=true`; records `per_request`, `serial_bundle`, or `provider_batch_api`. |
+| `request_metadata.comparison_iteration` | `CJLLMComparisonMetadata` | Optional hint | Emitted only when metadata hints **and** the iterative batching loop are enabled; carries the zero-based iteration index used by the stability-driven bundling loop. |
 
 ### Metadata construction
 
@@ -279,7 +280,9 @@ documented and locked down with unit tests (`tests/unit/test_llm_metadata_adapte
   keeping the contract additive-only.
 - Future batching flags (e.g., `cj_llm_batching_mode`, `comparison_iteration`) are added
   via `CJLLMComparisonMetadata.with_additional_context(...)` so new keys never
-  mutate legacy ones.
+  mutate legacy ones. Once the iterative batching loop is online, CJ passes the
+  zero-based iteration counter through this helper so callbacks can correlate
+  Bradley–Terry recomputations with the originating bundle.
 
 ### Callback expectations
 
@@ -342,6 +345,7 @@ LLM_QUEUE_TOTAL_TIMEOUT_SECONDS=900               # Total timeout (15 minutes)
 # LLM Batching Configuration
 CJ_ASSESSMENT_SERVICE_LLM_BATCHING_MODE=per_request
 CJ_ASSESSMENT_SERVICE_ENABLE_LLM_BATCHING_METADATA_HINTS=false
+CJ_ASSESSMENT_SERVICE_ENABLE_ITERATIVE_BATCHING_LOOP=false
 
 # LLM Provider API Keys
 OPENAI_API_KEY=sk-...
@@ -370,9 +374,24 @@ batch path (still single-item bundles for now) so the queue processor can call
 `process_comparison_batch`. `provider_batch_api` is wired end-to-end but behaves
 like `serial_bundle` until the provider-native batching work lands. When
 `CJ_ASSESSMENT_SERVICE_ENABLE_LLM_BATCHING_METADATA_HINTS` is `true`, every
-`LLMComparisonRequest.metadata` payload gains `cj_llm_batching_mode` (and future
-iteration hints). Callbacks echo those keys back unchanged, so toggling the flag
-is safe as long as downstream consumers tolerate additive metadata.
+`LLMComparisonRequest.metadata` payload gains `cj_llm_batching_mode`. Flip
+`CJ_ASSESSMENT_SERVICE_ENABLE_ITERATIVE_BATCHING_LOOP` to `true` once the
+stability-driven loop is actually running (serial bundling enabled, `MAX_ITERATIONS > 1`,
+and `COMPARISONS_PER_STABILITY_CHECK_ITERATION > 1`). With both flags enabled the
+adapter also emits `comparison_iteration`, giving downstream services iteration
+numbers alongside the batching mode. Callbacks echo the metadata verbatim, so the
+flags are safe to toggle provided consumers tolerate additive keys.
+
+The iterative loop is considered **online** only when all of the following are true:
+
+- `CJ_ASSESSMENT_SERVICE_ENABLE_ITERATIVE_BATCHING_LOOP=true`
+- `CJ_ASSESSMENT_SERVICE_LLM_BATCHING_MODE != per_request`
+- `COMPARISONS_PER_STABILITY_CHECK_ITERATION > 1` and `MIN_COMPARISONS_FOR_STABILITY_CHECK > 0`
+- `MAX_ITERATIONS > 1`
+
+In that state CJ adds `comparison_iteration` to the metadata whenever
+`CJ_ASSESSMENT_SERVICE_ENABLE_LLM_BATCHING_METADATA_HINTS=true`; otherwise the field
+is omitted.
 
 `COMPARISONS_PER_STABILITY_CHECK_ITERATION` defines the number of new pairs generated per stability iteration; `MAX_PAIRWISE_COMPARISONS` is an absolute guardrail on the batch. Both values are applied directly by `pair_generation.generate_comparison_tasks`, so adjust them via environment variables rather than hard-coding limits elsewhere.
 

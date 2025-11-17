@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
+from common_core.config_enums import LLMBatchingMode
 from common_core.events.cj_assessment_events import LLMConfigOverrides
 from huleedu_service_libs.logging_utils import create_service_logger
 from pydantic import BaseModel, Field
@@ -49,6 +50,43 @@ class ComparisonIterationResult(BaseModel):
     updated_scores: dict[str, float] = Field(
         description="Updated Bradley-Terry scores mapped by essay ID", default_factory=dict
     )
+
+
+def is_iterative_batching_online(settings: Settings) -> bool:
+    """Determine if the stability-driven batching loop is active for this environment."""
+
+    return (
+        getattr(settings, "ENABLE_ITERATIVE_BATCHING_LOOP", False)
+        and getattr(settings, "MAX_ITERATIONS", 1) > 1
+        and getattr(settings, "MIN_COMPARISONS_FOR_STABILITY_CHECK", 0) > 0
+        and getattr(settings, "COMPARISONS_PER_STABILITY_CHECK_ITERATION", 0) > 1
+        and settings.LLM_BATCHING_MODE is not LLMBatchingMode.PER_REQUEST
+    )
+
+
+async def _get_current_iteration(session: AsyncSession, cj_batch_id: int) -> int | None:
+    """Fetch the current iteration counter for a CJ batch."""
+
+    from services.cj_assessment_service.models_db import CJBatchState
+
+    batch_state = await session.get(CJBatchState, cj_batch_id)
+    return batch_state.current_iteration if batch_state else None
+
+
+def _build_iteration_metadata_context(
+    settings: Settings,
+    *,
+    current_iteration: int | None,
+) -> dict[str, Any] | None:
+    """Return additive metadata for downstream LLM requests when iteration loop is online."""
+
+    if not (
+        settings.ENABLE_LLM_BATCHING_METADATA_HINTS and is_iterative_batching_online(settings)
+    ):
+        return None
+
+    iteration_value = current_iteration if current_iteration is not None else 0
+    return {"comparison_iteration": iteration_value}
 
 
 async def _persist_llm_overrides_if_present(
@@ -221,6 +259,11 @@ async def submit_comparisons_for_async_processing(
             settings=settings,
         )
 
+        current_iteration = await _get_current_iteration(session, cj_batch_id)
+        iteration_metadata_context = _build_iteration_metadata_context(
+            settings, current_iteration=current_iteration
+        )
+
         await _persist_llm_overrides_if_present(
             session=session,
             cj_batch_id=cj_batch_id,
@@ -239,12 +282,17 @@ async def submit_comparisons_for_async_processing(
             max_tokens_override=max_tokens_override,
             system_prompt_override=system_prompt_override,
             provider_override=provider_override,
+            metadata_context=iteration_metadata_context,
         )
 
         logger.info(
             f"Submitted {submission_result.total_submitted} comparisons for async processing",
             extra={
-                **log_extra,
+                **(
+                    {**log_extra, "current_iteration": current_iteration}
+                    if current_iteration is not None
+                    else log_extra
+                ),
                 "cj_batch_id": cj_batch_id,
                 "total_submitted": submission_result.total_submitted,
                 "all_submitted": submission_result.all_submitted,
@@ -465,6 +513,10 @@ async def _process_comparison_iteration(
         settings=settings,
     )
 
+    iteration_metadata_context = _build_iteration_metadata_context(
+        settings, current_iteration=current_iteration
+    )
+
     # Extract batch config overrides from request_data if available
     batch_config_overrides = None
     if request_data.batch_config_overrides is not None:
@@ -499,6 +551,7 @@ async def _process_comparison_iteration(
         max_tokens_override=max_tokens_override,
         system_prompt_override=system_prompt_override,
         provider_override=provider_override,
+        metadata_context=iteration_metadata_context,
     )
 
     logger.info(
@@ -508,6 +561,7 @@ async def _process_comparison_iteration(
             "cj_batch_id": cj_batch_id,
             "total_submitted": submission_result.total_submitted,
             "all_submitted": submission_result.all_submitted,
+            "current_iteration": current_iteration,
         },
     )
 
