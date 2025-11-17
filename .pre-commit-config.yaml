@@ -40,7 +40,7 @@ repos:
 
     -   id: format-python
         name: Format Python files with ruff
-        entry: bash -c 'cd "$(git rev-parse --show-toplevel)" && pdm run format-all'
+        entry: bash -c 'cd "$(git rev-parse --show-toplevel)" && git ls-files "*.py" | xargs -r pdm run ruff format'
         language: system
         files: \.py$
         pass_filenames: false
@@ -48,7 +48,7 @@ repos:
 
     -   id: lint-python
         name: Lint Python files with ruff
-        entry: bash -c 'cd "$(git rev-parse --show-toplevel)" && pdm run lint-fix --unsafe-fixes'
+        entry: bash -c 'cd "$(git rev-parse --show-toplevel)" && git ls-files "*.py" | xargs -r pdm run ruff check --fix --unsafe-fixes'
         language: system
         files: \.py$
         pass_filenames: false
