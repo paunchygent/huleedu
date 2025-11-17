@@ -21,6 +21,8 @@ from contextlib import asynccontextmanager
 from typing import Any, NamedTuple
 
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
+from aiokafka.admin import AIOKafkaAdminClient, NewTopic
+from aiokafka.errors import TopicAlreadyExistsError
 from huleedu_service_libs.logging_utils import create_service_logger
 
 logger = create_service_logger("test.kafka_manager")
@@ -220,6 +222,46 @@ class KafkaTestManager:
         self.config = config or create_kafka_test_config()
         self._created_consumers: list[AIOKafkaConsumer] = []
         self._use_consumer_pool = True  # Enable consumer pooling with simplified implementation
+
+    async def ensure_topics(
+        self,
+        topics: list[str],
+        num_partitions: int = 1,
+        replication_factor: int = 1,
+    ) -> None:
+        """
+        Pre-create Kafka topics to avoid UnknownTopicOrPartitionError.
+
+        Args:
+            topics: List of topic names to create
+            num_partitions: Number of partitions per topic
+            replication_factor: Replication factor for topics
+
+        Note:
+            Silently succeeds if topics already exist (TopicAlreadyExistsError ignored).
+        """
+        admin_client = AIOKafkaAdminClient(bootstrap_servers=self.config.bootstrap_servers)
+
+        try:
+            await admin_client.start()
+
+            new_topics = [
+                NewTopic(
+                    name=topic,
+                    num_partitions=num_partitions,
+                    replication_factor=replication_factor,
+                )
+                for topic in topics
+            ]
+
+            try:
+                await admin_client.create_topics(new_topics, validate_only=False)
+                logger.info(f"✅ Created Kafka topics: {topics}")
+            except TopicAlreadyExistsError:
+                logger.debug(f"Topics already exist: {topics}")
+
+        finally:
+            await admin_client.close()
 
     @asynccontextmanager
     async def consumer(

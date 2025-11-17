@@ -87,6 +87,7 @@ class ServiceTestManager:
         ServiceEndpoint("file_service", 7001, has_http_api=True, has_metrics=True),
         ServiceEndpoint("spellchecker_service", 8002, has_http_api=True, has_metrics=True),
         ServiceEndpoint("cj_assessment_service", 9095, has_http_api=True, has_metrics=True),
+        ServiceEndpoint("llm_provider_service", 8090, has_http_api=True, has_metrics=True),
         ServiceEndpoint("class_management_service", 5002, has_http_api=True, has_metrics=True),
         ServiceEndpoint("result_aggregator_service", 4003, has_http_api=True, has_metrics=True),
         ServiceEndpoint("identity_service", 7005, has_http_api=True, has_metrics=True),
