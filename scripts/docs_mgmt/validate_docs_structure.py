@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Validate documentation structure per documentation/DOCS_STRUCTURE_SPEC.md.
+Validate documentation structure per docs/DOCS_STRUCTURE_SPEC.md.
 No external deps required.
 
 Validates:
@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any, Dict, Tuple
 
 ROOT = Path(__file__).resolve().parents[2]
-DOCS_DIR = ROOT / "documentation"
+DOCS_DIR = ROOT / "docs"
 
 # Top-level directories allowed under documentation/ (§3)
 ALLOWED_TOP_LEVEL_DIRS = {

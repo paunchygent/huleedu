@@ -25,7 +25,7 @@ repos:
         name: Validate documentation structure
         entry: python scripts/docs_mgmt/validate_docs_structure.py
         language: python
-        files: ^documentation/.*\.md$
-        exclude: ^documentation/(DOCS_STRUCTURE_SPEC|_archive/)
+        files: ^docs/.*\.md$
+        exclude: ^docs/(DOCS_STRUCTURE_SPEC|_archive/)
         pass_filenames: false
         stages: [pre-commit]

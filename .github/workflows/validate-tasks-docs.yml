@@ -4,7 +4,7 @@ on:
   pull_request:
     paths:
       - 'TASKS/**/*.md'
-      - 'documentation/**/*.md'
+      - 'docs/**/*.md'
       - 'scripts/task_mgmt/**'
       - 'scripts/docs_mgmt/**'
   push:
@@ -12,7 +12,7 @@ on:
       - main
     paths:
       - 'TASKS/**/*.md'
-      - 'documentation/**/*.md'
+      - 'docs/**/*.md'
 
 jobs:
   validate-tasks:
