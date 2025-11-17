@@ -418,7 +418,7 @@ git push -u origin <branch-name>
 # Use Read tool on: CLAUDE.md
 
 # Read the rule index
-# Use Read tool on: .claude/rules/000-rule-index.mdc
+# Use Read tool on: .claude/rules/000-rule-index.md
 
 # Read handoff documentation
 # Use Read tool on: .claude/HANDOFF.md

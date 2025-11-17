@@ -212,7 +212,7 @@ pdm run pytest-root services/class_management_service/tests/performance/ -v
 - **Explicit fixtures**: Import test utilities from shared conftest.py
 - **Timeout monitor testing**: Mock sleep for timer-based logic
 
-Reference: `.claude/rules/075-test-creation-methodology.mdc`
+Reference: `.claude/rules/075-test-creation-methodology.md`
 
 ## Migration Workflow
 

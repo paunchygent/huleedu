@@ -202,7 +202,7 @@ After planning, verify:
 
 ## Technical Constraints
 
-### Testing Standards (`.claude/rules/075-test-creation-methodology.mdc`)
+### Testing Standards (`.claude/rules/075-test-creation-methodology.md`)
 
 - **Markers**: Use `@pytest.mark.integration` for all integration tests
 - **Fixtures**: Reuse existing fixtures from `services/cj_assessment_service/tests/fixtures/`
@@ -214,7 +214,7 @@ After planning, verify:
 
 - **Type Safety**: `pdm run typecheck-all` must pass (0 errors)
 - **Test Pass Rate**: 100% of new tests must pass
-- **Documentation**: Follow `.claude/rules/090-documentation-standards.mdc`
+- **Documentation**: Follow `.claude/rules/090-documentation-standards.md`
 - **Imports**: Use absolute imports from repo root (no relative imports across service boundaries)
 
 ### File Naming Conventions
@@ -265,10 +265,10 @@ TASKS/TASK-LLM-MODEL-VERSION-MANAGEMENT.md
 - See Appendix A: Integration Analysis (lines 880-1063)
 
 **Architecture Rules**:
-- `.claude/rules/020.13-llm-provider-service-architecture.mdc`
-- `.claude/rules/042-async-patterns-and-di.mdc`
-- `.claude/rules/075-test-creation-methodology.mdc`
-- `.claude/rules/090-documentation-standards.mdc`
+- `.claude/rules/020.13-llm-provider-service-architecture.md`
+- `.claude/rules/042-async-patterns-and-di.md`
+- `.claude/rules/075-test-creation-methodology.md`
+- `.claude/rules/090-documentation-standards.md`
 
 **Implementation Files to Study**:
 - `services/cj_assessment_service/implementations/llm_provider_service_client.py`

@@ -228,6 +228,6 @@ event_id = uuid5(NAMESPACE_DNS, f"batch:{batch_id}:cj_complete")
 
 ## Related
 
-- `.claude/rules/020-architectural-mandates.mdc` - Architectural constraints
-- `.claude/rules/042-async-patterns-and-di.mdc` - DI and async patterns
+- `.claude/rules/020-architectural-mandates.md` - Architectural constraints
+- `.claude/rules/042-async-patterns-and-di.md` - DI and async patterns
 - CJ Assessment Service - Parameter usage examples

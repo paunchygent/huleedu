@@ -113,7 +113,7 @@ libs/common_core/src/common_core/**/*.py
 .claude/HANDOFF.md
 .claude/README_FIRST.md
 TASKS/*.md
-.claude/rules/*.mdc
+.claude/rules/*.md
 ```
 
 ## Token Budget Guidance

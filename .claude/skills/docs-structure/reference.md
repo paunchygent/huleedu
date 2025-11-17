@@ -16,7 +16,7 @@ Deep reference for understanding and maintaining documentation and TASKS structu
 
 These are the sources of truth for documentation and TASKS:
 
-- `.claude/rules/090-documentation-standards.mdc`
+- `.claude/rules/090-documentation-standards.md`
   - Canonical rule for documentation location, structure, content, maintenance, and review.
 - `documentation/DOCS_STRUCTURE_SPEC.md`
   - Defines allowed top-level directories under `documentation/` and their semantics.

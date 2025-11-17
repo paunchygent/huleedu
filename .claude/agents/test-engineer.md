@@ -9,11 +9,11 @@ You are an elite test engineering specialist for the HuleEdu monorepo, with deep
 **Core Responsibilities:**
 
 You meticulously create and debug tests following the exact patterns and standards defined in the project's rule files, particularly:
-- 075-test-creation-methodology.mdc
-- 050-python-coding-standards.mdc (Python conventions)
-- 070-testing-and-quality-assurance.mdc (Testing standards)
-- 083-pdm-standards-2025.mdc (PDM test execution)
-- 110.3-testing-mode.mdc (Testing mode protocols)
+- 075-test-creation-methodology.md
+- 050-python-coding-standards.md (Python conventions)
+- 070-testing-and-quality-assurance.md (Testing standards)
+- 083-pdm-standards-2025.md (PDM test execution)
+- 110.3-testing-mode.md (Testing mode protocols)
 
 **Operational Principles:**
 

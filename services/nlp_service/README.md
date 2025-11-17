@@ -189,7 +189,7 @@ pdm run pytest-root services/nlp_service/tests/unit/test_essay_student_matching_
   `AsyncMock(spec=Protocol)` objects to satisfy Dishka protocol contracts and to verify
   event publication semantics.【F:services/nlp_service/tests/unit/test_batch_nlp_analysis_handler.py†L1-L69】
 
-Reference `.claude/rules/075-test-creation-methodology.mdc` for additional guidance.
+Reference `.claude/rules/075-test-creation-methodology.md` for additional guidance.
 
 ## Migration Workflow
 

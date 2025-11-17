@@ -6,7 +6,7 @@
 > 2. **Keep business rules near the producer.** Changes should live in the ENG5 runner and its helper modules unless a shared contract must change.
 > 3. **Demonstrate outcomes.** For each requirement, capture evidence (logs, test output, or CLI screenshots) showing the new behaviour.
 >
-> Follow `090-documentation-standards.mdc` when updating this file. Summaries must be action-oriented, not diary-style.
+> Follow `090-documentation-standards.md` when updating this file. Summaries must be action-oriented, not diary-style.
 
 ## Status
 

@@ -348,4 +348,4 @@ pdm run pytest-root services/content_service/tests/test_health_routes.py -v
 - **Concurrent uploads**: Verify UUID uniqueness and async behavior
 - **Health check**: Verify storage path accessibility
 
-Reference: `.claude/rules/075-test-creation-methodology.mdc`
+Reference: `.claude/rules/075-test-creation-methodology.md`

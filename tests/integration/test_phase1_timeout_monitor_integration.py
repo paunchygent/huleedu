@@ -8,7 +8,7 @@ Tests the timeout monitor's core functionality with real database operations:
 - Multiple batch isolation and processing
 - Cross-service event propagation
 
-Following 070-testing-standards.mdc and 075-test-creation-methodology.mdc
+Following 070-testing-standards.md and 075-test-creation-methodology.md
 Using testcontainers for authentic database behavior.
 """
 

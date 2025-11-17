@@ -419,4 +419,4 @@ class CJAssessmentCompletedV1(BaseEventData):  # ❌
 - [Event Envelope](event-envelope.md) - EventEnvelope structure
 - [Event Registry](event-registry.md) - ProcessingEvent enum
 - `common_core/events/cj_assessment_events.py` - Canonical example implementation
-- `.claude/rules/020-architectural-mandates.mdc` - Separation of concerns
+- `.claude/rules/020-architectural-mandates.md` - Separation of concerns

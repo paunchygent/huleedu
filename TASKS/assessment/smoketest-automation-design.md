@@ -416,7 +416,7 @@ A successful smoketest implementation should:
 - `scripts/validate_service_config.py` - Configuration validation patterns
 - `scripts/prod.sh` - Production health check implementation
 - `docker-compose.services.yml` - Service health check definitions
-- `.claude/rules/075-test-creation-methodology.mdc` - Testing standards
+- `.claude/rules/075-test-creation-methodology.md` - Testing standards
 
 ---
 

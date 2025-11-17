@@ -2,13 +2,13 @@
 **Date**: 2025-11-06
 **Reviewer**: Claude Code (Automated Review)
 **Scope**: HuleEdu Monorepo Testing Infrastructure
-**Focus**: Compliance with `.claude/rules/075-test-creation-methodology.mdc` and `.claude/rules/070-testing-and-quality-assurance.mdc`
+**Focus**: Compliance with `.claude/rules/075-test-creation-methodology.md` and `.claude/rules/070-testing-and-quality-assurance.md`
 
 ---
 
 ## Executive Summary
 
-This comprehensive review assessed 150+ test files across all HuleEdu microservices against the behavioral test protocol defined in `.claude/rules/075-test-creation-methodology.mdc`.
+This comprehensive review assessed 150+ test files across all HuleEdu microservices against the behavioral test protocol defined in `.claude/rules/075-test-creation-methodology.md`.
 
 **Overall Assessment**: 🟡 **MODERATE COMPLIANCE** - Strong architectural foundations with critical violations that must be addressed.
 
@@ -362,7 +362,7 @@ async def test_something():
 - Varying levels of parametrization
 
 **Recommendations**:
-1. Create `.claude/rules/075.2-test-fixture-standards.mdc`
+1. Create `.claude/rules/075.2-test-fixture-standards.md`
 2. Document service-specific fixture patterns
 3. Add pre-commit hook to enforce 500 LoC limit
 4. Create test pattern examples in docs
@@ -539,10 +539,10 @@ With these fixes in place, the HuleEdu testing infrastructure will achieve:
 
 ## References
 
-- `.claude/rules/075-test-creation-methodology.mdc` - Test creation standards
-- `.claude/rules/075.1-parallel-test-creation-methodology.mdc` - Batch testing workflow
-- `.claude/rules/070-testing-and-quality-assurance.mdc` - Quality assurance standards
-- `.claude/rules/042-async-patterns-and-di.mdc` - DI patterns and protocols
+- `.claude/rules/075-test-creation-methodology.md` - Test creation standards
+- `.claude/rules/075.1-parallel-test-creation-methodology.md` - Batch testing workflow
+- `.claude/rules/070-testing-and-quality-assurance.md` - Quality assurance standards
+- `.claude/rules/042-async-patterns-and-di.md` - DI patterns and protocols
 
 ---
 

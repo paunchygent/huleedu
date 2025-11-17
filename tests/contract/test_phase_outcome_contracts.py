@@ -1,7 +1,7 @@
 """Contract tests for Phase Outcome Event models.
 
 Tests the Pydantic contracts between BOS and ELS services.
-Following 070-testing-and-quality-assurance.mdc principles.
+Following 070-testing-and-quality-assurance.md principles.
 """
 
 from __future__ import annotations

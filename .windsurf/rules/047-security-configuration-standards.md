@@ -11,8 +11,8 @@ Security configuration patterns and standards for HuleEdu microservices, coverin
 Model service: `@identity_service/`
 
 **Related Rules**:
-- [040-service-implementation-guidelines.mdc](mdc:040-service-implementation-guidelines.mdc) - Core service patterns
-- [043-service-configuration-and-logging.mdc](mdc:043-service-configuration-and-logging.mdc) - Configuration management
+- [040-service-implementation-guidelines.md](mdc:040-service-implementation-guidelines.md) - Core service patterns
+- [043-service-configuration-and-logging.md](mdc:043-service-configuration-and-logging.md) - Configuration management
 
 ## 2. SecureServiceSettings Base Class
 

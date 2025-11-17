@@ -6,7 +6,7 @@ Tests RAS's ability to:
 3. Handle timezone-aware processing_started_at field correctly
 4. Follow DDD patterns with proper protocol-based dependency injection
 
-Follows .cursor/rules/075-test-creation-methodology.mdc patterns.
+Follows .cursor/rules/075-test-creation-methodology.md patterns.
 """
 
 from __future__ import annotations

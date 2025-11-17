@@ -11,7 +11,7 @@ Integration Testing Scope:
 Tests the dynamic pipeline orchestration logic using real business logic components.
 Validates ProcessingPipelineState management, phase progression, and pipeline completion.
 
-Following 070-testing-and-quality-assurance.mdc:
+Following 070-testing-and-quality-assurance.md:
 - Mock only external boundaries (event publisher, specialized service clients)
 - Test real business logic components (PipelinePhaseCoordinator, repository operations)
 - Limited scope component interactions (not full E2E)

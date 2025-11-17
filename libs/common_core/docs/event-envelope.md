@@ -309,5 +309,5 @@ envelope = EventEnvelope[MyEventV1](
 
 - [Event Registry](event-registry.md) - ProcessingEvent enum and topic_name()
 - [Dual-Event Pattern](dual-event-pattern.md) - Thin vs rich events
-- `.claude/rules/052-event-contract-standards.mdc` - Event structure requirements
+- `.claude/rules/052-event-contract-standards.md` - Event structure requirements
 - `libs/huleedu_service_libs/docs/kafka-redis.md` - KafkaBus.publish() implementation

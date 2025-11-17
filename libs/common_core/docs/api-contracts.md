@@ -147,5 +147,5 @@ class MyAPIModelV1(BaseModel):
 ## Related
 
 - `common_core/api_models/` - All HTTP contracts
-- `.claude/rules/020-architectural-mandates.mdc` - Contract-only communication
-- `.claude/rules/051-pydantic-v2-standards.mdc` - Pydantic patterns
+- `.claude/rules/020-architectural-mandates.md` - Contract-only communication
+- `.claude/rules/051-pydantic-v2-standards.md` - Pydantic patterns

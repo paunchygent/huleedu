@@ -3,8 +3,8 @@
 ## Testing Strategy Based on Rule 075
 
 ### Pre-Implementation Checklist
-- [x] Rule compliance review (000-rule-index.mdc)
-- [x] Service architecture understanding (020.7-cj-assessment-service.mdc)
+- [x] Rule compliance review (000-rule-index.md)
+- [x] Service architecture understanding (020.7-cj-assessment-service.md)
 - [x] Domain analysis (CJ Assessment bounded context)
 - [x] Pattern study from existing tests
 - [ ] Run typecheck-all before implementation

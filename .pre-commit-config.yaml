@@ -5,7 +5,7 @@ repos:
 -   repo: local
     hooks:
     -   id: sync-rules
-        name: Sync Rules from .mdc to .md
+        name: Sync Rules from .md to .md
         entry: python scripts/utils/sync_rules.py --source .claude/rules --target .windsurf/rules
         language: python
         always_run: true

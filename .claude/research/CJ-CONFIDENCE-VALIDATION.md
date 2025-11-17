@@ -141,7 +141,7 @@ The outputs will feed directly into the recommendation phase, ensuring that any 
 
 ## 5. Phase 3 Roadmap Reference
 
-- Detailed implementation plan for grade-scale enablement and ENG5 NP data capture lives in `TASKS/TASK-CJ-CONFIDENCE-PHASE3-GRADE-SCALE-DATA-PIPELINE.md` (per rule `.claude/rules/110.7-task-creation-and-decomposition-methodology.mdc`).
+- Detailed implementation plan for grade-scale enablement and ENG5 NP data capture lives in `TASKS/TASK-CJ-CONFIDENCE-PHASE3-GRADE-SCALE-DATA-PIPELINE.md` (per rule `.claude/rules/110.7-task-creation-and-decomposition-methodology.md`).
 - Planned grade scales: `eng5_np_legacy_9_step` (`["F+", "E-", "E+", "D-", "D+", "C-", "C+", "B", "A"]`, essays below `F+` treated as `F`) and `eng5_np_national_9_step` (`["1", "2", "3", "4", "5", "6", "7", "8", "9"]`).
 - ENG5 NP 2016 inputs: instructions (`test_uploads/ANCHOR ESSAYS/ROLE_MODELS_ENG5_NP_2016/eng5_np_vt_2017_essay_instruction.md`), LLM prompt (`.../llm_prompt_cj_assessment_eng5.md`), student essays (`.../anchor_essays/`), anchors defined in `scripts/bayesian_consensus_model/d_optimal_workflow/models.py::DEFAULT_ANCHOR_ORDER`.
 - Phase 3 data outputs will be stored as JSON bundles under `.claude/research/data/eng5_np_2016/` capturing metadata, comparisons, BT stats, and grade projections.

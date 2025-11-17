@@ -34,7 +34,7 @@ def _clear_prometheus_registry() -> Generator[None, None, None]:
 
     This fixture prevents `ValueError: Duplicated timeseries` errors when running
     multiple tests that define the same metrics in the same process. This is the
-    standard pattern mandated by rule 070-testing-and-quality-assurance.mdc.
+    standard pattern mandated by rule 070-testing-and-quality-assurance.md.
 
     It is marked with `autouse=True` to be automatically applied to every
     test function within its scope without needing to be explicitly requested.

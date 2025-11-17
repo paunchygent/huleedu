@@ -11,27 +11,27 @@ Observability patterns for monitoring, tracing, and debugging HuleEdu services.
 ## Sub-Rules
 
 ### 071: Core Patterns
-- Location: `071.1-observability-core-patterns.mdc`
+- Location: `071.1-observability-core-patterns.md`
 - Covers: Philosophy, correlation patterns, naming conventions
 - When: Setting up any observability component
 
 ### 071.1: Prometheus Metrics
-- Location: `071.1-prometheus-metrics-patterns.mdc`
+- Location: `071.1-prometheus-metrics-patterns.md`
 - Covers: Metric types, service integration, label strategy
 - When: Adding metrics to services
 
 ### 071.2: Jaeger Tracing
-- Location: `071.2-jaeger-tracing-patterns.mdc`
+- Location: `071.2-jaeger-tracing-patterns.md`
 - Covers: OpenTelemetry integration, trace propagation, debugging
 - When: Adding distributed tracing
 
 ### 071.3: Grafana & Loki
-- Location: `071.3-grafana-loki-patterns.mdc`
+- Location: `071.3-grafana-loki-patterns.md`
 - Covers: Dashboard patterns, log queries, datasource configuration
 - When: Creating dashboards or log analysis
 
 ### 072: Grafana Playbooks
-- Location: `072-grafana-playbook-rules.mdc`
+- Location: `072-grafana-playbook-rules.md`
 - Covers: Troubleshooting guides and runbooks
 - When: Documenting operational procedures
 

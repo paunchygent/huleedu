@@ -5,7 +5,7 @@
 ### 1. Initial Setup
 
 ```markdown
-- FIRST ACTION Read `.claude/rules/000-rule-index.mdc` first. The index contains onboard instructions for all services and project rules and standards. If the prompt contains a task description, use it to read and review all rule files related to the task at hand.
+- FIRST ACTION Read `.claude/rules/000-rule-index.md` first. The index contains onboard instructions for all services and project rules and standards. If the prompt contains a task description, use it to read and review all rule files related to the task at hand.
 - SECOND ACTION Use the user's task description to read and review all rule files related to the task at hand.
 - THIRD ACTION Read `.claude/HANDOFF.md` and `.claude/README_FIRST.md` for **critical** cross-service task context.
 
@@ -16,8 +16,8 @@
 
 ```markdown
 1. **To avoid immediate task failure**: Read `.claude/HANDOFF.md` and `.claude/README_FIRST.md` for **critical** cross-service task context.
-2. **Select Mode**: Use `.claude/rules/110-ai-agent-interaction-modes.mdc` to choose mode (Planning, Coding, Debugging)
-3. **Rule Reference**: Consult `.claude/rules/000-rule-index.mdc` for relevant rules
+2. **Select Mode**: Use `.claude/rules/110-ai-agent-interaction-modes.md` to choose mode (Planning, Coding, Debugging)
+3. **Rule Reference**: Consult `.claude/rules/000-rule-index.md` for relevant rules
 cross-service task context.
 4. **Update**: After each task phase, Always stop to update `.claude/HANDOFF.md` and `.claude/README_FIRST.md` with any new information + ask user any clarifying questions to retain alignment with user's intent.
 ```
@@ -33,7 +33,7 @@ cross-service task context.
 ### 4. Documentation & Testing
 
 ```markdown
-- Update relevant task documents per `.claude/rules/090-documentation-standards.mdc`
+- Update relevant task documents per `.claude/rules/090-documentation-standards.md`
 - Never create files in root - follow folder patterns
 - All code changes require tests (run and verified)
 - Never lint style issues manually before having run format-all and lint-fix --unsafe-fixes
@@ -46,7 +46,7 @@ cross-service task context.
 
 ### Architectural Overview
 
-### Architecture (.claude/rules/010-foundational-principles.mdc)
+### Architecture (.claude/rules/010-foundational-principles.md)
 
 ```markdown
 - **Pattern**: Event-driven microservices with STRICT DDD, CC principles, and small modular SRP files (<400-500 LoC HARD LIMIT FILE SIZE).
@@ -63,7 +63,7 @@ cross-service task context.
 
 **dependency resolution** full path relative root for all imports. **NEVER** use relative imports when importing dependencies from outside service directory.
 
-### Service Communication (.claude/rules/020-architectural-mandates.mdc)
+### Service Communication (.claude/rules/020-architectural-mandates.md)
 
 ```markdown
 - **Primary**: Asynchronous via Kafka
@@ -82,7 +82,7 @@ cross-service task context.
 - **Migrations**: always consult .claude/rules/085-database-migration-standards.md
 ```
 
-### HTTP Services (.claude/rules/042-async-patterns-and-di.mdc)
+### HTTP Services (.claude/rules/042-async-patterns-and-di.md)
 
 ```markdown
 - **app.py**: Setup only (<150 LoC)
@@ -90,14 +90,14 @@ cross-service task context.
 - **Example**: `@services/file_service/` structure
 ```
 
-### Worker Services (.claude/rules/042-async-patterns-and-di.mdc)
+### Worker Services (.claude/rules/042-async-patterns-and-di.md)
 
 - **Quart Deployment Patterns**:
   - [services/essay_lifecycle_service]: Standalone worker and API services (complex processing)
   - Other services: Integrated worker using Quart's `@app.before_serving` in `services/*/app.py` (simpler services)
 - **Example**: `services/spellchecker_service/` (integrated) vs `services/essay_lifecycle_service/` (standalone)
 
-### Dependency Injection (.claude/rules/042-async-patterns-and-di.mdc)
+### Dependency Injection (.claude/rules/042-async-patterns-and-di.md)
 
 ```markdown
 - **Interfaces**: Define with `typing.Protocol` in `protocols.py`
@@ -107,7 +107,7 @@ cross-service task context.
   - `REQUEST`: Per-operation instances (DB sessions)
 ```
 
-### Event System (.claude/rules/051-event-contract-standards.mdc)
+### Event System (.claude/rules/051-event-contract-standards.md)
 
 ```markdown
 - **Envelope**: All Kafka events use `EventEnvelope`
@@ -117,7 +117,7 @@ cross-service task context.
 
 ## Testing & Quality
 
-### Testing (strict adherence to `.claude/rules/075-test-creation-methodology.mdc` + `.claude/rules/075.1-parallel-test-creation-methodology.mdc`)
+### Testing (strict adherence to `.claude/rules/075-test-creation-methodology.md` + `.claude/rules/075.1-parallel-test-creation-methodology.md`)
 
 #### Test Types
 
@@ -181,7 +181,7 @@ When asked to launch two or more agents in parallel: launch all agents in a sing
 ```markdown
 # Always use docker ps | grep huleedu first to find container name
 
-# Then access logs: read .cursor/rules/046-docker-container-debugging.mdc to properly debug containers.
+# Then access logs: read .cursor/rules/046-docker-container-debugging.md to properly debug containers.
 
 #### Development
 

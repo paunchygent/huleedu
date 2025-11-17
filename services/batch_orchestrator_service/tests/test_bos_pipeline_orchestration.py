@@ -1,6 +1,6 @@
 """Unit tests for BOS Pipeline Orchestration components.
 
-Tests actual business logic following 070-testing-and-quality-assurance.mdc.
+Tests actual business logic following 070-testing-and-quality-assurance.md.
 Mocks only external boundaries, not internal business logic.
 """
 

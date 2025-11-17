@@ -8,7 +8,7 @@ Purpose
 Key Notes
 
 - Outbox schema ownership: This service uses the shared Transactional Outbox model from `libs/huleedu_service_libs.outbox.models.EventOutbox`. Do not define or modify a service-local outbox model. All migrations for the outbox table must align with the shared library conventions (index names, columns, partial index on `published_at IS NULL`).
-- Migrations: Create Alembic migrations from this service directory. Avoid modifying pushed versions. Use `.cursor/rules/085-database-migration-standards.mdc` for guidance.
+- Migrations: Create Alembic migrations from this service directory. Avoid modifying pushed versions. Use `.cursor/rules/085-database-migration-standards.md` for guidance.
 
 CorrelationContext (Mandatory)
 
@@ -18,7 +18,7 @@ CorrelationContext (Mandatory)
   - Errors: pass `corr.uuid` to error factories; include `original_correlation_id=corr.original`.
   - Responses: echo `corr.original` in successful responses.
   - Events: use `corr.uuid` for event envelope `correlation_id`.
-  - See `.cursor/rules/043-service-configuration-and-logging.mdc` for details.
+  - See `.cursor/rules/043-service-configuration-and-logging.md` for details.
 
 Outbox Index Alignment
 
@@ -124,7 +124,7 @@ pdm run pytest-root services/entitlements_service/tests/contract/ -v
 - **Explicit fixtures**: Import test utilities explicitly (no conftest.py)
 - **Testcontainers**: PostgreSQL containers for integration tests
 
-Reference: `.claude/rules/075-test-creation-methodology.mdc`
+Reference: `.claude/rules/075-test-creation-methodology.md`
 
 ## Migration Workflow
 

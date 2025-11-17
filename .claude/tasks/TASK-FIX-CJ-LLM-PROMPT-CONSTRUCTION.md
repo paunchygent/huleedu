@@ -6,7 +6,7 @@
 >
 > 3. **Targeted Validation** — After completing each task, run the narrowest relevant `pdm run` quality checks or pytest nodes (include `-s` when debugging) to validate the change, and document the command and outcome.
 >
-> 4. **Task Document Updates** — Before ending the session, update this task document with clear progress notes so the next contributor can resume seamlessly. Follow Rule `090-documentation-standards.mdc` for concise, intent-focused updates.
+> 4. **Task Document Updates** — Before ending the session, update this task document with clear progress notes so the next contributor can resume seamlessly. Follow Rule `090-documentation-standards.md` for concise, intent-focused updates.
 >
 > 5. **Rule Adherence** — Apply all referenced architecture, DI, testing, and documentation standards in this file without introducing new patterns or fallbacks.
 

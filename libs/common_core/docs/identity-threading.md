@@ -150,4 +150,4 @@ Models without user_id/org_id cannot be attributed to quotas.
 
 - `common_core/api_models/batch_registration.py` - API contract with identity
 - `common_core/events/cj_assessment_events.py` - Event with identity
-- `.claude/rules/020-architectural-mandates.mdc` - Identity threading mandate
+- `.claude/rules/020-architectural-mandates.md` - Identity threading mandate

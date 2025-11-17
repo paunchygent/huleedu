@@ -222,11 +222,11 @@ The next AI agent working on this service MUST read these files and understand t
 
 #### 1. Architectural Rules and Standards
 
-- **`.cursor/rules/000-rule-index.mdc`** - Start here to understand all available rules
-- **`.cursor/rules/020-architectural-mandates.mdc`** - Core architectural principles
-- **`.cursor/rules/042-service-architecture-di-patterns.mdc`** - DI patterns and service structure
-- **`.cursor/rules/051-event-system.mdc`** and **`.cursor/rules/052-data-contracts.mdc`** - Event system design
-- **`.cursor/rules/070-testing-architecture.mdc`** - Testing requirements and patterns
+- **`.cursor/rules/000-rule-index.md`** - Start here to understand all available rules
+- **`.cursor/rules/020-architectural-mandates.md`** - Core architectural principles
+- **`.cursor/rules/042-service-architecture-di-patterns.md`** - DI patterns and service structure
+- **`.cursor/rules/051-event-system.md`** and **`.cursor/rules/052-data-contracts.md`** - Event system design
+- **`.cursor/rules/070-testing-architecture.md`** - Testing requirements and patterns
 - **`CLAUDE.md`** (both global and project) - User preferences and standards
 
 #### 2. Implementation Documentation

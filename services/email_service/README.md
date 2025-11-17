@@ -258,7 +258,7 @@ pdm run pytest-root services/email_service/tests/ -v -m "not smtp"
 - **Template fixtures**: Load test templates from `tests/fixtures/templates/`
 - **Explicit fixtures**: Import test utilities explicitly (no conftest.py)
 
-Reference: `.claude/rules/075-test-creation-methodology.mdc`
+Reference: `.claude/rules/075-test-creation-methodology.md`
 
 ## Migration Workflow
 

@@ -473,4 +473,4 @@ After all consumers migrated:
 
 - [Event Envelope](event-envelope.md) - EventEnvelope structure
 - [Dual-Event Pattern](dual-event-pattern.md) - Thin vs rich events
-- `.claude/rules/052-event-contract-standards.mdc` - Event structure standards
+- `.claude/rules/052-event-contract-standards.md` - Event structure standards

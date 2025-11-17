@@ -34,7 +34,7 @@ Event-driven microservice platform for automated essay processing and assessment
 See also:
 
 - `TASKS/ENTITLEMENT_SERVICE_IMPLEMENTATION_PLAN.md` (final reference + historical appendix)
-- `.cursor/rules/020.17-entitlements-service-architecture.mdc`
+- `.cursor/rules/020.17-entitlements-service-architecture.md`
 - `libs/common_core/src/common_core/entitlements_models.py`
 
 ## Testing & Quality

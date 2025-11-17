@@ -67,21 +67,21 @@ repomix --style xml --no-gitignore \
 - `libs/huleedu_service_libs/src/huleedu_service_libs/logging_utils.py`
 
 **Rules** (9 files):
-- `.claude/rules/000-rule-index.mdc`
-- `.claude/rules/030-event-driven-architecture-eda-standards.mdc`
-- `.claude/rules/042-async-patterns-and-di.mdc`
-- `.claude/rules/043-service-configuration-and-logging.mdc`
-- `.claude/rules/048-structured-error-handling-standards.mdc`
-- `.claude/rules/051-pydantic-v2-standards.mdc`
-- `.claude/rules/052-event-contract-standards.mdc`
-- `.claude/rules/070-testing-and-quality-assurance.mdc`
-- `.claude/rules/075-test-creation-methodology.mdc`
+- `.claude/rules/000-rule-index.md`
+- `.claude/rules/030-event-driven-architecture-eda-standards.md`
+- `.claude/rules/042-async-patterns-and-di.md`
+- `.claude/rules/043-service-configuration-and-logging.md`
+- `.claude/rules/048-structured-error-handling-standards.md`
+- `.claude/rules/051-pydantic-v2-standards.md`
+- `.claude/rules/052-event-contract-standards.md`
+- `.claude/rules/070-testing-and-quality-assurance.md`
+- `.claude/rules/075-test-creation-methodology.md`
 
 **Command**:
 ```bash
 repomix --style xml --no-gitignore \
   --output .claude/repomix_packages/repomix-eng5-kafka-review.xml \
-  --include ".claude/research/scripts/eng5_np_batch_runner.py,.claude/research/scripts/test_eng5_np_batch_runner.py,services/cj_assessment_service/kafka_consumer.py,libs/common_core/src/common_core/events/cj_assessment_events.py,libs/common_core/src/common_core/events/llm_provider_events.py,libs/common_core/src/common_core/event_enums.py,libs/common_core/src/common_core/__init__.py,libs/common_core/src/common_core/events/__init__.py,services/cj_assessment_service/event_processor.py,services/cj_assessment_service/protocols.py,services/cj_assessment_service/di.py,services/cj_assessment_service/config.py,.claude/HANDOFF.md,.claude/README_FIRST.md,TASKS/TASK-CJ-CONFIDENCE-PHASE3-GRADE-SCALE-DATA-PIPELINE.md,TASKS/ASSESSMENT_RESULT_ARCHITECTURE_WITH_ANCHORS.md,.claude/research/scripts/cj_confidence_analysis.py,.claude/research/scripts/cj_confidence_summary.json,libs/huleedu_service_libs/src/huleedu_service_libs/idempotency_v2.py,libs/huleedu_service_libs/src/huleedu_service_libs/logging_utils.py,.claude/rules/000-rule-index.mdc,.claude/rules/030-event-driven-architecture-eda-standards.mdc,.claude/rules/042-async-patterns-and-di.mdc,.claude/rules/043-service-configuration-and-logging.mdc,.claude/rules/048-structured-error-handling-standards.mdc,.claude/rules/051-pydantic-v2-standards.mdc,.claude/rules/052-event-contract-standards.mdc,.claude/rules/070-testing-and-quality-assurance.mdc,.claude/rules/075-test-creation-methodology.mdc"
+  --include ".claude/research/scripts/eng5_np_batch_runner.py,.claude/research/scripts/test_eng5_np_batch_runner.py,services/cj_assessment_service/kafka_consumer.py,libs/common_core/src/common_core/events/cj_assessment_events.py,libs/common_core/src/common_core/events/llm_provider_events.py,libs/common_core/src/common_core/event_enums.py,libs/common_core/src/common_core/__init__.py,libs/common_core/src/common_core/events/__init__.py,services/cj_assessment_service/event_processor.py,services/cj_assessment_service/protocols.py,services/cj_assessment_service/di.py,services/cj_assessment_service/config.py,.claude/HANDOFF.md,.claude/README_FIRST.md,TASKS/TASK-CJ-CONFIDENCE-PHASE3-GRADE-SCALE-DATA-PIPELINE.md,TASKS/ASSESSMENT_RESULT_ARCHITECTURE_WITH_ANCHORS.md,.claude/research/scripts/cj_confidence_analysis.py,.claude/research/scripts/cj_confidence_summary.json,libs/huleedu_service_libs/src/huleedu_service_libs/idempotency_v2.py,libs/huleedu_service_libs/src/huleedu_service_libs/logging_utils.py,.claude/rules/000-rule-index.md,.claude/rules/030-event-driven-architecture-eda-standards.md,.claude/rules/042-async-patterns-and-di.md,.claude/rules/043-service-configuration-and-logging.md,.claude/rules/048-structured-error-handling-standards.md,.claude/rules/051-pydantic-v2-standards.md,.claude/rules/052-event-contract-standards.md,.claude/rules/070-testing-and-quality-assurance.md,.claude/rules/075-test-creation-methodology.md"
 ```
 
 **Output**: 301 KB
@@ -142,18 +142,18 @@ repomix --style xml --no-gitignore \
 - `libs/huleedu_service_libs/src/huleedu_service_libs/logging_utils.py`
 
 **Critical Rules** (6 files):
-- `.claude/rules/000-rule-index.mdc`
-- `.claude/rules/042-async-patterns-and-di.mdc`
-- `.claude/rules/048-structured-error-handling-standards.mdc`
-- `.claude/rules/051-pydantic-v2-standards.mdc`
-- `.claude/rules/052-event-contract-standards.mdc`
-- `.claude/rules/075-test-creation-methodology.mdc`
+- `.claude/rules/000-rule-index.md`
+- `.claude/rules/042-async-patterns-and-di.md`
+- `.claude/rules/048-structured-error-handling-standards.md`
+- `.claude/rules/051-pydantic-v2-standards.md`
+- `.claude/rules/052-event-contract-standards.md`
+- `.claude/rules/075-test-creation-methodology.md`
 
 **Command**:
 ```bash
 repomix --style xml --no-gitignore \
   --output .claude/repomix_packages/repomix-metadata-population-task.xml \
-  --include ".claude/research/scripts/eng5_np_batch_runner.py,.claude/research/scripts/test_eng5_np_batch_runner.py,services/cj_assessment_service/kafka_consumer.py,libs/common_core/src/common_core/events/cj_assessment_events.py,libs/common_core/src/common_core/events/llm_provider_events.py,libs/common_core/src/common_core/event_enums.py,libs/common_core/src/common_core/__init__.py,libs/common_core/src/common_core/events/__init__.py,services/cj_assessment_service/event_processor.py,services/cj_assessment_service/implementations/llm_interaction_impl.py,services/cj_assessment_service/cj_core_logic/batch_pool_manager.py,services/cj_assessment_service/cj_core_logic/batch_submission_tracking.py,services/cj_assessment_service/cj_core_logic/callback_state_manager.py,services/cj_assessment_service/protocols.py,services/cj_assessment_service/config.py,services/cj_assessment_service/models_api.py,services/cj_assessment_service/implementations/db_access_impl.py,services/llm_provider_service/implementations/queue_processor_impl.py,services/llm_provider_service/protocols.py,services/llm_provider_service/config.py,services/llm_provider_service/internal_models.py,services/llm_provider_service/queue_models.py,services/llm_provider_service/api_models.py,.claude/HANDOFF.md,.claude/README_FIRST.md,TASKS/TASK-CJ-CONFIDENCE-PHASE3-GRADE-SCALE-DATA-PIPELINE.md,libs/huleedu_service_libs/src/huleedu_service_libs/idempotency_v2.py,libs/huleedu_service_libs/src/huleedu_service_libs/logging_utils.py,.claude/rules/000-rule-index.mdc,.claude/rules/042-async-patterns-and-di.mdc,.claude/rules/048-structured-error-handling-standards.mdc,.claude/rules/051-pydantic-v2-standards.mdc,.claude/rules/052-event-contract-standards.mdc,.claude/rules/075-test-creation-methodology.mdc"
+  --include ".claude/research/scripts/eng5_np_batch_runner.py,.claude/research/scripts/test_eng5_np_batch_runner.py,services/cj_assessment_service/kafka_consumer.py,libs/common_core/src/common_core/events/cj_assessment_events.py,libs/common_core/src/common_core/events/llm_provider_events.py,libs/common_core/src/common_core/event_enums.py,libs/common_core/src/common_core/__init__.py,libs/common_core/src/common_core/events/__init__.py,services/cj_assessment_service/event_processor.py,services/cj_assessment_service/implementations/llm_interaction_impl.py,services/cj_assessment_service/cj_core_logic/batch_pool_manager.py,services/cj_assessment_service/cj_core_logic/batch_submission_tracking.py,services/cj_assessment_service/cj_core_logic/callback_state_manager.py,services/cj_assessment_service/protocols.py,services/cj_assessment_service/config.py,services/cj_assessment_service/models_api.py,services/cj_assessment_service/implementations/db_access_impl.py,services/llm_provider_service/implementations/queue_processor_impl.py,services/llm_provider_service/protocols.py,services/llm_provider_service/config.py,services/llm_provider_service/internal_models.py,services/llm_provider_service/queue_models.py,services/llm_provider_service/api_models.py,.claude/HANDOFF.md,.claude/README_FIRST.md,TASKS/TASK-CJ-CONFIDENCE-PHASE3-GRADE-SCALE-DATA-PIPELINE.md,libs/huleedu_service_libs/src/huleedu_service_libs/idempotency_v2.py,libs/huleedu_service_libs/src/huleedu_service_libs/logging_utils.py,.claude/rules/000-rule-index.md,.claude/rules/042-async-patterns-and-di.md,.claude/rules/048-structured-error-handling-standards.md,.claude/rules/051-pydantic-v2-standards.md,.claude/rules/052-event-contract-standards.md,.claude/rules/075-test-creation-methodology.md"
 ```
 
 **Output**: 389 KB

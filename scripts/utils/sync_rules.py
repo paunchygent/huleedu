@@ -4,17 +4,17 @@ import os
 
 def sync_files(mdc_path: str, md_path: str) -> None:
     """
-    Synchronizes content from a source .mdc file to a target .md file,
+    Synchronizes content from a source .md file to a target .md file,
     ensuring the target is perfectly formatted for pre-commit hooks.
     """
     try:
         with open(mdc_path, "r", encoding="utf-8") as mdc_file:
             new_md_content = mdc_file.read()
     except FileNotFoundError:
-        print(f"⚠️ Error: Source .mdc file not found: {mdc_path} (Skipping)")
+        print(f"⚠️ Error: Source .md file not found: {mdc_path} (Skipping)")
         return
     except Exception as e:
-        print(f"⚠️ Error reading .mdc file {mdc_path}: {e} (Skipping)")
+        print(f"⚠️ Error reading .md file {mdc_path}: {e} (Skipping)")
         return
 
     new_md_content_normalized = new_md_content.rstrip()
@@ -51,7 +51,7 @@ def sync_files(mdc_path: str, md_path: str) -> None:
 
 def sync_directory(mdc_dir: str, md_dir: str) -> None:
     """
-    Synchronizes .md files in md_dir with .mdc files from mdc_dir.
+    Synchronizes .md files in md_dir with .md files from mdc_dir.
     Creates new .md files, updates existing ones, and prunes orphaned .md files.
     """
     print(f"🔄 Starting sync from '{mdc_dir}' to '{md_dir}'...")
@@ -73,8 +73,8 @@ def sync_directory(mdc_dir: str, md_dir: str) -> None:
         print(f"⚠️ Source directory '{mdc_dir}' not found. Cannot sync files.")
     else:
         for mdc_filename in sorted(os.listdir(mdc_dir)):
-            if mdc_filename.endswith(".mdc"):
-                md_filename = mdc_filename.replace(".mdc", ".md")
+            if mdc_filename.endswith(".md"):
+                md_filename = mdc_filename.replace(".md", ".md")
                 expected_md_files.add(md_filename)
                 mdc_path = os.path.join(mdc_dir, mdc_filename)
                 md_path = os.path.join(md_dir, md_filename)
@@ -102,14 +102,14 @@ def sync_directory(mdc_dir: str, md_dir: str) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Synchronize .md files from a source .mdc directory.",
+        description="Synchronize .md files from a source .md directory.",
         formatter_class=argparse.RawTextHelpFormatter,
     )
     parser.add_argument(
         "--source",
         dest="mdc_dir",
         default=".cursor/rules",
-        help="Directory with source .mdc files (default: .cursor/rules)",
+        help="Directory with source .md files (default: .cursor/rules)",
     )
     parser.add_argument(
         "--target",
@@ -120,4 +120,4 @@ if __name__ == "__main__":
 
     args, _ = parser.parse_known_args()
 
-    sync_directory(args.mdc_dir, args.md_dir)
+    sync_directory(args.md_dir, args.md_dir)

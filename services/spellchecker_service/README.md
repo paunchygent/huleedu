@@ -135,7 +135,7 @@ Environment variables with `SPELLCHECKER_SERVICE_` prefix:
 
 ## Database Migrations
 
-This service uses Alembic for PostgreSQL schema management. See `.cursor/rules/053-sqlalchemy-standards.mdc` for complete migration patterns.
+This service uses Alembic for PostgreSQL schema management. See `.cursor/rules/053-sqlalchemy-standards.md` for complete migration patterns.
 
 ```bash
 # Apply migrations

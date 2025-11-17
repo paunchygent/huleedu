@@ -4,7 +4,7 @@ Centralized contracts for HuleEdu event-driven microservices architecture.
 
 ## Purpose
 
-Single source of truth for inter-service contracts (Rule `.claude/rules/020-architectural-mandates.mdc`). All services import from here to prevent contract drift and ensure typed boundaries.
+Single source of truth for inter-service contracts (Rule `.claude/rules/020-architectural-mandates.md`). All services import from here to prevent contract drift and ensure typed boundaries.
 
 ## Library Structure
 
@@ -245,8 +245,8 @@ Common core has no runtime dependencies or environment variables. Pure contract 
 
 ## Related Documentation
 
-- `.claude/rules/020-architectural-mandates.mdc` - Contract-only communication
-- `.claude/rules/051-pydantic-v2-standards.mdc` - Pydantic v2 patterns
-- `.claude/rules/052-event-contract-standards.mdc` - Event structure requirements
+- `.claude/rules/020-architectural-mandates.md` - Contract-only communication
+- `.claude/rules/051-pydantic-v2-standards.md` - Pydantic v2 patterns
+- `.claude/rules/052-event-contract-standards.md` - Event structure requirements
 - `libs/huleedu_service_libs/docs/kafka-redis.md` - Event publishing implementation
 - `services/cj_assessment_service/README.md` - Canonical pattern example

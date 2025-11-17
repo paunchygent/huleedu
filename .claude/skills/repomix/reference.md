@@ -64,9 +64,9 @@ services/cj_assessment_service/event_processor.py,
 .claude/HANDOFF.md,
 .claude/README_FIRST.md,
 TASKS/TASK-*.md,
-.claude/rules/042-async-patterns-and-di.mdc,
-.claude/rules/048-structured-error-handling-standards.mdc,
-.claude/rules/075-test-creation-methodology.mdc
+.claude/rules/042-async-patterns-and-di.md,
+.claude/rules/048-structured-error-handling-standards.md,
+.claude/rules/075-test-creation-methodology.md
 ```
 
 **Output Naming**: `repomix-{component}-{purpose}-review.xml`
@@ -93,9 +93,9 @@ services/*/di.py,
 services/*/kafka_consumer.py,
 services/*/event_processor.py,
 libs/common_core/src/common_core/events/*.py,
-.claude/rules/020-architectural-mandates.mdc,
-.claude/rules/030-event-driven-architecture-eda-standards.mdc,
-.claude/rules/042-async-patterns-and-di.mdc
+.claude/rules/020-architectural-mandates.md,
+.claude/rules/030-event-driven-architecture-eda-standards.md,
+.claude/rules/042-async-patterns-and-di.md
 ```
 
 **Output Naming**: `repomix-{scope}-architecture-analysis.xml`
@@ -180,13 +180,13 @@ libs/huleedu_service_libs/src/huleedu_service_libs/error_handling/*.py
 
 **Rules and Standards**:
 ```
-.claude/rules/000-rule-index.mdc,
-.claude/rules/020-architectural-mandates.mdc,
-.claude/rules/042-async-patterns-and-di.mdc,
-.claude/rules/048-structured-error-handling-standards.mdc,
-.claude/rules/051-pydantic-v2-standards.mdc,
-.claude/rules/052-event-contract-standards.mdc,
-.claude/rules/075-test-creation-methodology.mdc
+.claude/rules/000-rule-index.md,
+.claude/rules/020-architectural-mandates.md,
+.claude/rules/042-async-patterns-and-di.md,
+.claude/rules/048-structured-error-handling-standards.md,
+.claude/rules/051-pydantic-v2-standards.md,
+.claude/rules/052-event-contract-standards.md,
+.claude/rules/075-test-creation-methodology.md
 ```
 
 ---
@@ -327,5 +327,5 @@ After generation, inform user of:
 - **examples.md**: Real-world usage examples from HuleEdu development
 - **SKILL.md**: Quick reference and activation criteria
 - **`.claude/commands/repomix.md`**: Interactive slash command interface
-- **`.claude/rules/000-rule-index.mdc`**: Index of all architectural rules
+- **`.claude/rules/000-rule-index.md`**: Index of all architectural rules
 - **`.claude/HANDOFF.md`**: Current project state and context

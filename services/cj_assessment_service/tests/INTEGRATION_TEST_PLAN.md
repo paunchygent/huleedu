@@ -339,7 +339,7 @@ pdm run pytest tests/integration/ --cov=services/cj_assessment_service --cov-rep
 5. **Error Injection** - Systematically test failure scenarios
 
 ### References
-- Testing Methodology: `.cursor/rules/075-test-creation-methodology.mdc`
-- Architecture Rules: `.cursor/rules/020-architectural-mandates.mdc`
-- Event Standards: `.cursor/rules/030-event-driven-architecture-eda-standards.mdc`
-- Error Handling: `.cursor/rules/048-structured-error-handling-standards.mdc`
+- Testing Methodology: `.cursor/rules/075-test-creation-methodology.md`
+- Architecture Rules: `.cursor/rules/020-architectural-mandates.md`
+- Event Standards: `.cursor/rules/030-event-driven-architecture-eda-standards.md`
+- Error Handling: `.cursor/rules/048-structured-error-handling-standards.md`

@@ -5,7 +5,7 @@ Tests the full Phase 1 student matching integration between BOS and ELS:
 - REGULAR batches: Content Provisioning → Student Matching → Ready for Pipeline
 - GUEST batches: Content Provisioning → Direct to Ready (bypass student matching)
 
-Following 070-testing-standards.mdc:
+Following 070-testing-standards.md:
 - Mock only external boundaries (NLP Service, Class Management Service)
 - Test real business logic components (handlers, event routing, state transitions)
 - Validate complete event flow with proper pydantic model validation

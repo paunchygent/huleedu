@@ -26,7 +26,7 @@ Scope
 References
 - Schemas: `libs/common_core/src/common_core/events/*`, `event_enums.py`, `envelope.py`
 - CI: `pyproject.toml` (add script), GitHub Actions (if used), tests in `tests/contract/*`
-- Rules: `052-event-contract-standards.mdc`, `070-testing-and-quality-assurance.mdc`
+- Rules: `052-event-contract-standards.md`, `070-testing-and-quality-assurance.md`
 
 Deliverables
 1. Schema directory: `libs/common_core/schemas/events/*.json` (or Avro), versioned per event (v1, v2, ...).

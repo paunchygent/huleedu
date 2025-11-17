@@ -247,7 +247,7 @@ pdm run pytest-root services/api_gateway_service/tests/test_batch_routes.py -v
 - **Rate limit testing**: Mock Redis backend for SlowAPI
 - **Correlation context**: Test correlation_id propagation through requests
 
-Reference: `.claude/rules/075-test-creation-methodology.mdc`
+Reference: `.claude/rules/075-test-creation-methodology.md`
 
 ## Configuration
 

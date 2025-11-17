@@ -78,7 +78,7 @@ Each README should include:
 
 ## Documentation Standards
 
-Following `.claude/rules/090-documentation-standards.mdc`:
+Following `.claude/rules/090-documentation-standards.md`:
 - Machine-intelligence focused (no marketing language)
 - Technical decision rules prominent
 - Canonical examples from real implementations
@@ -87,11 +87,11 @@ Following `.claude/rules/090-documentation-standards.mdc`:
 
 ## References
 
-- `.claude/rules/090-documentation-standards.mdc` - Documentation requirements
+- `.claude/rules/090-documentation-standards.md` - Documentation requirements
 - `libs/common_core/README.md` - Template pattern
 - `libs/common_core/docs/error-patterns.md` - Error handling patterns
 - `.claude/rules/085-database-migration-standards.md` - Migration standards
-- `.claude/rules/075-test-creation-methodology.mdc` - Testing patterns
+- `.claude/rules/075-test-creation-methodology.md` - Testing patterns
 - `.claude/results/common-core-documentation-session-1-results.md` - Session 1 lessons
 
 ## Session Timeline

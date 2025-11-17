@@ -597,7 +597,7 @@ pdm run pytest-root services/file_service/tests/ --cov=services/file_service --c
 
 **Test Coverage**: >90% maintained across unit and integration tests
 
-Reference: `.claude/rules/075-test-creation-methodology.mdc`
+Reference: `.claude/rules/075-test-creation-methodology.md`
 
 ## Migration Workflow
 

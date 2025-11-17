@@ -10,23 +10,23 @@ fileMatchPattern: "**/services/**"
 When working on specific services, refer to these detailed architecture documents:
 
 ### Core Processing Services
-- **Content Service**: `.cursor/rules/020.1-content-service-architecture.mdc`
-- **Spell Checker Service**: `.cursor/rules/020.2-spell-checker-service-architecture.mdc`
-- **Essay Lifecycle Service**: `.cursor/rules/020.5-essay-lifecycle-service-architecture.mdc`
-- **File Service**: `.cursor/rules/020.6-file-service-architecture.mdc`
+- **Content Service**: `.cursor/rules/020.1-content-service-architecture.md`
+- **Spell Checker Service**: `.cursor/rules/020.2-spell-checker-service-architecture.md`
+- **Essay Lifecycle Service**: `.cursor/rules/020.5-essay-lifecycle-service-architecture.md`
+- **File Service**: `.cursor/rules/020.6-file-service-architecture.md`
 
 ### Orchestration Services
-- **Batch Orchestrator Service**: `.cursor/rules/020.3-batch-orchestrator-service-architecture.mdc`
-- **Batch Conductor Service**: `.cursor/rules/020.8-batch-conductor-service.mdc`
-- **Result Aggregator Service**: `.cursor/rules/020.12-result-aggregator-service-architecture.mdc`
+- **Batch Orchestrator Service**: `.cursor/rules/020.3-batch-orchestrator-service-architecture.md`
+- **Batch Conductor Service**: `.cursor/rules/020.8-batch-conductor-service.md`
+- **Result Aggregator Service**: `.cursor/rules/020.12-result-aggregator-service-architecture.md`
 
 ### Assessment Services
-- **CJ Assessment Service**: `.cursor/rules/020.7-cj-assessment-service.mdc`
-- **LLM Provider Service**: `.cursor/rules/020.13-llm-provider-service-architecture.mdc`
+- **CJ Assessment Service**: `.cursor/rules/020.7-cj-assessment-service.md`
+- **LLM Provider Service**: `.cursor/rules/020.13-llm-provider-service-architecture.md`
 
 ### Management Services
-- **Class Management Service**: `.cursor/rules/020.9-class-management-service.mdc`
-- **API Gateway Service**: `.cursor/rules/020.10-api-gateway-and-websocket-service.mdc`
+- **Class Management Service**: `.cursor/rules/020.9-class-management-service.md`
+- **API Gateway Service**: `.cursor/rules/020.10-api-gateway-and-websocket-service.md`
 
 ## Service Implementation Checklist
 

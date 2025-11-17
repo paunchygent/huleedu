@@ -61,7 +61,7 @@ def _build_comparison_record(
 
 ### Architectural Constraints (Must Honor)
 
-Per `.claude/rules/020-architectural-mandates.mdc`:
+Per `.claude/rules/020-architectural-mandates.md`:
 
 1. **Contract-Only Communication**: Services communicate via canonical Pydantic event models in `libs/common_core/src/common_core/events/`
 2. **No Direct DB Access**: CJ Assessment Service cannot query LLM Provider's database; all data must flow through events
@@ -161,9 +161,9 @@ Per `.claude/rules/020-architectural-mandates.mdc`:
 
 3. **Maintain Idempotency**: Metadata must be deterministic for replayed events (v2 idempotency system compatibility)
 
-4. **DI Pattern Compliance**: Follow Dishka provider patterns (`.claude/rules/042-async-patterns-and-di.mdc`)
+4. **DI Pattern Compliance**: Follow Dishka provider patterns (`.claude/rules/042-async-patterns-and-di.md`)
 
-5. **Error Handling**: Use structured error handling per `.claude/rules/048-structured-error-handling-standards.mdc`
+5. **Error Handling**: Use structured error handling per `.claude/rules/048-structured-error-handling-standards.md`
 
 6. **Observability**: Ensure metadata supports distributed tracing (correlation IDs propagate)
 
@@ -172,7 +172,7 @@ Per `.claude/rules/020-architectural-mandates.mdc`:
 1. **Minimal Invasiveness**: Prefer solutions that touch the fewest files/layers
 2. **No Schema Breaking Changes**: Avoid altering existing event field types (Pydantic V2 strictness)
 3. **No Database Migrations**: Solution should not require new DB tables/columns
-4. **PDM Monorepo Compliance**: Follow repo workflow standards (`.claude/rules/080-repository-workflow-and-tooling.mdc`)
+4. **PDM Monorepo Compliance**: Follow repo workflow standards (`.claude/rules/080-repository-workflow-and-tooling.md`)
 
 ---
 
@@ -224,12 +224,12 @@ Flag any:
 
 ### Architectural Rules (Included in Review Package)
 
-- `.claude/rules/000-rule-index.mdc` - Rule index
-- `.claude/rules/042-async-patterns-and-di.mdc` - Async/DI patterns (Dishka scopes, provider patterns)
-- `.claude/rules/048-structured-error-handling-standards.mdc` - Error handling standards
-- `.claude/rules/051-pydantic-v2-standards.mdc` - Pydantic V2 usage patterns
-- `.claude/rules/052-event-contract-standards.mdc` - Event contract standards (envelope patterns, topic naming)
-- `.claude/rules/075-test-creation-methodology.mdc` - Testing methodology
+- `.claude/rules/000-rule-index.md` - Rule index
+- `.claude/rules/042-async-patterns-and-di.md` - Async/DI patterns (Dishka scopes, provider patterns)
+- `.claude/rules/048-structured-error-handling-standards.md` - Error handling standards
+- `.claude/rules/051-pydantic-v2-standards.md` - Pydantic V2 usage patterns
+- `.claude/rules/052-event-contract-standards.md` - Event contract standards (envelope patterns, topic naming)
+- `.claude/rules/075-test-creation-methodology.md` - Testing methodology
 
 ### Task Documentation
 

@@ -549,7 +549,7 @@ from textual.widgets import Input, Select  # Removed TYPE_CHECKING guard
 - `form_layout.py`: RichLog import, CSS `text-wrap: wrap; overflow-x: hidden`
 - `build_standalone.sh`: TUI-only (CLI removed)
 - `.gitignore`: PyInstaller artifacts
-- `.claude/rules/095-textual-tui-patterns.mdc`: Sections 9-12 (workers, Log vs RichLog, API gotchas)
+- `.claude/rules/095-textual-tui-patterns.md`: Sections 9-12 (workers, Log vs RichLog, API gotchas)
 
 ### Success Criteria ✅
 - Build: `pdm run build-standalone` completes, 106MB onefile, ~60s

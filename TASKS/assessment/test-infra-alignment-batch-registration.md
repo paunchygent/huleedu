@@ -68,21 +68,21 @@ Related service contracts & routes (no changes; reference for parity)
 
 Repository rules referenced
 
-- .cursor/rules/015-project-structure-standards.mdc
-- .cursor/rules/020-architectural-mandates.mdc
-- .cursor/rules/020.10-api-gateway-service.mdc
-- .cursor/rules/020.17-entitlements-service-architecture.mdc
-- .cursor/rules/030-event-driven-architecture-eda-standards.mdc
-- .cursor/rules/042.2-http-proxy-service-patterns.mdc
-- .cursor/rules/046-docker-container-debugging.mdc
-- .cursor/rules/050-python-coding-standards.mdc
-- .cursor/rules/070-testing-and-quality-assurance.mdc
-- .cursor/rules/075-test-creation-methodology.mdc
-- .cursor/rules/080-repository-workflow-and-tooling.mdc
-- .cursor/rules/090-documentation-standards.mdc
+- .cursor/rules/015-project-structure-standards.md
+- .cursor/rules/020-architectural-mandates.md
+- .cursor/rules/020.10-api-gateway-service.md
+- .cursor/rules/020.17-entitlements-service-architecture.md
+- .cursor/rules/030-event-driven-architecture-eda-standards.md
+- .cursor/rules/042.2-http-proxy-service-patterns.md
+- .cursor/rules/046-docker-container-debugging.md
+- .cursor/rules/050-python-coding-standards.md
+- .cursor/rules/070-testing-and-quality-assurance.md
+- .cursor/rules/075-test-creation-methodology.md
+- .cursor/rules/080-repository-workflow-and-tooling.md
+- .cursor/rules/090-documentation-standards.md
 
 Ancillary documentation update
-- .cursor/rules/000-rule-index.mdc → Add entry for .cursor/rules/020.17-entitlements-service-architecture.mdc
+- .cursor/rules/000-rule-index.md → Add entry for .cursor/rules/020.17-entitlements-service-architecture.md
 
 ## Design Decisions
 1) Client-like tests must use AGW for registration and class/file operations to validate edge identity injection and proxy behavior.
@@ -147,7 +147,7 @@ Phase 3 — Default Flip + Cleanup
 - Switch ServiceTestManager.create_batch() default to AGW and deprecate/remove BOS‑direct path after stability confirmed
 - Remove any deprecated BOS‑only registration helpers from functional codepaths
 - Update tests/README.md and TASKS references to codify AGW entry for client flows
-- Update .cursor/rules/000-rule-index.mdc to include 020.17 (if not already in index)
+- Update .cursor/rules/000-rule-index.md to include 020.17 (if not already in index)
 
 Checkpoints
 - CP3.1: Default create_batch → AGW without regressions
@@ -197,7 +197,7 @@ Integration tests (unchanged entry)
 - tests/integration/test_phase1_student_matching_integration.py – keep mocking BOS internals; do not switch to AGW
 
 Documentation and rules
-- Update .cursor/rules/000-rule-index.mdc with 020.17 entitlements architecture
+- Update .cursor/rules/000-rule-index.md with 020.17 entitlements architecture
 - Ensure references to Rule 042 proxy patterns and Rule 020.10 AGW in test docs where rationale is cited
  - Observability guidance: ensure tests adhere to 071-observability standards (no identity labels in metrics) when adding metrics assertions
 
@@ -261,17 +261,17 @@ Full quality gates
   - services/batch_orchestrator_service/api/batch_routes.py
   - libs/common_core/src/common_core/api_models/batch_registration.py
 - Rules:
-  - .cursor/rules/015-project-structure-standards.mdc
-  - .cursor/rules/020-architectural-mandates.mdc
-  - .cursor/rules/020.10-api-gateway-service.mdc
-  - .cursor/rules/020.17-entitlements-service-architecture.mdc
-  - .cursor/rules/030-event-driven-architecture-eda-standards.mdc
-  - .cursor/rules/042.2-http-proxy-service-patterns.mdc
-  - .cursor/rules/046-docker-container-debugging.mdc
-  - .cursor/rules/080-repository-workflow-and-tooling.mdc
-  - .cursor/rules/090-documentation-standards.mdc
-  - .cursor/rules/071-observability-index.mdc
-  - .cursor/rules/071.1-prometheus-metrics-patterns.mdc
+  - .cursor/rules/015-project-structure-standards.md
+  - .cursor/rules/020-architectural-mandates.md
+  - .cursor/rules/020.10-api-gateway-service.md
+  - .cursor/rules/020.17-entitlements-service-architecture.md
+  - .cursor/rules/030-event-driven-architecture-eda-standards.md
+  - .cursor/rules/042.2-http-proxy-service-patterns.md
+  - .cursor/rules/046-docker-container-debugging.md
+  - .cursor/rules/080-repository-workflow-and-tooling.md
+  - .cursor/rules/090-documentation-standards.md
+  - .cursor/rules/071-observability-index.md
+  - .cursor/rules/071.1-prometheus-metrics-patterns.md
 
 ## Recent Revisions Synopsis (2025-09-01)
 - Functional/E2E file uploads must be made via API Gateway `POST /v1/files/batch` to validate proxy behavior. Direct posts to File Service are reserved for service-scoped tests only.
@@ -284,11 +284,11 @@ Overarching issue:
 - E2E tests time out when BOS does not transition batches to `READY_FOR_PIPELINE_EXECUTION`. This typically happens when upstream events (file → ELS completion) are not observed.
 
 Prerequisites (rules to review):
-- `.cursor/rules/042.2-http-proxy-service-patterns.mdc` (edge identity injection and forwarding)
-- `.cursor/rules/030-event-driven-architecture-eda-standards.mdc` (envelopes, topics)
-- `.cursor/rules/043-service-configuration-and-logging.mdc` (backend URL config, logging)
-- `.cursor/rules/048-structured-error-handling-standards.mdc` (mapped error responses)
-- `.cursor/rules/070-testing-and-quality-assurance.mdc` and `.cursor/rules/075-test-creation-methodology.mdc` (abstraction boundaries)
+- `.cursor/rules/042.2-http-proxy-service-patterns.md` (edge identity injection and forwarding)
+- `.cursor/rules/030-event-driven-architecture-eda-standards.md` (envelopes, topics)
+- `.cursor/rules/043-service-configuration-and-logging.md` (backend URL config, logging)
+- `.cursor/rules/048-structured-error-handling-standards.md` (mapped error responses)
+- `.cursor/rules/070-testing-and-quality-assurance.md` and `.cursor/rules/075-test-creation-methodology.md` (abstraction boundaries)
 
 Affected components/files:
 - API Gateway: `services/api_gateway_service/routers/file_routes.py`, `services/api_gateway_service/config.py`
@@ -354,8 +354,8 @@ Following the architecturally aligned fix proposed by the dev team:
    - Test now passes with correct identity threading verified in ResourceConsumptionV1 events
 
 4. **Architecture Documentation Updated**:
-   - ✅ `.cursor/rules/030-event-driven-architecture-eda-standards.mdc` - Added section 2.2 Identity Propagation Pattern
-   - ✅ `.cursor/rules/046-docker-container-debugging.mdc` - Added warning about --since arguments with correlation IDs
+   - ✅ `.cursor/rules/030-event-driven-architecture-eda-standards.md` - Added section 2.2 Identity Propagation Pattern
+   - ✅ `.cursor/rules/046-docker-container-debugging.md` - Added warning about --since arguments with correlation IDs
 
 #### Test Results
 ✅ Identity threading test PASSING:
@@ -410,7 +410,7 @@ Date: 2025-09-01
 
 Implemented (Phase 1 core + initial Phase 2 migrations):
 - Rules/index
-  - Updated: `.cursor/rules/000-rule-index.mdc` now includes `020.17-entitlements-service-architecture.mdc` (and `020.16-email-service-architecture.mdc`).
+  - Updated: `.cursor/rules/000-rule-index.md` now includes `020.17-entitlements-service-architecture.md` (and `020.16-email-service-architecture.md`).
 
 - Utilities
   - Added AGW endpoint + batch registration via AGW:
@@ -534,7 +534,7 @@ Next session should implement:
 3. **Update Documentation**:
    - Update `tests/README.md` to codify AGW as the entry point for client flows
    - Update TASKS references to reflect completion of Phase 3
-   - Ensure `.cursor/rules/000-rule-index.mdc` includes `020.17-entitlements-service-architecture.mdc`
+   - Ensure `.cursor/rules/000-rule-index.md` includes `020.17-entitlements-service-architecture.md`
 
 4. **Final Verification**:
    - Run complete test suite to ensure no regressions

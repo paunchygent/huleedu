@@ -26,7 +26,7 @@ Scope
 References
 - Observability: `observability/*` (Prometheus, Grafana, Loki, Jaeger)
 - Kafka: resilient publisher/outbox (`libs/huleedu_service_libs/kafka/*`, `outbox/*`)
-- Rules: `071-observability-index.mdc`, `073-health-endpoint-implementation.mdc`
+- Rules: `071-observability-index.md`, `073-health-endpoint-implementation.md`
 
 Deliverables
 1. SLOs: availability, latency, error rate per HTTP service; processing throughput for workers.

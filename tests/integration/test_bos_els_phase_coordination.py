@@ -3,7 +3,7 @@
 Tests the communication flow between Batch Orchestrator Service (BOS) and
 Essay Lifecycle Service (ELS) using real business logic components.
 
-Following 070-testing-and-quality-assurance.mdc:
+Following 070-testing-and-quality-assurance.md:
 - Mock only external boundaries (phase coordinator, specialized services, storage)
 - Test real business logic components (BatchKafkaConsumer, event serialization)
 - Limited scope component interactions (not full E2E)

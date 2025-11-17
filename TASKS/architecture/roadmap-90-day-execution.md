@@ -19,7 +19,7 @@ labels: []
 Objective: Close the highest-impact gaps to reach EdTech Beta parity: SSO/RBAC, LTI/SIS integrations, compliance operationalization, multi‑tenancy, schema governance, SLOs/runbooks, and API productization.
 
 References
-- Rules: `.cursor/rules/020-architectural-mandates.mdc`, `042-async-patterns-and-di.mdc`, `048-structured-error-handling-standards.mdc`, `070-testing-and-quality-assurance.mdc`, `085-database-migration-standards.mdc`, `090-documentation-standards.mdc`, `110.*`
+- Rules: `.cursor/rules/020-architectural-mandates.md`, `042-async-patterns-and-di.md`, `048-structured-error-handling-standards.md`, `070-testing-and-quality-assurance.md`, `085-database-migration-standards.md`, `090-documentation-standards.md`, `110.*`
 - Tooling: `pyproject.toml` scripts, `docker-compose*.yml`, `observability/`
 - Services: `services/*`, shared libs: `libs/common_core`, `libs/huleedu_service_libs`
 

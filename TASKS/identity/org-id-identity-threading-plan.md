@@ -36,18 +36,18 @@ labels: []
 
 ## Prerequisites (Rebuild Operational Context)
 1. Read rules to align with HuleEdu standards (in order):
-   - `.cursor/rules/015-project-structure-standards.mdc`
-   - `.cursor/rules/080-repository-workflow-and-tooling.mdc`
-   - `.cursor/rules/010-foundational-principles.mdc`
-   - `.cursor/rules/020-architectural-mandates.mdc`
-   - `.cursor/rules/030-event-driven-architecture-eda-standards.mdc`
-   - `.cursor/rules/042-async-patterns-and-di.mdc`
-   - `.cursor/rules/050-python-coding-standards.mdc`
-   - `.cursor/rules/100-terminology-and-definitions.mdc`
-   - `.cursor/rules/110.1-planning-mode.mdc`
-   - `.cursor/rules/110.2-coding-mode.mdc`
-   - `.cursor/rules/048-structured-error-handling-standards.mdc`
-2. Select Mode: This task operates in Coding mode (`.cursor/rules/110-ai-agent-interaction-modes.mdc`).
+   - `.cursor/rules/015-project-structure-standards.md`
+   - `.cursor/rules/080-repository-workflow-and-tooling.md`
+   - `.cursor/rules/010-foundational-principles.md`
+   - `.cursor/rules/020-architectural-mandates.md`
+   - `.cursor/rules/030-event-driven-architecture-eda-standards.md`
+   - `.cursor/rules/042-async-patterns-and-di.md`
+   - `.cursor/rules/050-python-coding-standards.md`
+   - `.cursor/rules/100-terminology-and-definitions.md`
+   - `.cursor/rules/110.1-planning-mode.md`
+   - `.cursor/rules/110.2-coding-mode.md`
+   - `.cursor/rules/048-structured-error-handling-standards.md`
+2. Select Mode: This task operates in Coding mode (`.cursor/rules/110-ai-agent-interaction-modes.md`).
 3. Execute from repository root; use `pdm` scripts documented in README and rules.
 
 

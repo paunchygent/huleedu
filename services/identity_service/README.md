@@ -153,7 +153,7 @@ pdm run mypy services/identity_service/
 Identity Service uses the shared `libs/huleedu_service_libs/error_handling` helpers so every failure returns a deterministic
 payload that downstream services (API Gateway, BOS, admin tools) can reason about. Every route catches `HuleEduError` and
 serializes the embedded `error_detail` (message, `error_code`, `operation`, correlation_id, optional `status_code`) while
-unexpected exceptions are logged and surfaced as generic 500 responses per `.claude/rules/048-structured-error-handling-standards.mdc`.
+unexpected exceptions are logged and surfaced as generic 500 responses per `.claude/rules/048-structured-error-handling-standards.md`.
 
 ### ErrorCode Usage
 
@@ -210,7 +210,7 @@ raise_validation_error(
 
 ## Testing
 
-Testing follows `.claude/rules/075-test-creation-methodology.mdc` and keeps unit/integration boundaries explicit—no implicit
+Testing follows `.claude/rules/075-test-creation-methodology.md` and keeps unit/integration boundaries explicit—no implicit
 `conftest` fixtures outside of their scope.
 
 ### Layout
@@ -308,4 +308,4 @@ promotion gating).
 Identity Service currently exposes functionality exclusively through its HTTP API and Kafka events. There is no Typer/Click
 command surface yet; administrative automation (user seeding, forced revocations, rate-limit resets) is performed via the
 domain handlers invoked by API Gateway. If a CLI is added in the future it should follow the monorepo-standard Typer layout
-described in `.claude/rules/090-documentation-standards.mdc`.
+described in `.claude/rules/090-documentation-standards.md`.

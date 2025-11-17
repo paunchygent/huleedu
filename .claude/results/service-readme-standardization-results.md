@@ -58,7 +58,7 @@ Each standardized README now includes:
 - Common markers (@pytest.mark.asyncio, @pytest.mark.integration, etc.)
 - Test patterns (protocol-based mocking, testcontainers, fixtures)
 - Critical test scenarios
-- Reference to `.claude/rules/075-test-creation-methodology.mdc`
+- Reference to `.claude/rules/075-test-creation-methodology.md`
 
 ### 3. Migration Workflow (for database services)
 - Creating migrations (Alembic commands)

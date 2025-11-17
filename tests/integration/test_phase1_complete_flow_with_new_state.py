@@ -8,7 +8,7 @@ state, verifying:
 - Essays are NOT available until READY_FOR_PIPELINE_EXECUTION
 - Race condition is prevented by new state machine
 
-Following 070-testing-standards.mdc and 075-test-creation-methodology.mdc
+Following 070-testing-standards.md and 075-test-creation-methodology.md
 """
 
 from __future__ import annotations

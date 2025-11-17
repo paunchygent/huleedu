@@ -43,4 +43,4 @@ Activate when the user:
 
 - **Detailed Workflows & Patterns**: See `reference.md` in this directory
 - **Real-World Usage Examples**: See `examples.md` in this directory
-- **Normative Rules**: `.claude/rules/090-documentation-standards.mdc`
+- **Normative Rules**: `.claude/rules/090-documentation-standards.md`

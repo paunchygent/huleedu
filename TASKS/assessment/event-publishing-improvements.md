@@ -603,7 +603,7 @@ These fixes were essential for production readiness and revealed important archi
 ## References
 
 - [Kafka Headers Documentation](https://kafka.apache.org/documentation/#record)
-- [HuleEdu Event-Driven Architecture Standards](.cursor/rules/030-event-driven-architecture-eda-standards.mdc)
+- [HuleEdu Event-Driven Architecture Standards](.cursor/rules/030-event-driven-architecture-eda-standards.md)
 - [Outbox Pattern Best Practices](https://microservices.io/patterns/data/transactional-outbox.html)
 - [Schema Evolution Strategies](https://docs.confluent.io/platform/current/schema-registry/avro.html)
 

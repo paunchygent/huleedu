@@ -20,7 +20,7 @@ You will receive a JSON review report containing findings about a newly created 
 **Operational Protocol:**
 
 1. **Load Authoritative Rules**
-   - Start with `.cursor/rules/000-rule-index.mdc` and traverse ALL linked rules
+   - Start with `.cursor/rules/000-rule-index.md` and traverse ALL linked rules
    - Build a comprehensive checklist covering style, typing, testing, observability, security, config, and containerization
    - These rules have absolute precedence over any existing code patterns
 
@@ -134,7 +134,7 @@ You must output ONLY a valid JSON object with this exact structure:
       "contract_ref": "source#pointer"
     }
   ],
-  "rule_sources": ["mdc:000-rule-index.mdc", "..."]
+  "rule_sources": ["mdc:000-rule-index.md", "..."]
 }
 ```
 

@@ -130,7 +130,7 @@ This thin event pattern ensures ELS receives only the minimal data needed for st
 
 ## Database Migrations
 
-This service uses Alembic for PostgreSQL schema management. See `.cursor/rules/053-sqlalchemy-standards.mdc` for complete migration patterns.
+This service uses Alembic for PostgreSQL schema management. See `.cursor/rules/053-sqlalchemy-standards.md` for complete migration patterns.
 
 ```bash
 # Apply migrations
@@ -543,7 +543,7 @@ pdm run pytest-root services/essay_lifecycle_service/tests/contract/ -v
 - **Phase 1 stateless routing**: Student matching without state updates
 - **Circuit breaker integration**: Kafka failure handling
 
-Reference: `.claude/rules/075-test-creation-methodology.mdc`
+Reference: `.claude/rules/075-test-creation-methodology.md`
 
 ## Migration Workflow
 

@@ -35,12 +35,12 @@ This PR represents a significant architectural improvement to the CJ Assessment 
 
 ### Standards Applied
 
-- `.claude/rules/010-foundational-principles.mdc` - DDD/Clean Code
-- `.claude/rules/042-async-patterns-and-di.mdc` - Dishka DI patterns
-- `.claude/rules/051-event-contract-standards.mdc` - Event metadata
-- `.claude/rules/075-test-creation-methodology.mdc` - Testing standards
+- `.claude/rules/010-foundational-principles.md` - DDD/Clean Code
+- `.claude/rules/042-async-patterns-and-di.md` - Dishka DI patterns
+- `.claude/rules/051-event-contract-standards.md` - Event metadata
+- `.claude/rules/075-test-creation-methodology.md` - Testing standards
 - `.claude/rules/085-database-migration-standards.md` - Migration compliance
-- `.claude/rules/090-documentation-standards.mdc` - Documentation quality
+- `.claude/rules/090-documentation-standards.md` - Documentation quality
 
 ---
 
@@ -612,7 +612,7 @@ def _get_scoring_module():
 - `.claude/tasks/NEXT_SESSION_PROMPT.md` - Validation checklist
 
 **Rules Documentation:**
-- `.claude/rules/020.20-cj-llm-prompt-contract.mdc` - Prompt hierarchy
+- `.claude/rules/020.20-cj-llm-prompt-contract.md` - Prompt hierarchy
 - `.claude/code-reviews/PR_13_ANCHOR_GRADE_RECOVERY_2025_11_16.md` - Initial review
 
 **Total Changes:** ~6,195 additions, ~982 deletions across 64 files
