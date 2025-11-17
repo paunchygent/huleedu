@@ -23,7 +23,7 @@
    - Canonical example (CJ Assessment Service)
 
 2. **docs/event-envelope.md** - EventEnvelope structure, Generic[T_EventData], Pydantic v2 workaround
-3. **docs/event-registry.md** - ProcessingEvent enum, topic_name(), _TOPIC_MAPPING
+3. **docs/event-registry.md** - ProcessingEvent enum, topic_name(),_TOPIC_MAPPING
 4. **docs/dual-event-pattern.md** - Thin vs rich events, CJ example
 5. **docs/storage-references.md** - >50KB threshold pattern, ContentType enum
 6. **docs/api-contracts.md** - HTTP contracts, versioning, BatchRegistrationRequestV1
@@ -81,7 +81,7 @@
 **Before Session**: ~15-25% overall
 **After Session**: ~65-75% overall
 
-### Breakdown by Category:
+### Breakdown by Category
 
 | Category | Before | After | Files Updated |
 |----------|--------|-------|---------------|
@@ -118,12 +118,12 @@ All documentation written for AI assistant pattern recognition:
 
 ## Files Modified
 
-### Created (12 files):
+### Created (12 files)
 - libs/common_core/README.md
 - libs/common_core/docs/ (directory)
 - libs/common_core/docs/*.md (10 doc files)
 
-### Modified (5 files):
+### Modified (5 files)
 - libs/common_core/src/common_core/events/envelope.py
 - libs/common_core/src/common_core/event_enums.py
 - libs/common_core/src/common_core/metadata_models.py
@@ -141,7 +141,7 @@ All documentation written for AI assistant pattern recognition:
 
 ## Handoff for Session 2
 
-### Remaining common_core Work (if continuing common_core):
+### Remaining common_core Work (if continuing common_core)
 
 **Medium Priority** (~35% coverage remaining):
 - events/*.py event contract files (most have moderate coverage, CJ excellent)
@@ -285,7 +285,7 @@ Most valuable outcome: EventEnvelope and identity_models went from 0% to 100% do
 
 ## Final Coverage Metrics
 
-### Updated Breakdown:
+### Updated Breakdown
 
 | Category | Before | After Continuation | Status |
 |----------|--------|-------------------|--------|

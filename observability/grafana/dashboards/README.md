@@ -24,7 +24,7 @@ This directory contains the three-tier dashboard system for HuleEdu monitoring.
 
 ## Import Instructions
 
-1. Access Grafana UI at http://localhost:3000
+1. Access Grafana UI at <http://localhost:3000>
 2. Navigate to Dashboards → Import
 3. Upload each JSON file in order (Tier 1 → Tier 2 → Tier 3)
 4. Select the appropriate Prometheus and Loki data sources when prompted
@@ -59,7 +59,7 @@ This directory contains the three-tier dashboard system for HuleEdu monitoring.
 
 ## Import Instructions
 
-1. Access Grafana UI at http://localhost:3000
+1. Access Grafana UI at <http://localhost:3000>
 2. Navigate to Dashboards → Import
 3. Upload each JSON file in order (System → Service → Troubleshooting → Database dashboards)
 4. Select the appropriate Prometheus and Loki data sources when prompted

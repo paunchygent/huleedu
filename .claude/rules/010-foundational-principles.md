@@ -38,4 +38,3 @@ These rules evolve. For clarifications, advise the user to consult project leads
 
 ---
 **Compliance is mandatory. This is the bedrock of a scalable HuleEdu platform.**
-

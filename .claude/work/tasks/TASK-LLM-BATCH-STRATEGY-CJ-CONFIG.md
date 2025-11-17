@@ -27,7 +27,6 @@ Specifically, this task covers:
 - Adding minimal CJ metrics for batching mode usage.
 - Adding unit tests for configuration resolution and metadata propagation.
 
-
 ## Design Decisions (CJ-side)
 
 - **Environment defaults:**
@@ -74,7 +73,6 @@ These decisions are mirrored in `TASK-LLM-BATCH-STRATEGY-IMPLEMENTATION.md` and 
 - Ensure descriptions match the environment defaults documented in the parent task.
 - Confirm env var naming aligns with `env_prefix="CJ_ASSESSMENT_SERVICE_"`.
 
-
 ### 2. Extend `BatchConfigOverrides` with per-batch override
 
 **File:** `services/cj_assessment_service/cj_core_logic/batch_config.py`
@@ -101,7 +99,6 @@ These decisions are mirrored in `TASK-LLM-BATCH-STRATEGY-IMPLEMENTATION.md` and 
 
 This keeps the resolution logic centralized and testable.
 
-
 ### 3. Resolve effective batching mode in comparison processing
 
 **File:** `services/cj_assessment_service/cj_core_logic/comparison_processing.py`
@@ -121,7 +118,6 @@ This keeps the resolution logic centralized and testable.
 - Use `effective_mode` when incrementing CJ metrics and when populating metadata for LPS (see below).
 - This avoids a large signature change until there is a concrete need for LPS to receive per-batch
   mode as a first-class parameter.
-
 
 ### 4. Propagate batching metadata into LLM Provider Service
 
@@ -144,7 +140,6 @@ This keeps the resolution logic centralized and testable.
   - `cj_request_type: str` – e.g. `"cj_comparison"` or `"cj_retry"` for retry flows.
 
 - These fields will appear in `LLMComparisonRequest.metadata` and then in `QueuedRequest.request_data.metadata` on the LPS side.
-
 
 ### 5. CJ metrics for batching mode
 
@@ -169,7 +164,6 @@ This keeps the resolution logic centralized and testable.
 
 This matches the design decision that CJ exposes only lightweight batching metrics; LPS will be
 responsible for detailed HTTP/token/queue metrics.
-
 
 ### 6. Tests
 

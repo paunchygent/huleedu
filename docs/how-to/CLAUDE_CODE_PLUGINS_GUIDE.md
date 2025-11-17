@@ -509,8 +509,8 @@ https://github.com/jeremylongshore/claude-code-plugins-plus
 ## Additional Resources
 
 ### Marketplace
-- **Homepage:** https://claudecodeplugins.io
-- **GitHub:** https://github.com/jeremylongshore/claude-code-plugins-plus
+- **Homepage:** <https://claudecodeplugins.io>
+- **GitHub:** <https://github.com/jeremylongshore/claude-code-plugins-plus>
 - **License:** MIT (100% open source)
 
 ### Plugin Categories

@@ -45,6 +45,7 @@ docker exec huleedu_cj_assessment_db psql -U huleedu_user -d huleedu_cj_assessme
 ```
 
 ## Service Container Mapping
+
 | Service | Container(s) | Database |
 |---------|-------------|----------|
 | batch_orchestrator | huleedu_batch_orchestrator_service | huleedu_batch_orchestrator_db |

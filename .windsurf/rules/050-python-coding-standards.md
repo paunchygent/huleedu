@@ -110,5 +110,5 @@ class ConcreteImpl:
 - Validate framework configuration methods
 - Confirm environment variable alignment
 
-See [044-service-debugging-and-troubleshooting.md](mdc:044-service-debugging-and-troubleshooting.md) for systematic debugging approach.
+See [044-service-debugging-and-troubleshooting.md](mdc:044-service-debugging-and-troubleshooting.md) for systematic debugging approach
 ===

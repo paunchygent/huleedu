@@ -7,11 +7,11 @@ conversion_date: 2025-11-03T15:30:11.652642
 
 <!-- image -->
 
-## Edited by:
+## Edited by
 
 Anders Jönsson, Kristianstad University, Sweden
 
-## Reviewed by:
+## Reviewed by
 
 Jeffrey Buckley,
 
@@ -21,11 +21,11 @@ Ireland
 
 Tom Bramley, Cambridge Assessment, United Kingdom
 
-## *Correspondence:
+## *Correspondence
 
-San Verhavert san.verhavert@uantwerpen.be
+San Verhavert <san.verhavert@uantwerpen.be>
 
-## Specialty section:
+## Specialty section
 
 This article was submitted to Assessment, Testing and Applied Measurement, a section of the journal
 
@@ -43,7 +43,7 @@ Published:
 
 09 February 2022
 
-## Citation:
+## Citation
 
 Verhavert S, Furlong A and Bouwer R (2022) The Accuracy and Ef f ciency of a Reference-Based Adaptive Selection Algorithm for Comparative Judgment. Front. Educ. 6:785919.
 
@@ -233,7 +233,7 @@ Afterward, the judgment data was processed as follows. For every assessment sess
 
 Around is de f ned as the moment where every representation has been in a pair an equal amount of times. With 20 representations this is after 10 comparisons, 20,
 
-6 Currently named Comproved; https://comproved.com/en/. 7 30, . . .
+6 Currently named Comproved; <https://comproved.com/en/>. 7 30, . . .
 
 FIGURE1| Distribution of judgments throughout the assessment in phase 1 (Judgment number; x-axis) by assessor (y-axis), before reordering. The vertical dotted lines indicate the judgment number at which the estimates reached a rank-order reliability of 0.50, 0.70, 0.80, and 90 (respectively from left to right). Note: jitter added to y-axis coordinates for clarity.
 
@@ -405,7 +405,7 @@ Disregarding these limitations, the adaptive algorithm as described in the curre
 
 ## DATA AVAILABILITY STATEMENT
 
-The dataset analyzed in Study 1 cannot be made public, due to privacy restrictions in the ' Contributors agreement ' and related IB policy at the time of data collection. The data generated in Study 2 would produce very large f les that are dif f cult to transfer. Because of IP restrictions, no working R code can be provided for the simulation. The results of every replication and the R code for the graphs and tables are freely available via the Zenodo repository: https://doi.org/10.5281/zenodo.5537019.
+The dataset analyzed in Study 1 cannot be made public, due to privacy restrictions in the ' Contributors agreement ' and related IB policy at the time of data collection. The data generated in Study 2 would produce very large f les that are dif f cult to transfer. Because of IP restrictions, no working R code can be provided for the simulation. The results of every replication and the R code for the graphs and tables are freely available via the Zenodo repository: <https://doi.org/10.5281/zenodo.5537019>.
 
 ## ETHICS STATEMENT
 
@@ -425,7 +425,7 @@ The authors want to thank the assessors of Study 1 for their time an effort.
 
 ## SUPPLEMENTARY MATERIAL
 
-The Supplementary Material for this article can be found online at: https://www.frontiersin.org/articles/10.3389/feduc.2021.785919/ full#supplementary-material
+The Supplementary Material for this article can be found online at: <https://www.frontiersin.org/articles/10.3389/feduc.2021.785919/> full#supplementary-material
 
 ## REFERENCES
 
@@ -435,12 +435,12 @@ The Supplementary Material for this article can be found online at: https://www.
 - Bradley, R. A., and Terry, M. E. (1952). Rank Analysis of Incomplete Block Designs: I. The Method of Paired Comparisons. Biometrika 39 (3 -4), 324 -345. doi:10. 1093/biomet/39.3-4.324
 - Bramley, T., Bell, J. F., and Pollitt, A. (1998). Assessing Changes in Standards over Time Using Thurstone Paired Comparisons. Educ. Res. Perspect. 25 (2), 1 -24.
 - Bramley, T., and Gill, T. (2010). Evaluating the Rank-ordering Method for Standard Maintaining. Res. Pap. Educ. 25 (3), 293 -317. doi:10.1080/ 02671522.2010.498147
-- Bramley, T. (2015). ' Investigating the Reliability of Adaptive Comparative Judgment, ' in Cambridge Assessment Research Report (Cambridge, UK: Cambridge Assessment). Available at: www.cambridgeassessment.org.uk/Images/232694investigating-the-reliability-of-adaptive-comparative-judgment.pdf.
+- Bramley, T. (2015). ' Investigating the Reliability of Adaptive Comparative Judgment, ' in Cambridge Assessment Research Report (Cambridge, UK: Cambridge Assessment). Available at: <www.cambridgeassessment.org.uk/Images/232694investigating-the-reliability-of-adaptive-comparative-judgment.pdf>.
 - Bramley, T. (2007). ' Paired Comparison Methods, ' in Techniques for Monitoring the Comparability of Examination Standards . Editors P. Newton, J.-A. Baird, H. Goldstein, H. Patrick, and P. Tymms (London, U.K: Quali f cations and Curriculum Authority), 246 -300.
 - Bramley, T., and Vitello, S. (2019). The Effect of Adaptivity on the Reliability Coef f cient in Adaptive Comparative Judgement. Assess. Educ. Principles, Pol. Pract. 26, 43 -58. doi:10.1080/0969594X.2017.1418734
 - Brignell, C., Wicks, T., Tomas, C., and Halls, J. (2019). The Impact of Peer Assessment on Mathematics Students ' Understanding of Marking Criteria and Their Ability to Self-Regulate Learning. MSOR Connections 18 (1), 46 -55. doi:10.21100/msor.v18i1.1019
 - Crompvoets, E. A. V., Béguin, A. A., and Sijtsma, K. (2020). Adaptive Pairwise Comparison for Educational Measurement. J. Educ. Behav. Stat. 45 (3), 316 -338. doi:10.3102/1076998619890589
-- Curcin, M., Howard, E., Sully, K., and Black, B. (2019). ' Improving Awarding: 2018/2019 Pilots, ' in Research Repport Ofqual 19/6575. Research and Analysis (Coventry, U.K: Ofqual). Available at: https://www.gov.uk/government/ publications/improving-awarding-20182019-pilots.
+- Curcin, M., Howard, E., Sully, K., and Black, B. (2019). ' Improving Awarding: 2018/2019 Pilots, ' in Research Repport Ofqual 19/6575. Research and Analysis (Coventry, U.K: Ofqual). Available at: <https://www.gov.uk/government/> publications/improving-awarding-20182019-pilots.
 - Holmes, S. D., Meadows, M., Stockford, I., and He, Q. (2018). Investigating the Comparability of Examination Dif f culty Using Comparative Judgement and Rasch Modelling. Int. J. Test. 18 (4), 366 -391. doi:10.1080/15305058.2018. 1486316
 - IBM Corp (2016). IBM SPSS Statistics for Windows . version 24.0. Armonk, NY: IBM Corp.
 - Jones, I., and Alcock, L. (2014). Peer Assessment without Assessment Criteria. Stud. Higher Educ. 39 (10), 1774 -1787. doi:10.1080/03075079.2013.821974
@@ -454,11 +454,11 @@ The Supplementary Material for this article can be found online at: https://www.
 - Newhouse, C. P. (2014). Using Digital Representations of Practical Production Work for Summative Assessment. Assess. Educ. Principles, Pol. Pract. 21 (2), 205 -220. doi:10.1080/0969594X.2013.868341
 - Nunnally, J. C. (1978). Psychometric Theory . 2nd ed. New York, NY: McGraw-Hill. Pollitt, A., and Murray, N. L. (1995). ' What Raters Really Pay Attention to, ' in Studies in Language Testing 3: Performance Testing, Cognition and Assessment . Editors M. Milanovic and N. Saville (Cambridge, U.K: Cambridge University Press), 74 -91.
 - Pollitt, A. (2012). The Method of Adaptive Comparative Judgement. Assess. Educ. Principles, Pol. Pract. 19 (3), 281 -300. doi:10.1080/0969594X.2012.665354
-- R Core Team (2020). R: A Language and Environment for Statistical Computing . version 4.0.3. Vienna, Austria: R Foundation for Statistical Computing. Available at: www.R-project.org.
+- R Core Team (2020). R: A Language and Environment for Statistical Computing . version 4.0.3. Vienna, Austria: R Foundation for Statistical Computing. Available at: <www.R-project.org>.
 - Thurstone, L. L. (1927). A Law of Comparative Judgment. Psychol. Rev. 34 (4), 273 -286. doi:10.1037/h0070288
 - Thurstone, L. L. (1925). A Method of Scaling Psychological and Educational Tests. J. Educ. Psychol. 16 (7). doi:10.1037/h0073357
 - van Daal, T., Lesterhuis, M., Coertjens, L., van de Kamp, M.-T., Donche, V., and De Maeyer, S. (2017). The Complexity of Assessing Student Work Using Comparative Judgment: The Moderating Role of Decision Accuracy. Front. Educ. 2. doi:10.3389/feduc.2017.00044
-- Verhavert, S. (2018). ' Chapter 2 Estimating the Bradley-Terry-Luce Model in R, ' in Beyond a Mere Rank Order: The Method, the Reliability and the Ef f ciency of Comparative Judgment . Available at: https://repository.uantwerpen.be/ docman/irua/c24160/155690.pdf.
+- Verhavert, S. (2018). ' Chapter 2 Estimating the Bradley-Terry-Luce Model in R, ' in Beyond a Mere Rank Order: The Method, the Reliability and the Ef f ciency of Comparative Judgment . Available at: <https://repository.uantwerpen.be/> docman/irua/c24160/155690.pdf.
 - Verhavert, S., Bouwer, R., Donche, V., and De Maeyer, S. (2019). A MetaAnalysis on the Reliability of Comparative Judgement. Assess. Educ. 26 (5), 1 -22. doi:10.1080/0969594x.2019.1602027
 - Verhavert, S., De Maeyer, S., Donche, V., and Coertjens, L. (2018). Scale Separation Reliability: What Does it Mean in the Context of Comparative Judgment. Appl. Psychol. Meas. 42 (6), 428 -445. doi:10.1177/0146621617748321
 - Wright, B., and Stone, M. (1999). Measurement Essentials . 2nd ed. Wilmington, DE: Wide Range, Inc.

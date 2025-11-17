@@ -153,7 +153,7 @@ papers and the decisions were confirmed in all but five cases. For those five pa
 
 ## Requesting data
 
-For each of the 102 papers that we identified as eligible, we e-mailed the corresponding author in August 2021 to request the data (see https://osf.io/6gmvh for the email text). We sent a follow-up email to those who did not reply within 8 weeks, advising that we would cease data collection within 3-4 weeks.
+For each of the 102 papers that we identified as eligible, we e-mailed the corresponding author in August 2021 to request the data (see <https://osf.io/6gmvh> for the email text). We sent a follow-up email to those who did not reply within 8 weeks, advising that we would cease data collection within 3-4 weeks.
 
 By the end of the process, we obtained data from 33 of the 102 eligible publications. We received replies from the authors of 44 of the remaining publications, indicating they were unable to provide the requested data, with most of those explaining that the data were no longer available 3 .
 
@@ -169,7 +169,7 @@ Thus, our analysis is based on data from n = 41 papers for which we could obtain
 
 ## Data cleaning and preparation
 
-For each of the 101 judgement sessions, we assembled the CJ decision data in a standard format in the openly available repository at https://osf.io/m5wtz/. We also recorded details of each judgement session (including whether adaptive CJ was used) based on our reading of the published report. A summary of these details is shown in Table 2. In particular, while the previous meta-analysis by Verhavert et al. (2019) was based entirely on CJ studies in an education context, our sample includes 24 datasets from other research fields. Nevertheless, our sample is dominated by education studies; we return to this point in the Discussion. We identified that a majority (63%) of judgement sessions used non-adaptive CJ, while for 18% of judgement sessions we could not determine whether adaptivity was used. Only a minority of datasets (25%) were already openly available.
+For each of the 101 judgement sessions, we assembled the CJ decision data in a standard format in the openly available repository at <https://osf.io/m5wtz/>. We also recorded details of each judgement session (including whether adaptive CJ was used) based on our reading of the published report. A summary of these details is shown in Table 2. In particular, while the previous meta-analysis by Verhavert et al. (2019) was based entirely on CJ studies in an education context, our sample includes 24 datasets from other research fields. Nevertheless, our sample is dominated by education studies; we return to this point in the Discussion. We identified that a majority (63%) of judgement sessions used non-adaptive CJ, while for 18% of judgement sessions we could not determine whether adaptivity was used. Only a minority of datasets (25%) were already openly available.
 
 For each judgement session, we computed the characteristics ( NA , NC and NR ) from the raw CJ decision data. We also computed the SSR and SHR reliability measures, rather than
 
@@ -372,7 +372,6 @@ A related limitation of the present study is that we did not consider the impact
 
 A further limitation is that our analysis considered only SSR and SHR as measures of reliability. We focused on these measures due to their widespread use, and the existing interest in the relationship between them (as explained in Section 'Estimating reliability'). However, other analyses may be informative. In particular, Wu et al. (2022) proposed a framework of model diagnostics which can be used to check whether various assumptions of the Bradley-Terry model are satisfied (for instance, the 'consensus assumption', that assessors 'generally agree on the ranking of popularity of the objects and vote according to their Bradley-Terry scores', p. 470). While beyond the scope of the present work, applying this diagnostic framework to the 101 datasets we have collected could contribute further insight into the robustness of CJ methods across a range of applications, and moreover, could help to develop the diagnostic framework.
 
-
 to modelling sports outcomes to account for home advantage (e.g., Cattelan et al., 2013), and recently Seymour et al. (2022) used spatial parameters in human geography applications to reduce the number of comparisons required. We expect such technical developments to continue, and any subsequent improvements in the accuracy or efficiency of CJ methods would have implications for our findings and recommendations.
 
 ## Conclusion
@@ -397,58 +396,58 @@ Consent to participate Not applicable.
 
 Consent for publication Not applicable.
 
-Open practices statement Materials and analysis code are available at https://doi.org/10.17605/OSF.IO/M5WTZ. None of the reported analyses were preregistered.
+Open practices statement Materials and analysis code are available at <https://doi.org/10.17605/OSF.IO/M5WTZ>. None of the reported analyses were preregistered.
 
-Open Access This article is licensed under a Creative Commons Attribution 4.0 International License, which permits use, sharing, adaptation, distribution and reproduction in any medium or format, as long as you give appropriate credit to the original author(s) and the source, provide a link to the Creative Commons licence, and indicate if changes were made. The images or other third party material in this article are included in the article's Creative Commons licence, unless indicated otherwise in a credit line to the material. If material is not included in the article's Creative Commons licence and your intended use is not permitted by statutory regulation or exceeds the permitted use, you will need to obtain permission directly from the copyright holder. To view a copy of this licence, visit http://creativecomm ons.org/licenses/by/4.0/.
+Open Access This article is licensed under a Creative Commons Attribution 4.0 International License, which permits use, sharing, adaptation, distribution and reproduction in any medium or format, as long as you give appropriate credit to the original author(s) and the source, provide a link to the Creative Commons licence, and indicate if changes were made. The images or other third party material in this article are included in the article's Creative Commons licence, unless indicated otherwise in a credit line to the material. If material is not included in the article's Creative Commons licence and your intended use is not permitted by statutory regulation or exceeds the permitted use, you will need to obtain permission directly from the copyright holder. To view a copy of this licence, visit <http://creativecomm> ons.org/licenses/by/4.0/.
 
 ## References
 
-- Bartholomew, S. R., & Jones, M. D. (2022). A systematized review of research with adaptive comparative judgment (ACJ) in higher education. International Journal of Technology and Design Education, 32 (2), 1159-1190. https://doi.org/10.1007/s10798-020-09642-6
-- Bisson, M.-J., Gilmore, C., Inglis, M., & Jones, I. (2016). Measuring conceptual understanding using comparative judgement. International Journal of Research in Undergraduate Mathematics Education, 2 (2), 141-164. https://doi.org/10.1007/s40753-0160024-3
+- Bartholomew, S. R., & Jones, M. D. (2022). A systematized review of research with adaptive comparative judgment (ACJ) in higher education. International Journal of Technology and Design Education, 32 (2), 1159-1190. <https://doi.org/10.1007/s10798-020-09642-6>
+- Bisson, M.-J., Gilmore, C., Inglis, M., & Jones, I. (2016). Measuring conceptual understanding using comparative judgement. International Journal of Research in Undergraduate Mathematics Education, 2 (2), 141-164. <https://doi.org/10.1007/s40753-0160024-3>
 - Bond, T. G., & Fox, C. M. (2007). Applying the Rasch Model: Fundamental Measurement in the Human Sciences . London: Routledge.
-- Bradley, R. A., & Terry, M. E. (1952). Rank analysis of incomplete block designs: I. The method of paired comparisons. Biometrika, 39 (3/4), 324-345. https://doi.org/10.2307/2334029
+- Bradley, R. A., & Terry, M. E. (1952). Rank analysis of incomplete block designs: I. The method of paired comparisons. Biometrika, 39 (3/4), 324-345. <https://doi.org/10.2307/2334029>
 - Bramley, T. (2007). Paired comparison methods. In P. Newton, J.-A. Baird, H. Goldstein, H. Patrick, & P. Tymms (Eds.), Techniques for Monitoring the Comparability of Examination Standards (pp. 264-294). QCA.
 - Bramley, T. (2015). Investigating the reliability of Adaptive Comparative Judgment (tech. rep.). Cambridge Assessment . Cambridge.
 - Bramley, T., & Vitello, S. (2018). The effect of adaptivity on the reliability coefficient in adaptive comparative judgement. Assessment in Education: Principles, Policy & Practice, 26 (1), 43-58. https:// doi.org/10.1080/0969594X.2017.1418734
-- Cattelan, M., Varin, C., & Firth, D. (2013). Dynamic bradley-terry modelling of sports tournaments. Journal of the Royal Statistical Society Series C: Applied Statistics, 62 (1), 135-150. https://doi. org/10.1111/j.1467-9876.2012.01046.x
-- Crompvoets, E. A. V., Bëguin, A., & Sijtsma, K. (2021). On the bias and stability of the results of comparative judgment . https://doi. org/10.31234/osf.io/kq4jh
-- Evans, T., Mejía-Ramos, J. P., & Inglis, M. (2022). Do mathematicians and undergraduates agree about explanation quality? Educational Studies in Mathematics, 111 (3), 445-467. https://doi.org/10.1007/ s10649-022-10164-2
+- Cattelan, M., Varin, C., & Firth, D. (2013). Dynamic bradley-terry modelling of sports tournaments. Journal of the Royal Statistical Society Series C: Applied Statistics, 62 (1), 135-150. <https://doi>. org/10.1111/j.1467-9876.2012.01046.x
+- Crompvoets, E. A. V., Bëguin, A., & Sijtsma, K. (2021). On the bias and stability of the results of comparative judgment . <https://doi>. org/10.31234/osf.io/kq4jh
+- Evans, T., Mejía-Ramos, J. P., & Inglis, M. (2022). Do mathematicians and undergraduates agree about explanation quality? Educational Studies in Mathematics, 111 (3), 445-467. <https://doi.org/10.1007/> s10649-022-10164-2
 
-Gray, A., Rahat, A., Crick, T., & Lindsay, S. (2024). A bayesian active learning approach to comparative judgement within education assessment. Computers and Education: Artificial Intelligence, 6 , 100245. https://doi.org/10.1016/j.caeai.2024.100245
+Gray, A., Rahat, A., Crick, T., & Lindsay, S. (2024). A bayesian active learning approach to comparative judgement within education assessment. Computers and Education: Artificial Intelligence, 6 , 100245. <https://doi.org/10.1016/j.caeai.2024.100245>
 
 Hamilton, I. (2023). Pairwise Relations in Principle and in Practice (Doctoral dissertation). University of Warwick. Warwick. http:// webcat.warwick.ac.uk/record=b3948304
 
-- Hamilton, I., Tawn, N., & Firth, D. (2023). The many routes to the ubiquitous Bradley-Terry model. arXiv:2312.13619. https://doi. org/10.48550/arXiv.2312.13619
-- Hunter, J., & Jones, I. (2018). Free-Response Tasks in Primary Mathematics: A Window on Students' Thinking. 41st Annual Meeting of the Mathematics Education Research Group of Australasia (MERGA). Retrieved August 28, 2023, from https://eric.ed.gov/? id=ED592426
-- Issa Mattos, D., Ramos, Martins Silva, & É. (2022). Bayesian paired comparison with the bpcs package. Behavior Research Methods, 54 (4), 2025-2045. https://doi.org/10.3758/s13428-021-01714-2
+- Hamilton, I., Tawn, N., & Firth, D. (2023). The many routes to the ubiquitous Bradley-Terry model. arXiv:2312.13619. <https://doi>. org/10.48550/arXiv.2312.13619
+- Hunter, J., & Jones, I. (2018). Free-Response Tasks in Primary Mathematics: A Window on Students' Thinking. 41st Annual Meeting of the Mathematics Education Research Group of Australasia (MERGA). Retrieved August 28, 2023, from <https://eric.ed.gov/>? id=ED592426
+- Issa Mattos, D., Ramos, Martins Silva, & É. (2022). Bayesian paired comparison with the bpcs package. Behavior Research Methods, 54 (4), 2025-2045. <https://doi.org/10.3758/s13428-021-01714-2>
 - Jones, I., Bisson, M., Gilmore, C., & Inglis, M. (2019). Measuring conceptual understanding in randomised controlled trials: Can
 
-- comparative judgement help? British Educational Research Journal, 45 (3), 662-680. https://doi.org/10.1002/berj.3519
-- Jones, I., & Davies, B. (2024). Comparative judgement in education research. International Journal of Research & Method in Education, 47 (2), 170-181. https://doi.org/10.1080/1743727X.2023. 2242273
+- comparative judgement help? British Educational Research Journal, 45 (3), 662-680. <https://doi.org/10.1002/berj.3519>
+- Jones, I., & Davies, B. (2024). Comparative judgement in education research. International Journal of Research & Method in Education, 47 (2), 170-181. <https://doi.org/10.1080/1743727X.2023>. 2242273
 - Jones, I., Inglis, M., Gilmore, C., & Hodgen, J. (2013). Measuring conceptual understanding: The case of fractions. In A. M. Lindmeier & A. Heinze (Eds.), Proceedings of the 37th Conference of the International Group for the Psychology of Mathematics Education (pp. 113-120). IGPME.
 - Jones, I., Swan, M., & Pollitt, A. (2014). Assessing mathematical problem solving using comparative judgement. International Journal of Science and Mathematics Education, 13 (1), 151-177. https:// doi.org/10.1007/s10763-013-9497-6
-- Jones, S. R., Scott, C. J., Barnard, L. A., Highfield, R., Lintott, C. J., & Baeten, E. (2020). The visual complexity of coronal mass ejections follows the solar cycle. Space Weather, 18 (10), e2020SW002556. https://doi.org/10.1029/2020sw002556
-- Luckett, C. R., Burns, S. L., & Jenkinson, L. (2020). Estimates of relative acceptability from paired preference tests. Journal of Sensory Studies, 35 (5), Article e12593. https://doi.org/10.1111/joss.12593
-- Luna, F. G., Roca, J., Martín-Arévalo, E., & Lupiáñez, J. (2021). Measuring attention and vigilance in the laboratory vs. online: The split-half reliability of the ANTI-Vea. BehaviorResearchMethods, 53 (3), 1124-1147. https://doi.org/10.3758/s13428-020-01483-4
-- Mejía Ramos, J. P., Evans, T., Rittberg, C., & Inglis, M. (2021). Mathematicians' Assessments of the Explanatory Value of Proofs. Axiomathes, 5 , 575-599. https://doi.org/10.1007/s10516-02109545-8
+- Jones, S. R., Scott, C. J., Barnard, L. A., Highfield, R., Lintott, C. J., & Baeten, E. (2020). The visual complexity of coronal mass ejections follows the solar cycle. Space Weather, 18 (10), e2020SW002556. <https://doi.org/10.1029/2020sw002556>
+- Luckett, C. R., Burns, S. L., & Jenkinson, L. (2020). Estimates of relative acceptability from paired preference tests. Journal of Sensory Studies, 35 (5), Article e12593. <https://doi.org/10.1111/joss.12593>
+- Luna, F. G., Roca, J., Martín-Arévalo, E., & Lupiáñez, J. (2021). Measuring attention and vigilance in the laboratory vs. online: The split-half reliability of the ANTI-Vea. BehaviorResearchMethods, 53 (3), 1124-1147. <https://doi.org/10.3758/s13428-020-01483-4>
+- Mejía Ramos, J. P., Evans, T., Rittberg, C., & Inglis, M. (2021). Mathematicians' Assessments of the Explanatory Value of Proofs. Axiomathes, 5 , 575-599. <https://doi.org/10.1007/s10516-02109545-8>
 - Ofqual. (2015). A Comparison of Expected Difficulty, Actual Difficulty and Assessment of Problem Solving across GCSE Maths Sample Assessment Materials (tech. rep. No. 15/5679). https:// assets.publishing.service.gov.uk/government/uploads/system/ uploads/attachment\_data/file/429117/2015-05-21-gcse-mathsresearchon-sample-assessment-materials.pdf
 - Pollitt, A. (2012). Comparative judgement for assessment. International Journal of Technology and Design Education, 22 , 157-170. https:// doi.org/10.1007/s10798-011-9189-x
-- Robitzsch, A. (2024). Sirt: Supplementary item response theory models [R package version 4.1-15]. https://CRAN.R-project.org/ package=sirt
-- Routh, J., Paramasivam, S. J., Cockcroft, P., Wood, S., Remnant, J., Westermann, C., Reid, A., Pawson, P., Warman, S., Nadarajah, V. D., et al. (2023). Rating and ranking preparedness characteristics important for veterinary workplace clinical training: A novel application of pairwise comparisons and the elo algorithm. Frontiers in Medicine, 10 , 1128058. https://doi.org/10.3389/fmed. 2023.1128058
-- Seymour, R. G., Sirl, D., Preston, S. P., Dryden, I. L., Ellis, M. J., Perrat, B., & Goulding, J. (2022). The Bayesian Spatial BradleyTerry Model: Urban deprivation modelling in Tanzania. Journal of the Royal Statistical Society Series C: Applied Statistics, 71 (2), 288-308. https://doi.org/10.1111/rssc.12532
-- Stadthagen-Gonzälez, H., Parafita Couto, M. C., Párraga, C. A., & Damian, M. F. (2019). Testing alternative theoretical accounts of code-switching: Insights from comparative judgments of adjective-noun order. International Journal of Bilingualism, 23 (1), 200-220. https://doi.org/10.1177/1367006917728390
-- Thurstone, L. L. (1927). A law of comparative judgment. Psychological Review, 34 , 273-286. https://doi.org/10.1037/h0070288
-- Turner, H., & Firth, D. (2012). Bradley-Terry Models in R: The BradleyTerry2 Package. Journal of Statistical Software, 48 , 1-21. https://doi.org/10.18637/jss.v048.i09
-- Vanderdonckt, J., Zen, M., & Vatavu, R.-D. (2019). AB4Web: An On-Line A/B Tester for Comparing User Interface Design Alternatives. Proceedings of the ACM on Human-Computer Interaction , 3 (EICS), 18:1-18:28. https://doi.org/10.1145/3331160
+- Robitzsch, A. (2024). Sirt: Supplementary item response theory models [R package version 4.1-15]. <https://CRAN.R-project.org/> package=sirt
+- Routh, J., Paramasivam, S. J., Cockcroft, P., Wood, S., Remnant, J., Westermann, C., Reid, A., Pawson, P., Warman, S., Nadarajah, V. D., et al. (2023). Rating and ranking preparedness characteristics important for veterinary workplace clinical training: A novel application of pairwise comparisons and the elo algorithm. Frontiers in Medicine, 10 , 1128058. <https://doi.org/10.3389/fmed>. 2023.1128058
+- Seymour, R. G., Sirl, D., Preston, S. P., Dryden, I. L., Ellis, M. J., Perrat, B., & Goulding, J. (2022). The Bayesian Spatial BradleyTerry Model: Urban deprivation modelling in Tanzania. Journal of the Royal Statistical Society Series C: Applied Statistics, 71 (2), 288-308. <https://doi.org/10.1111/rssc.12532>
+- Stadthagen-Gonzälez, H., Parafita Couto, M. C., Párraga, C. A., & Damian, M. F. (2019). Testing alternative theoretical accounts of code-switching: Insights from comparative judgments of adjective-noun order. International Journal of Bilingualism, 23 (1), 200-220. <https://doi.org/10.1177/1367006917728390>
+- Thurstone, L. L. (1927). A law of comparative judgment. Psychological Review, 34 , 273-286. <https://doi.org/10.1037/h0070288>
+- Turner, H., & Firth, D. (2012). Bradley-Terry Models in R: The BradleyTerry2 Package. Journal of Statistical Software, 48 , 1-21. <https://doi.org/10.18637/jss.v048.i09>
+- Vanderdonckt, J., Zen, M., & Vatavu, R.-D. (2019). AB4Web: An On-Line A/B Tester for Comparing User Interface Design Alternatives. Proceedings of the ACM on Human-Computer Interaction , 3 (EICS), 18:1-18:28. <https://doi.org/10.1145/3331160>
 - Verhavert, S., Bouwer, R., Donche, V., & De Maeyer, S. (2019). A metaanalysis on the reliability of comparative judgement. Assessment in Education: Principles, Policy & Practice, 26 (5), 541-562. https:// doi.org/10.1080/0969594X.2019.1602027
-- Verhavert, S., De Maeyer, S., Donche, V., & Coertjens, L. (2018). Scale Separation Reliability: What Does It Mean in the Context of Comparative Judgment? Applied Psychological Measurement, 42 (6), 428-445. https://doi.org/10.1177/0146621617748321
-- Wheadon, C. (2015). How many judgements do you need? Retrieved September 30, 2023, from https://blog.nomoremarking.com/howmany-judgements-do-youneed-cf4822d3919f
-- Wheadon, C., Barmby, P., Christodoulou, D., & Henderson, B. (2020). A comparative judgement approach to the large-scale assessment of primary writing in england. Assessment in Education: Principles, Policy & Practice, 27 (1), 46-64. https://doi.org/10.1080/ 0969594X.2019.1700212
-- Williams, B. J., & Kaufmann, L. M. (2012). Reliability of the Go/No Go Association Task. Journal of Experimental Social Psychology, 48 (4), 879-891. https://doi.org/10.1016/j.jesp.2012.03.001
+- Verhavert, S., De Maeyer, S., Donche, V., & Coertjens, L. (2018). Scale Separation Reliability: What Does It Mean in the Context of Comparative Judgment? Applied Psychological Measurement, 42 (6), 428-445. <https://doi.org/10.1177/0146621617748321>
+- Wheadon, C. (2015). How many judgements do you need? Retrieved September 30, 2023, from <https://blog.nomoremarking.com/howmany-judgements-do-youneed-cf4822d3919f>
+- Wheadon, C., Barmby, P., Christodoulou, D., & Henderson, B. (2020). A comparative judgement approach to the large-scale assessment of primary writing in england. Assessment in Education: Principles, Policy & Practice, 27 (1), 46-64. <https://doi.org/10.1080/> 0969594X.2019.1700212
+- Williams, B. J., & Kaufmann, L. M. (2012). Reliability of the Go/No Go Association Task. Journal of Experimental Social Psychology, 48 (4), 879-891. <https://doi.org/10.1016/j.jesp.2012.03.001>
 - Wright, B. D., & Masters, G. N. (1982). Rating Scale Analysis: Rasch Measurement . Chicago: MESA Press.
-- Wu, W., Niezink, N., & Junker, B. (2022). A Diagnostic Framework for the Bradley-Terry Model. Journal of the Royal Statistical Society Series A: Statistics in Society, 185 (Supplement-2), S461-S484. https://doi.org/10.1111/rssa.12959
-- Zhang, Z., Yang, L.-Z., Vékony, T., Wang, C., & Li, H. (2024). Split-half reliability estimates of an online card sorting task in a community sample of young and elderly adults. Behavior Research Methods, 56 (2), 1039-1051. https://doi.org/10.3758/s13428-023-02104-6
-- Zucco, C., Batista, M., & Power, T. J. (2019). Measuring portfolio salience using the Bradley-Terry model: An illustration with data from Brazil. Research & Politics, 6 (1), 2053168019832089. https://doi.org/10.1177/2053168019832089
+- Wu, W., Niezink, N., & Junker, B. (2022). A Diagnostic Framework for the Bradley-Terry Model. Journal of the Royal Statistical Society Series A: Statistics in Society, 185 (Supplement-2), S461-S484. <https://doi.org/10.1111/rssa.12959>
+- Zhang, Z., Yang, L.-Z., Vékony, T., Wang, C., & Li, H. (2024). Split-half reliability estimates of an online card sorting task in a community sample of young and elderly adults. Behavior Research Methods, 56 (2), 1039-1051. <https://doi.org/10.3758/s13428-023-02104-6>
+- Zucco, C., Batista, M., & Power, T. J. (2019). Measuring portfolio salience using the Bradley-Terry model: An illustration with data from Brazil. Research & Politics, 6 (1), 2053168019832089. <https://doi.org/10.1177/2053168019832089>
 
 <!-- image -->
 

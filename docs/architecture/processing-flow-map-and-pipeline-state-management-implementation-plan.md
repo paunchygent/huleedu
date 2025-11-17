@@ -539,12 +539,12 @@ Complete Pipeline Architecture Map: From Client Request to Completion
   Development & Testing Strategy
 
   1. Test Coverage Requirements
-  # Essential test scenarios for multi-pipeline support
-  - Run CJ Assessment → Run NLP (Spellcheck should be skipped)
-  - Run NLP → Run CJ Assessment (Both should execute)
-  - Run Comprehensive Pipeline (All phases in sequence)
-  - Pipeline failure recovery and retry
-  - Concurrent pipeline rejection
+# Essential test scenarios for multi-pipeline support
+- Run CJ Assessment → Run NLP (Spellcheck should be skipped)
+- Run NLP → Run CJ Assessment (Both should execute)
+- Run Comprehensive Pipeline (All phases in sequence)
+- Pipeline failure recovery and retry
+- Concurrent pipeline rejection
   2. Development Environment Validation
     - All containers must support hot-reload for rapid iteration
     - Integration tests must cover multi-pipeline scenarios
@@ -594,4 +594,3 @@ Complete Pipeline Architecture Map: From Client Request to Completion
 
   The priority is clear: implement Phase 1 immediately to unblock NLP integration, then rapidly iterate through Phase 2 to support
   the full vision of composable, intelligent pipeline orchestration.
-

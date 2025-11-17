@@ -27,7 +27,7 @@ async def generate_batch_comparison(
 ) -> Tuple[list[LLMProviderResponse], list[LLMProviderError]]
 ```
 
-#### Provider-Specific Implementation Strategy:
+#### Provider-Specific Implementation Strategy
 - **Anthropic**: Leverage native batch API with async job processing
 - **OpenAI**: Use batch API for cost optimization  
 - **Google**: Utilize batch request capabilities  

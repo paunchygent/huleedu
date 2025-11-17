@@ -149,17 +149,17 @@ docker buildx ls
 
 ## Troubleshooting
 
-### If builds are still slow:
+### If builds are still slow
 1. Check available disk space: `docker system df`
 2. Clean BuildKit cache: `pdm run docker-builder-prune`
 3. Ensure Docker has enough CPU/memory allocated (Docker Desktop settings)
 
-### If parallel builds fail:
+### If parallel builds fail
 1. Try building services individually first
 2. Check for port conflicts between services
 3. Ensure all base images are accessible
 
-### PDM-specific issues:
+### PDM-specific issues
 1. Ensure pdm.lock exists in the repository
 2. If segmentation faults occur, verify --frozen-lockfile is used
 3. Consider using `pdm sync --prod` instead of `pdm install` for guaranteed lock-free operation

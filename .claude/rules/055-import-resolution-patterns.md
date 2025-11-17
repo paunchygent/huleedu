@@ -76,7 +76,7 @@ from services.batch_orchestrator_service.protocols import BatchRepositoryProtoco
 
 ## Service-Specific Patterns
 
-### All Services Use Full Module Paths:
+### All Services Use Full Module Paths
 - Batch Orchestrator Service (BOS)
 - Result Aggregator Service (RAS)
 - Essay Lifecycle Service (ELS)  

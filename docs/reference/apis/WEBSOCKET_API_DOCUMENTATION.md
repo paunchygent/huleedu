@@ -339,7 +339,6 @@ Notifies when a pipeline phase is skipped due to prior completion (optimization)
 }
 ```
 
-
 ## Error Handling and Reconnection
 
 ### Connection Errors
@@ -411,7 +410,6 @@ class ReconnectionManager {
 ```
 
 ## Client Integration Examples
-
 
 ### Framework Integration
 

@@ -17,7 +17,7 @@ New Zealand
 
 *CORRESPONDENCE
 
-Tine van Daal tine.vandaal@uantwerpen.be
+Tine van Daal <tine.vandaal@uantwerpen.be>
 
 ## SPECIALTY SECTION
 

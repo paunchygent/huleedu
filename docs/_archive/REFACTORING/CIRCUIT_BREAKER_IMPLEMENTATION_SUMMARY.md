@@ -11,7 +11,7 @@ Implement lazy tracer initialization using Python property pattern.
 
 ### Code Changes
 
-#### In `services/libs/huleedu_service_libs/resilience/circuit_breaker.py`:
+#### In `services/libs/huleedu_service_libs/resilience/circuit_breaker.py`
 
 **Replace (line 77):**
 ```python

@@ -59,7 +59,6 @@ Out of scope for this PR: full iterative BT loop in `workflow_continuation`, con
    - After successful registration the runner uploads **only student essays**.
    - `essay_refs` contain students exclusively; CJ injects anchors from its DB.
 
-
 ### 3.2 `scripts/cj_experiments_runners/eng5_np/inventory.py`
 
 **Implemented behaviour**
@@ -92,7 +91,6 @@ Out of scope for this PR: full iterative BT loop in `workflow_continuation`, con
 **Proposed changes**
 
 - No change to the `Settings` model; we only correct call sites.
-
 
 ### 4.2 `services/cj_assessment_service/cj_core_logic/comparison_processing.py`
 
@@ -131,7 +129,6 @@ comparison_tasks_for_llm: list[ComparisonTask] = await generate_comparison_tasks
 ```
 
 **Note:** `_process_comparison_iteration` is not yet wired into `workflow_continuation`; this PR only ensures its behaviour matches `submit_comparisons_for_async_processing` once it is used.
-
 
 ### 4.3 `services/cj_assessment_service/cj_core_logic/pair_generation.py`
 

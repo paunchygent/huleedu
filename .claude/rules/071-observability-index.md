@@ -40,11 +40,11 @@ Observability patterns for monitoring, tracing, and debugging HuleEdu services.
 ### Stack Access
 
 **Main Observability Components:**
-- **Grafana Dashboard**: http://localhost:3000 (admin/admin)
-- **Prometheus Metrics**: http://localhost:9091
-- **Alertmanager**: http://localhost:9094/ (note trailing slash for browser)
-- **Jaeger Tracing**: http://localhost:16686
-- **Loki Logs**: http://localhost:3100 ✅ WORKING
+- **Grafana Dashboard**: <http://localhost:3000> (admin/admin)
+- **Prometheus Metrics**: <http://localhost:9091>
+- **Alertmanager**: <http://localhost:9094/> (note trailing slash for browser)
+- **Jaeger Tracing**: <http://localhost:16686>
+- **Loki Logs**: <http://localhost:3100> ✅ WORKING
   - **Labels**: container, correlation_id, level, logger_name, service, service_name
   - **Promtail**: Automatically ingesting from all Docker containers
   - **JSON Parsing**: Automatic structured log parsing
@@ -55,15 +55,15 @@ Observability patterns for monitoring, tracing, and debugging HuleEdu services.
 - **AlertManager**: `http://alertmanager:9093`
 
 **Infrastructure Monitoring:**
-- **Kafka Metrics**: http://localhost:9308/metrics
-- **PostgreSQL Metrics**: http://localhost:9187/metrics
-- **Redis Metrics**: http://localhost:9121/metrics
-- **Node Metrics**: http://localhost:9100/metrics
+- **Kafka Metrics**: <http://localhost:9308/metrics>
+- **PostgreSQL Metrics**: <http://localhost:9187/metrics>
+- **Redis Metrics**: <http://localhost:9121/metrics>
+- **Node Metrics**: <http://localhost:9100/metrics>
 
 **Quick Dashboard Access:**
-- **System Health**: http://localhost:3000/d/huleedu-system-health/huleedu-system-health-overview
-- **Service Deep Dive**: http://localhost:3000/d/huleedu-service-deep-dive/huleedu-service-deep-dive
-- **Troubleshooting**: http://localhost:3000/d/huleedu-troubleshooting/huleedu-troubleshooting
+- **System Health**: <http://localhost:3000/d/huleedu-system-health/huleedu-system-health-overview>
+- **Service Deep Dive**: <http://localhost:3000/d/huleedu-service-deep-dive/huleedu-service-deep-dive>
+- **Troubleshooting**: <http://localhost:3000/d/huleedu-troubleshooting/huleedu-troubleshooting>
 
 ### Key Commands
 ```bash

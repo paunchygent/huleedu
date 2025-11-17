@@ -167,7 +167,7 @@ log_widget.write(wrap_log_message("Long message..."))
 ## 8. Documentation Sources
 
 ### 8.1. Priority Order
-1. Official Textual docs (https://textual.textualize.io)
+1. Official Textual docs (<https://textual.textualize.io>)
 2. Source code (github.com/Textualize/textual)
 3. AI training data (outdated, verify against docs)
 
@@ -186,7 +186,7 @@ from textual import work
 from textual.worker import work
 ```
 
-**Source**: https://textual.textualize.io/guide/workers/ (Textual 6.5.0)
+**Source**: <https://textual.textualize.io/guide/workers/> (Textual 6.5.0)
 **Lesson**: NEVER trust training data for Textual imports. ALWAYS verify.
 
 ### 9.2. Worker Decorator Usage
@@ -255,7 +255,7 @@ log = RichLog(id="result", markup=True, wrap=True, auto_scroll=True)
 log.write("[green]Success![/]")  # Output: Success! (in green)
 ```
 
-**Source**: https://textual.textualize.io/widgets/rich_log/
+**Source**: <https://textual.textualize.io/widgets/rich_log/>
 
 ### 10.4. Method Differences
 - **Log**: Has `write()`, `write_line()`, `write_lines()`
@@ -347,8 +347,8 @@ pdm run python -c "from textual.widgets import Log; import inspect; print(inspec
   ❌ `Log(wrap=True)` parameter (doesn't exist)
 
 ### 12.4. Documentation URLs (Textual 6.5.0)
-- Workers: https://textual.textualize.io/guide/workers/
-- Log widget: https://textual.textualize.io/widgets/log/
-- RichLog widget: https://textual.textualize.io/widgets/rich_log/
-- CSS Properties: https://textual.textualize.io/styles/text_wrap/
-- API Reference: Use search at https://textual.textualize.io/api/
+- Workers: <https://textual.textualize.io/guide/workers/>
+- Log widget: <https://textual.textualize.io/widgets/log/>
+- RichLog widget: <https://textual.textualize.io/widgets/rich_log/>
+- CSS Properties: <https://textual.textualize.io/styles/text_wrap/>
+- API Reference: Use search at <https://textual.textualize.io/api/>

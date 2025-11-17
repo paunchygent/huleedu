@@ -189,7 +189,7 @@ The following 40 files have **excellent documentation** (>85% coverage):
 | Utils | 5 | 1 | 4 (trivial, skip) | 20% |
 | **TOTALS** | **44** | **40 (91%)** | **4** | **91%** |
 
-**Note**: 4 util files are trivial (__init__.py, simple helpers) and don't require documentation. Real coverage: 40/42 relevant files = **95%+ excellent coverage** with emailing_models.py and pipeline_models.py completed.
+**Note**: 4 util files are trivial (**init**.py, simple helpers) and don't require documentation. Real coverage: 40/42 relevant files = **95%+ excellent coverage** with emailing_models.py and pipeline_models.py completed.
 
 ---
 

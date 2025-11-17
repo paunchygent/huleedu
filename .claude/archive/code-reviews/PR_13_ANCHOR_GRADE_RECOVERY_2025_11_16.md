@@ -1,6 +1,6 @@
 # Code Review: PR #13 - Anchor Grade Recovery + Calibration Fixes
 
-**PR URL:** https://github.com/paunchygent/huledu-reboot/pull/13
+**PR URL:** <https://github.com/paunchygent/huledu-reboot/pull/13>
 **Branch:** `feature/eng5-cj-anchor-comparison-flow`
 **Review Date:** 2025-11-16
 **Reviewer:** Claude Code (Sonnet 4.5)

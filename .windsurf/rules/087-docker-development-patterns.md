@@ -270,6 +270,7 @@ docker inspect huleedu_<service_name> | grep -A 10 "Mounts"
 ## Troubleshooting
 
 ### Common Issues
+
 | Issue | Cause | Solution |
 |-------|-------|----------|
 | Build failures | PDM lockfile generation | Check dependency compatibility |

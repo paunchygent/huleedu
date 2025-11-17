@@ -26,12 +26,11 @@ Comparative judgment
 
 An emphasis  on  elevating  current  educational  approaches  to  better  prepare  students  for the future has often centered on open-ended learning scenarios (Viseu and Oliveira 2017; Munroe 2015; Hannafin et al. 1994). Learning approaches such as problem-based (Boud and  Feletti  2013),  project-based  (Bell  2010),  design-based  (Bartholomew  2017),  and inquiry-based learning (Lazonder and Harmsen 2016), have all been lauded, implemented, criticized, and studied towards that end (Duran and Dökme 2016; Kirschner et al. 2006; Thomas 2000; Mills and Treagust 2003). In tandem with these efforts towards open-ended learning,  the  struggles  with  accurately  assessing  them  continues;  the  open-ended  nature of these approaches to pedagogy often results in difficulties related to reliable, valid, and
 
-* Scott R. Bartholomew scottbartholomew@byu.edu Matthew D. Jones jone1947@purdue.edu
+* Scott R. Bartholomew <scottbartholomew@byu.edu> Matthew D. Jones <jone1947@purdue.edu>
 
 1 Brigham Young University, 230 Snell, BYU, Provo, UT 84602, USA
 
 2 Purdue University, Young Hall, West Lafayette, IN 47907, USA
-
 
 feasible assessment due to the wide variety of potentially 'correct' answers (Bartholomew 2017; Kumar and Natarajan 2007).
 
@@ -42,7 +41,6 @@ Research  into  CJ  assessment  in  educational  settings  has  been  documented
 ACJ has been implemented in a variety of classroom settings, including as a tool for summative  assessment,  formative  assessment,  and  student  learning,  with  the  majority of  research  being  conducted  in  higher  education  settings.  Further,  implementation  has spanned  multiple  locations  across  Europe,  North  America,  and  Australia  (Bartholomew and  Yoshikawa  2018).  Additionally,  the  algorithm  embedded  in  ACJ,  which  works  to improve  reliability,  has  been  challenged  (Bramley  2015),  supported  (Pollitt  2015)  and refined (Rangel-Smith and Lynch 2018) and the body of ACJ-related research has continued to grow (Bartholomew and Yoshikawa 2018).
 
 In 2018, Bartholomew and Yoshikawa synthesized the ACJ literature in K-16 educational settings. This review of the research covered a wide breadth of student ages, with limited synthesis and study depth reporting. The years following their review have shown the amount of research of ACJ conducted at the university level and beyond is greater in volume than in any
-
 
 other educational setting, with this area continuing to grow at a rapid pace. Taken together, there is a need for review of ACJ-related research in higher education with an intentional focus on in-depth reporting of related studies. This review will serve those interested in understanding the research base around this field-specifically at the higher education level-as a starting block for future endeavors with an eye towards learning from past efforts. This synthesis will serve as a companion to other ACJ literature (e.g., Bartholomew and Yoshikawa 2018; Bramley 2015; Pollitt 2012; Verhavert et al. 2019), with a narrower focus (higher education ACJ implementation) and deeper analysis of processes, approaches, and findings from ACJ implementation  in  higher  education.  Additionally,  in  line  with  guidelines  for  systematized reviews  (Grant  and  Booth  2009),  commentary  around  potential  strengths,  weaknesses,  and improvements for the reported work will be provided to assist in future research planning. The guiding question for this review was:
 
@@ -56,7 +54,6 @@ This effort was guided by the identified research question, previously conducted
 
 We include, at the beginning of our review, an informational section-as a point of reference and context-with findings from articles centered on the method of ACJ. These articles were identified by the authors during the review process and deemed as critical for providing insight and an understanding into ACJ and specifically the reliability of the approach-the most debated aspect of ACJ (Bramley 2015; Pollitt 2015; Rangel-Smith and Lynch 2018). These articles-which are included to provide context for the remaining articles included in the systematized review-include pieces which we determined to be 'seminal' (having more than 75 citations at the time of this effort). The 'seminal' articles were not all exclusively couched in higher education settings but their impact on future efforts and ACJ were deemed significant  enough  to  warrant  inclusion  in  the  review  to  provide  appropriate  context  to  the reviewer.
 
-
 ## Understanding adaptive comparative judgment
 
 Using the stated criteria, several articles were identified and deemed critical in situating  ACJ  as  an  assessment  approach;  these  provide  context  and  understanding  to  the approach and often centered on the trustworthiness of the reliability measures reported. While Pollitt (2012) utilized research with young student writing samples to argue the reliability of the ACJ method, other articles (Pollitt 2004; Thurstone 1927) were mainly theoretical in nature with an emphasis on statistical and procedural methods employed. Bramley (2015) provided evidence to suggest the reliability measures reported through ACJ as inflated and invalid. However, Pollitt's (2015) criticism of the nature of Bramley's (2015) methodology responded and worked to resolve these concerns. More recent efforts by Rangel-Smith and Lynch (2018) have further responded to the chief criticisms of Bramley's (2015) and Pollitt's (2015) work, offering additional modifications to the algorithm and approach that would raise trust in the reliability measures reported. The majority of these stage-setting articles did not employ research with ACJ in educational settings with students-rather, modeling through statistics and computer functions were employed. Two additional articles summarized below (Bramley and Vitello 2018; Benton and Gallagher 2018) also focused on the reliability of the ACJ approach; these articles included research in educational settings-as opposed to being limited to statistical modelling-and, as such, will be included in the later analysis. Specific to our purpose in this review, we did not include articles focused on CJ, as opposed to ACJ, or articles centered on the development of the software platform or training of assessors. Researchers interested in ACJ should review the provided summaries of these pieces, in addition to the other items reported, as we perceive them as important to the understanding of ACJ and its place with educational settings. To set the stage for our review we provide a brief synopsis of these articles and the associated findings here:
@@ -65,7 +62,6 @@ Using the stated criteria, several articles were identified and deemed critical 
 2. Pollitt (2004) argues for CJ-as opposed to traditionally-used marking (assessing) methods-which he contends are flawed with bias, reliability, and validity issues. In this article, which has been cited almost 100 times at the time of this review, Pollitt points out that traditional approaches utilize a
 
 summative assessment system in which judgment of the quality of the achievement of students is compromised by an unnecessary concern for the reliability of marking by a widely distributed team of markers whom it is difficult and expensive to monitor well. Yet the alternative of paired comparative judgment has been shown to work adequately with these same current exams… a paired comparison (or rank ordering) system would provide much more precise quality control over the essential processes of evaluating students' performances (p. 20).
-
 
 Pollitt specifically points out that advances in computing make possible what once was not (i.e., scanning, uploading, and web-based dissemination of student work for judging) and that the time was right for adopting Thurstone's suggestions and using CJ in summative assessment for subjective work.
 
@@ -78,7 +74,6 @@ We  currently  operate  a  summative  assessment  system  in  which  judgment  o
 6. Rangel-Smith and Lynch (2018) responded to Bramley's (2015) and Pollitt's (2015) articles by analyzing the algorithm underpinning the adaptivity in ACJ. They developed coin-flip/mathematical simulations and compared these to ACJ in an effort to specifically investigate Bramley's (2015) challenge of the reliability reported through ACJ. Their results showed some bias in the adaptivity of ACJ which confirmed Bramley's arguments. However, the authors reported several steps which were undertaken to mitigate and/or eliminate these issues in the algorithm moving forward.
 7. Bramley and Vitello (2018) performed two studies: the first looked at ACJ compared to an All-Play-All method. The second looked at Random Comparative Judgment (RCJ). Their results led them to conclude that 'the SSR statistic should not be used as the basis for drawing strong conclusions about reliability when adaptivity has been used' (p. 53). Their findings, which are similar to Bramley's (2015) arguments center on a lack of trust in the reliability values produced through ACJ. However, the authors also contend that future research on adaptivity and reliability needs to continue to fully understand the outcomes and implications of the ACJ findings and reliability levels.
 
-
 8. Benton and Gallagher (2018) used a meta-analysis approach in combining existing data and performing their own pseudo-CJ simulation compared to traditional grading to render a correlational analysis. The purpose of the study was to discover if comparative judgment (particularly ACJ) was simply a form of multiple (repeated) marking. The authors contended against ACJ as an approach to expediting grading or improving reliability; specifically they noted that 'the evidence from this study supports [our study's purpose]…. The physical act of placing two essays next to each other and deciding which is better does not appear to produce judgments that, in themselves, have any more predictive valuethan getting the same individual to simply mark a set of essays' (p. 6).
 
 A review of these articles, which provide the backdrop for a clearer understanding of ACJ, made it clear that the debate over ACJ-including the approach, method, and statistical procedures-is  ongoing.  Reliability  measures  reported  through  ACJ  are  especially  contentious with arguments for and against. The reported contradictory findings suggest the need for further inquiry into the feasibility of ACJ as an approach to both assessment and learning. Despite the debate over ACJ, and the reliability levels especially, there are several notable instances of significant positive impacts from ACJ implementation. Increasing the reliability of assessment approaches, creating an 'easier' task for assessors, and the potential for learning to occur through ACJ all point to a potentially-positively-impactful opportunity; an opportunity that needs further investigation to more fully understand.
@@ -88,7 +83,6 @@ A review of these articles, which provide the backdrop for a clearer understandi
 Building on other synthesis work (Bartholomew and Yoshikawa 2018), we began the systematized  review  process  by  identifying  and  narrowing  potential  articles  for  inclusion. However,  unlike  Bartholomew  and  Yoshikawa  (2018)  our  focus  for  collecting  research was both narrower and broader in scope; narrower in our focus of ACJ research in university or higher educational settings (instead of K-16) and broader in our discrimination of what defined an educational setting (i.e. medical school, graduate studies, etc.). We initially  identified  ACJ  articles  through  a  keyword  search  ('ACJ,'  'Adaptive  Comparative Judgment') which centered on ACJ as an approach; these articles, which we have included in the previous section, center on the underpinning method and mechanism of ACJ (e.g., discussions  around  reliability,  validity,  the  adaptivity  algorithm,  etc.)  as  opposed  to  the findings of a research study which utilized ACJ. Our next step was to combine these stagesetting articles with an additional search for 'seminal' articles; with the main criteria for inclusion as a seminal piece being more than 75 citations (according to Google Scholar, December 2019). These publications were summarized in the preceding section and, along with citing works, were used to further refine our search parameters.
 
 After  investigating  and  summarizing  the  articles  which  set  the  stage  for  ACJ,  we proceeded  to  expand  our  search;  this  was  conducted  using  the  following  key  words: (1) Adaptive Comparative Judgment, (2) ACJ, (3) Comparative Judgment, and (4) CJ. Boolean phrases such as 'Adaptive Comparative Judgment AND/OR ACJ', 'Comparative Judgment AND/OR CJ' were also used. These terms were selected given their connection to, and use with, ACJ related research. The authors noted that these terms were sometimes used interchangeably-even in instances describing something that did not fit  both  terms.  Given the potential overlap in search terms, and the confusion of their use in the past, the authors deemed it necessary to use these four terms independently in
-
 
 searches to glean all potentially relevant articles. Each keyword search was conducted in several academic search engines including Google Scholar, ERIC via EBSCOhost, and Education Full Text.
 
@@ -101,7 +95,6 @@ After identifying 102 items, our next step in refining the potential articles wa
 1. Higher education context : the context of the paper should be limited to studies around ACJ in education settings at a higher education level. Although termed differently in different locations, 'higher education' is interpreted to mean post-secondary schooling occurring at a university or college. These settings include grades following 12th grade with students 18 years old and older.
 2. (a) Not included : papers with research involving settings outside of higher education such as K-12 education, workforce development, or business settings.
 2. Original research : all included works should reflect original findings and research around the use of ACJ.
-
 
 - (a) Not included : papers from the same author without new findings or explanations such as conference papers which were later published in journal articles or multiple articles using the same data.
 - (b) Not included : 'works in progress' or papers which had not been peer-reviewed (i.e., white papers).
@@ -119,13 +112,9 @@ Turning attention to the articles focused on educational research with ACJ, an i
 
 While the theoretical underpinnings of ACJ began in the United States of America with noted psychologist Louis L. Thurstone (1927), the initial efforts into implementing ACJ in educational settings were largely confined to researchers in the United Kingdom (Pollitt, Jones, Alcock, Kimbell, and Bramley) and Ireland (Seery, Lane, Canty, Buckley, Doyle, Phelan, and Rowsome). All the research articles published between 2004 and 2015 came from  these  two  geographic  locations  until  2016  when  Metzgar,  from  the  United  States, published his work related to ACJ for an MBA course. From 2016 to 2019 the geographic locations  represented  in  the  ACJ  research  spread  to  include  additional  research  in  the United States of America as well as locations such as Canada (Potter et al. 2017). However, the three epicenters of ACJ-related work in higher education appear to currently be the UK, Ireland, and the United States of America (see Fig. 3).
 
-
 Fig. 1 Overview of systematized literature review
 
-
 The participants included in ACJ-related research have almost exclusively been university  students  (see  Fig.  4).  Other  assessors  included  in  ACJ  research  have  included industry professionals (4), university instructors/professors (6), and/or other academic staff (e.g., course TAs). The majority of research has situated university students as the assessors  in  ACJ  research  (21).  In  most  of  these  instances  the  students  have  acted  as assessors of their own work, their peers work, or similar work to that completed in the course (see Table 2).
-
-
 
 **Table 2: Higher education ACJ integration: settings, assessors, subject area, and participants**
 
@@ -156,7 +145,6 @@ The participants included in ACJ-related research have almost exclusively been u
 
 In terms of subject area, the ACJ research in higher education has spanned a variety of courses including writing, mathematics, and design and technology (in Europe) or Technology &amp; Engineering Education (USA). The most common subject matter for ACJ-assessment has been design portfolios  situated  in  design  and  technology/Technology  &amp;  Engineering Education courses (see Fig. 5). Not surprisingly, this finding mirrors the content area of the researchers most heavily involved with ACJ research (see Table 1).
 
-
 **Table 1: Articles selected for inclusion in the synthesis of ACJ-related literature at the higher education level**
 
 | ID | Title | Author(s) | Source | Year |
@@ -181,17 +169,14 @@ In terms of subject area, the ACJ research in higher education has spanned a var
 | R | Inducting ITE students in assessment practices through the use of comparative judgment | Canty, D., Buckley, J., & Seery, N. | In PATT 37 University of Malta, Malta, June 2–6, 2019, pp. 117–124 | 2019 |
 | S | Investigating Differences in Formative Critiquing between Instructors and Students in Graphic Design | Zhang, L. | Doctoral dissertation, Purdue University Libraries | 2019 |
 | T | Learning by Evaluating (LbE) | Bartholomew, S.R., Mentzer, N., & Jones, M. | In Mississippi Valley Technology Education Conference. Nashville, TN | 2019 |
-| U | Informing Engineering Design through Adaptive Comparative Judgment | Strimel, G.J., Bartholomew, S.R., Purzer, S., Yoshikawa, E., & Zhang, L. | European Journal of Engineering Education. https://doi.org/10.1080/03043797.2020.1718614 | 2020ᵃ |
-| V | An exploration into the criteria used in assessing design activities with adaptive comparative judgment in technology education | Buckley, J., Canty, D., & Seery, N. | Irish Educational Studies. https://doi.org/10.1080/03323315.2020.1814838 | 2020ᵃ |
+| U | Informing Engineering Design through Adaptive Comparative Judgment | Strimel, G.J., Bartholomew, S.R., Purzer, S., Yoshikawa, E., & Zhang, L. | European Journal of Engineering Education. <https://doi.org/10.1080/03043797.2020.1718614> | 2020ᵃ |
+| V | An exploration into the criteria used in assessing design activities with adaptive comparative judgment in technology education | Buckley, J., Canty, D., & Seery, N. | Irish Educational Studies. <https://doi.org/10.1080/03323315.2020.1814838> | 2020ᵃ |
 
 ᵃThese articles were under review at the time of this publication preparation; during the subsequent revision process the references were updated to the 2020 publication information for each article, which was published online during the 2020 year
 
-
 As ACJ was founded on the idea that assessment in open-ended scenarios is difficult, unreliable, and time-consuming (Kimbell 2012a; Pollitt 2012), we expected to see student responses  to  open-ended  assignments  most  commonly  in  our  review  of  items  included. This expectation was realized as the most commonly assessed items, through ACJ, were portfolios  from  design  settings  and  projects  (13),  followed  by  writing  assignments  (6). Other items assessed through ACJ included math assignments, presentations, audio files, and other data formats (see Fig. 6).
 
-
 Fig. 4 Assessor demographics and the number of instances they appear in the research
-
 
 ## ACJ implementation approaches
 
@@ -209,12 +194,9 @@ C. Seery et al. (2012) had university students peer-grade student-made design pr
 
 Fig. 5 Subject areas in which ACJ research has been conducted
 
-
 Fig. 6 Types of scripts used in ACJ research
 
-
 A . Seery et al. (2011) had university students perform a design activity followed by making CJs on other student works. Their findings included that students have the capacity to identify evidence of learning and 'to judge the value of analytical thinking even if they did not achieve this themselves' (p. 17). These findings suggest the
-
 
 potential  for  ACJ  as  a  learning  and  evaluation  tool-even  with  'novice'  students. However,  a  correlation  between  the  rank  order-produced  by  student  judges-and the assessment results obtained from an instructor is not shared, thus indicating is a potential for the student judges (novices) to collectively obtain an 'incorrect' (i.e., different from the instructor 'expert') ranking of work.
 
@@ -225,7 +207,6 @@ C .  Seery et al. (2012) had university students peer-grade student-made design
 D . Canty (2012) used ACJ with students for assessment at the conclusion of a design task. Qualitative surveys were also taken of student performance, motivation, knowledge and skills, and other attributes. Students were able to assess 'capability' having had no predefined criteria and ACJ was validated as an effective method for designbased education. Canty's work used a hybrid of traditional (e.g., rubric-based), ACJ, and qualitative data collection; the results showed high reliability and validity while using ACJ with student assessors. While the results from both the student-produced and the expert-produced ACJ sessions were significantly correlated, Canty noted (p. 157) that:
 
 the student and professional assessors agreed on the general location of a portfolio on the rank order but it is evident that within these regions of the rank order there is variance on the perceived quality of the work.
-
 
 The implications of this variance within significantly correlated rank-orders is intriguing and further effort in this vein could produce promising insight into differences between student and expert perceptions.
 
@@ -257,7 +238,6 @@ While the authors call into consideration the potentially motivating experience 
 
 R . Canty et al. (2019) had students (student teachers in education) create an activity and an assessment to go along with that activity. These deliverables were assembled into portfolios  that  were  peer-judged  using  ACJ.  Students  were  asked  to  make  comments on the portfolios as they judged them. Based on the student survey responses following the experiment, students felt that using ACJ was helpful to their learning. Specifically,
 
-
 students felt the experience broadened their understanding of the assignment and potential approaches. Student comments, left while completing judgments, were qualitatively analyzed and the results showed that the majority of comments focused on task or process level changes. The authors note that more thought-provoking comments (e.g., selfregulative level) were few and could likely be increased through an intervention or training in class. Investigating the potential for such an intervention to elevate student ACJ comments would strengthen the understanding of student experience and the potential for ACJ to be used as a learning tool and not just an assessment tool.
 
 V . Buckley et al. (2020) had aspiring design and technology teachers use ACJ to evaluate  design  portfolios  created  by  their  peers.  While  completing  ACJ  comparisons  no external  criteria  was  provided,  and  the  students  were  requested  to  leave  comments explaining the criteria used in judgments for each comparison. A correlation between the contents of the student portfolios (e.g., how many images were included) and the ACJ outcome (i.e., parameter value) was conducted; the authors noted that (p. 11):
@@ -276,7 +256,6 @@ back on others' work' (p. 111). Further, students rated the ACJ process of compa
 - L . Barber (2018) assigned academic staff to use ACJ to grade/mark scripts that had been graded previously. ACJ marks given by the academic staff, though not well-correlated to previous grades, were 'better than the original marks' obtained by earlier graders (p. 6). The author highlights the potential of ACJ for improving reliability in grading while also  stressing  the  importance  of  selecting  the  judging  criteria  carefully.  Additionally, university students peer-graded a mock examination question using ACJ and generally praised the approach for learning and were more inclined to this approach of peer-grading than assigning traditional marks (scores). Further investigation into the selection of judgment criteria, or the lack thereof (see Canty et al. 2017, 2019; Seery et al. 2016) and  its  impact  on  the  selection  process  is  needed.  Judges  selecting  the  better  of  two items, with different criteria for selection in mind, may arrive at the same conclusion, or not; regardless, an understanding of the impact of the criteria for selection is needed to further explore the ramifications of ACJ for assessment and learning.
 - M . Bartholomew et al. (2018b) used mixed methods approaches to gather various data across five studies of ACJ in design and technical education. The findings from each of the five studies demonstrated that ACJ had the potential to be an assessment tool for student competencies in educational settings. Implications for using ACJ as a learning tool in highly specialized fields are shared as well as future directions for research into the potential for learning these skills through comparison. The authors note difficulties in  assessment  as  a  result  of  uncertainty  around  the  competencies  desired,  as  well  as the criteria for demonstrating competence. The authors recommend clearly identifying these before conducting an ACJ assessment of student work and highlight the need for additional research before widespread conclusions could be drawn.
 - Q .  Demonacos et al. (2019) used ACJ as a peer-feedback tool at the end of a writing assignment.  A  survey  was  also  used  to  gather  data.  Students  and  instructors  demonstrated low levels of agreement (correlationally) over grades, however the authors noted
-
 
 the quality of student and instructor qualitative feedback provided through ACJ. Interestingly,  the  authors  note  that  the  instructors  and  students  provided  feedback  on  very different aspects of the assignment. The differences in feedback between instructors and students is similar to a finding in Zhang (2019); an understanding of these differences, why they occur, and how the differences in feedback may influence subsequent student decisions, is unclear.
 
@@ -303,10 +282,7 @@ At the foundation of ACJ lies the idea that reliability of assessment results ma
 
 Validity, as reported in ACJ research, most often refers to a comparison of ACJ-produced  results  with  other  forms  of  assessment  and/or  grading  (i.e.,  traditional  rubricbased grading or professional marking). In other scenarios the ACJ-produced rank was
 
-
 compared with the actual functionality of designs or other commonly accepted standards  as  a  'validity  check.'  A  synopsis  of  findings,  related  to  both  the  reliability  and validity of research around ACJ, is included in Table 3.
-
-
 
 **Table 3: Reliability and validity results across studies**
 
@@ -335,7 +311,6 @@ compared with the actual functionality of designs or other commonly accepted sta
 | U | Strimel, G.J., Bartholomew, S.R., Purzer, S., Yoshikawa, E., & Zhang, L. (2020) | Correlations reported for ranks produced by students and teachers: r = 0.564; ranks produced by students and practicing engineers: r = 0.66; and for ranks produced by teachers and practicing engineers: r = 0.33 | Not reported |
 | V | Buckley, J., Canty, D., & Seery, N. (2020) | Auditing by module leaders through individually grading each piece of work for use and monitoring of misfit statistics. Qualitative analysis and coding to describe the amount of work, independent of quality, which was done (e.g. the number of sketches presented) | r = 0.974 |
 
-
 ## Conclusion
 
 This  synthesis  was  conducted  with  the  intent  of  serving  as  a  'launchpad'  for  those interested in ACJ in higher education settings, with key findings, efforts, and research synthesized for ease of review and identification of overarching findings and principles. This analysis focused on findings from studies of ACJ in higher education settings and, based on our synthesis of related research, we believe ACJ represents a valuable tool for  a  wide  variety  of  content  and  contextual  settings  in  higher  education.  As  higher education assessment methods must adapt to the ever-increasing volatility, uncertainty, complexity, and ambiguity of our modern world, pedagogical practice and instructional design  may  end  up  requiring  less  'right'  answer  approaches  to  assessment  and  more 'open-ended' methods. Therefore, ACJ may yet prove to be a vital learning and assessment tool in higher education. However, we caution readers that several areas of further inquiry were apparent in our review-these should be studied with intentionality before broadly accepting ACJ for educational purposes. Applications in both summative and formative assessment have demonstrated high levels of both reliability and validity as well as increases in student learning and achievement. Further, recent years have seen a marked increase in ACJ implementation in terms of location, quantity of research articles, and different content areas suggesting increased traction and interest surrounding the potential for increased use.
@@ -351,7 +326,7 @@ Significantly, while the majority of research in ACJ in higher education has emp
 - Bartholomew, S. R. (2017). Assessing open-ended design problems. Technology and Engineering Education Teacher, 76 (6), 13-17.
 - Bartholomew, S. R., Mentzer, N., &amp; Jones, M. (2019a). Learning by evaluating (LbE). In Mississippi Valley Technology Education Conference . Nashville, TN.
 - Bartholomew, S. R., Strimel, G. J., &amp; Jackson, A. (2018a). A comparison of traditional and adaptive comparative  judgment  assessment  techniques  for  freshman  engineering  design  projects. International Journal of Engineering Education, 34 (1), 20-33.
-- Bartholomew, S. R., & Yoshikawa, E. (2018). A systematic review of research around adaptive comparative judgment (ACJ) in K-16 education. 2018 CTETE Monograph Series. Retrieved from https://doi.org/10.21061/ctete-rms.v1.c.1.
+- Bartholomew, S. R., & Yoshikawa, E. (2018). A systematic review of research around adaptive comparative judgment (ACJ) in K-16 education. 2018 CTETE Monograph Series. Retrieved from <https://doi.org/10.21061/ctete-rms.v1.c.1>.
 - Bartholomew, S. R., Yoshikawa, E., &amp; Connolly, P. E. (2018b). Exploring the potential for identifying student competencies in design education through adaptive comparative judgment. In PATT35 Athlone Institute of Technology, Athlone, Ireland 18-21 June, 2018 (pp. 187-194).
 - Bartholomew, S., Zhang, L., Bravo, E. G., &amp; Strimel, G. J. (2019b). A tool for formative assessment and learning  in  a  graphics  design  course:  Adaptive  comparative  judgement. The Design Journal, 22 (1), 73-95.
 - Bartholomew, S., Zhang, L., Bravo, E. G., &amp; Strimel, G. J. (2019c). First, last, elsewhere… positioning adaptive comparative judgment in the design learning experience. In PATT 37 University of Malta, Malta, June 2-6, 2019 (pp. 65-74).
@@ -361,7 +336,7 @@ Significantly, while the majority of research in ACJ in higher education has emp
 - Boud, D., &amp; Feletti, G. (2013). The challenge of problem-based learning . London: Routledge.
 - Bramley, T. (2015). Investigating the reliability of adaptive comparative judgment (p. 36). Cambridge: Cambridge Assessment.
 - Bramley, T., &amp; Vitello, S. (2018). The effect of adaptivity on the reliability coefficient in adaptive comparative judgement. Assessment in Education: Principles, Policy &amp; Practice, 26 (1), 43-58.
-- Buckley, J., Canty, D., & Seery, N. (2020). An exploration into the criteria used in assessing design activities with adaptive comparative judgment in technology education. Irish Educational Studies. https://doi.org/10.1080/03323315.2020.1814838.
+- Buckley, J., Canty, D., & Seery, N. (2020). An exploration into the criteria used in assessing design activities with adaptive comparative judgment in technology education. Irish Educational Studies. <https://doi.org/10.1080/03323315.2020.1814838>.
 - Canty, D. (2012). The impact of holistic assessment using adaptive comparative judgment of student learning . PhD Thesis, University of Limerick, Ireland.
 - Canty, D., Buckley, J., &amp; Seery, N. (2019). Inducting ITE students in assessment practices through the use of comparative judgment. In PATT 37 University of Malta, Malta, June 2-6, 2019 (pp. 117-124).
 - Canty, D., Seery, N., Hartell, E., &amp; Doyle, A. (2017). Integrating peer assessment in technology education through adaptive comparative judgment. In PATT34 Technology &amp; Engineering Education-Fostering the Creativity of Youth Around the Globe, Millersville University, Pennsylvania, USA (pp. 10-14).
@@ -370,8 +345,6 @@ Significantly, while the majority of research in ACJ in higher education has emp
 - Duran, M., &amp; Dökme, İ. (2016). The effect of the inquiry-based learning approach on student's criticalthinking skills. Eurasia Journal of Mathematics, Science &amp; Technology Education, 12 (12), 2887-2908.
 - Grant, M. J., &amp; Booth, A. (2009). A typology of reviews: An analysis of 14 review types and associated methodologies. Health Information and Libraries Journal, 26 (2), 91-108.
 - Hannafin, M. J., Hall, C., Land, S., &amp; Hill, J. (1994). Learning in open-ended environments: Assumptions, methods, and implications. Educational Technology, 34 (8), 48-55.
-
-
 
 - Jones, I., & Alcock, L. (2012). Summative peer assessment of undergraduate calculus using adaptive comparative judgement. In P. Iannone & A. Simpson (Eds.), Mapping university mathematics assessment practices. Norwich: University of East Anglia.
 - Kimbell, R. (2007). E-assessment in project e-scape. Design &amp; Technology Education: An International Journal, 12 (2), 66-76.
@@ -387,25 +360,24 @@ Significantly, while the majority of research in ACJ in higher education has emp
 - Munroe, L. (2015). The open-ended approach framework. European Journal of Educational Research, 4 (3), 97-104.
 - Newhouse,  P.  (2011).  Comparative  pairs  marking  supports  authentic  assessment  of  practical  performance  within  constructivist  learning  environments.  In Applications  of  Rasch  measurement  in learning environments research (pp. 141-180). Rotterdam: Sense Publishers.
 - Noruzi, A. (2005). Google Scholar: The new generation of citation indexes. Libri, 55 (4), 170-180.
-- Pollitt, A. (2004). Let's stop marking exams. Retrieved July 23, 2018, from http://www.cambridgeassessment.org.uk/images/109719-let-s-stop-marking-exams.pdf.
+- Pollitt, A. (2004). Let's stop marking exams. Retrieved July 23, 2018, from <http://www.cambridgeassessment.org.uk/images/109719-let-s-stop-marking-exams.pdf>.
 - Pollitt, A. (2012). The method of adaptive comparative judgment. Assessment in Education: Principles, Policy &amp; Practice, 19 (3), 281-300.
-- Pollitt, A. (2015). On 'reliability' bias in ACJ. Cambridge Exam Research. Retrieved February 2, 2018, from https://www.researchgate.net/publication/283318012_On_'Reliability'_bias_in_ACJ.
+- Pollitt, A. (2015). On 'reliability' bias in ACJ. Cambridge Exam Research. Retrieved February 2, 2018, from <https://www.researchgate.net/publication/283318012_On_'Reliability'_bias_in_ACJ>.
 - Pollitt, A., &amp; Murray, N. L. (1996). What raters really pay attention to. Studies in Language Testing, 3 , 74-91.
 - Potter, T., Englund, L., Charbonneau, J., MacLean, M. T., Newell, J., &amp; Roll, I. (2017). ComPAIR: A new  online  tool  using  adaptive  comparative  judgement  to  support  learning  with  peer  feedback. Teaching &amp; Learning Inquiry, 5 (2), 89-113.
 - Purzer,  S.,  Fila,  N.,  &amp;  Nataraja,  K.  (2016).  Evaluation  of  current  assessment  methods  in  engineering entrepreneurship education. Advances in Engineering Education, 5 (1), n1.
 - Rangel-Smith, C., &amp; Lynch, D. (2018). Addressing the issue of bias in the measurement of reliability in the method of adaptive comparative judgment. In PATT35 Athlone Institute of Technology, Athlone, Ireland 18-21 June, 2018 (pp. 378-387).
 - Rhind, S. M., Hughes, K. J., Yool, D., Shaw, D., Kerr, W., &amp; Reed, N. (2017). Adaptive comparative judgment: A tool to support students' assessment literacy. Journal of Veterinary Medical Education, 44 (4), 686-691.
 - Rowsome, P., Seery, N., &amp; Lane, D. (2013). The development of pre-service design educator's capacity to make professional judgments on design capability using adaptive comparative judgment . American Society for Engineering Education.
-- Seery, N., Buckley, J., Delahunty, T., & Canty, D. (2018). Integrating learners into the assessment process using adaptive comparative judgement with an ipsative approach to identifying competence based gains relative to student ability levels. International Journal of Technology and Design Education, 29, 701-715. https://doi.org/10.1007/s10798-018-9468-x.
+- Seery, N., Buckley, J., Delahunty, T., & Canty, D. (2018). Integrating learners into the assessment process using adaptive comparative judgement with an ipsative approach to identifying competence based gains relative to student ability levels. International Journal of Technology and Design Education, 29, 701-715. <https://doi.org/10.1007/s10798-018-9468-x>.
 - Seery, N., Buckley, J., Doyle, A., &amp; Canty, D. (2016). The validity and reliability of adaptive comparative judgements in the assessment of graphical capability. In Proceedings of the 71st Mid-Year Conference of the Engineering Design Graphics Division (pp. 104-109).
-
 
 - Seery, N., Canty, D., &amp; Phelan, P. (2012). The validity and value of peer assessment using adaptive comparative judgement in design driven practical education. International Journal of Technology and Design Education, 22 (2), 205-226.
 - Seery, N., Lane, D., &amp; Canty, D. (2011). Exploring the value of democratic assessment in design based activities of graphical education. In 118th Annual American Society of Engineering Education Conference . Vancouver, BC: American Society for Engineering Education.
 - Steedle,  J.  T.,  &amp;  Ferrara,  S.  (2016).  Evaluating  comparative  judgment  as  an  approach  to  essay  scoring. Applied Measurement in Education, 29 (3), 211-223.
 - Stevens, D. D., &amp; Levi, A. J. (2013). Introduction to rubrics: An assessment tool to save grading time, convey effective feedback, and promote student learning . Sterling, VA: Stylus Publishing, LLC.
-- Strimel, G. J., Bartholomew, S. R., Purzer, S., Yoshikawa, E., & Zhang, L. (2020). Informing engineering design through adaptive comparative judgment. European Journal of Engineering Education. https://doi.org/10.1080/03043797.2020.1718614.
-- Thomas, J. W. (2000). A review of research on project-based learning. Autodesk Foundation. Retrieved from https://www.asec.purdue.edu/lct/HBCU/documents/AReviewofResearchofProject-BasedLearning.pdf.
+- Strimel, G. J., Bartholomew, S. R., Purzer, S., Yoshikawa, E., & Zhang, L. (2020). Informing engineering design through adaptive comparative judgment. European Journal of Engineering Education. <https://doi.org/10.1080/03043797.2020.1718614>.
+- Thomas, J. W. (2000). A review of research on project-based learning. Autodesk Foundation. Retrieved from <https://www.asec.purdue.edu/lct/HBCU/documents/AReviewofResearchofProject-BasedLearning.pdf>.
 - Thurstone, L. L. (1927). A law of comparative judgment. Psychological Review, 34 , 273-286.
 - Verhavert, S., Bouwer, R., Donche, V., &amp; De Maeyer, S. (2019). A meta-analysis on the reliability of comparative judgement. Assessment in Education: Principles, Policy &amp; Practice, 26 (5), 541-562.
 - Viseu,  F.,  &amp;  Oliveira,  I.  B.  (2017).  Open-ended  tasks  in  the  promotion  of  classroom  communication  in mathematics. International Electronic Journal of Elementary Education, 4 (2), 287-300.

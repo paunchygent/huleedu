@@ -72,6 +72,7 @@ docker exec huleedu_<service>_db psql -U huleedu_user -d <db_name> -c "\d <table
 ```
 
 **Database Name Mapping:**
+
 | Service | Container Name | Database Name | Port |
 |---------|---------------|---------------|------|
 | `cj_assessment_service` | `huleedu_cj_assessment_db` | `huleedu_cj_assessment` | 5434 |

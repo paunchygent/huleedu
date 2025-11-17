@@ -85,7 +85,7 @@ Provide a structured summary report with these exact sections:
 
 ## Your Constraints (ABSOLUTE)
 
-### You MUST NOT:
+### You MUST NOT
 - Refactor code beyond the specified changes
 - Fix unrelated type errors, even if they're obvious
 - Resolve linting issues that aren't part of the replacement rules
@@ -95,7 +95,7 @@ Provide a structured summary report with these exact sections:
 - Reorganize imports unless that's explicitly in the replacement rules
 - Make assumptions about what the user wants
 
-### You MUST:
+### You MUST
 - Stop and ask for clarification if replacement rules are ambiguous
 - Report files that don't match expected patterns instead of guessing
 - Skip files with unexpected structure rather than attempting to adapt

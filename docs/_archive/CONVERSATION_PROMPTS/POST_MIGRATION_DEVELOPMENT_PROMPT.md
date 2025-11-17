@@ -26,64 +26,64 @@ ULTRATHINK: HuleEdu Essay Lifecycle Service - Completing ELS-002 Distributed Sta
   Critical Rules & Architecture (MUST READ FIRST)
 
   1. Navigation & Core Rules:
-    - .cursor/rules/000-rule-index.md - Master rule index
-    - .cursor/rules/010-foundational-principles.md - Zero tolerance for backward compatibility
-    - .cursor/rules/020-architectural-mandates.md - Service autonomy requirements
-    - .cursor/rules/048-structured-error-handling-standards.md - Error patterns
-    - .cursor/rules/050-python-coding-standards.md - Type annotation requirements
-    - .cursor/rules/070-testing-and-quality-assurance.md - Protocol-based testing
+  - .cursor/rules/000-rule-index.md - Master rule index
+  - .cursor/rules/010-foundational-principles.md - Zero tolerance for backward compatibility
+  - .cursor/rules/020-architectural-mandates.md - Service autonomy requirements
+  - .cursor/rules/048-structured-error-handling-standards.md - Error patterns
+  - .cursor/rules/050-python-coding-standards.md - Type annotation requirements
+  - .cursor/rules/070-testing-and-quality-assurance.md - Protocol-based testing
   2. Service-Specific Architecture:
-    - .cursor/rules/020.5-essay-lifecycle-service-architecture.md - ELS architecture
-    - .cursor/rules/020.11-service-libraries-architecture.md - Service libraries
-    - .cursor/rules/042-async-patterns-and-di.md - Async patterns & DI
+  - .cursor/rules/020.5-essay-lifecycle-service-architecture.md - ELS architecture
+  - .cursor/rules/020.11-service-libraries-architecture.md - Service libraries
+  - .cursor/rules/042-async-patterns-and-di.md - Async patterns & DI
   3. Event & Testing Standards:
-    - .cursor/rules/030-event-driven-architecture-eda-standards.md - Event patterns
-    - .cursor/rules/052-event-contract-standards.md - Event contracts
-    - .cursor/rules/051-pydantic-v2-standards.md - Pydantic patterns
+  - .cursor/rules/030-event-driven-architecture-eda-standards.md - Event patterns
+  - .cursor/rules/052-event-contract-standards.md - Event contracts
+  - .cursor/rules/051-pydantic-v2-standards.md - Pydantic patterns
 
   Task Documentation & Context
 
   4. Task Definition:
-    - TASKS/ESSAY_LIFECYCLE_DISTRIBUTED_STATE_MANAGEMENT.md - ELS-002 requirements
-    - Section 8.1: HuleEdu ZERO tolerance policy
-    - Section 4: Legacy Code Removal status (90% complete)
+  - TASKS/ESSAY_LIFECYCLE_DISTRIBUTED_STATE_MANAGEMENT.md - ELS-002 requirements
+  - Section 8.1: HuleEdu ZERO tolerance policy
+  - Section 4: Legacy Code Removal status (90% complete)
   5. Project Configuration:
-    - /Users/olofs_mba/Documents/Repos/huledu-reboot/CLAUDE.md - Project rules
-    - /Users/olofs_mba/Documents/Repos/huledu-reboot/pyproject.toml - Dependencies
+  - /Users/olofs_mba/Documents/Repos/huledu-reboot/CLAUDE.md - Project rules
+  - /Users/olofs_mba/Documents/Repos/huledu-reboot/pyproject.toml - Dependencies
 
   Step 2: Current Implementation Status
 
   What Was Completed ✅
 
   1. Protocol Updates (services/essay_lifecycle_service/protocols.py):
-    - All BatchEssayTracker methods now async
-    - Added missing Redis operations to AtomicRedisClientProtocol
+  - All BatchEssayTracker methods now async
+  - Added missing Redis operations to AtomicRedisClientProtocol
   2. Implementation Refactoring (batch_essay_tracker_impl.py):
-    - Removed ALL in-memory state (batch_expectations, validation_failures)
-    - Removed ALL legacy methods
-    - All operations now use Redis coordinator exclusively
-    - Fixed timeout monitoring to use Redis TTL
+  - Removed ALL in-memory state (batch_expectations, validation_failures)
+  - Removed ALL legacy methods
+  - All operations now use Redis coordinator exclusively
+  - Fixed timeout monitoring to use Redis TTL
   3. Database Model Updates:
-    - Added table_args constraints to models_db.py
-    - Fixed BatchExpectation initialization in batch_tracker_persistence.py
+  - Added table_args constraints to models_db.py
+  - Fixed BatchExpectation initialization in batch_tracker_persistence.py
   4. Linting Fixes:
-    - Fixed all 71 linting errors
-    - Proper whitespace, unused variable cleanup
+  - Fixed all 71 linting errors
+  - Proper whitespace, unused variable cleanup
 
   Remaining Work 🚧
 
   1. Type Checking Issues (84 errors):
-    - Missing await calls in tests
-    - Redis client protocol mismatches
-    - Test mock type incompatibilities
-    - Missing type annotations
+  - Missing await calls in tests
+  - Redis client protocol mismatches
+  - Test mock type incompatibilities
+  - Missing type annotations
   2. Test Updates Required:
-    - test_batch_tracker_validation.py - 16 missing await calls
-    - test_atomic_batch_creation_integration.py - 2 missing await calls
-    - Redis mocks returning None instead of proper responses
+  - test_batch_tracker_validation.py - 16 missing await calls
+  - test_atomic_batch_creation_integration.py - 2 missing await calls
+  - Redis mocks returning None instead of proper responses
   3. TODO Implementations:
-    - list_active_batches() - line 272
-    - get_user_id_for_essay() - line 366
+  - list_active_batches() - line 272
+  - get_user_id_for_essay() - line 366
 
   Step 3: ULTRATHINK Agent Deployment
 
@@ -134,12 +134,12 @@ ULTRATHINK: HuleEdu Essay Lifecycle Service - Completing ELS-002 Distributed Sta
   Tasks:
 
   1. Implement list_active_batches():
-    - Use Redis SCAN for batch:*:metadata pattern
-    - Extract batch IDs from key names
+  - Use Redis SCAN for batch:*:metadata pattern
+  - Extract batch IDs from key names
   2. Implement get_user_id_for_essay():
-    - Scan active batches
-    - Check assignments for essay_id
-    - Return user_id from batch metadata
+  - Scan active batches
+  - Check assignments for essay_id
+  - Return user_id from batch metadata
 
   Implementation Pattern:
   async def list_active_batches(self) -> list[str]:
@@ -172,14 +172,14 @@ ULTRATHINK: HuleEdu Essay Lifecycle Service - Completing ELS-002 Distributed Sta
   Critical Type Issues to Fix
 
   1. Protocol Mismatch (line numbers from typecheck output):
-    - RedisClient vs AtomicRedisClientProtocol incompatibility
-    - subscribe() method signature differences
+  - RedisClient vs AtomicRedisClientProtocol incompatibility
+  - subscribe() method signature differences
   2. Missing Awaits in Tests:
-    - tracker.get_batch_status() calls without await
-    - tracker.assign_slot_to_content() calls without await
+  - tracker.get_batch_status() calls without await
+  - tracker.assign_slot_to_content() calls without await
   3. Mock Type Issues:
-    - Need proper AsyncMock specs for protocols
-    - Return value type mismatches
+  - Need proper AsyncMock specs for protocols
+  - Return value type mismatches
 
   Files Modified in Previous Session
 

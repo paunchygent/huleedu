@@ -423,7 +423,7 @@ manual `CJ_ADMIN_TOKEN` override.
   - mock_provider_impl.py: Fixed token calculation referencing undefined essay_a/essay_b (critical runtime bug)
   - circuit_breaker_llm_provider.py: Fixed signature mismatch with protocol
   - llm_orchestrator_impl.py: Fixed test_provider_availability using old parameters
-  - comparison_processing.py:212: Fixed system_prompt_override scope issue in _process_comparison_iteration
+  - comparison_processing.py:212: Fixed system_prompt_override scope issue in_process_comparison_iteration
   - test_pool_integration.py: Updated test assertions to expect system_prompt_override parameter
   - Cleanup: Removed unused start_time parameter, unused raise_validation_error import
 

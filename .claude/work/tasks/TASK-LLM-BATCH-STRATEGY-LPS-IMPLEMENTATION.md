@@ -29,7 +29,6 @@ Implement the LLM Provider Service changes needed to:
 CJ configuration, per-batch overrides, and CJ-side metrics are handled in
 `TASK-LLM-BATCH-STRATEGY-CJ-CONFIG.md` and must be completed first to avoid boundary churn.
 
-
 ## Design Decisions (LPS-side)
 
 - **Environment defaults:**
@@ -89,7 +88,6 @@ These decisions mirror the parent task and CJ config task and should not diverge
 - Ensure descriptions reference the environment defaults documented in the parent task.
 - Confirm env var naming aligns with `env_prefix="LLM_PROVIDER_SERVICE_"`.
 
-
 ### 2. Dispatch based on `QUEUE_PROCESSING_MODE` in queue processor
 
 **File:** `services/llm_provider_service/implementations/queue_processor_impl.py`
@@ -118,7 +116,6 @@ These decisions mirror the parent task and CJ config task and should not diverge
 - Once a bundle is formed:
   - Pass the list of `(QueuedRequest, LLMComparisonRequest)` pairs into a new
     `ComparisonProcessorImpl.process_comparison_batch` method.
-
 
 ### 3. Add `process_comparison_batch` to `ComparisonProcessorImpl`
 
@@ -156,7 +153,6 @@ These decisions mirror the parent task and CJ config task and should not diverge
   extended to use provider-specific multi-prompt calls for small bundles (<= 4) while preserving the
   one-result-per-request contract.
 
-
 ### 4. Map batch results back to queue handlers
 
 **File:** `services/llm_provider_service/implementations/queue_processor_impl.py`
@@ -173,7 +169,6 @@ These decisions mirror the parent task and CJ config task and should not diverge
   - Status transitions (`QUEUED` → `PROCESSING` → `COMPLETED`/`FAILED`) remain consistent.
   - Requests are still removed from the queue after completion or permanent failure.
   - Callback events (`LLMComparisonResultV1`) are identical to the `PER_REQUEST` path.
-
 
 ### 5. Enrich provider-side metadata
 
@@ -197,7 +192,6 @@ These decisions mirror the parent task and CJ config task and should not diverge
   - Group requests by provider, model, and processing mode.
   - Diagnose issues with specific bundles or providers.
 
-
 ### 6. LPS metrics for batching
 
 **File:** `services/llm_provider_service/metrics.py` (or equivalent)
@@ -220,7 +214,6 @@ These decisions mirror the parent task and CJ config task and should not diverge
 
 - Continue to rely on existing `LLMOrchestratorResponse`-driven metrics for token usage and cost,
   combining them with the new bundle metrics to analyse cost/latency trade-offs.
-
 
 ### 7. Tests
 

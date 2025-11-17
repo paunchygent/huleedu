@@ -4,7 +4,7 @@
 
 The improved Promtail configuration handles structlog JSON parsing more gracefully:
 
-### Key Improvements:
+### Key Improvements
 
 1. **Flexible JSON Detection**: First checks if a line is valid JSON before trying to parse it
 2. **Multiple Message Field Support**: Handles different field names (`event`, `message`, `msg`)
@@ -31,7 +31,7 @@ The improved Promtail configuration handles structlog JSON parsing more graceful
 
 ## Verifying the Improvements
 
-### Check in Grafana:
+### Check in Grafana
 
 1. Go to the Service Deep Dive dashboard
 2. Select a service (e.g., `batch_orchestrator_service`)
@@ -41,7 +41,7 @@ The improved Promtail configuration handles structlog JSON parsing more graceful
    - Cleaner log formatting
    - Correlation IDs still properly extracted when present
 
-### Test Query:
+### Test Query
 
 In Grafana Explore, try this query to see the difference:
 ```
@@ -52,12 +52,12 @@ This shows only successfully parsed logs.
 
 ## What to Expect
 
-### Before (Original Config):
+### Before (Original Config)
 - Many logs show `JSONParserErr`
 - `__error__` field pollutes the log view
 - Still functional but visually noisy
 
-### After (Improved Config):
+### After (Improved Config)
 - Cleaner log parsing
 - Optional fields handled gracefully
 - Better handling of structlog's `event` field

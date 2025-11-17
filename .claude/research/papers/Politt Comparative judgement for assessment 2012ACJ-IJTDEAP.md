@@ -13,7 +13,7 @@ CITATIONS
 
 139
 
-## 1 author:
+## 1 author
 
 <!-- image -->
 
@@ -71,7 +71,7 @@ The most important principle was that the system was designed to be meritocratic
 
 Cambridge Exam Research, Cambridge, UK
 
-e-mail: alastair@camexam.co.uk
+e-mail: <alastair@camexam.co.uk>
 
 <!-- image -->
 
@@ -215,7 +215,7 @@ P
 
 ## Author's personal copy
 
-## This statistic is reported in the TAG e-scape system (under full report ) as:
+## This statistic is reported in the TAG e-scape system (under full report ) as
 
 | Number   | Name   |   Count |   MnRes |   UnWMS |   UnWZ |   WMS |    WZ |
 |----------|--------|---------|---------|---------|--------|-------|-------|
@@ -326,21 +326,21 @@ A. Wood (Eds.), Techniques for monitoring the comparability of examination stand
 
 <!-- image -->
 
-- QCA. Available (26/09/2011) at: http://www.ofqual.gov.uk/files/2007-comparability-exam-standardsh-chapter6.pdf.
+- QCA. Available (26/09/2011) at: <http://www.ofqual.gov.uk/files/2007-comparability-exam-standardsh-chapter6.pdf>.
 - Anastasi, A. (1986). Evolving concepts of test validation. Annual Review of Psychology, 37 , 1-15.
 - Andrich, D. (1978). Relationships between the Thurstone and Rasch approaches to item scaling. Applied Psychological Measurement, 2 , 451-462.
 - Baker, E. L., Ayers, P., O'Neill, H. F., Choi, K., Sawyer, W., Sylvester., R. M., &amp; Carroll, B. (2008). KS3 English test marker study in Australia . Final report to the National Assessment Agency of England, London, QCA.
-- Bramley, T., (2007). Paired comparison methods. In P. Newton, J. Baird, H. Patrick, H. Goldstein, P. Timms, &amp; A. Wood (Eds). Techniques for monitoring the comparability of examination standards . London, QCA. Available (26/09/2011) at: http://www.ofqual.gov.uk/files/2007-comparability-examstandards-i-chapter7.pdf.
+- Bramley, T., (2007). Paired comparison methods. In P. Newton, J. Baird, H. Patrick, H. Goldstein, P. Timms, &amp; A. Wood (Eds). Techniques for monitoring the comparability of examination standards . London, QCA. Available (26/09/2011) at: <http://www.ofqual.gov.uk/files/2007-comparability-examstandards-i-chapter7.pdf>.
 - Cronbach, L. J., Gleser, G. C., Nanda, H., &amp; Rajaratnam, N. (1972). The dependability of behavioral measurements: Theory of generalizability for scores and profiles . New York: Wiley Lawrence Erlbaum Associates.
 - D'Arcy, J. (Ed.). (1997). Comparability studies between modular and non -modular syllabuses in GCE Advanced level biology, English literature and mathematics in the 1996 summer examinations . Standing Committee on Research on behalf of the Joint Forum for the GCSE and GCE.
 - Haley, C., &amp; Wothers, P. (2005). In M. D. Archer, &amp; C. D. Haley (Eds.), The 1702 chair of chemistry at Cambridge . Cambridge: CUP.
 - Kelly, G. A. (1955). The psychology of personal constructs (Vol. I and II). New York: Norton.
-- Kimbell, R., Wheeler, T., Stables, K., Sheppard, T., Martin, F., Davies, D., Pollitt, A., &amp; Whitehouse, G. (2009). e-scape portfolio assessment: phase 3 report . London: Technology Education Research Unit, Goldsmiths, UL. http://www.gold.ac.uk/teru/projectinfo/projecttitle,5882,en.php.
-- Linacre, J. M. (1994). Many-facet Rasch measurement , 2nd ed. Chicago: MESA Press.http://www.rasch.org/ books.htm.
+- Kimbell, R., Wheeler, T., Stables, K., Sheppard, T., Martin, F., Davies, D., Pollitt, A., &amp; Whitehouse, G. (2009). e-scape portfolio assessment: phase 3 report . London: Technology Education Research Unit, Goldsmiths, UL. <http://www.gold.ac.uk/teru/projectinfo/projecttitle,5882,en.php>.
+- Linacre, J. M. (1994). Many-facet Rasch measurement , 2nd ed. Chicago: MESA Press.<http://www.rasch.org/> books.htm.
 - Miyazaki, I. (1963). China's examination hell: the civil service examinations of imperial China (C. Schirokauer (1976), Trans). New York: Weatherhill.
-- Pollitt, A., &amp; Elliott, G. (2003). Monitoring and investigating comparability: A proper role for human judgement . Invited paper, QCA comparability seminar, Newport Pagnall. Qualifications and curriculum authority, London. Available at: http://www.camexam.co.uk/.
+- Pollitt, A., &amp; Elliott, G. (2003). Monitoring and investigating comparability: A proper role for human judgement . Invited paper, QCA comparability seminar, Newport Pagnall. Qualifications and curriculum authority, London. Available at: <http://www.camexam.co.uk/>.
 - Pollitt, A., &amp; Murray, N. L. (1993). What raters really pay attention to language testing research colloquium, Cambridge (Reprinted from M. Milanovic, &amp; N. Saville (Eds.), 1996, Studies in language testing 3: Performance testing, cognition and assessment . Cambridge: Cambridge University Press).
-- QCDA. (2011). Importance of design and technology key stage 3 . http://www.education.gov.uk/schools/ teachingandlearning/curriculum/secondary/b00199489/dt/programme. Accessed: 9 Dec 2011.
+- QCDA. (2011). Importance of design and technology key stage 3 . <http://www.education.gov.uk/schools/> teachingandlearning/curriculum/secondary/b00199489/dt/programme. Accessed: 9 Dec 2011.
 - Rasch, G. (1960/1980). Probabilistic models for some intelligence and attainment tests . Copenhagen: Danish Institute for Educational Research. Reprinted as 2nd ed., 1980, Chicago: University of Chicago Press.
 - Shavelson, R., &amp; Webb, N. (2000). Generalizability theory. In J. L. Green, G. Camilli, &amp; P. B. Elmore (Eds.), Handbook of complementary methods in education research, Chapter 18 . London: Lawrence Erlbaum Associates.
 - Stray, C. (2001). The shift from oral to written examinations: Cambridge and Oxford 1700-1900. Assessment in Education, 8 , 33-50.
@@ -350,7 +350,7 @@ A. Wood (Eds.), Techniques for monitoring the comparability of examination stand
 - Watson, R. (1818). Anecdotes of the life of Richard Watson … written by himself at different intervals, and revised in 1814 . Published by his son, Richard Watson, L. L. B., prebendary of Landaff and Wells. London: T. Cadell and W. Davies.
 - Weiss, D. J., &amp; Kingsbury, G. G. (1984). Application of computerized adaptive testing to educational problems. Journal of Educational Measurement, 21 , 361-375.
 - Wordsworth, C. (1877). Scholae academicae . London: Frank Cass.
-- Wright, B. D., &amp; Masters, G. N. (1982). Rating scale analysis . Chicago: MESA Press. http://www.rasch.org/ books.htm.
+- Wright, B. D., &amp; Masters, G. N. (1982). Rating scale analysis . Chicago: MESA Press. <http://www.rasch.org/> books.htm.
 
 <!-- image -->
 

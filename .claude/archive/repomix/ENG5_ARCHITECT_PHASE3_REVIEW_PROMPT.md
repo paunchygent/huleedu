@@ -4,7 +4,6 @@
 **Session Scope**: 3-4 focused hours  
 **Context**: Phase 3.3 – Batch Tooling & Data Capture
 
-
 ## 🎯 Review Objective
 
 Validate that the ENG5 NP runner's event-driven pipeline is architecturally complete for a single execute-mode run to emit schema-compliant artefacts without manual patching or missing metadata. This review should confirm the runner is ready for downstream statistical validation (Phase 4) with deterministic inputs/outputs and full observability for LLM cost tracking.
