@@ -234,7 +234,7 @@ Please provide:
 
 - **Parent Task**: `TASKS/TASK-CJ-CONFIDENCE-PHASE3-GRADE-SCALE-DATA-PIPELINE.md`
 - **Mathematical Validation**: `TASKS/TASK-CJ-CONFIDENCE-MATHEMATICAL-VALIDATION.md`
-- **Session Context**: `.claude/HANDOFF.md` (Phase 3.2/3.3 completion status)
+- **Session Context**: `.claude/work/session/handoff.md` (Phase 3.2/3.3 completion status)
 - **Architecture Rules**: `.windsurf/rules/020-architectural-mandates.md`
 
 ---

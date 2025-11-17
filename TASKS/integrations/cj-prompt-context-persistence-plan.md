@@ -197,4 +197,4 @@ After implementation:
 - Updated service implementation across event processor, batch prep, orchestrator, repository, pair generation, and metrics modules.
 - New `PromptHydrationFailure`, `Result[T, E]`, and `CJProcessingMetadata` plus supporting unit tests.
 - Extended fixtures and integration tests reflecting the dependency injection changes.
-- Updated `.claude/HANDOFF.md` (already done) with plan summary for cross-session visibility.
+- Updated `.claude/work/session/handoff.md` (already done) with plan summary for cross-session visibility.

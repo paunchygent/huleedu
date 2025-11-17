@@ -107,8 +107,8 @@ Use emoji indicators in the task file:
 
 Tasks complement other documentation:
 
-- **`.claude/HANDOFF.md`** - Current session work, immediate next steps
-- **`.claude/README_FIRST.md`** - Architectural decisions, service status
+- **`.claude/work/session/handoff.md`** - Current session work, immediate next steps
+- **`.claude/work/session/readme-first.md`** - Architectural decisions, service status
 - **`.claude/rules/`** - Implementation standards and requirements
 - **`services/*/README.md`** - Service-specific patterns and guides
 - **`TASKS/`** - Detailed planning and design for significant work

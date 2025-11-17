@@ -421,7 +421,7 @@ git push -u origin <branch-name>
 # Use Read tool on: .claude/rules/000-rule-index.md
 
 # Read handoff documentation
-# Use Read tool on: .claude/HANDOFF.md
+# Use Read tool on: .claude/work/session/handoff.md
 ```
 
 ### 2. Use Specialized Tools Over Bash

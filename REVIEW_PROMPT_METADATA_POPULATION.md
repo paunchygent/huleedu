@@ -234,8 +234,8 @@ Flag any:
 ### Task Documentation
 
 - `TASKS/TASK-CJ-CONFIDENCE-PHASE3-GRADE-SCALE-DATA-PIPELINE.md` - Full Phase 3 context
-- `.claude/HANDOFF.md` - Current project state
-- `.claude/README_FIRST.md` - Critical cross-service context
+- `.claude/work/session/handoff.md` - Current project state
+- `.claude/work/session/readme-first.md` - Critical cross-service context
 
 ### Infrastructure Libraries
 

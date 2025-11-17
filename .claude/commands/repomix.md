@@ -35,7 +35,7 @@ Please specify one of the following, or describe your custom requirements:
 
 **4. `/repomix context`**
 - Minimal essential context
-- Includes: Task docs, HANDOFF.md, README_FIRST.md, key implementation files
+- Includes: Task docs, handoff.md, readme-first.md, key implementation files
 - Use for: Quick onboarding, initial exploration
 
 **5. `/repomix custom`**
@@ -110,8 +110,8 @@ libs/common_core/src/common_core/**/*.py
 
 ### Documentation & Standards
 ```
-.claude/HANDOFF.md
-.claude/README_FIRST.md
+.claude/work/session/handoff.md
+.claude/work/session/readme-first.md
 TASKS/*.md
 .claude/rules/*.md
 ```

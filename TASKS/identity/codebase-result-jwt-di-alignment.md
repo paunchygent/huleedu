@@ -169,8 +169,8 @@ Realign shared patterns by consolidating the Result monad, centralizing JWT test
 
 After code changes land:
 
-1. Compress `.claude/HANDOFF.md` to include only active work.
-2. Update `.claude/README_FIRST.md` sections 10 and 15 with brief “Completed” summaries referencing the consolidated patterns.
+1. Compress `.claude/work/session/handoff.md` to include only active work.
+2. Update `.claude/work/session/readme-first.md` sections 10 and 15 with brief "Completed" summaries referencing the consolidated patterns.
 3. Mark `TASKS/CJ_PROMPT_CONTEXT_PERSISTENCE_PLAN.md` as completed with a status banner.
 
 Commit message suggestion: `docs: compress handoff and mark CJ prompt plan complete`.

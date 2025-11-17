@@ -50,7 +50,7 @@ services/llm_provider_service/protocols.py
 - Core implementation files (main logic + tests)
 - Event contracts (if event-driven)
 - Service patterns (DI, protocols, config)
-- Documentation (HANDOFF.md, README_FIRST.md, task docs)
+- Documentation (handoff.md, readme-first.md, task docs)
 - Infrastructure (idempotency, logging, error handling)
 - Critical rules (042-async-patterns, 048-error-handling, 051-pydantic, 052-event-contracts, 075-testing)
 
@@ -61,8 +61,8 @@ services/llm_provider_service/protocols.py
 services/cj_assessment_service/kafka_consumer.py,
 libs/common_core/src/common_core/events/*.py,
 services/cj_assessment_service/event_processor.py,
-.claude/HANDOFF.md,
-.claude/README_FIRST.md,
+.claude/work/session/handoff.md,
+.claude/work/session/readme-first.md,
 TASKS/TASK-*.md,
 .claude/rules/042-async-patterns-and-di.md,
 .claude/rules/048-structured-error-handling-standards.md,
@@ -110,14 +110,14 @@ libs/common_core/src/common_core/events/*.py,
 
 **File Categories**:
 - Task documentation (TASKS/*.md)
-- Handoff and README files (.claude/HANDOFF.md, .claude/README_FIRST.md)
+- Handoff and README files (.claude/work/session/handoff.md, .claude/work/session/readme-first.md)
 - Primary implementation file(s)
 - Relevant event contracts (if applicable)
 
 **Example Includes**:
 ```bash
-.claude/HANDOFF.md,
-.claude/README_FIRST.md,
+.claude/work/session/handoff.md,
+.claude/work/session/readme-first.md,
 TASKS/TASK-{specific-task}.md,
 {primary-implementation-file}.py
 ```
@@ -145,8 +145,9 @@ huledu-reboot/
 │   ├── rules/                  # Architectural standards
 │   ├── research/               # Analysis scripts and data
 │   ├── repomix_packages/       # Generated packages (output location)
-│   ├── HANDOFF.md              # Current project state
-│   └── README_FIRST.md         # Critical context
+│   ├── work/session/
+│   │   ├── handoff.md          # Current project state
+│   │   └── readme-first.md     # Critical context
 ├── TASKS/                       # Task documentation
 ├── Documentation/               # Schemas, architecture docs
 └── test_uploads/                # Test data and fixtures
@@ -214,7 +215,7 @@ Map the objective to one of the templates:
 Based on the template and monorepo structure:
 1. Start with core categories (events, implementations, protocols)
 2. Add service-specific files based on task scope
-3. Include relevant documentation (HANDOFF, task docs, README)
+3. Include relevant documentation (handoff, task docs, README)
 4. Add infrastructure files if relevant (logging, error handling, DI)
 5. Include applicable rules from `.claude/rules/`
 
@@ -251,7 +252,7 @@ After generation, inform user of:
 
 1. **Start Small**: For exploratory analysis, start with minimal context and expand as needed
 2. **Avoid Noise**: Exclude test fixtures, migrations, and large data files unless specifically needed
-3. **Include Context**: Always include `.claude/HANDOFF.md` and `.claude/README_FIRST.md` for critical project context
+3. **Include Context**: Always include `.claude/work/session/handoff.md` and `.claude/work/session/readme-first.md` for critical project context
 4. **Match Patterns**: Follow existing naming conventions visible in `.claude/repomix_packages/`
 5. **Verify Files Exist**: Before executing, ensure suggested files exist in the repository
 6. **Token Budget**: For AI analysis, target 70K-100K tokens for comprehensive reviews, <30K for focused analysis
@@ -328,4 +329,4 @@ After generation, inform user of:
 - **SKILL.md**: Quick reference and activation criteria
 - **`.claude/commands/repomix.md`**: Interactive slash command interface
 - **`.claude/rules/000-rule-index.md`**: Index of all architectural rules
-- **`.claude/HANDOFF.md`**: Current project state and context
+- **`.claude/work/session/handoff.md`**: Current project state and context
