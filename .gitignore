@@ -73,3 +73,7 @@ docs/rapport_till_kollegor/
 build/
 dist/
 *.spec
+
+# Migration backups
+*_backup_*/
+documentation_backup_*/
