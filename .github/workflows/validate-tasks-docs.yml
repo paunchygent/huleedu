@@ -1,0 +1,50 @@
+name: Validate TASKS and Documentation Structure
+
+on:
+  pull_request:
+    paths:
+      - 'TASKS/**/*.md'
+      - 'documentation/**/*.md'
+      - 'scripts/task_mgmt/**'
+      - 'scripts/docs_mgmt/**'
+  push:
+    branches:
+      - main
+    paths:
+      - 'TASKS/**/*.md'
+      - 'documentation/**/*.md'
+
+jobs:
+  validate-tasks:
+    name: Validate TASKS Structure
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Validate TASKS frontmatter and structure
+        run: |
+          python scripts/task_mgmt/validate_front_matter.py --verbose
+        continue-on-error: false
+
+  validate-docs:
+    name: Validate Documentation Structure
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Validate documentation structure
+        run: |
+          python scripts/docs_mgmt/validate_docs_structure.py --verbose
+        continue-on-error: false

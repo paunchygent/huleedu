@@ -1,3 +1,19 @@
+---
+id: 'TASK-DEV-DOCKER-LOCK-ALIGNMENT'
+title: 'TASK – Align Dev Docker Builds With Single-Lockfile Workflow'
+type: 'task'
+status: 'research'
+priority: 'medium'
+domain: 'infrastructure'
+service: ''
+owner_team: 'agents'
+owner: ''
+program: ''
+created: '2025-11-16'
+last_updated: '2025-11-17'
+related: []
+labels: []
+---
 # TASK – Align Dev Docker Builds With Single-Lockfile Workflow
 
 **Created:** 2025-11-07  

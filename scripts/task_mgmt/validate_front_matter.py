@@ -26,11 +26,41 @@ ALLOWED_DOMAINS = {
     "security",
     "integrations",
     "architecture",
+    "programs",
 }
 ALLOWED_STATUSES = {"research", "blocked", "in_progress", "completed", "paused", "archived"}
 ALLOWED_PRIORITIES = {"low", "medium", "high", "critical"}
 
+# Top-level directories allowed under TASKS/
+ALLOWED_TOP_LEVEL_DIRS = {
+    "programs",
+    "assessment",
+    "content",
+    "identity",
+    "frontend",
+    "infrastructure",
+    "security",
+    "integrations",
+    "architecture",
+    "archive",
+}
+
+# Files excluded from validation
+EXCLUDED_FILES = {
+    "_REORGANIZATION_PROPOSAL.md",
+    "INDEX.md",
+    "README.md",
+    "HUB.md",
+}
+
+# ID validation pattern: A-Z, 0-9, _, - only; must start with uppercase letter or digit
+ID_PATTERN = re.compile(r"^[A-Z0-9][A-Z0-9_-]*$")
+
+# Subdirectory naming pattern: lower_snake_case
+SUBDIR_PATTERN = re.compile(r"^[a-z0-9_]+$")
+
 FRONT_MATTER_REQUIRED = [
+    "id",
     "title",
     "status",
     "priority",
@@ -67,17 +97,152 @@ def read_front_matter(p: Path) -> Tuple[Dict[str, Any], str]:
     return data, body
 
 
-def validate_file(p: Path, strict: bool = False) -> list[str]:
+def validate_no_spaces(p: Path, tasks_root: Path) -> list[str]:
+    """
+    Validate that no path components contain spaces.
+
+    Args:
+        p: Path to validate
+        tasks_root: Root TASKS directory
+
+    Returns:
+        List of error messages (empty if valid)
+    """
     errors: list[str] = []
+    rel_path = p.relative_to(tasks_root)
+    for part in rel_path.parts:
+        if " " in part:
+            errors.append(f"path contains spaces: '{rel_path}'")
+            break
+    return errors
+
+
+def validate_filename_id_match(p: Path, fm: Dict[str, Any]) -> list[str]:
+    """
+    Validate that filename (without .md) matches frontmatter id.
+
+    Args:
+        p: Path to file
+        fm: Parsed frontmatter dict
+
+    Returns:
+        List of error messages (empty if valid)
+    """
+    errors: list[str] = []
+    filename_stem = p.stem  # filename without extension
+    fm_id = fm.get("id", "")
+    if filename_stem != fm_id:
+        errors.append(f"filename '{p.name}' does not match id '{fm_id}'")
+    return errors
+
+
+def validate_id_format(fm: Dict[str, Any]) -> list[str]:
+    """
+    Validate that id matches pattern: A-Z, 0-9, _, - only; starts with uppercase or digit.
+
+    Args:
+        fm: Parsed frontmatter dict
+
+    Returns:
+        List of error messages (empty if valid)
+    """
+    errors: list[str] = []
+    fm_id = fm.get("id", "")
+    if not fm_id:
+        return errors  # Missing id is handled by required field validation
+
+    if not ID_PATTERN.match(fm_id):
+        # Determine specific issue for better error message
+        if not fm_id[0].isupper() and not fm_id[0].isdigit():
+            errors.append(f"id '{fm_id}' must start with uppercase letter or digit")
+        else:
+            errors.append(
+                f"id '{fm_id}' contains invalid characters (must be A-Z, 0-9, _, - only)"
+            )
+    return errors
+
+
+def validate_path_structure(p: Path, tasks_root: Path) -> list[str]:
+    """
+    Validate that file is in correct directory taxonomy.
+
+    Args:
+        p: Path to file
+        tasks_root: Root TASKS directory
+
+    Returns:
+        List of error messages (empty if valid)
+    """
+    errors: list[str] = []
+    rel_path = p.relative_to(tasks_root)
+    parts = rel_path.parts
+
+    if len(parts) == 1:
+        # File at root level (not in any subdirectory)
+        errors.append(
+            "file at root level, should be in domain directory "
+            "(e.g., assessment/, frontend/, programs/)"
+        )
+    elif len(parts) >= 2:
+        # Check top-level directory
+        top_level = parts[0]
+        if top_level not in ALLOWED_TOP_LEVEL_DIRS:
+            allowed_str = ", ".join(sorted(ALLOWED_TOP_LEVEL_DIRS))
+            errors.append(
+                f"invalid top-level directory '{top_level}/' (allowed: {allowed_str})"
+            )
+    return errors
+
+
+def validate_directory_naming(p: Path, tasks_root: Path) -> list[str]:
+    """
+    Validate that subdirectories use lower_snake_case.
+
+    Args:
+        p: Path to file
+        tasks_root: Root TASKS directory
+
+    Returns:
+        List of error messages (empty if valid)
+    """
+    errors: list[str] = []
+    rel_path = p.relative_to(tasks_root)
+    parts = rel_path.parts
+
+    # Check all directory components (excluding top-level and filename)
+    if len(parts) > 2:
+        for subdir in parts[1:-1]:  # Skip top-level dir and filename
+            if not SUBDIR_PATTERN.match(subdir):
+                errors.append(f"subdirectory '{subdir}' must use lower_snake_case")
+    return errors
+
+
+def validate_file(p: Path, tasks_root: Path, strict: bool = False) -> list[str]:
+    """
+    Validate a task file for compliance with TASKS specification.
+
+    Args:
+        p: Path to file
+        tasks_root: Root TASKS directory
+        strict: Enable strict validation (currently unused)
+
+    Returns:
+        List of error messages (empty if valid)
+    """
+    errors: list[str] = []
+
+    # Parse frontmatter
     fm, _ = read_front_matter(p)
     if not fm:
         errors.append("missing front matter")
         return errors
 
+    # Validate required fields
     for key in FRONT_MATTER_REQUIRED:
         if key not in fm or not str(fm[key]).strip():
             errors.append(f"missing required '{key}'")
 
+    # Validate enum fields
     if fm.get("domain") not in ALLOWED_DOMAINS:
         errors.append(f"invalid domain '{fm.get('domain')}'")
     if fm.get("status") not in ALLOWED_STATUSES:
@@ -85,7 +250,7 @@ def validate_file(p: Path, strict: bool = False) -> list[str]:
     if fm.get("priority") not in ALLOWED_PRIORITIES:
         errors.append(f"invalid priority '{fm.get('priority')}'")
 
-    # Dates
+    # Validate dates
     for key in ("created", "last_updated"):
         val = str(fm.get(key, ""))
         try:
@@ -97,11 +262,40 @@ def validate_file(p: Path, strict: bool = False) -> list[str]:
     if not fm.get("owner_team"):
         errors.append("owner_team must be set (e.g., 'agents')")
 
+    # New validations from spec §13
+    errors.extend(validate_filename_id_match(p, fm))
+    errors.extend(validate_id_format(fm))
+
     return errors
 
 
+def should_exclude_file(p: Path, tasks_root: Path, exclude_archive: bool) -> bool:
+    """
+    Determine if a file should be excluded from validation.
+
+    Args:
+        p: Path to file
+        tasks_root: Root TASKS directory
+        exclude_archive: Whether to exclude archived files
+
+    Returns:
+        True if file should be excluded, False otherwise
+    """
+    # Exclude archive files if flag is set
+    if exclude_archive and "archive" in p.parts:
+        return True
+
+    # Exclude specific files
+    if p.name in EXCLUDED_FILES:
+        return True
+
+    return False
+
+
 def main(argv: list[str]) -> int:
-    ap = argparse.ArgumentParser()
+    ap = argparse.ArgumentParser(
+        description="Validate TASKS frontmatter and structure compliance"
+    )
     ap.add_argument("--root", default=str(TASKS_DIR), help="Tasks root directory")
     ap.add_argument("--exclude-archive", action="store_true", default=True)
     ap.add_argument("--verbose", "-v", action="store_true")
@@ -109,11 +303,23 @@ def main(argv: list[str]) -> int:
 
     root = Path(args.root)
     failures = 0
+
     for p in root.rglob("*.md"):
-        if "archive" in p.parts and args.exclude_archive:
+        # Check exclusions first
+        if should_exclude_file(p, root, args.exclude_archive):
             continue
+
         rel = p.relative_to(ROOT)
-        errs = validate_file(p)
+        errs: list[str] = []
+
+        # Validate path structure (before parsing frontmatter)
+        errs.extend(validate_no_spaces(p, root))
+        errs.extend(validate_path_structure(p, root))
+        errs.extend(validate_directory_naming(p, root))
+
+        # Validate file content and frontmatter
+        errs.extend(validate_file(p, root))
+
         if errs:
             failures += 1
             print(f"[ERROR] {rel}:")

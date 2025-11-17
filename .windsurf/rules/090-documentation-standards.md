@@ -5,94 +5,183 @@ alwaysApply: false
 ---
 # 090: Documentation Standards
 
-## 1. Types of Documentation
-- **Architectural Documentation**: High-level overviews, service boundaries, data flow diagrams
-- **Service Documentation**: READMEs for each service
-- **Contract Documentation**: Documentation derived from Pydantic models
-- **Code-Level Documentation**: Docstrings and comments
-- **Development Rules**: This set of rules (managed via `.cursor/rules/`)
+This rule is **normative** for all documentation in the repository.
 
-## 2. Service READMEs
+## 1. Purpose and Normative References
 
-### 2.1. Mandatory Service READMEs
-- Every microservice directory under `services/` **MUST** have a `README.md` file
-- Always review relevant READMEs and .claude/rules/ After any major or minor change in behavior.
+- Define canonical rules for documentation **location**, **structure**, **content**, **formatting**, **maintenance**, and **review**.
+- Provide a stable, machine-enforceable contract for AI agents and developers.
 
-### 2.2. Content Requirements
-Service READMEs **MUST** include:
-- Concise service purpose and responsibility within its bounded context
-- Overview of key domain entities it manages
-- List of events it produces and consumes
-- Overview of any APIs it exposes
-- How to set up and run the service locally (including environment variables)
-- How to run its tests
+Normative references:
 
-### 2.3. Keep READMEs Current
-- Service READMEs **MUST** be updated when service functionality, events, or APIs change
-- **MUST** propose updates to `README.md` when modifying a service
+- `documentation/DOCS_STRUCTURE_SPEC.md` – Project documentation layout, taxonomy, and naming.
+- `TASKS/_REORGANIZATION_PROPOSAL.md` – TASKS structure, task frontmatter, and enforcement.
+- `.claude/rules/000-rule-index.mdc` – Rule index and rule management.
 
-## 3. Library Documentation
+Where older documentation contradicts this rule or the normative references, it MUST be updated or removed.
 
-### 3.1. Mandatory Library READMEs
-- Every shared library under `libs/` **MUST** have a comprehensive `README.md`
-- Library documentation **MUST** be more detailed than service documentation due to wider usage
+## 2. Documentation Taxonomy and Locations
 
-### 3.2. Library Documentation Requirements
-Library READMEs **MUST** include:
-- **Overview**: Purpose and design philosophy of the library
-- **Installation**: Setup instructions and dependencies
-- **API Documentation**: Complete reference for every public module:
-  - Module purpose and design decisions
-  - All public functions/classes with full signatures
-  - Parameters, return types, exceptions raised
-  - Usage examples from actual services
-  - Configuration requirements
-- **Integration Patterns**: How services should integrate the library
-- **Testing Guidelines**: How to test code using the library
-- **Migration Guide**: How to migrate from previous patterns
-- **Best Practices**: Common patterns and anti-patterns
-- **Environment Variables**: All configuration options
+Types of documentation and their canonical locations:
 
-### 3.3. Module Documentation
-- Every module **MUST** have a module-level docstring
-- All public functions/classes **MUST** have comprehensive docstrings
-- Use type hints for all parameters and return values
-- Include examples in docstrings where helpful
+- **Architectural Documentation**
+  - High-level overviews, service boundaries, processing flows, DDD boundaries.
+  - Location: `documentation/architecture/`, `documentation/decisions/`, and `documentation/overview/`.
+- **Service Documentation**
+  - Per-service responsibilities, endpoints, events, local setup.
+  - Location: `documentation/services/` and `services/<service>/README.md`.
+- **Contract Documentation**
+  - HTTP APIs, events, schemas, and Pydantic models.
+  - Location: code in `libs/common_core/` and generated or curated reference in `documentation/reference/`.
+- **Code-Level Documentation**
+  - Docstrings, inline comments, and type hints in source files.
+  - Location: alongside the code in `services/`, `libs/`, and `scripts/`.
+- **Development Rules**
+  - Implementation and process rules (this file and related rules).
+  - Location: `.claude/rules/` and `.windsurf/rules/`.
+- **Task and Programme Documentation**
+  - Work items, designs and implementation plans.
+  - Location: `TASKS/`, governed by `TASKS/_REORGANIZATION_PROPOSAL.md`.
 
-### 3.4. Keep Library Documentation Current
-- Library documentation **MUST** be updated with ANY API changes
-- **MUST** update examples when service usage patterns change
-- **MUST** maintain backward compatibility notes
+Any new documentation MUST be placed in the appropriate location above.
 
-## 4. Contract Documentation (Pydantic Models)
+## 3. Project Documentation Layout (`documentation/`)
 
-### 4.1. Pydantic Models as Source of Truth
-- Pydantic model definitions in `common/models/` **ARE** the primary source of truth for contract documentation
-- **MUST** reference these models when explaining data structures for events or APIs
+- All project-level documentation (other than service/library READMEs, rules, and TASKS documents) MUST live under `documentation/`.
+- `documentation/` MUST follow the taxonomy defined in `documentation/DOCS_STRUCTURE_SPEC.md`:
+  - Allowed top-level directories: `overview/`, `architecture/`, `services/`, `operations/`, `how-to/`, `reference/`, `decisions/`, `product/`, `research/`.
+  - No additional top-level directories MAY be created without updating `DOCS_STRUCTURE_SPEC.md` and this rule.
+- Naming:
+  - Files MUST use `.md` extension and MUST NOT contain spaces.
+  - New documentation file basenames MUST be `kebab-case` (lowercase words separated by `-`).
+  - Existing `SCREAMING_SNAKE_CASE` filenames are permitted for backward compatibility but SHOULD be migrated to `kebab-case` ASAP and always when touched for other changes.
+  - Directory names MUST be `kebab-case` or `lower_snake_case`.
+- Runbooks:
+  - Runbooks under `documentation/operations/` SHOULD include the frontmatter described in `DOCS_STRUCTURE_SPEC.md`.
+- Decision records:
+  - ADRs MUST live under `documentation/decisions/` and SHOULD follow the filename and frontmatter patterns in `DOCS_STRUCTURE_SPEC.md`.
 
-### 4.2. Auto-Generation
-- Explore tools to automatically generate documentation (OpenAPI spec from Quart endpoints, documentation from Pydantic models)
+## 4. Service READMEs
 
-## 5. Development Rules Documentation
+### 4.1 Mandatory Service READMEs
 
-### 5.1. Rules in `.cursor/rules/`
-- Development rules **SHALL** reside exclusively in `.cursor/rules/` directory
+- Every microservice directory under `services/` **MUST** have a `README.md`.
+- After any behavior change (APIs, events, core logic), the relevant service `README.md` MUST be reviewed and updated if necessary.
 
-### 5.2. MDC Format
-- Rule files **MUST** use `.mdc` file extension
+### 4.2 Content Requirements
 
-### 5.3. Rule Index
-- `000-rule-index.mdc` file **MUST** be maintained as up-to-date index of all rule files
-- **MUST** propose update to index when new rule files added or existing ones renamed
+Each service `README.md` MUST include:
 
-## 6. Updating Documentation
+- Concise purpose and responsibility within its bounded context.
+- Overview of key domain entities it manages.
+- List of events it produces and consumes (with links to contracts where applicable).
+- Overview of any HTTP or message-based APIs it exposes.
+- How to set up and run the service locally (including key environment variables).
+- How to run its tests.
 
-### 6.1. Documentation as Part of the Task
-- Updating relevant documentation (READMEs, rules index) **MUST** be integral part of any task that changes code or architecture
-- **MUST** include documentation updates in task completion steps
+### 4.3 Keep Service READMEs Current
 
-### 6.2. Task Documentation Compression
-- **MUST** compress completed tasks in task documents to preserve only implementation summary
-- **MUST** use hyper-technical language with code examples, no promotional language
-- **MUST** maximize information density per token
-- Format: `### Task Name ✅ COMPLETED` with implementation summary containing essential technical details, code snippets, and remaining work only
+- Service READMEs MUST be updated when service functionality, contracts, or dependencies change.
+- Any PR that changes a service in a way that affects its external behavior MUST either:
+  - Update the service `README.md`, or
+  - Explicitly justify in the PR why no documentation change is required.
+
+## 5. Library Documentation
+
+### 5.1 Mandatory Library READMEs
+
+- Every shared library under `libs/` MUST have a comprehensive `README.md`.
+- Library documentation MUST be more detailed than service documentation because of wider reuse.
+
+### 5.2 Library Documentation Requirements
+
+Library `README.md` files MUST include:
+
+- **Overview**: Purpose and design philosophy of the library.
+- **Installation/Usage**: Setup instructions and dependency expectations.
+- **API Documentation**: Reference for public modules and types:
+  - Module purpose and key design decisions.
+  - Public functions/classes with signatures and type hints.
+  - Parameters, return types, and raised exceptions.
+  - Usage examples taken from real services or scripts.
+- **Integration Patterns**: Recommended patterns for using the library from services.
+- **Testing Guidelines**: How to test code that consumes the library.
+- **Migration Guide**: How to migrate from previous versions or patterns when breaking changes occur.
+- **Environment Variables / Configuration**: All relevant configuration options.
+
+### 5.3 Module-Level Documentation
+
+- Every library module SHOULD have a module-level docstring.
+- All public functions and classes MUST have docstrings consistent with the library README and type hints.
+- Examples in docstrings SHOULD be minimal, executable, and aligned with current patterns.
+
+### 5.4 Keeping Library Documentation Current
+
+- Library documentation MUST be updated with any public API changes.
+- Usage examples MUST be updated when service usage patterns change.
+- Backward-compatibility notes MUST be maintained where relevant.
+
+## 6. Contract Documentation (Pydantic Models and Schemas)
+
+### 6.1 Pydantic Models and Schemas as Source of Truth
+
+- Pydantic models and schemas in the shared contract libraries (for example `libs/common_core/src/common_core/`) ARE the primary source of truth for event and HTTP API contracts.
+- Documentation in `documentation/reference/` MUST reference these models rather than duplicating them by hand.
+
+### 6.2 Auto-Generation and Synchronization
+
+- Where feasible, contract documentation SHOULD be auto-generated (for example, OpenAPI from HTTP endpoints, schema docs from Pydantic models).
+- When auto-generation is not available, manually curated docs MUST stay aligned with the underlying models; drift is not acceptable.
+
+## 7. Development Rules Documentation
+
+### 7.1 Rules Location
+
+- Development rules MUST reside in `.claude/rules/` (for `.mdc` rule files) and `.windsurf/rules/` (for `.md` equivalents).
+- No other directories may contain canonical development rules.
+
+### 7.2 Rule File Format
+
+- `.claude/rules/` rule files MUST use the `.mdc` extension with the standard frontmatter (`description`, `globs`, `alwaysApply`).
+- `.windsurf/rules/` MUST contain the corresponding `.md` views.
+
+### 7.3 Rule Index
+
+- `000-rule-index.mdc` MUST be maintained as an up-to-date index of all rule files.
+- Any addition, removal, or rename of a rule file MUST be accompanied by an update to `000-rule-index.mdc`.
+
+## 8. Content Style and Formatting
+
+- Documentation MUST be concise, technical, and free of promotional language.
+- Prefer lists, short paragraphs, and explicit examples over long narrative text.
+- Use Markdown consistently:
+  - `#`/`##`/`###` headings for structure.
+  - Bullet lists for enumerations.
+  - Fenced code blocks with language hints for commands and code.
+- Content SHOULD be optimized for AI tooling:
+  - High information density per token.
+  - Stable, machine-readable patterns (frontmatter, headings, enums).
+
+## 9. Task Documentation and Compression
+
+- All task and programme documents under `TASKS/` are governed by `TASKS/_REORGANIZATION_PROPOSAL.md`.
+- Completed tasks in narrative documents (for example, task collections) MUST be compressed:
+  - Use the format: `### Task Name ✅ COMPLETED`.
+  - Provide a brief, hyper-technical implementation summary with essential details, code references, and any remaining work.
+  - Avoid restating the entire history of the task; rely on Git history and referenced files instead.
+
+## 10. Documentation as Part of Work and Review
+
+- Updating relevant documentation (service READMEs, library READMEs, `documentation/` pages, TASKS, and rules where needed) is a REQUIRED part of any task that changes behavior, contracts, or architecture.
+- Task descriptions MUST explicitly include required documentation updates in their implementation plan and success criteria.
+- Code reviews MUST include verification that documentation has been updated or an explicit justification that no update is required.
+
+## 11. Maintenance and Drift Control
+
+- Documentation MUST be treated as versioned code:
+  - Changes go through the same review process.
+  - Large reorganizations MUST be captured as dedicated tasks under `TASKS/`.
+- Periodic maintenance tasks SHOULD:
+  - Reconcile `documentation/` with actual behavior and service READMEs.
+  - Remove or clearly mark obsolete documents.
+  - Ensure that rule files, docs specs, and TASKS specs remain consistent.

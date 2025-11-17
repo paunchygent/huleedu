@@ -11,3 +11,21 @@ repos:
         always_run: true
         pass_filenames: false
         stages: [pre-commit]
+
+    -   id: validate-tasks-frontmatter
+        name: Validate TASKS frontmatter and structure
+        entry: python scripts/task_mgmt/validate_front_matter.py
+        language: python
+        files: ^TASKS/.*\.md$
+        exclude: ^TASKS/(_REORGANIZATION_PROPOSAL|INDEX|README|archive/)
+        pass_filenames: false
+        stages: [pre-commit]
+
+    -   id: validate-docs-structure
+        name: Validate documentation structure
+        entry: python scripts/docs_mgmt/validate_docs_structure.py
+        language: python
+        files: ^documentation/.*\.md$
+        exclude: ^documentation/(DOCS_STRUCTURE_SPEC|_archive/)
+        pass_filenames: false
+        stages: [pre-commit]
