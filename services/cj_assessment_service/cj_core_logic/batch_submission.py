@@ -46,6 +46,7 @@ async def submit_batch_chunk(
     temperature_override: float | None = None,
     max_tokens_override: int | None = None,
     system_prompt_override: str | None = None,
+    provider_override: str | None = None,
 ) -> None:
     """Submit a chunk of comparison tasks with tracking.
 
@@ -58,6 +59,7 @@ async def submit_batch_chunk(
         model_override: Optional model name override
         temperature_override: Optional temperature override
         max_tokens_override: Optional max tokens override
+        provider_override: Optional provider override forwarded to LPS
 
     Raises:
         HuleEduError: On LLM provider communication failure
@@ -116,6 +118,7 @@ async def submit_batch_chunk(
             temperature_override=temperature_override,
             max_tokens_override=max_tokens_override,
             system_prompt_override=system_prompt_override,
+            provider_override=provider_override,
         )
 
         # Log submission results

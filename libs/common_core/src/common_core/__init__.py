@@ -15,7 +15,7 @@ from .batch_service_models import (
     BatchServiceSpellcheckInitiateCommandDataV1,
     BatchServiceStudentMatchingInitiateCommandDataV1,
 )
-from .config_enums import Environment, LLMProviderType
+from .config_enums import Environment, LLMBatchingMode, LLMProviderType
 from .domain_enums import (
     ContentType,
     CourseCode,
@@ -173,6 +173,7 @@ __all__ = [
     "ErrorDetail",
     # Config Enums
     "Environment",
+    "LLMBatchingMode",
     "LLMProviderType",
     # WebSocket Enums
     "WebSocketEventCategory",

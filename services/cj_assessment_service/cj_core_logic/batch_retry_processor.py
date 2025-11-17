@@ -89,6 +89,7 @@ class BatchRetryProcessor:
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,
         system_prompt_override: str | None = None,
+        provider_override: str | None = None,
     ) -> BatchSubmissionResult | None:
         """Submit retry batch if threshold reached.
 
@@ -152,6 +153,9 @@ class BatchRetryProcessor:
             final_system_prompt_override = _resolve_override(
                 system_prompt_override, "system_prompt_override"
             )
+            final_provider_override = _resolve_override(
+                provider_override, "provider_override"
+            )
 
             # Submit retry batch using core submitter
             result = cast(
@@ -165,6 +169,7 @@ class BatchRetryProcessor:
                     temperature_override=final_temperature_override,
                     max_tokens_override=final_max_tokens_override,
                     system_prompt_override=final_system_prompt_override,
+                    provider_override=final_provider_override,
                 ),
             )
 
@@ -229,6 +234,7 @@ class BatchRetryProcessor:
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,
         system_prompt_override: str | None = None,
+        provider_override: str | None = None,
     ) -> BatchSubmissionResult | None:
         """Process all remaining failed comparisons at end of batch.
 
@@ -263,6 +269,7 @@ class BatchRetryProcessor:
                 temperature_override=temperature_override,
                 max_tokens_override=max_tokens_override,
                 system_prompt_override=system_prompt_override,
+                provider_override=provider_override,
             )
 
         except Exception as e:

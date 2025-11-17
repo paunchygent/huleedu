@@ -139,6 +139,7 @@ async def submit_comparisons_for_async_processing(
     model_override = None
     temperature_override = None
     max_tokens_override = None
+    provider_override = None
     # Use CJ's canonical system prompt as default (can be overridden by event)
     system_prompt_override = settings.SYSTEM_PROMPT
 
@@ -146,6 +147,7 @@ async def submit_comparisons_for_async_processing(
         model_override = llm_config_overrides.model_override
         temperature_override = llm_config_overrides.temperature_override
         max_tokens_override = llm_config_overrides.max_tokens_override
+        provider_override = llm_config_overrides.provider_override
         # Only override system prompt if explicitly provided (not None)
         if llm_config_overrides.system_prompt_override is not None:
             system_prompt_override = llm_config_overrides.system_prompt_override
@@ -236,6 +238,7 @@ async def submit_comparisons_for_async_processing(
             temperature_override=temperature_override,
             max_tokens_override=max_tokens_override,
             system_prompt_override=system_prompt_override,
+            provider_override=provider_override,
         )
 
         logger.info(
@@ -471,10 +474,12 @@ async def _process_comparison_iteration(
     llm_config_overrides = request_data.llm_config_overrides
     # Use CJ's canonical system prompt as default (can be overridden by event)
     system_prompt_override = settings.SYSTEM_PROMPT
+    provider_override = None
     if llm_config_overrides:
         # Only override system prompt if explicitly provided (not None)
         if llm_config_overrides.system_prompt_override is not None:
             system_prompt_override = llm_config_overrides.system_prompt_override
+        provider_override = llm_config_overrides.provider_override
 
     await _persist_llm_overrides_if_present(
         session=session,
@@ -493,6 +498,7 @@ async def _process_comparison_iteration(
         temperature_override=temperature_override,
         max_tokens_override=max_tokens_override,
         system_prompt_override=system_prompt_override,
+        provider_override=provider_override,
     )
 
     logger.info(

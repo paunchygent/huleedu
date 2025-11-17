@@ -419,6 +419,8 @@ Migrated CJ Assessment `request_data` from `dict[str, Any]` to `CJAssessmentRequ
 
 This work freezes today’s CJ ↔ LLM Provider boundary ahead of the batching implementation so future metadata fields can be added without breaking ENG5 runners or callback handling.
 
+- 2025-11-17 follow-up: promoted shared `LLMBatchingMode` enum across common_core, CJ, and LPS; threaded `CJ_ASSESSMENT_SERVICE_LLM_BATCHING_MODE` / `LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE` into settings/DI; and gated the new `cj_llm_batching_mode` metadata hint behind `CJ_ASSESSMENT_SERVICE_ENABLE_LLM_BATCHING_METADATA_HINTS`. CJ now forwards provider overrides from every ingress path (ELS events, original-request rehydration, ENG5 runner snapshots) and the queue processor exposes a `serial_bundle` mode that wraps dequeued work in single-item `BatchComparisonItem`s (no behavioural delta yet, but exercises `process_comparison_batch`). READMEs document the toggles and new tests cover helper adapters, queue mode branching, and ENG5 override payload parity.
+
 ## Configuration Files
 
 - `.env` - Environment variables (not in git)

@@ -24,3 +24,11 @@ class LLMProviderType(str, Enum):
     GOOGLE = "google"
     OPENROUTER = "openrouter"
     MOCK = "mock"
+
+
+class LLMBatchingMode(str, Enum):
+    """Queue/batching modes shared between CJ Assessment and LLM Provider Service."""
+
+    PER_REQUEST = "per_request"
+    SERIAL_BUNDLE = "serial_bundle"
+    PROVIDER_BATCH_API = "provider_batch_api"

@@ -93,6 +93,7 @@ class LLMInteractionImpl(LLMInteractionProtocol):
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,
         system_prompt_override: str | None = None,
+        provider_override: str | LLMProviderType | None = None,
     ) -> list[ComparisonResult]:
         """Perform multiple comparison tasks using configured LLM providers.
 
@@ -100,9 +101,12 @@ class LLMInteractionImpl(LLMInteractionProtocol):
             tasks: List of comparison tasks to process.
             correlation_id: Request correlation ID for tracing
             tracking_map: Optional map of (essay_a_id, essay_b_id) to unique correlation IDs
+            bos_batch_id: Optional BOS batch identifier propagated for ENG5 correlation
             model_override: Optional model name override
             temperature_override: Optional temperature override (0.0-2.0)
             max_tokens_override: Optional max tokens override
+            system_prompt_override: Optional system prompt override per batch
+            provider_override: Optional provider name override forwarded to LPS
 
         Returns:
             List of comparison results corresponding to the input tasks.
@@ -161,6 +165,10 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                         task,
                         bos_batch_id=bos_batch_id,
                     )
+                    if self.settings.ENABLE_LLM_BATCHING_METADATA_HINTS:
+                        metadata_adapter = metadata_adapter.with_additional_context(
+                            cj_llm_batching_mode=self.settings.LLM_BATCHING_MODE.value,
+                        )
                     request_metadata = metadata_adapter.to_request_metadata()
                     response_data = await provider.generate_comparison(
                         user_prompt=task.prompt,
@@ -169,6 +177,7 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                         model_override=model_override,
                         temperature_override=temperature_override,
                         max_tokens_override=max_tokens_override,
+                        provider_override=provider_override,
                         request_metadata=request_metadata,
                     )
 
@@ -204,10 +213,10 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                             status="error",
                         ).inc()
 
+                    # Note: exc_info omitted to avoid Rich+Mock interaction in tests
                     logger.error(
                         f"Unexpected error processing task {task.essay_a.id}-{task.essay_b.id}: "
                         f"{e}",
-                        exc_info=True,
                     )
                     return ComparisonResult(
                         task=task,
@@ -240,10 +249,13 @@ class LLMInteractionImpl(LLMInteractionProtocol):
             async_count = 0
             for i, result in enumerate(results):
                 if isinstance(result, Exception):
+                    # Note: exc_info omitted here as exceptions should have been logged with full
+                    # traceback in the inner except block of process_task(). Logging here with
+                    # exc_info=result can trigger Rich's introspection of Mock objects in test
+                    # environments, causing TypeError when Rich tries to render local variables.
                     logger.error(
                         f"Task with essays {tasks[i].essay_a.id}-{tasks[i].essay_b.id} "
                         f"raised an exception: {result}",
-                        exc_info=result,
                     )
                     final_results.append(
                         ComparisonResult(

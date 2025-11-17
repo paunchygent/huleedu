@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, AsyncContextManager, Awaitable, Callable, Protocol, TypeVar
 from uuid import UUID
 
+from common_core import LLMProviderType
 from sqlalchemy.ext.asyncio import AsyncSession
 
 if TYPE_CHECKING:
@@ -362,16 +363,20 @@ class LLMInteractionProtocol(Protocol):
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,
         system_prompt_override: str | None = None,
+        provider_override: str | LLMProviderType | None = None,
     ) -> list[Any]:
         """Perform comparative judgment on a list of comparison tasks.
 
         Args:
             tasks: List of ComparisonTask objects
             correlation_id: Request correlation ID for tracing
+            tracking_map: Optional per-pair correlation override map
+            bos_batch_id: Optional BOS batch identifier propagated to metadata
             model_override: Optional model name override
             temperature_override: Optional temperature override (0.0-2.0)
             max_tokens_override: Optional max tokens override
             system_prompt_override: Optional system prompt override
+            provider_override: Optional provider name override forwarded to LPS
 
         Returns:
             List of ComparisonResult objects
@@ -392,6 +397,7 @@ class BatchProcessorProtocol(Protocol):
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,
         system_prompt_override: str | None = None,
+        provider_override: str | LLMProviderType | None = None,
     ) -> "BatchSubmissionResult":
         """Submit comparison batch with configurable batch size."""
         ...
@@ -432,6 +438,7 @@ class BatchRetryProcessorProtocol(Protocol):
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,
         system_prompt_override: str | None = None,
+        provider_override: str | LLMProviderType | None = None,
     ) -> "BatchSubmissionResult | None":
         """Submit retry batch if threshold reached."""
         ...
@@ -444,6 +451,7 @@ class BatchRetryProcessorProtocol(Protocol):
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,
         system_prompt_override: str | None = None,
+        provider_override: str | LLMProviderType | None = None,
     ) -> "BatchSubmissionResult | None":
         """Process all remaining failed comparisons at end of batch."""
         ...

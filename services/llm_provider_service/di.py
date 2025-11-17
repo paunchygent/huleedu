@@ -438,4 +438,5 @@ class LLMProviderServiceProvider(Provider):
             event_publisher=event_publisher,
             trace_context_manager=trace_context_manager,
             settings=settings,
+            queue_processing_mode=settings.QUEUE_PROCESSING_MODE,
         )

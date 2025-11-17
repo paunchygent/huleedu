@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from common_core import Environment, LLMProviderType
+from common_core import Environment, LLMBatchingMode, LLMProviderType
 from common_core.event_enums import ProcessingEvent, topic_name
 from dotenv import find_dotenv, load_dotenv
 from huleedu_service_libs.auth import JWTValidationSettings
@@ -114,6 +114,20 @@ class Settings(SecureServiceSettings, JWTValidationSettings):
     DEFAULT_LLM_MODEL: str = Field(
         default="gpt-5-mini-2025-08-07",
         description="Default LLM model to use for comparison requests",
+    )
+    LLM_BATCHING_MODE: LLMBatchingMode = Field(
+        default=LLMBatchingMode.PER_REQUEST,
+        description=(
+            "How CJ submits comparisons to LLM Provider: per_request, serial_bundle, "
+            "provider_batch_api."
+        ),
+    )
+    ENABLE_LLM_BATCHING_METADATA_HINTS: bool = Field(
+        default=False,
+        description=(
+            "When true, CJLLMComparisonMetadata emits batching hints such as "
+            "cj_llm_batching_mode and comparison_iteration into request_metadata."
+        ),
     )
 
     # LLM Provider Service configuration

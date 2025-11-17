@@ -10,7 +10,7 @@ import time
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-from common_core import LLMProviderType, QueueStatus
+from common_core import LLMBatchingMode, LLMProviderType, QueueStatus
 from common_core.events.envelope import EventEnvelope
 from common_core.events.llm_provider_events import LLMComparisonResultV1, TokenUsage
 from huleedu_service_libs.logging_utils import create_service_logger
@@ -24,6 +24,7 @@ from services.llm_provider_service.implementations.trace_context_manager_impl im
     TraceContextManagerImpl,
 )
 from services.llm_provider_service.internal_models import (
+    BatchComparisonItem,
     LLMOrchestratorResponse,
     LLMQueuedResult,
 )
@@ -48,6 +49,7 @@ class QueueProcessorImpl:
         event_publisher: LLMEventPublisherProtocol,
         trace_context_manager: TraceContextManagerImpl,
         settings: Settings,
+        queue_processing_mode: LLMBatchingMode | None = None,
     ):
         """Initialize queue processor.
 
@@ -63,6 +65,7 @@ class QueueProcessorImpl:
         self.event_publisher = event_publisher
         self.trace_context_manager = trace_context_manager
         self.settings = settings
+        self.queue_processing_mode = queue_processing_mode or settings.QUEUE_PROCESSING_MODE
 
         # Processing state
         self._running = False
@@ -137,7 +140,8 @@ class QueueProcessorImpl:
         """
         logger.info(
             f"Processing queued request {request.queue_id}, "
-            f"correlation_id: {request.request_data.correlation_id}"
+            f"correlation_id: {request.request_data.correlation_id}",
+            extra={"queue_processing_mode": self.queue_processing_mode.value},
         )
 
         # Update status to processing
@@ -183,13 +187,37 @@ class QueueProcessorImpl:
                     },
                 )
 
-                # Use comparison processor for domain logic only
-                result = await self.comparison_processor.process_comparison(
-                    provider=provider,
-                    user_prompt=req_data.user_prompt,
-                    correlation_id=req_data.correlation_id or request.queue_id,
-                    **overrides,
-                )
+                result: LLMOrchestratorResponse | LLMQueuedResult
+                if self.queue_processing_mode is LLMBatchingMode.PER_REQUEST:
+                    result = await self.comparison_processor.process_comparison(
+                        provider=provider,
+                        user_prompt=req_data.user_prompt,
+                        correlation_id=req_data.correlation_id or request.queue_id,
+                        **overrides,
+                    )
+                else:
+                    batch_item = BatchComparisonItem(
+                        provider=provider,
+                        user_prompt=req_data.user_prompt,
+                        correlation_id=req_data.correlation_id or request.queue_id,
+                        overrides=overrides or None,
+                    )
+                    batch_results = await self.comparison_processor.process_comparison_batch(
+                        [batch_item]
+                    )
+                    if not batch_results:
+                        raise_processing_error(
+                            service="llm_provider_service",
+                            operation="queue_request_processing",
+                            message="Batch processor returned no results",
+                            correlation_id=req_data.correlation_id or request.queue_id,
+                            details={
+                                "provider": provider.value,
+                                "queue_id": str(request.queue_id),
+                                "queue_processing_mode": self.queue_processing_mode.value,
+                            },
+                        )
+                    result = batch_results[0]
 
             if isinstance(result, LLMOrchestratorResponse):
                 await self._handle_request_success(request, result)

@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, Dict, Optional
 
 from common_core import LLMProviderType
-from common_core.config_enums import Environment
+from common_core.config_enums import Environment, LLMBatchingMode
 from huleedu_service_libs.config import SecureServiceSettings
 from pydantic import AliasChoices, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -218,6 +218,13 @@ class Settings(SecureServiceSettings):
     QUEUE_MAX_RETRIES: int = Field(
         default=3,
         description="Maximum number of retries for failed requests",
+    )
+    QUEUE_PROCESSING_MODE: LLMBatchingMode = Field(
+        default=LLMBatchingMode.PER_REQUEST,
+        description=(
+            "How dequeued requests are processed: per_request (direct), serial_bundle "
+            "(single-item batch wrapper), or provider_batch_api (future native batching)."
+        ),
     )
 
     # Development Response Recording

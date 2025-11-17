@@ -10,6 +10,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
+from common_core import LLMProviderType
 from common_core.status_enums import CJBatchStateEnum
 from huleedu_service_libs.error_handling import raise_processing_error
 from huleedu_service_libs.logging_utils import create_service_logger
@@ -65,6 +66,7 @@ class BatchProcessor:
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,
         system_prompt_override: str | None = None,
+        provider_override: str | LLMProviderType | None = None,
     ) -> BatchSubmissionResult:
         """Submit comparison batch with configurable batch size.
 
@@ -135,6 +137,7 @@ class BatchProcessor:
                     temperature_override=temperature_override,
                     max_tokens_override=max_tokens_override,
                     system_prompt_override=system_prompt_override,
+                    provider_override=provider_override,
                 )
 
                 total_submitted += len(batch_tasks)
@@ -244,6 +247,7 @@ class BatchProcessor:
         model_override = None
         temperature_override = None
         max_tokens_override = None
+        provider_override = None
         # Use CJ's canonical system prompt as default (can be overridden by event)
         system_prompt_override = self.settings.SYSTEM_PROMPT
 
@@ -251,6 +255,7 @@ class BatchProcessor:
             model_override = llm_config_overrides.model_override
             temperature_override = llm_config_overrides.temperature_override
             max_tokens_override = llm_config_overrides.max_tokens_override
+            provider_override = llm_config_overrides.provider_override
             # Only override system prompt if explicitly provided (not None)
             if llm_config_overrides.system_prompt_override is not None:
                 system_prompt_override = llm_config_overrides.system_prompt_override
@@ -264,6 +269,7 @@ class BatchProcessor:
             temperature_override=temperature_override,
             max_tokens_override=max_tokens_override,
             system_prompt_override=system_prompt_override,
+            provider_override=provider_override,
         )
 
     # Private helper methods

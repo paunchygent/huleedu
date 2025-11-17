@@ -269,7 +269,7 @@ documented and locked down with unit tests (`tests/unit/test_llm_metadata_adapte
 | `request_metadata.essay_b_id` | `CJLLMComparisonMetadata` | ✅ | Correlates results to essay B |
 | `request_metadata.bos_batch_id` | `CJLLMComparisonMetadata` | Optional | BOS/ELS batch identifier when available |
 | `request_metadata.prompt_sha256` | LPS queue processor | Optional | Deterministic hash of rendered prompt for replay/debug |
-| `request_metadata.cj_llm_batching_mode` | `CJLLMComparisonMetadata` | Optional hint | Planned batching mode (`per_request`, `provider_serial_bundle`, etc.) |
+| `request_metadata.cj_llm_batching_mode` | `CJLLMComparisonMetadata` | Optional hint | Emitted when `CJ_ASSESSMENT_SERVICE_ENABLE_LLM_BATCHING_METADATA_HINTS=true`; records `per_request`, `serial_bundle`, or `provider_batch_api`. |
 
 ### Metadata construction
 
@@ -339,6 +339,10 @@ LLM_QUEUE_POLLING_EXPONENTIAL_BASE=1.5            # Backoff multiplier
 LLM_QUEUE_POLLING_MAX_ATTEMPTS=30                 # Maximum polling attempts
 LLM_QUEUE_TOTAL_TIMEOUT_SECONDS=900               # Total timeout (15 minutes)
 
+# LLM Batching Configuration
+CJ_ASSESSMENT_SERVICE_LLM_BATCHING_MODE=per_request
+CJ_ASSESSMENT_SERVICE_ENABLE_LLM_BATCHING_METADATA_HINTS=false
+
 # LLM Provider API Keys
 OPENAI_API_KEY=sk-...
 ANTHROPIC_API_KEY=sk-ant-...
@@ -358,6 +362,17 @@ METRICS_PORT=9090          # Port for health and metrics endpoints
 # Observability
 LOG_LEVEL=INFO
 ```
+
+`CJ_ASSESSMENT_SERVICE_LLM_BATCHING_MODE` mirrors
+`LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE`. `per_request` preserves the current
+one-at-a-time behaviour, while `serial_bundle` causes CJ to label requests for the
+batch path (still single-item bundles for now) so the queue processor can call
+`process_comparison_batch`. `provider_batch_api` is wired end-to-end but behaves
+like `serial_bundle` until the provider-native batching work lands. When
+`CJ_ASSESSMENT_SERVICE_ENABLE_LLM_BATCHING_METADATA_HINTS` is `true`, every
+`LLMComparisonRequest.metadata` payload gains `cj_llm_batching_mode` (and future
+iteration hints). Callbacks echo those keys back unchanged, so toggling the flag
+is safe as long as downstream consumers tolerate additive metadata.
 
 `COMPARISONS_PER_STABILITY_CHECK_ITERATION` defines the number of new pairs generated per stability iteration; `MAX_PAIRWISE_COMPARISONS` is an absolute guardrail on the batch. Both values are applied directly by `pair_generation.generate_comparison_tasks`, so adjust them via environment variables rather than hard-coding limits elsewhere.
 

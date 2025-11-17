@@ -12,6 +12,7 @@ from uuid import UUID
 
 import aiohttp
 from common_core import LLMProviderType
+from common_core.events.cj_assessment_events import LLMConfigOverrides as CJLLMConfigOverrides
 from huleedu_service_libs.error_handling import (
     HuleEduError,
     raise_authentication_error,
@@ -37,6 +38,7 @@ logger = create_service_logger("cj_assessment_service.llm_provider_service_clien
 
 def _build_llm_config_override_payload(
     *,
+    overrides: CJLLMConfigOverrides | ProviderLLMConfigOverrides | None = None,
     provider_override: str | LLMProviderType | None = None,
     model_override: str | None = None,
     temperature_override: float | None = None,
@@ -44,6 +46,18 @@ def _build_llm_config_override_payload(
     max_tokens_override: int | None = None,
 ) -> dict[str, Any] | None:
     """Convert CJ overrides into the provider service payload."""
+    if overrides is not None:
+        provider_override = provider_override or getattr(overrides, "provider_override", None)
+        model_override = model_override or getattr(overrides, "model_override", None)
+        temp_attr = getattr(overrides, "temperature_override", None)
+        if temperature_override is None and temp_attr is not None:
+            temperature_override = temp_attr
+        max_attr = getattr(overrides, "max_tokens_override", None)
+        if max_tokens_override is None and max_attr is not None:
+            max_tokens_override = max_attr
+        prompt_attr = getattr(overrides, "system_prompt_override", None)
+        if system_prompt_override is None and prompt_attr is not None:
+            system_prompt_override = prompt_attr
     provider_enum: LLMProviderType | None = None
     if isinstance(provider_override, LLMProviderType):
         provider_enum = provider_override

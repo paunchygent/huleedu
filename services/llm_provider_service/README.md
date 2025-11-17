@@ -96,6 +96,24 @@ LLM_PROVIDER_SERVICE_ACTIVE_MODEL_FAMILIES='{"anthropic":["claude-haiku","claude
 
 **Model Family Tracking**: Configure which model families trigger actionable alerts (exit code 4) in the model checker CLI. New models in tracked families are prioritized for testing and manifest updates, while untracked families are shown as informational only (exit code 5). Use JSON format with lowercase provider names as keys.
 
+### Queue Processing Mode
+
+`LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE` determines how dequeued requests flow
+through the comparison processor:
+
+- `per_request` (default): call `process_comparison` exactly once per dequeued item.
+- `serial_bundle`: wrap each dequeued item in a `BatchComparisonItem` and invoke
+  `process_comparison_batch` with a single-item list. This keeps behaviour
+  identical today but exercises the batch API so future serial bundling only needs
+  to change the bundling logic, not the queue processor wiring.
+- `provider_batch_api`: reserved for native provider batch endpoints. Until that
+  lands, it behaves the same as `serial_bundle` but allows end-to-end plumbing to
+  be validated ahead of time.
+
+The queue processor logs `queue_processing_mode` for every dequeued request and the
+callback payload is identical in all modes, so you can safely flip the flag in
+development to validate future batching paths.
+
 ## Development
 
 ### Local Setup
