@@ -14,21 +14,23 @@ last_updated: "2025-11-17"
 related: []
 labels: []
 ---
-# SIS Integration Plan: OneRoster + Clever + ClassLink (Weeks 2–6)
-
 Objective
+
 - Ingest rosters from SIS/LMS via OneRoster (CSV/REST) and connectors (Clever/ClassLink) into CMS.
 
 Scope
+
 - In: CSV import pipeline, REST OneRoster client, connector auth flows (tokens), scheduled sync + delta updates.
 - Out: Full district admin portal (future), advanced de-duplication heuristics (phase 2).
 
 References
+
 - CMS: `services/class_management_service/*` (API, models, DI)
 - NLP Phase 1: matching relies on accurate rosters
 - Rules: `020`, `042`, `053-sqlalchemy-standards`, `070`
 
 Deliverables
+
 1. CSV Import: CLI + API to import OneRoster CSV to CMS.
 2. REST Import: OneRoster REST client with pagination and filtering.
 3. Connectors: Clever/ClassLink token exchange and fetch.
@@ -36,6 +38,7 @@ Deliverables
 5. Tests: Integration tests with fixtures; idempotent re-runs.
 
 Work Packages
+
 1) Data Model & Migrations (CMS)
    - Extend CMS schemas for external IDs (sourcedId, vendor ids) and sync state tables.
    - Alembic migrations, repository methods, indexes.
@@ -59,10 +62,13 @@ Work Packages
    - Docs: Import instructions, mapping decisions, failure modes.
 
 Dependencies
+
 - SIS/API tokens; OneRoster sample datasets.
 
 Risks/Mitigations
+
 - Data quality variance ➜ robust validation and dead-letter report for rejects.
 
 Definition of Done
+
 - OneRoster CSV/REST import usable; Clever/ClassLink fetch + upsert working; periodic sync in place; tests pass.

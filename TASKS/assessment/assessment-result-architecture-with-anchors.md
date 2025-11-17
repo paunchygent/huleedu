@@ -14,14 +14,14 @@ last_updated: "2025-11-17"
 related: []
 labels: []
 ---
-# Assessment Result Architecture with Anchor Essay Integration
-
 ## Overview
+
 This document defines the implementation of a multi-method assessment architecture that supports anchor essay integration, A/B testing of assessment models, and comprehensive audit trails. The design prioritizes extensibility while avoiding premature optimization.
 
 ## Core Architectural Decisions
 
 ### 1. Assessment Method Tracking
+
 Multiple assessment methods can evaluate the same essay, enabling cross-validation and quality assurance.
 
 ```python
@@ -34,6 +34,7 @@ class AssessmentMethodEnum(str, Enum):
 ```
 
 ### 2. Result Storage Pattern
+
 All assessment results flow to the existing Result Aggregator Service via events. No unique constraints block multiple assessments of the same essay.
 
 ## Sprint 1: Critical Implementation Tasks
@@ -41,6 +42,7 @@ All assessment results flow to the existing Result Aggregator Service via events
 ### Task 1: Database Schema Updates
 
 #### 1.1 Remove Rubric Field from AssessmentInstruction
+
 ```sql
 -- In CJ Assessment Service
 ALTER TABLE assessment_instructions 
@@ -48,6 +50,7 @@ DROP COLUMN IF EXISTS rubric;
 ```
 
 #### 1.2 Add Model Tracking to GradeProjection
+
 ```sql
 -- Immediate change to existing table
 ALTER TABLE grade_projections
@@ -62,6 +65,7 @@ CREATE INDEX idx_grade_proj_method ON grade_projections(assessment_method, cj_ba
 ### Task 2: Anchor Essay Pool Integration
 
 #### 2.1 Modify Batch Preparation Flow
+
 **File**: `services/cj_assessment_service/cj_core_logic/workflow_orchestrator.py`
 
 ```python
@@ -123,6 +127,7 @@ async def _prepare_essays_with_anchors(
 ```
 
 #### 2.2 Filter Anchors from Student Rankings
+
 **File**: `services/cj_assessment_service/cj_core_logic/scoring_ranking.py`
 
 ```python
@@ -156,6 +161,7 @@ async def get_essay_rankings(
 ### Task 3: Enhanced Grade Calibration
 
 #### 3.1 Use Anchor Scores for Boundary Calibration
+
 **File**: `services/cj_assessment_service/cj_core_logic/grade_projector.py`
 
 ```python
@@ -199,6 +205,7 @@ async def _calibrate_grade_boundaries(
 ### Task 4: Event Publishing to Result Aggregator
 
 #### 4.1 Enhance CJAssessmentCompletedV1 Event
+
 **File**: `services/cj_assessment_service/event_processor.py`
 
 ```python
@@ -228,6 +235,7 @@ event_data = CJAssessmentCompletedV1(
 ### Task 5: Store Assessment Results Locally
 
 #### 5.1 Save Results After Grade Projection
+
 **File**: `services/cj_assessment_service/cj_core_logic/grade_projector.py`
 
 ```python
@@ -260,21 +268,25 @@ for essay_id, grade in grade_projections.primary_grades.items():
 ## Sprint 2: Future Enhancements (Deferred)
 
 ### Enhancement 1: Result Selection Logic
+
 - Implement in Result Aggregator Service when needed
 - Priority: is_primary_result → preferred_method → confidence → recency
 - No implementation until multiple assessment methods active
 
 ### Enhancement 2: Predefined Assignment Catalog
+
 - Create UI/API for managing assessment instructions
 - Enable selection of predefined assignments with anchors
 - Link to batch orchestrator pipeline requests
 
 ### Enhancement 3: NLP Assessment Integration
+
 - Add NLP Random Forest assessment service
 - Publish results to Result Aggregator
 - Enable ensemble grading methods
 
 ### Enhancement 4: A/B Testing Framework
+
 - Experiment tracking with experiment_id
 - Model performance comparison
 - Automated primary result selection
@@ -282,6 +294,7 @@ for essay_id, grade in grade_projections.primary_grades.items():
 ## Implementation Checklist
 
 ### Immediate (Sprint 1)
+
 - [ ] Remove rubric field from AssessmentInstruction
 - [ ] Add model tracking fields to GradeProjection
 - [ ] Implement anchor essay mixing in batch preparation
@@ -292,6 +305,7 @@ for essay_id, grade in grade_projections.primary_grades.items():
 - [ ] Store results with model tracking
 
 ### Deferred (Future Sprints)
+
 - [ ] Result selection service in RAS
 - [ ] Predefined assignment management
 - [ ] NLP assessment service
@@ -301,12 +315,14 @@ for essay_id, grade in grade_projections.primary_grades.items():
 ## Testing Requirements
 
 ### Unit Tests
+
 1. Test anchor essay mixing logic
 2. Test anchor filtering from rankings
 3. Test grade calibration with anchors
 4. Test model tracking in events
 
 ### Integration Tests
+
 1. Full workflow with anchor essays
 2. Grade projection with/without anchors
 3. Event publishing to Result Aggregator

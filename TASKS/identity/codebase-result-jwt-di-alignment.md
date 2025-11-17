@@ -14,8 +14,6 @@ last_updated: "2025-11-17"
 related: []
 labels: []
 ---
-# Codebase Alignment: Result Monad, JWT Helpers, Content Client DI
-
 ## Objective
 
 Realign shared patterns by consolidating the Result monad, centralizing JWT test helpers, and restoring Dishka-based injection for the CJ content client. Execute in three phases; run the validation commands at the end of each phase before moving on.
@@ -51,6 +49,7 @@ Realign shared patterns by consolidating the Result monad, centralizing JWT test
      - `.claude/rules/000-rule-index.md` already indexes Result monad correctly
 
 4. **Validation** ✅
+
    ```bash
    pdm run typecheck-all                                    # PASS (pre-existing errors unrelated to Result)
    pdm run pytest-root libs/huleedu_service_libs/tests/utils/test_result.py -v  # 15/15 PASS
@@ -60,12 +59,14 @@ Realign shared patterns by consolidating the Result monad, centralizing JWT test
    ```
 
 **Files Created**:
+
 - `libs/huleedu_service_libs/src/huleedu_service_libs/utils/result.py`
 - `libs/huleedu_service_libs/src/huleedu_service_libs/utils/__init__.py`
 - `libs/huleedu_service_libs/tests/utils/__init__.py`
 - `libs/huleedu_service_libs/tests/utils/test_result.py`
 
 **Files Modified**:
+
 - `libs/huleedu_service_libs/src/huleedu_service_libs/__init__.py` (added Result export)
 - `services/cj_assessment_service/event_processor.py` (updated import)
 - `services/cj_assessment_service/models_api.py` (removed Result class, cleaned imports)
@@ -112,6 +113,7 @@ Realign shared patterns by consolidating the Result monad, centralizing JWT test
    - Referenced `AuthTestManager` for functional/integration tests
 
 4. **Validation** ✅
+
    ```bash
    pdm run typecheck-all                        # PASS (Success: no issues found in 1236 source files)
    pdm run pytest-root libs/huleedu_service_libs/tests/test_jwt_helpers.py -v  # 21/21 PASS
@@ -123,11 +125,13 @@ Realign shared patterns by consolidating the Result monad, centralizing JWT test
 **Code Reduction**: Removed ~150 lines of duplicated JWT test helper code across services
 
 **Files Created**:
+
 - `libs/huleedu_service_libs/src/huleedu_service_libs/testing/__init__.py`
 - `libs/huleedu_service_libs/src/huleedu_service_libs/testing/jwt_helpers.py`
 - `libs/huleedu_service_libs/tests/test_jwt_helpers.py`
 
 **Files Modified**:
+
 - `services/cj_assessment_service/tests/unit/test_admin_prompt_endpoints.py` (added missing imports)
 - `services/cj_assessment_service/tests/unit/test_admin_routes.py` (added missing imports)
 - `services/api_gateway_service/tests/test_auth.py` (migrated 15 tests, removed 4 local helpers)
@@ -156,6 +160,7 @@ Realign shared patterns by consolidating the Result monad, centralizing JWT test
    - Update `.claude/rules/042-async-patterns-and-di.md` with a short “pure implementation + wrapper” testing pattern.
 
 5. **Validation**
+
    ```bash
    pdm run typecheck-all
    pdm run pytest-root services/cj_assessment_service/tests/unit -q
@@ -183,4 +188,3 @@ Commit message suggestion: `docs: compress handoff and mark CJ prompt plan compl
 - Phase 1 rollback restores local Result implementations; services continue working but lose consistency.
 - Phase 2 rollback reintroduces duplicated JWT helpers; no production impact.
 - Phase 3 rollback reinstates manual `content_client` threading; tests still pass but DI inconsistency returns.
-

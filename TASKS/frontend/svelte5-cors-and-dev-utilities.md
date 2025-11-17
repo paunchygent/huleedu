@@ -14,8 +14,6 @@ last_updated: "2025-11-17"
 related: []
 labels: []
 ---
-# Svelte 5 + Vite CORS Configuration and Development Utilities
-
 ## Overview
 
 This task implements Priority 3.1 (Development Configuration) from the Frontend Readiness Checklist, specifically focusing on enhancing CORS configuration and adding development utilities optimized for Svelte 5 + Vite frontend stack.
@@ -33,12 +31,14 @@ The current backend services are configured with React-centric CORS origins and 
 ## Current State Analysis
 
 ### CORS Configuration
+
 - **API Gateway**: `CORS_ORIGINS` defaults to `["http://localhost:3000", "http://localhost:3001"]` (React ports)
 - **WebSocket Service**: `CORS_ORIGINS` defaults to `["http://localhost:3000"]` only
 - **Comments**: Still reference "React frontend" instead of "Svelte 5 + Vite"
 - **Environment Detection**: Basic `ENV_TYPE` field exists but underutilized
 
 ### Development Infrastructure
+
 - **Mock Data**: Extensive mock implementations exist for testing but no frontend-specific mock endpoints
 - **Authentication**: JWT infrastructure exists but no test token generation for development
 - **Environment Detection**: Limited development-specific features
@@ -48,11 +48,14 @@ The current backend services are configured with React-centric CORS origins and 
 ### Phase 1: Enhanced CORS Configuration (45 minutes)
 
 #### 1.1 Update Default CORS Origins
+
 **Files to Modify:**
+
 - `services/api_gateway_service/config.py`
 - `services/websocket_service/config.py`
 
 **Changes:**
+
 ```python
 # API Gateway Service
 CORS_ORIGINS: list[str] = Field(
@@ -76,9 +79,11 @@ CORS_ORIGINS: list[str] = Field(
 ```
 
 #### 1.2 Environment-Specific CORS Patterns
+
 **New File:** `services/api_gateway_service/utils/cors_utils.py`
 
 **Implementation:**
+
 ```python
 def get_cors_origins_for_environment(env_type: str, custom_origins: list[str] | None = None) -> list[str]:
     """Get CORS origins based on environment type - optimized for Svelte 5 + Vite."""
@@ -107,7 +112,9 @@ def get_cors_origins_for_environment(env_type: str, custom_origins: list[str] | 
 ```
 
 #### 1.3 Update Configuration Comments
+
 Update all references from "React frontend" to "Svelte 5 + Vite frontend" in:
+
 - Configuration classes
 - Documentation strings
 - Code comments
@@ -115,9 +122,11 @@ Update all references from "React frontend" to "Svelte 5 + Vite frontend" in:
 ### Phase 2: Development Utilities (90 minutes)
 
 #### 2.1 Mock Data Endpoints
+
 **New File:** `services/api_gateway_service/routers/dev_routes.py`
 
 **Endpoints to Implement:**
+
 ```python
 @router.get("/dev/mock/classes")
 async def get_mock_classes() -> list[dict]:
@@ -148,15 +157,18 @@ async def trigger_mock_notification(
 ```
 
 **Mock Data Structure:**
+
 - Align with existing Pydantic models
 - Optimize for Svelte 5 runes (`$state()`, `$derived()`, `$effect()`)
 - Include realistic data variations for different UI states
 - Support batch processing states and transitions
 
 #### 2.2 Test User Token Generation
+
 **Endpoint:** `/dev/auth/test-token`
 
 **Implementation:**
+
 ```python
 @router.post("/dev/auth/test-token")
 async def generate_test_token(
@@ -169,6 +181,7 @@ async def generate_test_token(
 ```
 
 **Features:**
+
 - Support different user types (teacher, student, admin)
 - Configurable expiration times
 - Optional class association
@@ -176,7 +189,9 @@ async def generate_test_token(
 - Integration with existing JWT validation middleware
 
 #### 2.3 Development Environment Detection
+
 **Enhancements:**
+
 ```python
 def is_development_environment() -> bool:
     """Check if running in development environment."""
@@ -195,6 +210,7 @@ async def development_middleware(request: Request, call_next):
 ```
 
 **Development-Only Features:**
+
 - Debug headers for troubleshooting
 - Enhanced error responses with stack traces
 - Development route registration conditional on environment
@@ -203,7 +219,9 @@ async def development_middleware(request: Request, call_next):
 ### Phase 3: Integration and Testing (30 minutes)
 
 #### 3.1 Route Registration
+
 Update `services/api_gateway_service/app/main.py`:
+
 ```python
 # Development routes (only in development environment)
 if is_development_environment():
@@ -212,6 +230,7 @@ if is_development_environment():
 ```
 
 #### 3.2 Testing Strategy
+
 1. **CORS Testing**: Verify Vite dev server (5173) can connect without CORS errors
 2. **Mock Endpoints**: Test all mock endpoints return valid data matching API schemas
 3. **Token Generation**: Verify generated tokens work with existing authentication middleware
@@ -219,7 +238,9 @@ if is_development_environment():
 5. **WebSocket Mocks**: Test mock WebSocket notifications trigger properly
 
 #### 3.3 Documentation Updates
+
 Update the following files:
+
 - `Documentation/guides/FRONTEND_INTEGRATION_INDEX.md` - Add new CORS ports and development utilities
 - `Documentation/apis/API_REFERENCE.md` - Document new development endpoints
 - `Documentation/guides/SVELTE_INTEGRATION_GUIDE.md` - Add examples using new mock endpoints
@@ -228,6 +249,7 @@ Update the following files:
 ## Acceptance Criteria
 
 ### CORS Configuration
+
 - [ ] API Gateway defaults to Vite ports (5173, 4173) with React port (3000) as backup
 - [ ] WebSocket Service matches API Gateway CORS configuration
 - [ ] Environment-specific CORS patterns implemented and tested
@@ -235,6 +257,7 @@ Update the following files:
 - [ ] CORS works with Vite dev server without manual configuration
 
 ### Development Utilities
+
 - [ ] Mock data endpoints return realistic data matching existing API schemas
 - [ ] Mock data optimized for Svelte 5 reactive patterns
 - [ ] Test token generation works with different user types and claims
@@ -243,6 +266,7 @@ Update the following files:
 - [ ] Development-only features are properly gated
 
 ### Integration
+
 - [ ] All development routes only available in development environment
 - [ ] Mock WebSocket notifications trigger correctly
 - [ ] No breaking changes to existing production functionality
@@ -267,12 +291,15 @@ Update the following files:
 ## Risks and Mitigations
 
 ### Risk: Breaking Production CORS
+
 **Mitigation**: Keep existing React port (3000) as backup, test thoroughly in staging
 
 ### Risk: Security Exposure of Development Endpoints
+
 **Mitigation**: Strict environment detection, comprehensive testing of environment gating
 
 ### Risk: Mock Data Drift from Real API
+
 **Mitigation**: Use existing Pydantic models, regular validation against real API schemas
 
 ## Timeline

@@ -14,22 +14,24 @@ last_updated: "2025-11-17"
 related: []
 labels: []
 ---
-# Identity: OIDC SSO + RBAC/ABAC (Weeks 1–3)
-
 Objective
+
 - Implement OIDC SSO (Google for Education first), introduce RBAC/ABAC role model, and enforce in API Gateway + services.
 
 Scope
+
 - In: OIDC login, JWKS federation, role claims propagation, gateway authz middleware, identity roles administration endpoints.
 - Out: SAML (tracked separately for later), SCIM (captured as stretch goal).
 
 References
+
 - Identity service: `services/identity_service/*` (routes, di, models)
 - Gateway: `services/api_gateway_service/app/*`, `routers/*`
 - Shared: `libs/huleedu_service_libs/error_handling/*`, `libs/common_core/identity_models.py`
 - Rules: `020-architectural-mandates`, `042-async-patterns-and-di`, `048-structured-error-handling-standards`, `070-testing-and-quality-assurance`
 
 Deliverables
+
 1. OIDC SSO: `.well-known/openid-configuration` support, OIDC client config (Google), code/exchange + PKCE, session issuance.
 2. RBAC/ABAC: Role model (student/teacher/admin/district_admin), optional attributes for ABAC (tenant_id, org_id).
 3. Gateway enforcement: AuthN (existing) + AuthZ middleware with role/claims checks; per-route role guards.
@@ -37,6 +39,7 @@ Deliverables
 5. Tests: E2E login, token introspection, role-protected route access, regression.
 
 Work Packages
+
 1) OIDC Provider Integration (Identity)
    - Add provider config and discovery: `services/identity_service/api/well_known_routes.py` (extend for OIDC metadata)
    - Implement `/v1/auth/oidc/callback` exchange and session issuance.
@@ -63,11 +66,14 @@ Work Packages
    - Docs: Identity README (flows), Gateway README (guards), update `documentation/`.
 
 Dependencies
+
 - Google OIDC credentials; secure callback URL; `.env` entries.
 
 Risks/Mitigations
+
 - Token audience/scope mismatch ➜ strict audience checks and e2e tests.
 - Role drift ➜ centralize role definitions in identity and expose via introspection endpoint.
 
 Definition of Done
+
 - OIDC login end-to-end works; RBAC enforced at gateway; identity role admin endpoints live; tests pass (`pdm run test-all`).

@@ -14,8 +14,6 @@ last_updated: "2025-11-17"
 related: []
 labels: []
 ---
-# Phase 3 – CJ Confidence Programme Hub
-
 **Purpose**: Provide a single overview for Phase 3 workstreams so contributors can see status, owners, and next actions without traversing multiple task files.
 
 ## 1. Programme Snapshot
@@ -67,6 +65,7 @@ _Last refresh: 2025-11-09_
 | 2025-11-06 | Prompt references replace essay_instructions across services | `TASK-PHASE-3.2-PROMPT-ARCHITECTURE-IMPLEMENTATION.md` |
 
 **Current risks**
+
 - Legacy fixtures still referencing `essay_instructions` → coordinate cleanup (prompt architecture task).
 - Downstream BI/AI Feedback not yet consuming `student_prompt_ref` → track in prompt architecture task.
 

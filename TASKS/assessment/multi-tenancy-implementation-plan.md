@@ -14,22 +14,24 @@ last_updated: "2025-11-17"
 related: []
 labels: []
 ---
-# Multi‑Tenancy Implementation (Weeks 5–8)
-
 Objective
+
 - Introduce tenant isolation across data, events, and rate limits to support schools/districts.
 
 Scope
+
 - In: `tenant_id` propagation, DB schema updates, cache separation, per‑tenant rate limits/quotas, LLM usage tracking.
 - Out: Full billing integration (tracked separately).
 
 References
+
 - Services DB layers: `services/*/models_db.py`, Alembic per service
 - Gateway: `services/api_gateway_service/app/rate_limiter.py`
 - Events: `libs/common_core/src/common_core/events/*`, `event_enums.py`, `envelope.py`
 - Rules: `020`, `053`, `070`, `085`
 
 Deliverables
+
 1. Tenant ID in JWT and gateway headers (from Identity/SSO claims).
 2. DB: Add `tenant_id` columns + indexes where applicable; update repositories.
 3. Cache: Redis key namespaces include tenant.
@@ -37,6 +39,7 @@ Deliverables
 5. Tests: E2E verifying isolation and limits.
 
 Work Packages
+
 1) Contract & Claims
    - Identity issues `tenant_id` claim; gateway forwards header `X-Tenant-ID`.
    - Acceptance: Services log and trust tenant context.
@@ -59,4 +62,5 @@ Work Packages
    - Docs: tenant model, migration guidance, operational notes.
 
 Definition of Done
+
 - Tenant-aware auth, data, cache, and limits in place; tests pass; operational docs updated.

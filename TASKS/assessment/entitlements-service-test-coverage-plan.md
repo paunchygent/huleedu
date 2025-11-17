@@ -14,8 +14,6 @@ last_updated: "2025-11-17"
 related: []
 labels: []
 ---
-# Entitlements Service — Test Coverage Plan (Final)
-
 ## Goals
 
 - ≥85% coverage with emphasis on behavioral tests, contracts, and cross-service flows.

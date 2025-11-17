@@ -14,8 +14,6 @@ last_updated: "2025-11-17"
 related: []
 labels: []
 ---
-# D-Optimal Pair Optimizer Rollout Plan
-
 ## Objective
 
 Operationalize the Fisher-information optimizer for CJ pair planning with a unified dynamic intake workflow that supports multi-session optimization, eliminating CSV-based baseline loading in favor of direct parameter inputs.
@@ -28,18 +26,21 @@ Operationalize the Fisher-information optimizer for CJ pair planning with a unif
 The first implementation treated "locked pairs" as historical data that the optimizer should build upon. This was incorrect.
 
 **Actual Requirements:**
+
 - **previous_comparisons**: Historical comparison data from past sessions that the optimizer analyzes to build complementary schedules
 - **locked_pairs**: Hard constraints - pairs that MUST be included in the current schedule (rare, optional use case)
 
 **Why This Matters:**
 
 Multi-session workflow requires the optimizer to:
+
 1. **Session 1**: Generate fresh comparisons with baseline coverage (no history)
 2. **Session 2+**: Load previous session data, analyze coverage gaps, generate complementary comparisons
 
 **Example Workflow:**
 
 **Session 1 (no history):**
+
 ```bash
 python -m scripts.bayesian_consensus_model.redistribute_pairs optimize-pairs \
   --student JA24 --student II24 --student ES24 \
@@ -48,6 +49,7 @@ python -m scripts.bayesian_consensus_model.redistribute_pairs optimize-pairs \
 ```
 
 **Session 2 (building on Session 1):**
+
 ```bash
 python -m scripts.bayesian_consensus_model.redistribute_pairs optimize-pairs \
   --student JA24 --student II24 --student ES24 \
@@ -57,6 +59,7 @@ python -m scripts.bayesian_consensus_model.redistribute_pairs optimize-pairs \
 ```
 
 **Corrective Actions Taken:**
+
 - Added `ComparisonRecord` dataclass for type-safe historical data representation
 - Updated `DynamicSpec` with `previous_comparisons` field (separate from `locked_pairs`)
 - Implemented `derive_required_student_anchor_pairs()` for coverage gap analysis
@@ -69,6 +72,7 @@ python -m scripts.bayesian_consensus_model.redistribute_pairs optimize-pairs \
 ### ✅ Complete
 
 **Core Features:**
+
 - Dynamic Spec Schema with students, anchors, previous_comparisons, locked_pairs, total_slots
 - CLI with direct parameters (`--student`, `--previous-csv`, `--lock-pair`)
 - TUI with unified workflow (single "Generate Assignments" button)
@@ -78,12 +82,14 @@ python -m scripts.bayesian_consensus_model.redistribute_pairs optimize-pairs \
 - Status filter removal (legacy "core" vs "extra" filtering eliminated)
 
 **Quality Metrics:**
+
 - 50+ tests passing (includes 11 CSV loading tests)
 - Type checks passing
 - Linting clean (0 errors)
 - Code organization: All files under 500 LoC after refactoring
 
 **Documentation:**
+
 - README updated with current workflow
 - CSV loading test coverage documented
 - Previous_comparisons vs locked_pairs distinction clarified
@@ -91,17 +97,20 @@ python -m scripts.bayesian_consensus_model.redistribute_pairs optimize-pairs \
 ## Completed Work Summary
 
 ### ✅ TUI Simplification
+
 - CSV student loading with fallback to manual entry
 - Unified workflow: single button generates both pairs and assignments
 - Clearer field labels and instructions
 - Dynamic anchor display (no hardcoded mappings)
 
 ### ✅ Status Filter Removal
+
 - Removed `StatusSelector` enum, `status` field from `Comparison`, `filter_comparisons()` function
 - Updated all modules: `redistribute_core.py`, `d_optimal_workflow`, CLI, TUI
 - Design rationale: Status filtering breaks Fisher-information design; specify exact slots upfront instead
 
 ### ✅ Code Organization Refactoring
+
 - Split bloated `d_optimal_workflow.py` (788 lines) into focused package:
   - `data_loaders.py`, `design_analysis.py`, `optimization_runners.py`, `synthetic_data.py`, `io_utils.py`
 - Moved `load_students_from_csv()` to shared utilities
@@ -109,6 +118,7 @@ python -m scripts.bayesian_consensus_model.redistribute_pairs optimize-pairs \
 - Backward compatibility maintained via `__init__.py` re-exports
 
 ### ✅ CSV Loading Tests
+
 - 11 comprehensive test cases covering column matching, error handling, whitespace normalization, empty file detection
 - All tests passing
 
@@ -119,16 +129,19 @@ python -m scripts.bayesian_consensus_model.redistribute_pairs optimize-pairs \
 **Completed:** 2025-11-01
 
 **Implementation Summary:**
+
 - Removed "Total Comparison Slots" input field from TUI
 - Auto-calculate `total_slots = num_raters × per_rater` in `_run_optimizer()`
 - Updated instructions text to reflect simplified workflow
 - Removed orphaned `DEFAULT_PAIRS` constant
 
 **Files Modified:**
+
 - `redistribute_tui.py`: Removed manual slots input, added auto-calculation (498 LoC)
 - Tests: All 47 tests passing
 
 **Results:**
+
 - ✅ UI simplified (one less confusing input)
 - ✅ Optimizer generates exact pairs needed for rater assignments
 - ✅ No shortage/excess warnings in normal workflow
@@ -144,20 +157,24 @@ python -m scripts.bayesian_consensus_model.redistribute_pairs optimize-pairs \
 Removed all legacy baseline CSV workflow code that was replaced by dynamic spec workflow.
 
 **Removed from `d_optimal_workflow/__init__.py`:**
+
 - 12 unused exports (60% reduction: 20 → 8 exports)
 - Legacy functions: `load_baseline_design`, `load_baseline_from_records`, `load_baseline_payload`, `optimize_from_payload`
 - Internal-only functions: `optimize_schedule`, `derive_student_anchor_requirements`, `summarize_design`, `unique_pair_count`, `run_synthetic_optimization`
 - Test-only types: `DEFAULT_ANCHOR_ORDER`, `ComparisonRecord`, `BaselinePayload`
 
 **Removed from `test_redistribute.py`:**
+
 - 3 legacy test functions (~70 lines)
 - Inlined test-only constants for remaining tests
 
 **Files Modified:**
+
 - `d_optimal_workflow/__init__.py`: Cleaned public API to 8 exports
 - `test_redistribute.py`: Removed 3 legacy tests (50 → 47 tests)
 
 **Results:**
+
 - ✅ All 47 tests passing
 - ✅ Clean public API (only actively used exports)
 - ✅ Type checking passes
@@ -173,6 +190,7 @@ Removed all legacy baseline CSV workflow code that was replaced by dynamic spec 
 Removed complex try/except import blocks and sys.path hacks, replaced with clean absolute imports matching project standards.
 
 **Before (58 lines):**
+
 ```python
 import sys
 if __package__ in (None, ""):
@@ -189,6 +207,7 @@ except ImportError:
 ```
 
 **After (27 lines):**
+
 ```python
 from pathlib import Path
 from typing import Optional
@@ -198,10 +217,12 @@ from scripts.bayesian_consensus_model.redistribute_core import (...)
 ```
 
 **Files Modified:**
+
 - `redistribute_tui.py`: Removed 31 lines of import complexity
 - `redistribute_pairs.py`: Removed 31 lines of import complexity
 
 **Results:**
+
 - ✅ All 47 tests passing
 - ✅ CLI works: `pdm run python -m scripts.bayesian_consensus_model.redistribute_pairs --help`
 - ✅ TUI imports successfully
@@ -222,6 +243,7 @@ from scripts.bayesian_consensus_model.redistribute_core import (...)
 Create standalone executable binaries for `cj-pair-generator-tui` and `redistribute-pairs` using PyInstaller `--onefile` mode.
 
 **Benefits:**
+
 - True standalone executables (no Python installation required)
 - Single-file distribution (~25-35MB per executable)
 - Copy to `/usr/local/bin/` or distribute to non-developers
@@ -240,6 +262,7 @@ Create standalone executable binaries for `cj-pair-generator-tui` and `redistrib
 **Goal:** Allow users to choose output destinations (assignments + comparison pairs) via OS-native “Save As” dialogs instead of manual path entry.
 
 **Steps:**
+
 1. **Library selection:** Evaluate `crossfiledialog` (preferred) or platform-specific fallbacks if licensing/availability requires.
 2. **Async integration:** Wrap dialog launch in `asyncio.to_thread()` (or executor) so the Textual UI stays responsive while the modal dialog is open.
 3. **UI affordance:** Add “Browse…” buttons beside `#output_input` and `#optimizer_output_input`; disable the generate button while waiting for the dialog result.
@@ -254,6 +277,7 @@ Create standalone executable binaries for `cj-pair-generator-tui` and `redistrib
 **Goal:** Make the `Previous Session CSV` field behave identically to the `Students CSV` field for drag-and-drop and multi-path paste.
 
 **Steps:**
+
 1. Extend `FILE_DROP_TARGET_IDS` to include `previous_csv_input`.
 2. Ensure `on_input_changed` / `on_paste` logic treats the field the same as the existing CSV inputs.
 3. Update placeholder/help text to advertise drag-and-drop support.

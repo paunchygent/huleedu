@@ -23,8 +23,8 @@ Context: What We've Completed
 
   Documentation Created:
 
-  - scripts/cj_experiments_runners/eng5_np/ASSIGNMENT_SETUP.md - Assignment setup workflow
-  - scripts/cj_experiments_runners/eng5_np/ANCHOR_REGISTRATION_EXAMPLE.md - Practical anchor registration example
+- scripts/cj_experiments_runners/eng5_np/ASSIGNMENT_SETUP.md - Assignment setup workflow
+- scripts/cj_experiments_runners/eng5_np/ANCHOR_REGISTRATION_EXAMPLE.md - Practical anchor registration example
 
   TASK: Research & Document Complete Data Flow Architecture
 
@@ -36,19 +36,19 @@ Context: What We've Completed
 
   Current Understanding:
 
-  - CJ Assessment Service has assessment_instructions table (stores assignment_id, grade_scale, instructions text)
-  - Admin API endpoint: POST /admin/v1/assessment-instructions
-  - CLI uses this to create assignment contexts
+- CJ Assessment Service has assessment_instructions table (stores assignment_id, grade_scale, instructions text)
+- Admin API endpoint: POST /admin/v1/assessment-instructions
+- CLI uses this to create assignment contexts
 
   INVESTIGATE:
 
-  - Does Class Management Service (CMS) also have assignment records?
-  - What's the relationship between CJ's assessment_instructions and CMS's assignment model?
-  - For teacher-created assignments via API Gateway, which service is the source of truth?
-  - Do we need cross-service synchronization or are these separate domains?
-  - Check: services/class_management_service/models_db.py for assignment models
-  - Check: Assignment creation flow through API Gateway → Batch Orchestrator → CMS
-  - Document ownership boundaries: Research data (CJ) vs Production assignments (CMS)
+- Does Class Management Service (CMS) also have assignment records?
+- What's the relationship between CJ's assessment_instructions and CMS's assignment model?
+- For teacher-created assignments via API Gateway, which service is the source of truth?
+- Do we need cross-service synchronization or are these separate domains?
+- Check: services/class_management_service/models_db.py for assignment models
+- Check: Assignment creation flow through API Gateway → Batch Orchestrator → CMS
+- Document ownership boundaries: Research data (CJ) vs Production assignments (CMS)
 
   Key Files to Investigate:
   services/class_management_service/models_db.py
@@ -63,9 +63,9 @@ Context: What We've Completed
 
   Current Understanding:
 
-  - Content stored in Content Service (blob storage)
-  - References in CJ Assessment Service anchor_essay_references table
-  - Schema:
+- Content stored in Content Service (blob storage)
+- References in CJ Assessment Service anchor_essay_references table
+- Schema:
   anchor_essay_references (
     id, assignment_id, grade, grade_scale,
     text_storage_id,  -- Points to Content Service
@@ -74,12 +74,12 @@ Context: What We've Completed
 
   VALIDATE:
 
-  - Content Service stores actual essay text as blobs (confirm implementation)
-  - CJ Assessment stores only metadata + text_storage_id reference (confirm)
-  - Is this architecture consistent with other essay storage patterns?
-  - Check Content Service implementation: services/content_service/
-  - Verify storage ID format and retrieval mechanism
-  - Document: Anchor essay = Reference in CJ DB + Blob in Content Service
+- Content Service stores actual essay text as blobs (confirm implementation)
+- CJ Assessment stores only metadata + text_storage_id reference (confirm)
+- Is this architecture consistent with other essay storage patterns?
+- Check Content Service implementation: services/content_service/
+- Verify storage ID format and retrieval mechanism
+- Document: Anchor essay = Reference in CJ DB + Blob in Content Service
 
   Key Files to Investigate:
   services/content_service/models_db.py
@@ -99,22 +99,22 @@ Context: What We've Completed
 
   INVESTIGATE:
 
-  - Path A (User Uploads):
-    - Trace complete flow: API Gateway → Batch Orchestrator → File Service?
-    - Does File Service store essays or delegate to Content Service?
-    - Where does Essay Lifecycle Service fit?
-    - What's CMS's role in user essay uploads?
-    - Which service creates the essay records?
-    - Database tables: Where are user essays tracked?
-  - Path B (CLI Uploads):
-    - Currently: CLI → Content Service (confirmed)
-    - Does CLI create records in any other service?
-    - How do CLI-uploaded essays integrate with CMS/Batch Orchestrator?
-  - Cross-Path Questions:
-    - Are these two separate flows or should they converge?
-    - Should CLI uploads create CMS records?
-    - How do we prevent duplicate storage?
-    - What's the relationship between cj_processed_essays and other essay tables?
+- Path A (User Uploads):
+  - Trace complete flow: API Gateway → Batch Orchestrator → File Service?
+  - Does File Service store essays or delegate to Content Service?
+  - Where does Essay Lifecycle Service fit?
+  - What's CMS's role in user essay uploads?
+  - Which service creates the essay records?
+  - Database tables: Where are user essays tracked?
+- Path B (CLI Uploads):
+  - Currently: CLI → Content Service (confirmed)
+  - Does CLI create records in any other service?
+  - How do CLI-uploaded essays integrate with CMS/Batch Orchestrator?
+- Cross-Path Questions:
+  - Are these two separate flows or should they converge?
+  - Should CLI uploads create CMS records?
+  - How do we prevent duplicate storage?
+  - What's the relationship between cj_processed_essays and other essay tables?
 
   Key Files to Investigate:
   services/api_gateway_service/
@@ -131,43 +131,45 @@ Context: What We've Completed
 
   TRACE:
 
-  - Teacher creates assignment in CMS → assignment_id generated
-  - Teacher uploads essays for assignment → how is assignment_id linked?
-  - Batch Orchestrator triggers CJ assessment → how is assignment_id passed?
-  - CJ Assessment loads anchors → queries by assignment_id
-  - CLI creates assignment via admin API → same assignment_id space?
-  - Are research assignments (CLI) separate from production assignments (CMS)?
+- Teacher creates assignment in CMS → assignment_id generated
+- Teacher uploads essays for assignment → how is assignment_id linked?
+- Batch Orchestrator triggers CJ assessment → how is assignment_id passed?
+- CJ Assessment loads anchors → queries by assignment_id
+- CLI creates assignment via admin API → same assignment_id space?
+- Are research assignments (CLI) separate from production assignments (CMS)?
 
   Required Deliverable
 
   Create: .claude/research/eng5_runner_architecture_data_flow.md
 
   Structure:
-  # ENG5 Runner & Essay Assessment Architecture
 
-  ## 1. Assignment Management
+# ENG5 Runner & Essay Assessment Architecture
 
-  ### Assignment Ownership Matrix
+## 1. Assignment Management
+
+### Assignment Ownership Matrix
+
   | Service | Responsibility | Tables | API Endpoints |
   |---------|---------------|--------|---------------|
   | CJ Assessment Service | Research assignment contexts | assessment_instructions | POST /admin/v1/assessment-instructions |
   | Class Management Service | Production assignments | ??? | ??? |
 
-  ### Assignment Creation Flows
+### Assignment Creation Flows
 
-  - CLI Research Path: ...
-  - Teacher Production Path: ...
-  - Synchronization: ...
+- CLI Research Path: ...
+- Teacher Production Path: ...
+- Synchronization: ...
 
-  ## 2. Anchor Essay Storage Architecture
+## 2. Anchor Essay Storage Architecture
 
-  ### Storage Pattern
+### Storage Pattern
 
-  - **Blob Storage**: Content Service stores actual essay text
-  - **Metadata**: CJ Assessment Service stores references
-  - **Diagram**: [Draw architecture]
+- **Blob Storage**: Content Service stores actual essay text
+- **Metadata**: CJ Assessment Service stores references
+- **Diagram**: [Draw architecture]
 
-  ### Storage Flow
+### Storage Flow
 
   1. CLI: `register-anchors` command
   2. Text extraction from .docx/.pdf
@@ -175,17 +177,20 @@ Context: What We've Completed
   4. CJ stores in Content Service → gets storage_id
   5. CJ creates anchor_essay_references record
 
-  ## 3. Student Essay Storage Patterns
+## 3. Student Essay Storage Patterns
 
-  ### Path A: User Upload (Production)
+### Path A: User Upload (Production)
+
   [Diagram/Flow]
   User → API Gateway → ??? → Storage
 
-  ### Path B: CLI Upload (Research)
+### Path B: CLI Upload (Research)
+
   [Diagram/Flow]
   CLI → Content Service → cj_processed_essays
 
-  ### Storage Comparison
+### Storage Comparison
+
   | Aspect | User Uploads | CLI Uploads |
   |--------|-------------|-------------|
   | Entry Point | API Gateway | CLI |
@@ -193,26 +198,27 @@ Context: What We've Completed
   | Database Records | ??? | cj_processed_essays |
   | Ownership | CMS? | CJ Assessment |
 
-  ## 4. Cross-Service Integration
+## 4. Cross-Service Integration
 
-  ### Assignment ID Flow
+### Assignment ID Flow
+
   [Diagram showing assignment_id propagation]
 
-  ### Data Ownership Boundaries
+### Data Ownership Boundaries
 
-  - CJ Assessment: Research data, anchor essays, comparative judgments
-  - CMS: Teacher/student/class management, production assignments
-  - Content Service: Blob storage for all essay content
-  - File Service: ???
-  - Essay Lifecycle Service: ???
+- CJ Assessment: Research data, anchor essays, comparative judgments
+- CMS: Teacher/student/class management, production assignments
+- Content Service: Blob storage for all essay content
+- File Service: ???
+- Essay Lifecycle Service: ???
 
-  ## 5. Architectural Recommendations
+## 5. Architectural Recommendations
 
   Based on research findings:
 
-  - [ ] Should CLI uploads integrate with CMS?
-  - [ ] Consolidation opportunities?
-  - [ ] Clear service boundaries?
+- [ ] Should CLI uploads integrate with CMS?
+- [ ] Consolidation opportunities?
+- [ ] Clear service boundaries?
 
   Research Methodology
 
@@ -224,28 +230,32 @@ Context: What We've Completed
 
   Tools to Use
 
-  # Search for assignment_id usage across services
+# Search for assignment_id usage across services
+
   grep -r "assignment_id" services/*/models_db.py
 
-  # Find essay-related tables
+# Find essay-related tables
+
   grep -r "class.*Essay" services/*/models_db.py
 
-  # Trace Content Service usage
+# Trace Content Service usage
+
   grep -r "content_service" services/
 
-  # Find file upload endpoints
+# Find file upload endpoints
+
   grep -r "upload.*essay\|essay.*upload" services/*/api/
 
   Success Criteria
 
   The research document should answer:
 
-  - ✅ Clear ownership: Which service owns what data?
-  - ✅ Storage architecture: Where is essay content stored (blob vs DB)?
-  - ✅ Flow diagrams: Visual representation of both user and CLI upload paths
-  - ✅ Integration points: How services communicate for essay assessment
-  - ✅ Architectural alignment: Does current design follow DDD/microservice principles?
-  - ✅ Recommendations: Any consolidation or clarification needed?
+- ✅ Clear ownership: Which service owns what data?
+- ✅ Storage architecture: Where is essay content stored (blob vs DB)?
+- ✅ Flow diagrams: Visual representation of both user and CLI upload paths
+- ✅ Integration points: How services communicate for essay assessment
+- ✅ Architectural alignment: Does current design follow DDD/microservice principles?
+- ✅ Recommendations: Any consolidation or clarification needed?
 
   Files Modified So Far (For Context)
 

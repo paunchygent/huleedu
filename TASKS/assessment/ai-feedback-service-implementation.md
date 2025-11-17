@@ -14,8 +14,6 @@ last_updated: "2025-11-17"
 related: []
 labels: []
 ---
-# AI Feedback Service Implementation Task
-
 ## Executive Summary
 
 The AI Feedback Service is an intelligent prompt curator and orchestrator that collects pre-computed analyses from upstream services (Spellchecker, NLP, CJ Assessment) and uses this rich context to generate comprehensive AI-powered teacher feedback and edited essays. It acts as the final stage in the essay processing pipeline, consuming aggregated data to craft optimal prompts for LLM-based feedback generation.

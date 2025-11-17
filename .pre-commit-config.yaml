@@ -29,3 +29,11 @@ repos:
         exclude: ^docs/(DOCS_STRUCTURE_SPEC|_archive/)
         pass_filenames: false
         stages: [pre-commit]
+
+    -   id: markdownlint
+        name: Lint markdown files
+        entry: markdownlint --fix --config .markdownlint.json
+        language: node
+        files: \.(md|markdown)$
+        additional_dependencies: ['markdownlint-cli@0.45.0']
+        stages: [pre-commit]

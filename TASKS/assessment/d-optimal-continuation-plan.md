@@ -14,8 +14,6 @@ last_updated: "2025-11-17"
 related: []
 labels: []
 ---
-# Continuation-aware Optimizer Plan
-
 ## Objective
 
 Extend the D-optimal pair optimizer so that multi-session runs truly continue from previous sessions: historical comparisons influence slot usage, repeat limits, and information gain. The output for the current session must contain only newly scheduled comparisons, while diagnostics reflect the combined (historical + new) design.

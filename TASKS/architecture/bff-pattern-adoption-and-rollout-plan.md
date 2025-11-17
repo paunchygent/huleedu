@@ -14,23 +14,24 @@ last_updated: "2025-11-17"
 related: []
 labels: []
 ---
-# Backend-For-Frontend (BFF) Pattern — Adoption & Rollout Plan
-
 Status: Draft
 Owner: Architecture
 Last updated: 2025-08-23
 
 ## Purpose
+
 - Define a concrete, repo-aligned plan to introduce per-role BFFs without assumptions.
 - Capture explicit decision points and unknowns before implementation (“no vibe-coding”).
 - Sequence work to deliver Teacher BFF first, then Admin BFF.
 
 ## Scope
+
 - Phase 1: `bff-teacher` for Teacher screens (1–4) with gateway routing and initial DTOs.
 - Phase 2: `bff-admin` for Admin screens (6–7) with gateway routing; introduce Config service if approved.
 - Future: Student BFF when Student role goes live.
 
 ## Current State (Evidence Only)
+
 - API Gateway (FastAPI): `services/api_gateway_service`
   - App and routers registered in `services/api_gateway_service/app/__init__.py`
   - Routers present: `routers/class_routes.py`, `routers/status_routes.py`, `routers/file_routes.py`, `routers/batch_routes.py` (proxy + composition patterns)
@@ -56,6 +57,7 @@ Last updated: 2025-08-23
 - Docker Compose: `docker-compose.services.yml` — no BFF services defined yet
 
 ## Desired End State
+
 - Introduce per-role BFFs:
   - `bff-teacher`: Composes CMS, RAS, Files, Content, Identity for Teacher UI screens
   - `bff-admin`: Composes Identity (admin), Config service (new), and operational sources for Admin UI
@@ -66,6 +68,7 @@ Last updated: 2025-08-23
 - Streaming: BFF emits minimal diffs to Redis channels `user:{user_id}:events`; `websocket_service` broadcasts to clients
 
 ## Decision Points (To Resolve Before/While Implementing)
+
 1. BFF topology: single multi-role BFF vs separate per-role services
    - Default recommendation: separate `bff-teacher` and `bff-admin` for ownership and scaling
 2. Contract ownership: where DTOs live and how to version
@@ -86,6 +89,7 @@ Last updated: 2025-08-23
    - Short TTL in-memory vs Redis cache for stable metadata; per dependency timeouts and circuit breakers
 
 ## Screen Inventory → BFF Endpoints (No Assumptions Beyond Evidence)
+
 - Teacher 1. Class dashboard (summary across batches)
   - Proposed: `GET /v1/teacher/dashboard`
   - Sources available today: RAS user batches (exists). CMS class listing (missing).
@@ -105,6 +109,7 @@ Last updated: 2025-08-23
   - Requires a new Config service API (missing)
 
 ## Proposed BFF Service Structures (Concrete)
+
 - `services/bff_teacher_service/`
   - `app.py`: FastAPI app setup (CORS, tracing, metrics, DI), ≤150 LoC
   - `api/teacher_routes.py`: `/v1/teacher/*` handlers
@@ -116,13 +121,16 @@ Last updated: 2025-08-23
 - `services/bff_admin_service/` (mirror structure)
 
 ## Domain Gaps to Close (Blocking/Enhancing)
+
 - CMS: Add `GET /v1/classes` with support for filtering by owner (owner from `X-User-ID`)
 - RAS: Add essay-level query to avoid full-batch fetch for single essay view
 - Identity: Add admin endpoints for listing pending users and approve/deny actions
 - Config: Stand up minimal `config_service` with `GET/PUT /v1/settings/{namespace}` and audit logging
 
 ## Implementation Plan (Incremental)
+
 Phase 1 — `bff-teacher` MVP
+
 1) Create service skeleton `services/bff_teacher_service/` (app, di, dto, clients, tests)
 2) Implement endpoints:
    - `GET /v1/teacher/batches/{batch_id}` (compose from RAS)
@@ -147,6 +155,7 @@ Phase 2 — Domain Enhancements + `bff-admin`
 11) Add API Gateway proxy routes: `/bff/v1/admin/{path:path}` → `BFF_ADMIN_URL`
 
 ## Example DTO Placeholders (Fields Grounded in Existing Models)
+
 Note: Finalize all DTOs via a contract workshop before coding. Placeholders below list only fields backed by current evidence.
 
 - `TeacherBatchDetailV1`
@@ -167,6 +176,7 @@ Note: Finalize all DTOs via a contract workshop before coding. Placeholders belo
   - Class-centric fields are “TBD” pending CMS `GET /v1/classes` implementation
 
 ## Testing & Validation
+
 - Unit tests for BFF route handlers and composition (mock `httpx.AsyncClient`)
 - Contract tests for DTO models using sample payloads from:
   - `services/result_aggregator_service/models_api.py::BatchStatusResponse`
@@ -178,12 +188,14 @@ Note: Finalize all DTOs via a contract workshop before coding. Placeholders belo
   - `pdm run lint` (Ruff)
 
 ## Observability & Security (Reused Patterns)
+
 - Metrics: Reuse `huleedu_service_libs.metrics_middleware` for HTTP; per-downstream histograms
 - Tracing: Propagate `X-Correlation-ID`; OTEL setup mirrors existing services
 - AuthZ: Gateway provides JWT; BFF trusts `X-User-ID` and enforces teacher↔class scope via CMS checks where needed
 - RAS internal calls authenticated via `X-Internal-API-Key` + `X-Service-ID`
 
 ## Risks & Mitigations
+
 - Missing downstream endpoints (CMS list, RAS essay, Identity admin):
   - Track as dependencies; stage dashboard as batch-centric; iterate post-availability
 - Duplication across BFFs:
@@ -192,6 +204,7 @@ Note: Finalize all DTOs via a contract workshop before coding. Placeholders belo
   - Start with Redis pub/sub diffs for batch status only; expand deliberately
 
 ## Open Questions
+
 1. Confirm BFF topology (single vs per-role) and service names/ports
 2. Finalize DTO fields for each screen (contract-first review required)
 3. Decide caching policy per dependency (in-memory vs Redis; TTL values)
@@ -199,17 +212,18 @@ Note: Finalize all DTOs via a contract workshop before coding. Placeholders belo
 5. Confirm Identity admin approval workflow (states, events, side effects)
 
 ## Non-Goals (For Now)
+
 - Full document assembly service (use Content/File as-is)
 - Cross-service direct DB access (forbidden by architecture rules)
 - Gateway taking on UI-specific composition (BFF owns it)
 
 ## Acceptance Criteria (Phase 1)
+
 - `bff-teacher` service composes real data for screens 2–4
 - `/bff/v1/teacher/*` routes available via API Gateway
 - DTO models exist with contract tests; no unverified fields
 - Unit tests cover composition, error mapping, and partial failure cases
 - Optional: batch status diffs published to Redis and visible through `websocket_service`
-
 
 ---
 
@@ -218,6 +232,7 @@ Note: Finalize all DTOs via a contract workshop before coding. Placeholders belo
 This section explains, step by step, what a Backend‑For‑Frontend (BFF) is, why we use it, and exactly how it looks in this repository—using only structures that exist here today. Code snippets are illustrative and follow the same libraries and patterns you can see under `services/api_gateway_service/` and other services.
 
 ## BFF 101 (What and Why)
+
 - A BFF is a small backend tailored to a specific frontend (or role) that:
   - Calls multiple domain services in parallel (composition).
   - Returns a screen‑specific shape (DTO) that fits the UI perfectly.
@@ -227,6 +242,7 @@ This section explains, step by step, what a Backend‑For‑Frontend (BFF) is, w
   - It’s not a domain service (e.g., Class Management, Result Aggregator). Those own business logic and data. The BFF only composes their results.
 
 In HuleEdu terms:
+
 - Gateway: `services/api_gateway_service` (FastAPI) — entrypoint for the web app.
 - BFFs (to add): one per role, e.g. `bff-teacher`, later `bff-admin`. Gateway routes `/bff/v1/*` to them.
 - Services that the BFF composes:
@@ -237,6 +253,7 @@ In HuleEdu terms:
   - WebSocket service (FastAPI) for push updates (existing pub/sub pipeline)
 
 ## How BFF Shows Up in This Repo
+
 - New services under `services/` (e.g., `services/bff_teacher_service/`).
 - New gateway routers that forward `/bff/v1/teacher/*` to the teacher BFF (thin proxy only).
 - DTOs (Pydantic) defined inside the BFF for each screen, with versioned modules like `dto/teacher_v1.py`.
@@ -245,13 +262,16 @@ In HuleEdu terms:
 ## Step‑by‑Step: Build `bff-teacher` MVP
 
 We’ll implement four endpoints aligned with Teacher screens that already have upstream support:
+
 1) Dashboard summary (batch‑centric for MVP)
 2) Batch detail view
 3) Essay feedback view (subset from RAS batch payload)
 4) Student association review/confirm (CMS)
 
 ### 1) Create the service skeleton
+
 Target structure:
+
 ```
 services/bff_teacher_service/
   app.py               # FastAPI app, middleware, DI hookup
@@ -271,6 +291,7 @@ services/bff_teacher_service/
 Why FastAPI? Evidence: the gateway and websocket services already use FastAPI + Dishka (`dishka.integrations.fastapi`) and HuleEdu libs have FastAPI error integration (`huleedu_service_libs.error_handling.fastapi`). Using the same stack reduces friction.
 
 Minimal `app.py` (follows gateway patterns):
+
 ```python
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -288,7 +309,9 @@ app.include_router(teacher_router, prefix="/v1/teacher", tags=["Teacher BFF"])
 ```
 
 ### 2) Define DTOs (screen contracts)
+
 Only include fields we can fetch from current services. Example DTOs referencing RAS structures in `services/result_aggregator_service/models_api.py`:
+
 ```python
 # services/bff_teacher_service/dto/teacher_v1.py
 from datetime import datetime
@@ -319,7 +342,9 @@ class BatchDetailV1(BaseModel):
 ```
 
 ### 3) Write thin service clients
+
 Clients call existing endpoints. Example RAS client using internal auth headers (compose file provides `${HULEEDU_INTERNAL_API_KEY}` to RAS):
+
 ```python
 # services/bff_teacher_service/clients/ras_client.py
 from httpx import AsyncClient
@@ -352,6 +377,7 @@ class RASClient:
 ```
 
 Example CMS client for owner class list (you can see the new `GET /v1/classes/` route in `services/class_management_service/api/class_routes.py`):
+
 ```python
 # services/bff_teacher_service/clients/cms_client.py
 from httpx import AsyncClient
@@ -369,7 +395,9 @@ class CMSClient:
 ```
 
 ### 4) Implement the BFF routes
+
 Example: Batch detail screen composition (maps RAS response to `BatchDetailV1`).
+
 ```python
 # services/bff_teacher_service/api/teacher_routes.py
 from dishka.integrations.fastapi import FromDishka, inject
@@ -404,7 +432,9 @@ async def get_batch_detail(batch_id: str, ras: FromDishka[RASClient], user_id: F
 Note: In the real implementation, you will normalize errors via `huleedu_service_libs.error_handling.fastapi` and return proper 4xx/5xx responses, just like the gateway does.
 
 ### 5) Dependency Injection (DI)
+
 Follow the gateway pattern: provide dependencies (settings, user_id, clients) with Dishka.
+
 ```python
 # services/bff_teacher_service/di.py
 import os
@@ -430,7 +460,9 @@ def setup_dependency_injection(app: FastAPI) -> None:
 ```
 
 ### 6) Expose BFF via the Gateway (minimal proxy)
+
 Add thin proxy routes in the gateway to forward `/bff/v1/teacher/*` to `bff-teacher`:
+
 ```python
 # services/api_gateway_service/routers/bff_teacher_routes.py (pattern mirrors class_routes.py)
 from dishka.integrations.fastapi import DishkaRoute, FromDishka
@@ -458,10 +490,13 @@ async def proxy_teacher_bff(path: str, request: Request) -> tuple[str, int, dict
         )
     return r.text, r.status_code, dict(r.headers)
 ```
+
 Register this router in `services/api_gateway_service/app/__init__.py` the same way other routers are included.
 
 ### 7) Wire Docker Compose (service + envs)
+
 Add a service like (example, adjust ports/names as needed):
+
 ```yaml
 # docker-compose.services.yml (illustrative snippet)
   bff_teacher_service:
@@ -478,14 +513,18 @@ Add a service like (example, adjust ports/names as needed):
       - HULEEDU_INTERNAL_API_KEY=${HULEEDU_INTERNAL_API_KEY}
       - ENVIRONMENT=${ENVIRONMENT:-production}
 ```
+
 Then add to gateway config:
+
 ```python
 # services/api_gateway_service/config.py (add fields)
 BFF_TEACHER_URL: str = Field(default="http://bff_teacher_service:4101")
 ```
 
 ### 8) Test the BFF
+
 Unit test example using FastAPI’s test client and mocking the RAS client:
+
 ```python
 import pytest
 from fastapi.testclient import TestClient
@@ -515,6 +554,7 @@ def test_get_batch_detail_happy_path(monkeypatch):
 ## End‑to‑End Example Calls
 
 1) CMS class list (now available):
+
 ```
 GET /v1/classes?limit=10&offset=0
 Headers: X-User-ID: teacher_123
@@ -529,6 +569,7 @@ Response 200
 ```
 
 2) Teacher BFF batch detail via gateway:
+
 ```
 GET /bff/v1/teacher/batches/abcd-1234
 Headers: Authorization: Bearer <jwt>, X-User-ID: teacher_123
@@ -544,15 +585,18 @@ Response 200 (BatchDetailV1)
 ```
 
 ## Streaming Notes (Where BFF fits)
+
 - The WebSocket service already consumes teacher notification events from Kafka and publishes to Redis channels. See `services/websocket_service/implementations/notification_event_consumer.py`.
 - A BFF can optionally publish small diffs to Redis (e.g., batch status changes) using the same Redis client interfaces in `huleedu_service_libs.protocols` (evidence exists). This is an enhancement, not required for MVP because WS push is already implemented for notifications.
 
 ## Responsibilities Recap
+
 - BFF (per role): composition, role‑specific DTOs, fine‑grained authZ, minimal policy, optional Redis diffs.
 - API Gateway: authN, CORS, coarse rate limit, correlation IDs, thin proxy to BFFs/services.
 - Domain Services (CMS, RAS, etc.): business logic, persistence, events; no UI‑specific response shaping.
 
 ## Common Pitfalls (and Repo‑specific Tips)
+
 - Don’t put composition logic in the gateway; keep it in the BFF.
 - Only include DTO fields backed by actual upstream data (verify endpoints and model fields).
 - Propagate `X-User-ID` and `X-Correlation-ID` in all inter‑service calls (patterns exist across services).

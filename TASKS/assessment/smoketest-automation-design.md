@@ -14,8 +14,6 @@ last_updated: "2025-11-17"
 related: []
 labels: []
 ---
-# TASK: Comprehensive Smoketest Automation Design
-
 **Status**: 🔵 RESEARCH & PLANNING
 **Priority**: HIGH
 **Created**: 2025-11-13
@@ -28,6 +26,7 @@ Design and implement a comprehensive, automated smoketest suite that validates t
 ## Context
 
 Currently, the platform has:
+
 - Individual service health checks (`/healthz` endpoints)
 - Configuration validation (`scripts/validate_service_config.py`)
 - Docker health checks in compose files
@@ -46,6 +45,7 @@ Currently, the platform has:
 **Question**: What health check capabilities do we currently have?
 
 **Research Points**:
+
 - [ ] Document all service `/healthz` endpoint implementations
   - What information do they return? (service name, status, dependencies, version?)
   - Do they check database connectivity?
@@ -68,6 +68,7 @@ Currently, the platform has:
   - File: `docker-compose.services.yml`
 
 **Open Questions**:
+
 - Should smoketest call internal health endpoints or external ports?
 - How do we handle services that are slow to start? (grace periods)
 - Should we distinguish between critical vs non-critical services?
@@ -79,6 +80,7 @@ Currently, the platform has:
 **Question**: What are the critical paths and dependencies in our platform?
 
 **Research Points**:
+
 - [ ] Map service dependencies from docker-compose `depends_on`
   - Which services are foundational? (databases, kafka, redis)
   - Which services depend on which others?
@@ -96,6 +98,7 @@ Currently, the platform has:
   - Result retrieval
 
 **Open Questions**:
+
 - What's the minimum viable set of services for basic functionality?
 - Should we test service-to-service communication or just endpoints?
 - How do we handle optional/feature-flagged services?
@@ -107,6 +110,7 @@ Currently, the platform has:
 **Question**: What existing tests can we leverage or learn from?
 
 **Research Points**:
+
 - [ ] Review existing integration tests
   - Location: `services/*/tests/integration/`
   - What do they test? (database, kafka, HTTP?)
@@ -128,6 +132,7 @@ Currently, the platform has:
   - Can we create a @smoketest marker?
 
 **Open Questions**:
+
 - Should smoketest be a pytest suite or a standalone script?
 - How much overlap with existing tests is acceptable?
 - Should we mock external APIs or test against real services?
@@ -139,6 +144,7 @@ Currently, the platform has:
 **Question**: What information do we need when a smoketest fails?
 
 **Research Points**:
+
 - [ ] Review observability stack
   - Logging: structured logs, log levels
   - Metrics: Prometheus endpoints at `/metrics`
@@ -160,6 +166,7 @@ Currently, the platform has:
   - Kafka topic inspection
 
 **Open Questions**:
+
 - How verbose should smoketest output be? (summary vs detailed)
 - Should we capture logs on failure automatically?
 - Should we include performance thresholds? (response time SLAs)
@@ -172,6 +179,7 @@ Currently, the platform has:
 **Question**: Where will smoketest run and how should it adapt?
 
 **Research Points**:
+
 - [ ] Document environment types
   - Development (local docker-compose)
   - CI/CD (GitHub Actions, Jenkins?)
@@ -189,6 +197,7 @@ Currently, the platform has:
   - Are there services that can be skipped in dev?
 
 **Open Questions**:
+
 - Should there be different smoketest levels? (minimal, standard, comprehensive)
 - How do we handle cloud-only services in local dev?
 - Should we support "offline" mode with mocks?
@@ -200,6 +209,7 @@ Currently, the platform has:
 **Question**: How does smoketest fit into existing workflows?
 
 **Research Points**:
+
 - [ ] Review existing validation scripts
   - `scripts/validate_service_config.py` - configuration validation
   - `scripts/prod.sh health` - production health check
@@ -216,6 +226,7 @@ Currently, the platform has:
   - Where should `smoketest` live?
 
 **Open Questions**:
+
 - Should smoketest be part of `pdm run dev-start` or separate?
 - Should it run automatically or require explicit invocation?
 - Should we integrate with pre-commit hooks?
@@ -228,6 +239,7 @@ Currently, the platform has:
 **Question**: What test data do we need and how do we manage it?
 
 **Research Points**:
+
 - [ ] Review test data locations
   - `test_uploads/` - sample essays and prompts
   - `scripts/seed-dev-data.sh` - database seeding
@@ -244,6 +256,7 @@ Currently, the platform has:
   - `scripts/reset_test_environment.sh`
 
 **Open Questions**:
+
 - Should smoketest create its own test data or use existing fixtures?
 - Should it clean up after itself or leave artifacts for debugging?
 - How do we handle test data isolation? (unique IDs, timestamps)
@@ -256,6 +269,7 @@ Currently, the platform has:
 **Question**: How fast should smoketest be?
 
 **Research Points**:
+
 - [ ] Measure current test execution times
   - Health check response times (curl timing)
   - Service startup times (docker-compose up timing)
@@ -272,6 +286,7 @@ Currently, the platform has:
   - Async HTTP requests
 
 **Open Questions**:
+
 - What's acceptable smoketest duration? (30s? 2min? 5min?)
 - Should we optimize for speed or comprehensiveness?
 - Can we run checks in parallel safely?
@@ -284,6 +299,7 @@ Currently, the platform has:
 **Question**: What format should smoketest results take?
 
 **Research Points**:
+
 - [ ] Review existing report formats
   - pytest output (verbose, summary, junit XML)
   - `scripts/validate_service_config.py` output (emoji, colored text)
@@ -301,6 +317,7 @@ Currently, the platform has:
   - Alerts for failures
 
 **Open Questions**:
+
 - Should we generate HTML reports?
 - Should results be stored for historical comparison?
 - Should we integrate with monitoring systems?
@@ -313,6 +330,7 @@ Currently, the platform has:
 **Question**: How should smoketest handle transient failures?
 
 **Research Points**:
+
 - [ ] Review retry patterns in codebase
   - HTTP client retry logic
   - Kafka consumer retry configuration
@@ -328,6 +346,7 @@ Currently, the platform has:
   - Are there graceful degradation strategies?
 
 **Open Questions**:
+
 - Should smoketest retry failed checks? (how many times?)
 - Should there be exponential backoff?
 - Should we distinguish between retryable vs fatal failures?
@@ -340,18 +359,22 @@ Currently, the platform has:
 ### Architecture Options
 
 **Option A: Pytest-based Suite**
+
 - Pros: Leverages existing test infrastructure, good IDE integration, markers, fixtures
 - Cons: Requires pytest dependencies, might be slower, more complex
 
 **Option B: Standalone Python Script**
+
 - Pros: Simple, fast, minimal dependencies, easy to run anywhere
 - Cons: Less structured, harder to extend, no test framework features
 
 **Option C: Shell Script**
+
 - Pros: Very fast, no Python dependencies, easy to read
 - Cons: Limited error handling, harder to maintain, platform-dependent
 
 **Option D: Hybrid Approach**
+
 - Core validation: Fast shell script for basic checks
 - Extended validation: Pytest suite for integration tests
 - Both callable via PDM scripts
@@ -359,23 +382,27 @@ Currently, the platform has:
 ### Scope Levels
 
 **Level 1: Configuration & Infrastructure (< 10s)**
+
 - [ ] Configuration validation (`validate-config`)
 - [ ] Docker services running (`docker ps`)
 - [ ] Port availability checks
 
 **Level 2: Service Health (< 30s)**
+
 - [ ] All `/healthz` endpoints respond 200
 - [ ] Database connectivity checks
 - [ ] Redis connectivity
 - [ ] Kafka broker reachable
 
 **Level 3: Critical Paths (< 2min)**
+
 - [ ] Admin authentication flow
 - [ ] Content upload (small file)
 - [ ] Health with database summary
 - [ ] Metrics endpoints responding
 
 **Level 4: Integration Workflows (< 5min)**
+
 - [ ] End-to-end CJ assessment (minimal)
 - [ ] Inter-service communication
 - [ ] Event publishing and consumption

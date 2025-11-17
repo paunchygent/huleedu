@@ -14,11 +14,10 @@ last_updated: "2025-11-17"
 related: []
 labels: []
 ---
-# 90-Day Execution Roadmap (Alpha ➜ Beta)
-
 Objective: Close the highest-impact gaps to reach EdTech Beta parity: SSO/RBAC, LTI/SIS integrations, compliance operationalization, multi‑tenancy, schema governance, SLOs/runbooks, and API productization.
 
 References
+
 - Rules: `.cursor/rules/020-architectural-mandates.md`, `042-async-patterns-and-di.md`, `048-structured-error-handling-standards.md`, `070-testing-and-quality-assurance.md`, `085-database-migration-standards.md`, `090-documentation-standards.md`, `110.*`
 - Tooling: `pyproject.toml` scripts, `docker-compose*.yml`, `observability/`
 - Services: `services/*`, shared libs: `libs/common_core`, `libs/huleedu_service_libs`
@@ -26,34 +25,42 @@ References
 ## Milestones
 
 1) Identity & Access (Weeks 1–3)
+
 - OIDC SSO (Google for Education), RBAC/ABAC roles, token introspection hardening.
 - Owners: Identity + API Gateway teams.
 
 2) LMS & SIS Integrations (Weeks 2–6)
+
 - LTI 1.3 adapter (NRPS, AGS). OneRoster import pipeline + Clever/ClassLink connectors.
 - Owners: API Gateway + new LTI Adapter + CMS.
 
 3) Compliance Operationalization (Weeks 3–7)
+
 - DSR (export/erasure), retention policies, audit logging, secrets manager/KMS plan.
 - Owners: Platform + CMS + File/Content + Identity.
 
 4) Multi‑tenancy (Weeks 5–8)
+
 - Tenant ID in DB/event models, per‑tenant rate limits/quotas and LLM cost tracking.
 - Owners: All service owners, coordinated via Platform.
 
 5) Event Schema Governance (Weeks 6–8)
+
 - JSON Schema/Avro registry, CI gate on breaking changes, contract tests expansion.
 - Owners: Platform + common_core.
 
 6) SLOs, Alerts, Runbooks (Weeks 7–9)
+
 - Define SLOs, Prometheus alert rules, DLQ/runbook docs and replay scripts.
 - Owners: Platform + each service owner.
 
 7) API Productization (Weeks 8–10)
+
 - API keys, quotas, public OpenAPI, doc site updates, versioning policy.
 - Owners: API Gateway + Docs.
 
 ## Workstreams (link to detailed plans)
+
 - Identity & RBAC: `TASKS/IDENTITY_SSO_AND_RBAC_PLAN.md`
 - LTI (LMS): `TASKS/LTI_LMS_INTEGRATION_PLAN.md`
 - SIS (OneRoster/Clever/ClassLink): `TASKS/SIS_INTEGRATION_ONEROSTER_CLEVER_CLASSLINK_PLAN.md`
@@ -64,6 +71,7 @@ References
 - API Productization: `TASKS/API_PRODUCTIZATION_AND_DOCS_PLAN.md`
 
 ## Definition of Done (Beta Readiness)
+
 - SSO live (OIDC), baseline RBAC enforced at gateway and services.
 - LTI 1.3 flow passes LMS certification against one target LMS; OneRoster CSV import functional.
 - DSR export/erasure endpoints implemented with audit trail; retention job(s) configured.
@@ -75,5 +83,6 @@ References
 ---
 
 Execution notes
+
 - Use `pdm run dev` for builds; restart services with `pdm run restart <service>` or `pdm run restart-all`.
 - Validate changes with `pdm run test-all` and `pdm run typecheck-all` before PRs.

@@ -19,6 +19,7 @@ TASKS/
 Tasks related to platform infrastructure, service orchestration, CI/CD, and cross-cutting operational concerns.
 
 **Examples:**
+
 - Docker configuration and orchestration
 - CI/CD pipeline improvements
 - Test automation frameworks
@@ -33,6 +34,7 @@ Tasks related to platform infrastructure, service orchestration, CI/CD, and cros
 Tasks related to service implementation, business logic, feature development, and service-specific refactoring.
 
 **Examples:**
+
 - CJ assessment improvements
 - Identity service implementation
 - API productization
@@ -42,6 +44,7 @@ Tasks related to service implementation, business logic, feature development, an
 ## Task Naming Conventions
 
 ### Numbered Tasks
+
 Format: `NNN-descriptive-name.md`
 
 Used for sequential, dependent tasks or milestone work.
@@ -49,6 +52,7 @@ Used for sequential, dependent tasks or milestone work.
 **Example**: `002-eng5-cli-validation.md`
 
 ### Descriptive Tasks
+
 Format: `DESCRIPTIVE_NAME_IN_CAPS.md`
 
 Used for standalone tasks, planning documents, or major initiatives.
@@ -56,6 +60,7 @@ Used for standalone tasks, planning documents, or major initiatives.
 **Example**: `API_PRODUCTIZATION_AND_DOCS_PLAN.md`
 
 ### Prefixed Tasks
+
 Format: `TASK-CATEGORY-description.md`
 
 Used for categorized work items.
@@ -124,6 +129,7 @@ Tasks complement other documentation:
 ## Maintenance
 
 Periodically review tasks to:
+
 - Update statuses
 - Archive completed work
 - Identify stale tasks

@@ -7,6 +7,7 @@ This directory contains task documents related to platform infrastructure, servi
 Tasks that fit in this directory include:
 
 ### Infrastructure & Platform
+
 - Docker configuration and orchestration
 - Container management and optimization
 - Database infrastructure patterns
@@ -15,6 +16,7 @@ Tasks that fit in this directory include:
 - Monitoring and observability setup
 
 ### CI/CD & Automation
+
 - Build pipelines
 - Test automation frameworks
 - Deployment automation
@@ -23,6 +25,7 @@ Tasks that fit in this directory include:
 - Smoke testing and health checks
 
 ### Cross-Service Patterns
+
 - Event schema governance
 - Service discovery patterns
 - Inter-service communication standards
@@ -30,6 +33,7 @@ Tasks that fit in this directory include:
 - Secrets management
 
 ### Development Tooling
+
 - Developer workflow improvements
 - Local development environment setup
 - Debug and diagnostic tools
@@ -51,20 +55,24 @@ Tasks that fit in this directory include:
 ### Active Tasks
 
 #### [SMOKETEST_AUTOMATION_DESIGN.md](./SMOKETEST_AUTOMATION_DESIGN.md)
+
 **Status**: 🔵 RESEARCH & PLANNING
 **Priority**: HIGH
 **Description**: Design comprehensive automated smoketest suite for validating platform health, service integration, and critical user workflows across dev, CI, and production environments.
 
 #### [001-database-url-centralization.md](./001-database-url-centralization.md)
+
 **Status**: ✅ COMPLETED
 **Description**: Centralized database URL construction with proper password encoding across all services to handle special characters and prevent startup failures.
 
 ### Planning Tasks
 
 #### [EVENT_SCHEMA_GOVERNANCE_AND_CI_PLAN.md](./EVENT_SCHEMA_GOVERNANCE_AND_CI_PLAN.md)
+
 **Description**: Establish governance patterns and CI validation for event schemas to prevent breaking changes in event-driven communication.
 
 #### [TASK-DEV-DOCKER-LOCK-ALIGNMENT.md](./TASK-DEV-DOCKER-LOCK-ALIGNMENT.md)
+
 **Description**: Align Docker container dependencies with PDM lockfile to ensure consistent environments between local development and containerized deployments.
 
 ---
@@ -108,6 +116,7 @@ When creating new infrastructure tasks, use this structure:
 ## Integration with Development Workflow
 
 Infrastructure tasks often affect:
+
 - `docker-compose.services.yml` - Service orchestration
 - `pyproject.toml` - Build scripts and tooling
 - `scripts/` - Automation scripts
@@ -121,6 +130,7 @@ Always consider cross-service impact and update documentation when implementing 
 ## Maintenance
 
 This directory should be reviewed periodically to:
+
 - Archive completed tasks (move to archive/ subfolder or add ✅ ARCHIVED status)
 - Update task statuses
 - Identify orphaned or outdated tasks

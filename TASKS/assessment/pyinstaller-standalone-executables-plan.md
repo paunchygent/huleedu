@@ -14,8 +14,6 @@ last_updated: "2025-11-17"
 related: []
 labels: []
 ---
-# PyInstaller Standalone Executables Plan
-
 ## Objective
 
 Create standalone executable binaries for `cj-pair-generator-tui` and `redistribute-pairs` using PyInstaller with `--onefile` mode, enabling distribution and execution on any machine without Python installation or dependency management.
@@ -23,12 +21,14 @@ Create standalone executable binaries for `cj-pair-generator-tui` and `redistrib
 ## Context
 
 The Bayesian consensus model scripts (`redistribute_tui.py` and `redistribute_pairs.py`) are currently Python modules requiring:
+
 - Python 3.11+ environment
 - PDM dependency management
 - Project-relative imports
 - External dependencies (textual, numpy, scipy, typer)
 
 **Goal**: Package into single-file executables that:
+
 - Run on any macOS/Linux/Windows machine (same architecture)
 - Bundle Python interpreter + all dependencies
 - Require no installation or setup
@@ -37,7 +37,9 @@ The Bayesian consensus model scripts (`redistribute_tui.py` and `redistribute_pa
 ## Trade-offs: `--onefile` vs `--onedir`
 
 ### `--onefile` (Chosen Approach)
+
 **How it works:**
+
 - Single executable file (~25-35MB)
 - Unpacks to temp directory on each run (`/tmp/_MEIxxxxxx/`)
 - Startup time: 1-3 seconds (acceptable for interactive tools)
@@ -53,7 +55,9 @@ The Bayesian consensus model scripts (`redistribute_tui.py` and `redistribute_pa
 ❌ Temp directory bloat over time
 
 ### `--onedir` (Alternative)
+
 **How it works:**
+
 - Executable + libraries folder (~80-100MB)
 - No unpacking, runs directly
 - Startup time: <0.5 seconds
@@ -85,6 +89,7 @@ build = [
 ```
 
 Install:
+
 ```bash
 pdm install
 ```
@@ -129,6 +134,7 @@ echo "  sudo cp dist/redistribute-pairs /usr/local/bin/"
 ```
 
 Make executable:
+
 ```bash
 chmod +x scripts/build_standalone.sh
 ```
@@ -143,6 +149,7 @@ build-standalone = {shell = "scripts/build_standalone.sh"}
 ```
 
 Usage:
+
 ```bash
 pdm run build-standalone
 ```
@@ -188,6 +195,7 @@ if __name__ == "__main__":
 **3.1. Update `.gitignore`**
 
 Add:
+
 ```gitignore
 # PyInstaller
 build/
@@ -226,6 +234,7 @@ pdm run build-standalone
 **4.3. Test on Clean Environment**
 
 Optional: Test on machine without Python/PDM to verify true standalone:
+
 ```bash
 # Copy to clean VM/container
 scp dist/cj-pair-generator-tui user@clean-machine:/tmp/
@@ -307,12 +316,14 @@ huledu-reboot/
 ## Success Criteria
 
 ### Build Phase
+
 - ✅ `pdm run build-standalone` completes without errors
 - ✅ Creates `dist/cj-pair-generator-tui` and `dist/redistribute-pairs`
 - ✅ Both executables are ~25-35MB single files
 - ✅ File permissions are executable (`-rwxr-xr-x`)
 
 ### Execution Phase
+
 - ✅ `./dist/cj-pair-generator-tui` launches TUI without errors
 - ✅ `./dist/redistribute-pairs --help` shows CLI help
 - ✅ `./dist/redistribute-pairs optimize-pairs ...` runs optimizer
@@ -320,6 +331,7 @@ huledu-reboot/
 - ✅ No Python installation required on target machine
 
 ### Distribution Phase
+
 - ✅ Executables can be copied to `/usr/local/bin/`
 - ✅ Run from any directory: `cj-pair-generator-tui` works globally
 - ✅ No dependency errors on clean environment
@@ -329,6 +341,7 @@ huledu-reboot/
 ## Advanced Optimizations (Optional Future Work)
 
 ### Reduce Binary Size
+
 ```bash
 # Use UPX compression (requires upx installed)
 pdm run pyinstaller \
@@ -341,13 +354,16 @@ pdm run pyinstaller \
 Result: ~15-20MB (instead of 25-35MB)
 
 ### Exclude Unnecessary Modules
+
 Create `pyinstaller-hooks/hook-exclude.py`:
+
 ```python
 # Exclude test frameworks, unused stdlib modules
 excludedimports = ['pytest', 'unittest', 'tkinter']
 ```
 
 Add to build:
+
 ```bash
 pdm run pyinstaller \
   --onefile \
@@ -356,7 +372,9 @@ pdm run pyinstaller \
 ```
 
 ### Cross-Platform Builds
+
 PyInstaller can't cross-compile. To build for multiple platforms:
+
 ```bash
 # On macOS: builds macOS binary
 pdm run build-standalone
@@ -369,6 +387,7 @@ pdm run build-standalone
 ```
 
 Distribute platform-specific archives:
+
 - `redistribute-tools-macos-arm64.tar.gz`
 - `redistribute-tools-macos-x86_64.tar.gz`
 - `redistribute-tools-linux-x86_64.tar.gz`
@@ -379,6 +398,7 @@ Distribute platform-specific archives:
 ## Maintenance
 
 ### Rebuilding After Code Changes
+
 ```bash
 # After modifying TUI/CLI code:
 pdm run build-standalone
@@ -389,6 +409,7 @@ sudo cp dist/cj-pair-generator-tui /usr/local/bin/
 ```
 
 ### Cleanup
+
 ```bash
 # Remove build artifacts
 rm -rf build/ dist/ *.spec
@@ -399,18 +420,22 @@ rm -rf build/ dist/ *.spec
 ## Constraints & Limitations
 
 ### File Size
+
 - ✅ **Acceptable**: 25-35MB per executable (modern machines)
 - ❌ **Not suitable**: Environments with strict size limits (<10MB)
 
 ### Startup Time
+
 - ✅ **Acceptable**: 1-3 seconds for interactive tools
 - ❌ **Not suitable**: High-frequency automation (use Python module instead)
 
 ### Platform Dependence
+
 - ✅ Binary is platform-specific (macOS binary won't run on Linux)
 - ❌ Need separate builds for each platform
 
 ### Python Version Lock
+
 - ✅ Built binary uses Python 3.11 (frozen at build time)
 - ❌ Can't upgrade Python without rebuilding
 
@@ -419,22 +444,27 @@ rm -rf build/ dist/ *.spec
 ## Adherence to Project Standards
 
 ### DRY (Don't Repeat Yourself)
+
 ✅ Single build script handles both executables
 ✅ Reuses existing Python modules (no duplication)
 
 ### SOLID
+
 ✅ No architectural changes needed
 ✅ Entry points (`main()`) follow SRP
 
 ### YAGNI (You Aren't Gonna Need It)
+
 ✅ No extra features beyond standalone execution
 ✅ Optional optimizations documented but not implemented unless needed
 
 ### Clean Code
+
 ✅ No sys.path hacks (removed in previous task)
 ✅ Entry points are minimal wrappers
 
 ### Documentation Standards (Rule 090)
+
 ✅ This task document follows TASKS/ structure
 ✅ Includes context, implementation steps, success criteria
 ✅ Future maintenance guidance included
@@ -456,10 +486,12 @@ rm -rf build/ dist/ *.spec
 ## Dependencies
 
 **Required:**
+
 - PDM environment (already present)
 - pyinstaller>=6.0 (to be added)
 
 **Optional:**
+
 - UPX compressor (for size optimization)
 - Cross-platform VMs (for multi-platform builds)
 
@@ -468,17 +500,20 @@ rm -rf build/ dist/ *.spec
 ## Risk Assessment
 
 **Low Risk:**
+
 - ✅ No changes to core logic
 - ✅ Minimal code changes (2 entry point functions)
 - ✅ Build artifacts are gitignored
 - ✅ Existing tests validate functionality
 
 **Potential Issues:**
+
 - ⚠️ First-time PyInstaller setup may require debugging import paths
 - ⚠️ Platform-specific libraries (numpy, scipy) may need PyInstaller hooks
 - ⚠️ Textual TUI framework may have hidden dependencies
 
 **Mitigation:**
+
 - Test thoroughly before distribution
 - Keep original Python module workflow as fallback
 - Document any PyInstaller-specific configuration needed
@@ -492,6 +527,7 @@ rm -rf build/ dist/ *.spec
 **Distribution**: `sudo cp dist/cj-pair-generator-tui /usr/local/bin/`
 
 ### Setup Complete
+
 - Dependencies: PyInstaller 6.16.0 (monorepo-tools), numpy/scipy moved to main deps
 - Build script: `scripts/build_standalone.sh` (`--onefile --clean --noconfirm`)
 - Gitignore: build/, dist/, *.spec
@@ -500,6 +536,7 @@ rm -rf build/ dist/ *.spec
 ### Critical Fixes Applied
 
 **1. UI Blocking** - CPU-intensive operations froze event loop
+
 ```python
 from textual import work  # NOT from textual.worker (ImportError)
 
@@ -509,11 +546,13 @@ async def _generate_assignments(self) -> None:
 ```
 
 **2. Text Truncation** - Log widget API misuse
+
 - `Log.write()` ignores newlines → use `Log.write_line()` for wrapping
 - CSS: `text-wrap: wrap; overflow-x: hidden` required
 - Removed obsolete manual `textwrap.fill()` wrapping
 
 **3. Rich Markup** - Log doesn't support markup, switched to RichLog
+
 ```python
 from textual.widgets import RichLog as TextLog
 yield TextLog(id="result", markup=True, wrap=True, auto_scroll=True)
@@ -521,28 +560,33 @@ self.call_from_thread(log_widget.write, "[green]Complete![/]")  # RichLog uses w
 ```
 
 **4. TYPE_CHECKING** - Runtime NameError for Input/Select (previous session)
+
 ```python
 from textual.widgets import Input, Select  # Removed TYPE_CHECKING guard
 ```
 
 **Textual API Gotchas** (training data errors):
+
 - ❌ `from textual.worker import work` → ✅ `from textual import work`
 - ❌ `Log(markup=True)` → ✅ `RichLog(markup=True)`
 - ❌ `RichLog.write_line()` → ✅ `RichLog.write()`
 - Verify imports: `pdm run python -c "from textual import work; print(work)"`
 
 **macOS Splash Screen Limitation**:
+
 - PyInstaller `--splash` incompatible (Tcl/Tk threading restriction)
 - Native Swift launcher viable but out of scope (YAGNI)
 - Accepted 1-3s startup delay without feedback
 
 ### Build Details
+
 - Binary size: 106MB (vs estimated 25-35MB) - includes numpy/scipy/pandas/matplotlib + Python 3.11
 - TUI-only build (CLI removed per user request)
 - Build time: ~60s
 - PyInstaller-safe codebase verified (27 files analyzed, no dynamic imports/sys.path hacks)
 
 ### Files Modified
+
 - `pyproject.toml`: PyInstaller dep, numpy/scipy to main, build-standalone script
 - `redistribute_tui.py`: @work decorator, RichLog import, write() calls, main() entry
 - `workflow_executor.py`: Removed TYPE_CHECKING guard for Input/Select
@@ -552,6 +596,7 @@ from textual.widgets import Input, Select  # Removed TYPE_CHECKING guard
 - `.claude/rules/095-textual-tui-patterns.md`: Sections 9-12 (workers, Log vs RichLog, API gotchas)
 
 ### Success Criteria ✅
+
 - Build: `pdm run build-standalone` completes, 106MB onefile, ~60s
 - Runtime: TUI responsive, background threading works, Rich markup renders, text wraps
 - Distribution: No Python required, 1-3s startup

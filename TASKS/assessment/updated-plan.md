@@ -14,8 +14,6 @@ last_updated: "2025-11-17"
 related: []
 labels: []
 ---
-# Redis Caching Solution for BCS Duplicate Calls - Updated Plan
-
 ## Executive Summary
 
 This document outlines the implementation of a Redis caching layer to eliminate duplicate BCS (Batch Conductor Service) calls in the Batch Orchestrator Service (BOS). The solution addresses architectural concerns around error handling, layering, configuration, and resilience.

@@ -18,6 +18,7 @@ Generated: 2025-11-17T20:12:06
 ## By Domain
 
 ### assessment (16)
+
 - [AI Feedback Service Implementation Task](TASKS/assessment/ai-feedback-service-implementation.md) — `research`
 - [API Productization & Docs (Weeks 8–10)](TASKS/assessment/api-productization-and-docs-plan.md) — `research`
 - [Assessment Result Architecture with Anchor Essay Integration](TASKS/assessment/assessment-result-architecture-with-anchors.md) — `research`
@@ -36,39 +37,48 @@ Generated: 2025-11-17T20:12:06
 - [🧠 ULTRATHINK: NLP Phase 2 Implementation Status](TASKS/assessment/nlp-phase2-command-handler-skeleton-plan.md) — `research`
 
 ### content (1)
+
 - [HANDOFF: TUI Help Screen Completion](TASKS/content/continuation-prompt.md) — `research`
 
 ### identity (3)
+
 - [Codebase Alignment: Result Monad, JWT Helpers, Content Client DI](TASKS/identity/codebase-result-jwt-di-alignment.md) — `research`
 - [Identity: OIDC SSO + RBAC/ABAC (Weeks 1–3)](TASKS/identity/identity-sso-and-rbac-plan.md) — `research`
 - [Task: Org Identity Threading for Cost Attribution (Development-Only)](TASKS/identity/org-id-identity-threading-plan.md) — `research`
 
 ### frontend (2)
+
 - [Frontend Readiness Preparation Checklist](TASKS/frontend/frontend-readiness-checklist.md) — `research`
 - [Svelte 5 + Vite CORS Configuration and Development Utilities](TASKS/frontend/svelte5-cors-and-dev-utilities.md) — `research`
 
 ### infrastructure (1)
+
 - [SLOs, Alerts, and Runbooks (Weeks 7–9)](TASKS/infrastructure/slo-alerts-and-runbooks-plan.md) — `research`
 
 ### security (1)
+
 - [Compliance Operationalization: GDPR/FERPA (Weeks 3–7)](TASKS/security/compliance-gdpr-ferpa-operationalization-plan.md) — `research`
 
 ### integrations (3)
+
 - [SIS Integration Plan: OneRoster + Clever + ClassLink (Weeks 2–6)](TASKS/integrations/sis-integration-oneroster-clever-classlink-plan.md) — `research`
 - [TASKS Directory Inventory Analysis](TASKS/integrations/task-inventory-analysis.md) — `research`
 - [✅ COMPLETED (2025-11-12)](TASKS/integrations/cj-prompt-context-persistence-plan.md) — `research`
 
 ### architecture (2)
+
 - [90-Day Execution Roadmap (Alpha ➜ Beta)](TASKS/architecture/roadmap-90-day-execution.md) — `research`
 - [Backend-For-Frontend (BFF) Pattern — Adoption & Rollout Plan](TASKS/architecture/bff-pattern-adoption-and-rollout-plan.md) — `research`
 
 ### programs (2)
+
 - [ENG5 Runner & Essay Assessment Architecture](TASKS/programs/cj_confidence/eng-5-batch-runner-cj-assessment-research-task.md) — `research`
 - [Phase 3 – CJ Confidence Programme Hub](TASKS/programs/cj_confidence/phase3-cj-confidence-hub.md) — `research`
 
 ## By Status
 
 ### research (31)
+
 - [90-Day Execution Roadmap (Alpha ➜ Beta)](TASKS/architecture/roadmap-90-day-execution.md) — `architecture`
 - [AI Feedback Service Implementation Task](TASKS/assessment/ai-feedback-service-implementation.md) — `assessment`
 - [API Productization & Docs (Weeks 8–10)](TASKS/assessment/api-productization-and-docs-plan.md) — `assessment`
@@ -104,9 +114,11 @@ Generated: 2025-11-17T20:12:06
 ## By Programme
 
 ### cj_confidence (2)
+
 - [ENG5 Runner & Essay Assessment Architecture](TASKS/programs/cj_confidence/eng-5-batch-runner-cj-assessment-research-task.md) — `programs` · `research`
 - [Phase 3 – CJ Confidence Programme Hub](TASKS/programs/cj_confidence/phase3-cj-confidence-hub.md) — `programs` · `research`
 
 ## Files Missing Front Matter
+
 - TASKS/README.md
 - TASKS/infrastructure/README.md
