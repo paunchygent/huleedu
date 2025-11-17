@@ -5,10 +5,9 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 from uuid import UUID
 
-from common_core import LLMProviderType
+from common_core import LLMComparisonRequest, LLMProviderType
 from huleedu_service_libs.logging_utils import create_service_logger
 
-from services.llm_provider_service.api_models import LLMComparisonRequest
 from services.llm_provider_service.config import Settings
 from services.llm_provider_service.exceptions import (
     HuleEduError,

@@ -8,6 +8,7 @@ Completion checking and retry processing are handled by dedicated modules.
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 from common_core import LLMProviderType
@@ -67,6 +68,7 @@ class BatchProcessor:
         max_tokens_override: int | None = None,
         system_prompt_override: str | None = None,
         provider_override: str | LLMProviderType | None = None,
+        metadata_context: dict[str, Any] | None = None,
     ) -> BatchSubmissionResult:
         """Submit comparison batch with configurable batch size.
 
@@ -138,6 +140,7 @@ class BatchProcessor:
                     max_tokens_override=max_tokens_override,
                     system_prompt_override=system_prompt_override,
                     provider_override=provider_override,
+                    metadata_context=metadata_context,
                 )
 
                 total_submitted += len(batch_tasks)

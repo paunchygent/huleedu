@@ -1,70 +1,13 @@
-"""API request/response models for LLM Provider Service."""
+"""API request/response models for LLM Provider Service.
 
-from typing import Any, Dict
-from uuid import UUID
+This module contains LPS-internal models only.
+Shared HTTP contracts are in common_core.api_models.llm_provider
+"""
 
-from common_core import EssayComparisonWinner, LLMProviderType
+from datetime import date
+from typing import Any
+
 from pydantic import BaseModel, Field
-
-
-class LLMConfigOverrides(BaseModel):
-    """LLM configuration overrides."""
-
-    provider_override: LLMProviderType | None = None
-    model_override: str | None = None
-    temperature_override: float | None = Field(None, ge=0.0, le=2.0)
-    system_prompt_override: str | None = None
-    max_tokens_override: int | None = Field(None, gt=0)
-
-
-class LLMComparisonRequest(BaseModel):
-    """Request model for LLM essay comparison.
-
-    Note: Essays should be embedded directly in the user_prompt field.
-    This ensures efficient token usage and clear separation of concerns.
-    """
-
-    user_prompt: str = Field(..., description="The complete comparison prompt including essays")
-
-    # REQUIRED callback topic for async processing
-    callback_topic: str = Field(
-        ..., description="Kafka topic for result callback (required for all requests)"
-    )
-
-    # Optional configuration overrides
-    llm_config_overrides: LLMConfigOverrides | None = None
-
-    # Correlation tracking
-    correlation_id: UUID | None = None
-    user_id: str | None = None
-
-    # Metadata for extensibility
-    metadata: Dict[str, Any] = Field(default_factory=dict)
-
-
-class LLMComparisonResponse(BaseModel):
-    """Response model for LLM essay comparison."""
-
-    # Core result fields (matching CJ Assessment expectations)
-    winner: EssayComparisonWinner = Field(description="Selected essay")
-    justification: str = Field(description="Justification for the choice")
-    confidence: float = Field(description="Confidence score (1-5)")
-
-    # Provider information
-    provider: str = Field(description="Actual provider used")
-    model: str = Field(description="Actual model used")
-
-    # Performance metrics
-    response_time_ms: int = Field(description="Response time in milliseconds")
-    token_usage: Dict[str, int] | None = Field(description="Token usage stats")
-    cost_estimate: float | None = Field(description="Estimated cost in USD")
-
-    # Tracing
-    correlation_id: UUID = Field(description="Request correlation ID")
-    trace_id: str | None = Field(description="Distributed trace ID")
-
-    # Metadata
-    metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
 class LLMProviderStatus(BaseModel):
@@ -97,7 +40,7 @@ class HealthCheckResponse(BaseModel):
     status: str = Field(description="Service status")
     service: str = Field(description="Service name")
     version: str = Field(description="Service version")
-    dependencies: Dict[str, Dict[str, Any]] = Field(
+    dependencies: dict[str, dict[str, Any]] = Field(
         default_factory=dict, description="Status of service dependencies"
     )
 
@@ -109,19 +52,44 @@ class UsageSummaryResponse(BaseModel):
     total_requests: int = Field(description="Total requests in period")
     successful_requests: int = Field(description="Successful requests")
     failed_requests: int = Field(description="Failed requests")
-    total_tokens: Dict[str, int] = Field(description="Total tokens by type")
+    total_tokens: dict[str, int] = Field(description="Total tokens by type")
     total_cost: float = Field(description="Total cost in USD")
-    provider_breakdown: Dict[str, Dict[str, Any]] = Field(description="Usage breakdown by provider")
+    provider_breakdown: dict[str, dict[str, Any]] = Field(description="Usage breakdown by provider")
 
 
-class LLMQueuedResponse(BaseModel):
-    """Response model when LLM request is queued for callback delivery."""
+class ModelInfoResponse(BaseModel):
+    """Model information for API exposure.
 
-    queue_id: UUID = Field(description="Unique queue identifier for tracking")
-    status: str = Field(default="queued", description="Request status")
-    message: str = Field(
-        default="Request queued for processing", description="User-friendly status message"
+    Subset of ModelConfig fields relevant for external clients.
+    Internal manifest fields (parameter compatibility flags, etc.) are excluded.
+    """
+
+    model_id: str = Field(description="Provider-specific model identifier")
+    provider: str = Field(description="Provider hosting this model")
+    display_name: str = Field(description="Human-readable model name")
+    model_family: str = Field(description="Model family identifier")
+    max_tokens: int = Field(description="Maximum output tokens supported")
+    context_window: int = Field(description="Total context window size")
+    supports_streaming: bool = Field(description="Supports streaming responses")
+    capabilities: dict[str, bool] = Field(description="Model capabilities")
+    cost_per_1k_input_tokens: float | None = Field(
+        default=None, description="Cost per 1000 input tokens in USD"
     )
-    estimated_wait_minutes: int | None = Field(
-        default=None, description="Estimated wait time in minutes"
+    cost_per_1k_output_tokens: float | None = Field(
+        default=None, description="Cost per 1000 output tokens in USD"
     )
+    is_deprecated: bool = Field(description="Model is deprecated")
+    release_date: date | None = Field(default=None, description="Model release date")
+    recommended_for: list[str] = Field(description="Use cases this model excels at")
+
+
+class ModelManifestResponse(BaseModel):
+    """Response model for model manifest endpoint.
+
+    Returns all available models grouped by provider.
+    """
+
+    providers: dict[str, list[ModelInfoResponse]] = Field(
+        description="Models grouped by provider name"
+    )
+    total_models: int = Field(description="Total number of models across all providers")

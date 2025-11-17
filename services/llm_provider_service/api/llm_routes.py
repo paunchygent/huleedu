@@ -3,7 +3,12 @@
 import time
 from uuid import uuid4
 
-from common_core import CircuitBreakerState, LLMProviderType
+from common_core import (
+    CircuitBreakerState,
+    LLMComparisonRequest,
+    LLMProviderType,
+    LLMQueuedResponse,
+)
 from dishka import FromDishka
 from huleedu_service_libs.error_handling.quart import create_error_response
 from huleedu_service_libs.logging_utils import create_service_logger
@@ -12,10 +17,10 @@ from quart import Blueprint, Response, jsonify, request
 from quart_dishka import inject
 
 from services.llm_provider_service.api_models import (
-    LLMComparisonRequest,
     LLMProviderListResponse,
     LLMProviderStatus,
-    LLMQueuedResponse,
+    ModelInfoResponse,
+    ModelManifestResponse,
 )
 from services.llm_provider_service.config import Settings
 from services.llm_provider_service.exceptions import HuleEduError
@@ -23,6 +28,7 @@ from services.llm_provider_service.implementations.trace_context_manager_impl im
     TraceContextManagerImpl,
 )
 from services.llm_provider_service.internal_models import LLMQueuedResult
+from services.llm_provider_service.manifest import ProviderName, list_models
 from services.llm_provider_service.metrics import get_llm_metrics
 from services.llm_provider_service.protocols import LLMOrchestratorProtocol
 
@@ -280,6 +286,96 @@ async def test_provider(
         return jsonify(
             {
                 "error": f"Failed to test provider {provider}",
+                "details": str(e),
+            }
+        ), 500
+
+
+@llm_bp.route("/models", methods=["GET"])
+async def get_models() -> Response | tuple[Response, int]:
+    """Get available LLM models grouped by provider.
+
+    Query Parameters:
+        provider (optional): Filter by specific provider (e.g., 'anthropic', 'openai')
+        include_deprecated (optional): Include deprecated models (default: false)
+
+    Returns:
+        200: ModelManifestResponse with models grouped by provider
+        400: Invalid provider name
+        500: Internal error
+    """
+    try:
+        # Parse query parameters
+        provider_filter = request.args.get("provider")
+        include_deprecated = request.args.get("include_deprecated", "false").lower() == "true"
+
+        # Validate provider if specified
+        provider_enum = None
+        if provider_filter:
+            try:
+                provider_enum = ProviderName(provider_filter.lower())
+            except ValueError:
+                valid_providers = [p.value for p in ProviderName if p != ProviderName.MOCK]
+                return jsonify(
+                    {
+                        "error": f"Invalid provider: {provider_filter}",
+                        "valid_providers": valid_providers,
+                    }
+                ), 400
+
+        # Get models from manifest
+        models = list_models(provider_enum)
+
+        # Filter out deprecated models unless explicitly requested
+        if not include_deprecated:
+            models = [m for m in models if not m.is_deprecated]
+
+        # Filter out MOCK provider (internal testing only)
+        models = [m for m in models if m.provider != ProviderName.MOCK]
+
+        # Group models by provider
+        providers_dict: dict[str, list[ModelInfoResponse]] = {}
+        for model in models:
+            provider_name = model.provider.value
+            if provider_name not in providers_dict:
+                providers_dict[provider_name] = []
+
+            # Convert ModelConfig to ModelInfoResponse
+            model_info = ModelInfoResponse(
+                model_id=model.model_id,
+                provider=model.provider.value,
+                display_name=model.display_name,
+                model_family=model.model_family,
+                max_tokens=model.max_tokens,
+                context_window=model.context_window,
+                supports_streaming=model.supports_streaming,
+                capabilities=model.capabilities,
+                cost_per_1k_input_tokens=model.cost_per_1k_input_tokens,
+                cost_per_1k_output_tokens=model.cost_per_1k_output_tokens,
+                is_deprecated=model.is_deprecated,
+                release_date=model.release_date,
+                recommended_for=model.recommended_for,
+            )
+            providers_dict[provider_name].append(model_info)
+
+        # Build response
+        response = ModelManifestResponse(
+            providers=providers_dict,
+            total_models=len(models),
+        )
+
+        logger.info(
+            f"Manifest query returned {len(models)} models "
+            f"(provider_filter={provider_filter}, include_deprecated={include_deprecated})"
+        )
+
+        return jsonify(response.model_dump()), 200
+
+    except Exception as e:
+        logger.exception("Error retrieving model manifest")
+        return jsonify(
+            {
+                "error": "Failed to retrieve model manifest",
                 "details": str(e),
             }
         ), 500

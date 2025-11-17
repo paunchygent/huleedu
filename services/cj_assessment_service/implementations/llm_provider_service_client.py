@@ -11,6 +11,7 @@ from typing import Any
 from uuid import UUID
 
 import aiohttp
+from common_core import LLMConfigOverridesHTTP as ProviderLLMConfigOverrides
 from common_core import LLMProviderType
 from common_core.events.cj_assessment_events import LLMConfigOverrides as CJLLMConfigOverrides
 from huleedu_service_libs.error_handling import (
@@ -29,9 +30,6 @@ from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.protocols import LLMProviderProtocol, RetryManagerProtocol
-from services.llm_provider_service.api_models import (
-    LLMConfigOverrides as ProviderLLMConfigOverrides,
-)
 
 logger = create_service_logger("cj_assessment_service.llm_provider_service_client")
 
