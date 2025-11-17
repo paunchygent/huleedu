@@ -9,6 +9,43 @@ configuration.
 
 ---
 
+## Implementation Status (Updated 2025-11-17)
+
+**Overall Progress**: ~30% complete (9 items fully complete, 5 items partial, 16 items not started)
+
+### Phase Breakdown
+
+- **Phase 1 (CJ Configuration)**: 2 complete, 2 partial, 7 incomplete
+  - ✅ LLMBatchingMode enum exists
+  - ✅ LLM_BATCHING_MODE setting exists
+  - ⚠️ Metadata model partial (cj_llm_batching_mode field exists, missing cj_batch_id, cj_source, cj_request_type)
+  - ⚠️ Tests partial (metadata propagation tested for existing field)
+  - ❌ Missing: override mechanism, resolution function, allowed providers setting, config tests
+
+- **Phase 2 (LPS Serial Bundling)**: 3 complete, 4 partial, 6 incomplete
+  - ✅ process_comparison_batch method exists
+  - ✅ Result mapping to callbacks implemented
+  - ✅ Basic batch processing tests exist
+  - ⚠️ Queue routing exists but only wraps single requests
+  - ⚠️ QUEUE_PROCESSING_MODE setting exists (uses LLMBatchingMode, not separate enum)
+  - ❌ Missing: actual multi-request bundling, bundle size limit, metadata enrichment
+
+- **Phase 3 (Metrics)**: 0 complete, 0 partial, 8 incomplete
+  - ❌ No metrics implemented
+
+### Critical Gaps
+
+1. **CJ doesn't bundle multiple requests** - Current "serial bundle" mode only wraps single requests
+2. **No override mechanism** - Cannot set batching mode per-batch
+3. **Incomplete metadata** - Missing cj_batch_id, cj_source, cj_request_type fields
+4. **No observability** - No metrics for batching behavior
+
+### Next Steps
+
+Start with Phase 1 remaining items to complete CJ configuration before enhancing LPS bundling.
+
+---
+
 ## CJ comparison submission modes and LLM batching
 
 CJ has two **comparison submission shapes**:
@@ -94,16 +131,14 @@ For the full implementation plan and design rationale, see
 
 ### 1. Add CJ batching configuration enums & fields
 
-- [ ] **Introduce `LLMBatchingMode` enum in CJ config**
-  - File: `services/cj_assessment_service/config.py`
-  - Enum values:
-    - `PER_REQUEST`
-    - `PROVIDER_SERIAL_BUNDLE`
-    - `PROVIDER_BATCH_API`
+- [x] **Introduce `LLMBatchingMode` enum in CJ config** ✅ COMPLETE
+  - File: `libs/common_core/src/common_core/config_enums.py:29-34`
+  - Enum values: `PER_REQUEST`, `SERIAL_BUNDLE`, `PROVIDER_BATCH_API`
   - Ensure the enum is used only as a *hint*; LLM Provider Service owns the physical batching.
 
-- [ ] **Add `LLM_BATCHING_MODE` to CJ `Settings`**
-  - Default: `LLMBatchingMode.PER_REQUEST` (preserve current behaviour).
+- [x] **Add `LLM_BATCHING_MODE` to CJ `Settings`** ✅ COMPLETE
+  - File: `services/cj_assessment_service/config.py:118-124`
+  - Default: `LLMBatchingMode.PER_REQUEST` (preserves current behaviour) ✅
   - Description: explains each mode and explicitly states that provider service implements the
     actual batching strategy.
   - Confirm env var mapping via `env_prefix="CJ_ASSESSMENT_SERVICE_"` still works as expected.
@@ -131,37 +166,40 @@ For the full implementation plan and design rationale, see
 
 ### 3. Propagate batching metadata to LLM Provider Service
 
-- [ ] **Extend metadata in `LLMInteractionImpl.perform_comparisons`**
+- [~] **Extend metadata in `LLMInteractionImpl.perform_comparisons`** ⚠️ PARTIAL
   - File: `services/cj_assessment_service/implementations/llm_interaction_impl.py`.
+  - Status: `CJLLMComparisonMetadata` model exists in `models_api.py:52-77`
   - For each `ComparisonTask`, enrich `request_metadata` with:
-    - `cj_batch_id: str` – `str(cj_batch_id)`.
-    - `cj_source: str` – e.g. `"els"`, `"bos"`, `"eng5_runner"` (derived from request data).
-    - `cj_llm_batching_mode: str` – `effective_mode.value`.
-    - `cj_request_type: str` – e.g. `"cj_comparison"`, `"cj_retry"`.
+    - `cj_batch_id: str` – `str(cj_batch_id)`. ❌ MISSING
+    - `cj_source: str` – e.g. `"els"`, `"bos"`, `"eng5_runner"` (derived from request data). ❌ MISSING
+    - `cj_llm_batching_mode: str` – `effective_mode.value`. ✅ EXISTS (models_api.py:72-77, conditionally populated in llm_interaction_impl.py:170-173)
+    - `cj_request_type: str` – e.g. `"cj_comparison"`, `"cj_retry"`. ❌ MISSING
   - Confirm that these keys are present in `LLMComparisonRequest.metadata` in the provider service
     (via a small integration or unit test).
   - Ensure `request_metadata` is built via `CJLLMComparisonMetadata`
     only, and that this model remains **strictly additive**:
     existing keys (`"essay_a_id"`, `"essay_b_id"`,
     `"bos_batch_id"`) must keep their current names and semantics so
-    that legacy consumers continue to work.
+    that legacy consumers continue to work. ✅ CONFIRMED
 
 ### 4. CJ-side tests & validation
 
-- [ ] **Unit tests for `LLMBatchingMode` resolution**
+- [ ] **Unit tests for `LLMBatchingMode` resolution** ❌ MISSING
   - Add a focused test module, e.g.
     `services/cj_assessment_service/tests/unit/test_llm_batching_config.py`.
   - Cover:
     - Default: no overrides → `effective_mode == settings.LLM_BATCHING_MODE`.
     - Override set in `batch_config_overrides` → `effective_mode` equals override.
     - Invalid values are rejected at Pydantic validation time (enum enforcement).
+  - NOTE: Cannot be tested until `resolve_effective_llm_batching_mode()` function exists
 
-- [ ] **Unit tests for metadata propagation**
+- [~] **Unit tests for metadata propagation** ⚠️ PARTIAL
+  - File: `services/cj_assessment_service/tests/unit/test_llm_metadata_adapter.py:35-46` ✅
   - Use a small test double for `LLMProviderProtocol` to capture `LLMComparisonRequest` objects.
   - Assertions:
-    - `metadata["cj_batch_id"]` matches the CJ batch id used in test.
-    - `metadata["cj_llm_batching_mode"]` matches the resolved `effective_mode`.
-    - `metadata["cj_source"]` and `metadata["cj_request_type"]` are present and sensible.
+    - `metadata["cj_batch_id"]` matches the CJ batch id used in test. ❌ NOT TESTED (field doesn't exist)
+    - `metadata["cj_llm_batching_mode"]` matches the resolved `effective_mode`. ✅ TESTED
+    - `metadata["cj_source"]` and `metadata["cj_request_type"]` are present and sensible. ❌ NOT TESTED (fields don't exist)
 
 ---
 
@@ -169,32 +207,36 @@ For the full implementation plan and design rationale, see
 
 ### 1. Add queue processing modes and serial-bundle limits
 
-- [ ] **Introduce `QueueProcessingMode` and `BatchApiMode` enums in LPS config**
+- [~] **Introduce `QueueProcessingMode` and `BatchApiMode` enums in LPS config** ⚠️ ARCHITECTURE DEVIATION
   - File: `services/llm_provider_service/config.py`.
-  - `QueueProcessingMode` values:
+  - STATUS: Uses `LLMBatchingMode` enum from common_core instead of separate enums
+  - `QueueProcessingMode` values: ❌ NOT IMPLEMENTED (using LLMBatchingMode instead)
     - `PER_REQUEST`
     - `SERIAL_BUNDLE`
     - `BATCH_API`
-  - `BatchApiMode` values:
+  - `BatchApiMode` values: ❌ NOT IMPLEMENTED
     - `DISABLED`
     - `NIGHTLY`
     - `OPPORTUNISTIC`
+  - NOTE: Current architecture reuses LLMBatchingMode enum across both services
 
-- [ ] **Extend LPS `Settings` with queue/batch fields**
+- [~] **Extend LPS `Settings` with queue/batch fields** ⚠️ PARTIAL
   - Add:
-    - `QUEUE_PROCESSING_MODE: QueueProcessingMode = PER_REQUEST`.
-    - `SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL: int` (default ~8, constrained within [1, 64]).
+    - `QUEUE_PROCESSING_MODE: QueueProcessingMode = PER_REQUEST`. ✅ EXISTS (config.py:222-228, but uses LLMBatchingMode type)
+    - `SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL: int` (default ~8, constrained within [1, 64]). ❌ MISSING
   - Keep batch API mode fields present but initially unused for behaviour changes in this phase.
 
 ### 2. Implement `QueueProcessingMode.SERIAL_BUNDLE`
 
-- [ ] **Dispatch to serial-bundle path in `_process_queue_loop`**
-  - File: `services/llm_provider_service/implementations/queue_processor_impl.py`.
+- [~] **Dispatch to serial-bundle path in `_process_queue_loop`** ⚠️ PARTIAL
+  - File: `services/llm_provider_service/implementations/queue_processor_impl.py:203-232`.
+  - STATUS: Routes to batch processor when not PER_REQUEST ✅
+  - LIMITATION: Only wraps single requests in list, doesn't actually bundle multiple ❌
   - When `QUEUE_PROCESSING_MODE == SERIAL_BUNDLE`:
     - Use a new helper method (e.g. `_process_request_serial_bundle`) instead of
-      `_process_request(request)`.
+      `_process_request(request)`. ❌ MISSING (inline logic used instead)
 
-- [ ] **Implement `_process_request_serial_bundle`**
+- [ ] **Implement `_process_request_serial_bundle`** ❌ MISSING
   - Behaviour:
     - Dequeue the first `QueuedRequest`.
     - Resolve provider + overrides exactly as in `_process_request`.
@@ -205,13 +247,15 @@ For the full implementation plan and design rationale, see
       - Same resolved provider and model.
       - Optionally same `cj_llm_batching_mode` when present in `request_data.metadata`.
     - Invoke a batch processing method on `ComparisonProcessorImpl`.
+  - CURRENT: Only single-request wrapping exists (queue_processor_impl.py:215-219)
 
-- [ ] **Add `ComparisonProcessorImpl.process_comparison_batch`**
-  - File: `services/llm_provider_service/implementations/comparison_processor_impl.py`.
+- [x] **Add `ComparisonProcessorImpl.process_comparison_batch`** ✅ COMPLETE
+  - File: `services/llm_provider_service/protocols.py` (protocol definition)
+  - File: `services/llm_provider_service/implementations/comparison_processor_impl.py` (implementation)
   - Signature (conceptual):
     - `async def process_comparison_batch(provider, requests, correlation_ids, **overrides)`.
   - First iteration:
-    - Implement as a simple loop calling `process_comparison` per request.
+    - Implement as a simple loop calling `process_comparison` per request. ✅ IMPLEMENTED
     - This gives a single code path for both serial-bundle and per-request modes without changing
       external behaviour.
   - **During the pre-task phase, `QueueProcessorImpl._process_queue_loop`
@@ -220,28 +264,31 @@ For the full implementation plan and design rationale, see
     corresponding serial-bundle dispatch is part of the main batching
     implementation task, not the pre-contract hardening.
 
-- [ ] **Map batch results back to queue handlers**
+- [x] **Map batch results back to queue handlers** ✅ COMPLETE
+  - File: `services/llm_provider_service/implementations/queue_processor_impl.py:234-241`
   - For each `(QueuedRequest, LLMOrchestratorResponse)` pair in the batch:
-    - Reuse `_handle_request_success` for success cases.
-    - Wrap errors in `HuleEduError` and reuse `_handle_request_hule_error` for failure cases.
+    - Reuse `_handle_request_success` for success cases. ✅ IMPLEMENTED
+    - Wrap errors in `HuleEduError` and reuse `_handle_request_hule_error` for failure cases. ✅ IMPLEMENTED
   - Ensure that queue status transitions and callback events are identical to the
     `QueueProcessingMode.PER_REQUEST` path.
 
 ### 3. LPS-side metadata & diagnostics
 
-- [ ] **Enrich queued requests with provider-side metadata**
+- [ ] **Enrich queued requests with provider-side metadata** ❌ MISSING
   - After resolving provider/model in `_process_request` / `_process_request_serial_bundle`, add:
-    - `resolved_provider` to `request.request_data.metadata`.
-    - `resolved_model` to `request.request_data.metadata`.
-    - `queue_processing_mode` to `request.request_data.metadata`.
+    - `resolved_provider` to `request.request_data.metadata`. ❌ NOT IMPLEMENTED
+    - `resolved_model` to `request.request_data.metadata`. ❌ NOT IMPLEMENTED
+    - `queue_processing_mode` to `request.request_data.metadata`. ❌ NOT IMPLEMENTED
   - These fields should be visible in logs and can be used for bundle grouping and diagnostics.
 
-- [ ] **Serial-bundling tests**
+- [~] **Serial-bundling tests** ⚠️ PARTIAL
+  - File: `services/llm_provider_service/tests/unit/test_queue_processor_error_handling.py:315-364` ✅
+  - File: `services/llm_provider_service/tests/unit/test_comparison_processor.py:131-204` ✅
   - Add unit tests for `_process_request_serial_bundle` that:
-    - Simulate a queue with multiple compatible and incompatible requests.
+    - Simulate a queue with multiple compatible and incompatible requests. ❌ NOT TESTED (method doesn't exist yet)
     - Assert that compatible requests are processed together and incompatible ones are left for a
-      later batch or processed separately.
-    - Verify that per-request callbacks and queue status updates remain correct.
+      later batch or processed separately. ❌ NOT TESTED (no multi-request bundling)
+    - Verify that per-request callbacks and queue status updates remain correct. ✅ TESTED (for single-request wrapping)
 
 ---
 

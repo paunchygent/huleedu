@@ -71,7 +71,9 @@ class CJLLMComparisonMetadata(BaseModel):
     )
     cj_llm_batching_mode: str | None = Field(
         default=None,
-        description="Planned CJ batching mode hint (per_request|provider_serial_bundle|provider_batch_api)",
+        description=(
+            "Planned CJ batching mode hint (per_request|provider_serial_bundle|provider_batch_api)"
+        ),
     )
 
     @classmethod

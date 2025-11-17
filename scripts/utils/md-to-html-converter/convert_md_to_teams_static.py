@@ -22,7 +22,7 @@ def extract_mermaid_blocks(markdown_content: str) -> List[Tuple[str, str]]:
         List of tuples (mermaid_code, placeholder_id)
     """
     mermaid_blocks = []
-    pattern = r'```mermaid\n(.*?)\n```'
+    pattern = r"```mermaid\n(.*?)\n```"
     matches = re.finditer(pattern, markdown_content, re.DOTALL)
 
     for i, match in enumerate(matches):
@@ -42,35 +42,44 @@ def convert_mermaid_to_png(mermaid_code: str) -> Optional[str]:
     """
     try:
         # Check if mermaid-cli is available
-        subprocess.run(['mmdc', '--version'], capture_output=True, check=True)
+        subprocess.run(["mmdc", "--version"], capture_output=True, check=True)
     except (subprocess.CalledProcessError, FileNotFoundError):
-        print("Warning: mermaid-cli (mmdc) not found. Install with: npm install -g @mermaid-js/mermaid-cli")
+        print(
+            "Warning: mermaid-cli (mmdc) not found. Install with: "
+            "npm install -g @mermaid-js/mermaid-cli"
+        )
         return None
 
     try:
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.mmd', delete=False) as mmd_file:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mmd", delete=False) as mmd_file:
             mmd_file.write(mermaid_code)
             mmd_file.flush()
 
-            with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as png_file:
+            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as png_file:
                 # Convert Mermaid to PNG using mermaid-cli
                 cmd = [
-                    'mmdc',
-                    '-i', mmd_file.name,
-                    '-o', png_file.name,
-                    '-t', 'default',
-                    '-b', 'white',
-                    '--width', '1200',
-                    '--height', '800'
+                    "mmdc",
+                    "-i",
+                    mmd_file.name,
+                    "-o",
+                    png_file.name,
+                    "-t",
+                    "default",
+                    "-b",
+                    "white",
+                    "--width",
+                    "1200",
+                    "--height",
+                    "800",
                 ]
 
                 result = subprocess.run(cmd, capture_output=True, text=True)
 
                 if result.returncode == 0:
                     # Read the PNG file and encode as base64
-                    with open(png_file.name, 'rb') as f:
+                    with open(png_file.name, "rb") as f:
                         png_data = f.read()
-                        base64_image = base64.b64encode(png_data).decode('utf-8')
+                        base64_image = base64.b64encode(png_data).decode("utf-8")
                         return base64_image
                 else:
                     print(f"Error converting Mermaid: {result.stderr}")
@@ -84,7 +93,7 @@ def convert_mermaid_to_png(mermaid_code: str) -> Optional[str]:
         try:
             Path(mmd_file.name).unlink(missing_ok=True)
             Path(png_file.name).unlink(missing_ok=True)
-        except:
+        except Exception:
             pass
 
 
@@ -104,10 +113,10 @@ def convert_markdown_to_teams_static(markdown_path: str, output_path: Optional[s
         raise FileNotFoundError(f"Markdown file not found: {markdown_path}")
 
     if output_path is None:
-        output_path = str(markdown_file.with_suffix('.html'))
+        output_path = str(markdown_file.with_suffix(".html"))
 
     # Read markdown content
-    with open(markdown_file, 'r', encoding='utf-8') as f:
+    with open(markdown_file, "r", encoding="utf-8") as f:
         markdown_content = f.read()
 
     # Extract Mermaid blocks
@@ -116,8 +125,10 @@ def convert_markdown_to_teams_static(markdown_path: str, output_path: Optional[s
     # Replace Mermaid blocks with placeholders
     modified_markdown = markdown_content
     for mermaid_code, placeholder_id in mermaid_blocks:
-        pattern = r'```mermaid\n' + re.escape(mermaid_code) + r'\n```'
-        modified_markdown = re.sub(pattern, f"<!-- {placeholder_id} -->", modified_markdown, count=1)
+        pattern = r"```mermaid\n" + re.escape(mermaid_code) + r"\n```"
+        modified_markdown = re.sub(
+            pattern, f"<!-- {placeholder_id} -->", modified_markdown, count=1
+        )
 
     # Teams-optimized HTML template
     html_template = """<!DOCTYPE html>
@@ -274,7 +285,7 @@ def convert_markdown_to_teams_static(markdown_path: str, output_path: Optional[s
         }}
 
         /* Fix anchor scroll offset to account for any fixed elements */
-        .main-content h1, .main-content h2, .main-content h3, 
+        .main-content h1, .main-content h2, .main-content h3,
         .main-content h4, .main-content h5, .main-content h6 {{
             scroll-margin-top: 20px; /* Offset for smooth scrolling */
         }}
@@ -429,18 +440,14 @@ def convert_markdown_to_teams_static(markdown_path: str, output_path: Optional[s
         import pypandoc
 
         # Get document title from filename
-        doc_title = Path(markdown_path).stem.replace('_', ' ').title()
+        doc_title = Path(markdown_path).stem.replace("_", " ").title()
 
         # Convert modified markdown to HTML
         pandoc_output = pypandoc.convert_text(
             modified_markdown,
-            'html',
-            format='markdown',
-            extra_args=[
-                '--no-highlight',
-                '--wrap=none',
-                '--standalone'
-            ]
+            "html",
+            format="markdown",
+            extra_args=["--no-highlight", "--wrap=none", "--standalone"],
         )
 
         # Extract TOC from pandoc_output
@@ -451,31 +458,33 @@ def convert_markdown_to_teams_static(markdown_path: str, output_path: Optional[s
         if toc_match:
             toc_html = toc_match.group(0)
             # Remove TOC from the main content to avoid duplication
-            pandoc_output = toc_pattern.sub('', pandoc_output)
+            pandoc_output = toc_pattern.sub("", pandoc_output)
 
         # Extract only the body content from Pandoc's standalone output
         # to avoid CSS/JS conflicts with anchor navigation
-        body_pattern = re.compile(r'<body[^>]*>(.*?)</body>', re.DOTALL)
+        body_pattern = re.compile(r"<body[^>]*>(.*?)</body>", re.DOTALL)
         body_match = body_pattern.search(pandoc_output)
         if body_match:
             pandoc_output = body_match.group(1).strip()
 
         # Prepare the final HTML with the extracted TOC and main content
         final_html = html_template.format(
-            title=doc_title,
-            content=pandoc_output,
-            toc_nav_content=toc_html
+            title=doc_title, content=pandoc_output, toc_nav_content=toc_html
         )
 
         # Replace placeholders with Mermaid images
         for mermaid_code, placeholder_id in mermaid_blocks:
             png_base64 = convert_mermaid_to_png(mermaid_code)
             if png_base64:
-                img_tag = f"<div class=\"mermaid-image\"><img src=\"data:image/png;base64,{png_base64}\" alt=\"Mermaid Diagram\"></div>"
+                img_tag = (
+                    f'<div class="mermaid-image"><img '
+                    f'src="data:image/png;base64,{png_base64}" '
+                    f'alt="Mermaid Diagram"></div>'
+                )
                 final_html = final_html.replace(f"<!-- {placeholder_id} -->", img_tag)
 
         # Write the final HTML to the output file
-        with open(output_path, 'w', encoding='utf-8') as f:
+        with open(output_path, "w", encoding="utf-8") as f:
             f.write(final_html)
 
         logging.info(f"Successfully converted {markdown_path} to {output_path}")

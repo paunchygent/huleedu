@@ -157,7 +157,8 @@ def validate_id_format(fm: Dict[str, Any]) -> list[str]:
             errors.append(f"id '{fm_id}' must start with lowercase letter or digit")
         else:
             errors.append(
-                f"id '{fm_id}' contains invalid characters (must be lowercase kebab-case: a-z, 0-9, - only)"
+                f"id '{fm_id}' contains invalid characters "
+                "(must be lowercase kebab-case: a-z, 0-9, - only)"
             )
     return errors
 

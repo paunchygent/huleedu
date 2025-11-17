@@ -18,7 +18,7 @@ def convert_md_to_pdf(md_file: str, output_file: str | None = None):
         return False
 
     if output_file is None:
-        output_file = str(md_path.with_suffix('.pdf'))
+        output_file = str(md_path.with_suffix(".pdf"))
 
     # Get the directory containing this script
     script_dir = Path(__file__).parent
@@ -35,18 +35,24 @@ def convert_md_to_pdf(md_file: str, output_file: str | None = None):
         str(md_path),
         f"--lua-filter={filter_path}",
         "--toc",  # Include table of contents
-        "--metadata", "toc-title=Innehållsförteckning", # Custom TOC title
+        "--metadata",
+        "toc-title=Innehållsförteckning",  # Custom TOC title
         f"--css={css_path}",  # Custom TOC and PDF styles
         "--pdf-engine=weasyprint",  # Use weasyprint instead of LaTeX
         # Add specific WeasyPrint parameters to control diagram sizing and page breaks
-        "--variable", "papersize=a4",
-        "--variable", "geometry:margin=2cm", 
-        "--variable", "fontsize=10pt",
+        "--variable",
+        "papersize=a4",
+        "--variable",
+        "geometry:margin=2cm",
+        "--variable",
+        "fontsize=10pt",
         # Add HTML options to control page breaks
         "--epub-embed-font=Arial",  # Force embed fonts
-        "--html-q-tags",           # Use quotes for quotes
-        "--variable", "documentclass=report", # More compact spacing
-        "-o", str(output_file)
+        "--html-q-tags",  # Use quotes for quotes
+        "--variable",
+        "documentclass=report",  # More compact spacing
+        "-o",
+        str(output_file),
     ]
 
     # Define HTML output file for debugging structure
@@ -57,11 +63,13 @@ def convert_md_to_pdf(md_file: str, output_file: str | None = None):
         "pandoc",
         str(md_path),
         f"--lua-filter={filter_path}",
-        "--toc", # Keep TOC for structure
-        "--metadata", "toc-title=Innehållsförteckning", # Keep custom TOC title
-        "--standalone", # Ensure full HTML document
-        "--self-contained", # Embed assets if any, for easier viewing (optional)
-        "-o", html_output_file
+        "--toc",  # Keep TOC for structure
+        "--metadata",
+        "toc-title=Innehållsförteckning",  # Keep custom TOC title
+        "--standalone",  # Ensure full HTML document
+        "--self-contained",  # Embed assets if any, for easier viewing (optional)
+        "-o",
+        html_output_file,
     ]
     print(f"Generating intermediate HTML: {html_output_file}...")
     print(f"HTML Command: {' '.join(html_cmd)}")
@@ -78,8 +86,8 @@ def convert_md_to_pdf(md_file: str, output_file: str | None = None):
         print(f"❌ Unexpected error during intermediate HTML generation: {e_html}")
 
     # Proceed with PDF generation
-    print(f"Converting {md_file} to {output_file} (PDF)..." )
-    print(f"PDF Command: {' '.join(cmd)}") # cmd is the original PDF command
+    print(f"Converting {md_file} to {output_file} (PDF)...")
+    print(f"PDF Command: {' '.join(cmd)}")  # cmd is the original PDF command
 
     try:
         pdf_result = subprocess.run(cmd, capture_output=True, text=True, check=False)
@@ -100,6 +108,7 @@ def convert_md_to_pdf(md_file: str, output_file: str | None = None):
     except Exception as e:
         print(f"❌ Unexpected error: {e}")
         return False
+
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
