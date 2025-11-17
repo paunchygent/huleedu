@@ -164,6 +164,7 @@ class TestBatchRetryProcessor:
                 temperature_override=None,
                 max_tokens_override=None,
                 system_prompt_override=None,
+                provider_override=None,
             )
 
             # Verify metrics
@@ -196,6 +197,7 @@ class TestBatchRetryProcessor:
             "temperature_override": 0.2,
             "max_tokens_override": 1500,
             "system_prompt_override": "Persisted system prompt",
+            "provider_override": "anthropic",
         }
 
         mock_pool_manager.form_retry_batch.return_value = retry_tasks
@@ -229,6 +231,7 @@ class TestBatchRetryProcessor:
                 call_args[1]["system_prompt_override"]
                 == overrides_metadata["system_prompt_override"]
             )
+            assert call_args[1]["provider_override"] == overrides_metadata["provider_override"]
 
     async def test_submit_retry_batch_disabled(
         self,
@@ -313,6 +316,7 @@ class TestBatchRetryProcessor:
                 model_override=model_override,
                 temperature_override=temperature_override,
                 max_tokens_override=max_tokens_override,
+                provider_override="openai",
             )
 
             # Assert
@@ -325,7 +329,7 @@ class TestBatchRetryProcessor:
             assert call_args[1]["temperature_override"] == temperature_override
             assert call_args[1]["max_tokens_override"] == max_tokens_override
             assert call_args[1]["system_prompt_override"] is None
-            assert call_args[1]["system_prompt_override"] is None
+            assert call_args[1]["provider_override"] == "openai"
 
     async def test_submit_retry_batch_force_retry_all(
         self,
@@ -516,6 +520,7 @@ class TestBatchRetryProcessor:
                 model_override=model_override,
                 temperature_override=temperature_override,
                 max_tokens_override=max_tokens_override,
+                provider_override="anthropic",
             )
 
             # Assert
@@ -526,6 +531,7 @@ class TestBatchRetryProcessor:
             assert call_args[1]["model_override"] == model_override
             assert call_args[1]["temperature_override"] == temperature_override
             assert call_args[1]["max_tokens_override"] == max_tokens_override
+            assert call_args[1]["provider_override"] == "anthropic"
 
     async def test_process_remaining_failed_comparisons_no_failures(
         self,

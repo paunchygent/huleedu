@@ -11,6 +11,8 @@ import pytest
 from aioresponses import aioresponses
 from sqlalchemy import select
 
+from common_core.events.cj_assessment_events import LLMConfigOverrides
+
 from services.cj_assessment_service.cj_core_logic.comparison_processing import (
     submit_comparisons_for_async_processing,
 )
@@ -224,7 +226,7 @@ class TestLLMPayloadConstructionIntegration:
         assert llm_config["provider_override"] == test_settings.DEFAULT_LLM_PROVIDER.value
         assert llm_config["model_override"] == test_settings.DEFAULT_LLM_MODEL
         assert llm_config["temperature_override"] == test_settings.DEFAULT_LLM_TEMPERATURE
-        assert llm_config["max_tokens_override"] is None
+        assert llm_config.get("max_tokens_override") is None
         assert llm_config["system_prompt_override"] == test_settings.SYSTEM_PROMPT
 
         metadata = http_request["metadata"]
@@ -234,6 +236,50 @@ class TestLLMPayloadConstructionIntegration:
 
         assert http_request["callback_topic"] == test_settings.LLM_PROVIDER_CALLBACK_TOPIC
         assert isinstance(http_request["correlation_id"], str)
+
+    async def test_eng5_overrides_reach_llm_provider(
+        self,
+        postgres_repository: CJRepositoryProtocol,
+        real_llm_interaction: tuple[LLMInteractionProtocol, aioresponses],
+        capture_requests_from_mocker: CapturedRequestExtractor,
+        test_settings: Settings,
+    ) -> None:
+        """ENG5 runner overrides propagate unchanged through CJ → LPS."""
+
+        log_label = "eng5-overrides"
+        cj_batch_id, bos_batch_id = await _create_batch_with_context(
+            postgres_repository,
+            label=log_label,
+        )
+        essays = _build_mock_essays(log_label)
+        overrides = LLMConfigOverrides(
+            provider_override="anthropic",
+            model_override="claude-haiku-4-5-20251001",
+            temperature_override=0.35,
+            max_tokens_override=2048,
+            system_prompt_override="ENG5 custom system prompt",
+        )
+
+        http_request = await _submit_and_capture_request(
+            postgres_repository=postgres_repository,
+            llm_interaction=real_llm_interaction,
+            capture_requests_from_mocker=capture_requests_from_mocker,
+            test_settings=test_settings,
+            essays=essays,
+            cj_batch_id=cj_batch_id,
+            bos_batch_id=bos_batch_id,
+            log_label=log_label,
+            llm_overrides=overrides,
+        )
+
+        llm_config = http_request["llm_config_overrides"]
+        assert llm_config == {
+            "provider_override": "anthropic",
+            "model_override": "claude-haiku-4-5-20251001",
+            "temperature_override": 0.35,
+            "max_tokens_override": 2048,
+            "system_prompt_override": "ENG5 custom system prompt",
+        }
 
     async def test_metadata_correlation_id_flow(
         self,
@@ -385,6 +431,7 @@ async def _submit_and_capture_request(
     bos_batch_id: str,
     log_label: str,
     correlation_id: UUID | None = None,
+    llm_overrides: LLMConfigOverrides | None = None,
 ) -> dict[str, Any]:
     """Submit comparisons and return the captured HTTP request body."""
 
@@ -400,6 +447,7 @@ async def _submit_and_capture_request(
         ],
         language=DEFAULT_LANGUAGE,
         course_code=DEFAULT_COURSE_CODE,
+        llm_config_overrides=llm_overrides,
     )
 
     await submit_comparisons_for_async_processing(

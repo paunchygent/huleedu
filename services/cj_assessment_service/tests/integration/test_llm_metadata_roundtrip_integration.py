@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import json
-from types import SimpleNamespace
+from typing import cast
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 import pytest
 from aiokafka import ConsumerRecord
-from common_core import LLMProviderType
+from common_core import LLMBatchingMode, LLMProviderType
 from common_core.domain_enums import EssayComparisonWinner
 
 from services.cj_assessment_service.config import Settings as CJSettings
@@ -25,6 +25,7 @@ from services.llm_provider_service.api_models import (
 from services.llm_provider_service.api_models import (
     LLMConfigOverrides as ProviderOverrides,
 )
+from services.llm_provider_service.config import Settings as LPSSettings
 from services.llm_provider_service.implementations.queue_processor_impl import QueueProcessorImpl
 from services.llm_provider_service.implementations.trace_context_manager_impl import (
     TraceContextManagerImpl,
@@ -80,17 +81,22 @@ async def test_metadata_roundtrip_from_cj_to_lps_and_back() -> None:
         metadata={"prompt_sha256": "abc123"},
     )
 
+    lps_settings = LPSSettings()
+    lps_settings.QUEUE_POLL_INTERVAL_SECONDS = 0.1
+    lps_settings.QUEUE_MAX_RETRIES = 3
+    lps_settings.QUEUE_PROCESSING_MODE = LLMBatchingMode.PER_REQUEST
     queue_processor = QueueProcessorImpl(
         comparison_processor=AsyncMock(),
         queue_manager=AsyncMock(),
         event_publisher=AsyncMock(),
         trace_context_manager=TraceContextManagerImpl(),
-        settings=SimpleNamespace(QUEUE_POLL_INTERVAL_SECONDS=0.1, QUEUE_MAX_RETRIES=3),
+        settings=lps_settings,
     )
 
     await queue_processor._publish_callback_event(queued_request, orchestrator_response)
 
-    publish_call = queue_processor.event_publisher.publish_to_topic.call_args
+    publish_mock = cast(AsyncMock, queue_processor.event_publisher.publish_to_topic)
+    publish_call = publish_mock.call_args
     event_data = publish_call[1]["envelope"].data
     assert event_data.request_id == str(queue_id)
     assert event_data.request_metadata["essay_a_id"] == "essay-a"

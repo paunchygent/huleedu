@@ -8,6 +8,7 @@ from uuid import uuid4
 import aiohttp
 import pytest
 from common_core.error_enums import ErrorCode
+from common_core.events.cj_assessment_events import LLMConfigOverrides as CJLLMConfigOverrides
 from huleedu_service_libs.error_handling import HuleEduError, assert_raises_huleedu_error
 
 from services.cj_assessment_service.config import Settings
@@ -244,6 +245,24 @@ class TestOverrideAdapter:
             system_prompt_override="prompt",
         )
         assert payload == {"system_prompt_override": "prompt"}
+
+    def test_accepts_common_core_llm_config_overrides(self) -> None:
+        overrides = CJLLMConfigOverrides(
+            provider_override="openai",
+            model_override="gpt-4o-mini",
+            temperature_override=0.25,
+            max_tokens_override=2048,
+            system_prompt_override="custom",
+        )
+
+        payload = _build_llm_config_override_payload(overrides=overrides)
+        assert payload == {
+            "provider_override": "openai",
+            "model_override": "gpt-4o-mini",
+            "temperature_override": 0.25,
+            "max_tokens_override": 2048,
+            "system_prompt_override": "custom",
+        }
 
     async def test_generate_comparison_rejects_sync_response(
         self, client: LLMProviderServiceClient, mock_session: AsyncMock

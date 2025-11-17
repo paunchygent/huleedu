@@ -203,6 +203,36 @@ class TestBatchProcessor:
         assert result.total_submitted == len(sample_comparison_tasks)
         assert result.all_submitted is True
 
+    @pytest.mark.asyncio
+    async def test_handle_batch_submission_passes_provider_override(
+        self,
+        batch_processor: BatchProcessor,
+        sample_comparison_tasks: list[ComparisonTask],
+        mock_llm_interaction: AsyncMock,
+    ) -> None:
+        """Ensure provider overrides flow from request data to the LLM interaction."""
+        request_data = CJAssessmentRequestData(
+            bos_batch_id="bos-override",
+            assignment_id="assign-1",
+            essays_to_process=[
+                EssayToProcess(els_essay_id="essay-1", text_storage_id="storage-1"),
+                EssayToProcess(els_essay_id="essay-2", text_storage_id="storage-2"),
+            ],
+            language="en",
+            course_code="ENG5",
+            llm_config_overrides=LLMConfigOverrides(provider_override="anthropic"),
+        )
+
+        await batch_processor.handle_batch_submission(
+            cj_batch_id=42,
+            comparison_tasks=sample_comparison_tasks,
+            correlation_id=uuid4(),
+            request_data=request_data,
+        )
+
+        call_kwargs = mock_llm_interaction.perform_comparisons.call_args.kwargs
+        assert call_kwargs["provider_override"] == "anthropic"
+
     async def test_submit_comparison_batch_empty_tasks(
         self,
         batch_processor: BatchProcessor,

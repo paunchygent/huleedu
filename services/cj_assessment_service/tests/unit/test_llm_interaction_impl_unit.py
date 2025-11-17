@@ -16,7 +16,7 @@ from unittest.mock import Mock
 from uuid import UUID, uuid4
 
 import pytest
-from common_core import LLMProviderType
+from common_core import LLMBatchingMode, LLMProviderType
 
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.implementations.llm_interaction_impl import LLMInteractionImpl
@@ -102,6 +102,8 @@ class TestLLMInteractionImplProtocolCompliance:
         settings.DEFAULT_LLM_PROVIDER = LLMProviderType.OPENAI
         settings.DEFAULT_LLM_MODEL = "gpt-4"
         settings.max_concurrent_llm_requests = 3
+        settings.ENABLE_LLM_BATCHING_METADATA_HINTS = False
+        settings.LLM_BATCHING_MODE = LLMBatchingMode.PER_REQUEST
         return settings
 
     @pytest.fixture
@@ -191,6 +193,7 @@ class TestLLMInteractionImplProtocolCompliance:
             temperature_override=0.7,
             max_tokens_override=500,
             system_prompt_override="CJ prompt",
+            provider_override="anthropic",
         )
 
         # Assert - Parameter passing verification
@@ -202,6 +205,7 @@ class TestLLMInteractionImplProtocolCompliance:
         assert params["temperature_override"] == 0.7
         assert params["max_tokens_override"] == 500
         assert params["system_prompt_override"] == "CJ prompt"
+        assert params["provider_override"] == "anthropic"
         assert params["request_metadata"] == {
             "essay_a_id": sample_comparison_task.essay_a.id,
             "essay_b_id": sample_comparison_task.essay_b.id,
@@ -228,6 +232,28 @@ class TestLLMInteractionImplProtocolCompliance:
         assert metadata["bos_batch_id"] == "bos-batch-001"
         assert metadata["essay_a_id"] == sample_comparison_task.essay_a.id
         assert metadata["essay_b_id"] == sample_comparison_task.essay_b.id
+
+    @pytest.mark.asyncio
+    async def test_metadata_includes_batching_hint_when_flag_enabled(
+        self,
+        providers_dict_success: dict[LLMProviderType, LLMProviderProtocol],
+        test_settings: Settings,
+        sample_comparison_task: ComparisonTask,
+        successful_provider: MockLLMProvider,
+    ) -> None:
+        """Ensure batching hints are additive when the feature flag is enabled."""
+        test_settings.ENABLE_LLM_BATCHING_METADATA_HINTS = True
+        test_settings.LLM_BATCHING_MODE = LLMBatchingMode.SERIAL_BUNDLE
+
+        llm_impl = LLMInteractionImpl(providers=providers_dict_success, settings=test_settings)
+
+        await llm_impl.perform_comparisons(
+            tasks=[sample_comparison_task],
+            correlation_id=uuid4(),
+        )
+
+        metadata = successful_provider.last_call_params["request_metadata"]
+        assert metadata["cj_llm_batching_mode"] == LLMBatchingMode.SERIAL_BUNDLE.value
 
     @pytest.mark.asyncio
     async def test_error_handling_creates_structured_results(
@@ -343,6 +369,8 @@ class TestLLMInteractionImplProtocolCompliance:
         settings = Mock(spec=Settings)
         settings.DEFAULT_LLM_PROVIDER = LLMProviderType.ANTHROPIC  # Not available
         settings.DEFAULT_LLM_MODEL = "test-model"
+        settings.ENABLE_LLM_BATCHING_METADATA_HINTS = False
+        settings.LLM_BATCHING_MODE = LLMBatchingMode.PER_REQUEST
 
         providers_dict: dict[LLMProviderType, LLMProviderProtocol] = {
             LLMProviderType.OPENAI: successful_provider  # Only OpenAI available
@@ -388,6 +416,8 @@ class TestLLMInteractionImplAsyncBehavior:
         settings.DEFAULT_LLM_PROVIDER = LLMProviderType.OPENAI
         settings.DEFAULT_LLM_MODEL = "gpt-4"
         settings.max_concurrent_llm_requests = 2  # Low limit for testing
+        settings.ENABLE_LLM_BATCHING_METADATA_HINTS = False
+        settings.LLM_BATCHING_MODE = LLMBatchingMode.PER_REQUEST
 
         providers_dict: dict[LLMProviderType, LLMProviderProtocol] = {
             LLMProviderType.OPENAI: test_provider_with_delay
@@ -450,6 +480,8 @@ class TestLLMInteractionImplErrorScenarios:
         settings.DEFAULT_LLM_PROVIDER = LLMProviderType.OPENAI
         settings.DEFAULT_LLM_MODEL = "gpt-4"
         settings.max_concurrent_llm_requests = 3
+        settings.ENABLE_LLM_BATCHING_METADATA_HINTS = False
+        settings.LLM_BATCHING_MODE = LLMBatchingMode.PER_REQUEST
 
         llm_impl = LLMInteractionImpl(providers=mixed_behavior_providers, settings=settings)
 
@@ -496,6 +528,8 @@ class TestLLMInteractionImplErrorScenarios:
         settings.DEFAULT_LLM_PROVIDER = LLMProviderType.OPENAI
         settings.DEFAULT_LLM_MODEL = "gpt-4"
         settings.max_concurrent_llm_requests = 3
+        settings.ENABLE_LLM_BATCHING_METADATA_HINTS = False
+        settings.LLM_BATCHING_MODE = LLMBatchingMode.PER_REQUEST
 
         alternating_provider = AlternatingProvider()
         providers_dict: dict[LLMProviderType, LLMProviderProtocol] = {
@@ -545,6 +579,8 @@ class TestLLMInteractionImplConfigurationBehavior:
         settings.DEFAULT_LLM_PROVIDER = LLMProviderType.OPENAI
         settings.DEFAULT_LLM_MODEL = "gpt-4"
         # No max_concurrent_llm_requests attribute
+        settings.ENABLE_LLM_BATCHING_METADATA_HINTS = False
+        settings.LLM_BATCHING_MODE = LLMBatchingMode.PER_REQUEST
 
         provider = MockLLMProvider(behavior="success")
         providers_dict: dict[LLMProviderType, LLMProviderProtocol] = {

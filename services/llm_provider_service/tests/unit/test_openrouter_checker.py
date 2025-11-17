@@ -89,6 +89,7 @@ class TestCheckLatestModels:
         mock_response = AsyncMock()
         mock_response.status = 200
         mock_response.json = AsyncMock(return_value={"data": []})
+        mock_response.raise_for_status = Mock()
 
         # Create async context manager for response
         mock_response.__aenter__ = AsyncMock(return_value=mock_response)
@@ -125,6 +126,7 @@ class TestCheckLatestModels:
                 ]
             }
         )
+        mock_response.raise_for_status = Mock()
 
         mock_response.__aenter__ = AsyncMock(return_value=mock_response)
         mock_response.__aexit__ = AsyncMock(return_value=None)
@@ -164,6 +166,7 @@ class TestCheckLatestModels:
                 ]
             }
         )
+        mock_response.raise_for_status = Mock()
 
         mock_response.__aenter__ = AsyncMock(return_value=mock_response)
         mock_response.__aexit__ = AsyncMock(return_value=None)
@@ -204,6 +207,7 @@ class TestCheckLatestModels:
                 ]
             }
         )
+        mock_response.raise_for_status = Mock()
 
         mock_response.__aenter__ = AsyncMock(return_value=mock_response)
         mock_response.__aexit__ = AsyncMock(return_value=None)
@@ -249,6 +253,7 @@ class TestCheckLatestModels:
                 ]
             }
         )
+        mock_response.raise_for_status = Mock()
 
         mock_response.__aenter__ = AsyncMock(return_value=mock_response)
         mock_response.__aexit__ = AsyncMock(return_value=None)

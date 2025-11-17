@@ -7,7 +7,7 @@ import pytest
 from services.llm_provider_service.config import Settings
 
 
-class TestSettings(Settings):
+class LLMProviderTestSettings(Settings):
     """Typed settings for tests - inherits from production Settings."""
 
     # Override defaults for testing
@@ -34,9 +34,9 @@ class TestSettings(Settings):
 
 
 @pytest.fixture
-def unit_test_settings() -> TestSettings:
+def unit_test_settings() -> LLMProviderTestSettings:
     """Settings for unit tests - no infrastructure dependencies."""
-    return TestSettings(
+    return LLMProviderTestSettings(
         # Core service settings
         SERVICE_NAME="test-llm-provider-service",
         LOG_LEVEL="DEBUG",
@@ -65,9 +65,9 @@ def unit_test_settings() -> TestSettings:
 
 
 @pytest.fixture
-def integration_test_settings() -> TestSettings:
+def integration_test_settings() -> LLMProviderTestSettings:
     """Settings for integration tests - includes infrastructure."""
-    return TestSettings(
+    return LLMProviderTestSettings(
         # Core service settings
         SERVICE_NAME="test-llm-provider-service-integration",
         LOG_LEVEL="INFO",
@@ -96,9 +96,9 @@ def integration_test_settings() -> TestSettings:
 
 
 @pytest.fixture
-def performance_test_settings() -> TestSettings:
+def performance_test_settings() -> LLMProviderTestSettings:
     """Settings for performance tests - realistic configuration."""
-    return TestSettings(
+    return LLMProviderTestSettings(
         # Core service settings
         SERVICE_NAME="test-llm-provider-service-performance",
         LOG_LEVEL="WARNING",  # Reduce logging noise
@@ -124,16 +124,16 @@ def performance_test_settings() -> TestSettings:
 
 
 # Factory function for custom settings
-def create_test_settings(**overrides: Any) -> TestSettings:
+def create_test_settings(**overrides: Any) -> LLMProviderTestSettings:
     """Create test settings with custom overrides.
 
     Args:
         **overrides: Setting values to override
 
     Returns:
-        TestSettings instance with overrides applied
+        LLMProviderTestSettings instance with overrides applied
     """
-    base_settings = TestSettings()
+    base_settings = LLMProviderTestSettings()
 
     # Apply overrides
     for key, value in overrides.items():

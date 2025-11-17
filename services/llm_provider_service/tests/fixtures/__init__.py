@@ -13,7 +13,7 @@ from .callback_fixtures import (
 from .fake_event_publisher import FakeEventPublisher
 from .fake_queue_bus import FakeQueueBus
 from .test_settings import (
-    TestSettings,
+    LLMProviderTestSettings,
     create_test_settings,
     integration_test_settings,
     performance_test_settings,
@@ -24,7 +24,7 @@ __all__ = [
     # Classes
     "FakeEventPublisher",
     "FakeQueueBus",
-    "TestSettings",
+    "LLMProviderTestSettings",
     # Factory functions
     "create_test_settings",
     # Fixtures

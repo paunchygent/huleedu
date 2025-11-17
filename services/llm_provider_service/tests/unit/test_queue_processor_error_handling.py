@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from unittest.mock import AsyncMock, Mock
 
 import pytest
-from common_core import LLMProviderType, QueueStatus
+from common_core import EssayComparisonWinner, LLMBatchingMode, LLMProviderType, QueueStatus
 from common_core.error_enums import ErrorCode
 from common_core.models.error_models import ErrorDetail
 
@@ -283,3 +283,62 @@ Essay B content""",
         mock_event_publisher.publish_llm_request_completed.assert_called_once()
         call_args = mock_event_publisher.publish_llm_request_completed.call_args
         assert call_args.kwargs["success"] is True
+
+    @pytest.mark.asyncio
+    async def test_serial_bundle_mode_uses_batch_api(
+        self,
+        mock_comparison_processor: AsyncMock,
+        mock_queue_manager: AsyncMock,
+        mock_event_publisher: AsyncMock,
+        mock_trace_context_manager: Mock,
+    ) -> None:
+        """Serial bundle mode should call process_comparison_batch instead of per-request."""
+        settings = Settings()
+        settings.QUEUE_PROCESSING_MODE = LLMBatchingMode.SERIAL_BUNDLE
+        settings.QUEUE_POLL_INTERVAL_SECONDS = 0.1
+
+        queue_processor = QueueProcessorImpl(
+            comparison_processor=mock_comparison_processor,
+            queue_manager=mock_queue_manager,
+            event_publisher=mock_event_publisher,
+            trace_context_manager=mock_trace_context_manager,
+            settings=settings,
+            queue_processing_mode=settings.QUEUE_PROCESSING_MODE,
+        )
+
+        request_data = LLMComparisonRequest(
+            user_prompt="prompt",
+            callback_topic="topic",
+            correlation_id=uuid.uuid4(),
+            llm_config_overrides=LLMConfigOverrides(provider_override=LLMProviderType.MOCK),
+        )
+        queued_request = QueuedRequest(
+            queue_id=uuid.uuid4(),
+            request_data=request_data,
+            status=QueueStatus.QUEUED,
+            queued_at=datetime.now(timezone.utc),
+            size_bytes=len(request_data.model_dump_json()),
+            callback_topic="topic",
+        )
+
+        mock_queue_manager.update_status = AsyncMock()
+        mock_queue_manager.remove = AsyncMock()
+        mock_comparison_processor.process_comparison_batch.return_value = [
+            LLMOrchestratorResponse(
+                winner=EssayComparisonWinner.ESSAY_A,
+                justification="A",
+                confidence=0.5,
+                provider=LLMProviderType.MOCK,
+                model="mock",
+                correlation_id=queued_request.queue_id,
+                response_time_ms=10,
+                token_usage={"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+                cost_estimate=0.0,
+                metadata={"prompt_sha256": "abc"},
+            )
+        ]
+
+        await queue_processor._process_request(queued_request)
+
+        mock_comparison_processor.process_comparison_batch.assert_called_once()
+        mock_comparison_processor.process_comparison.assert_not_called()

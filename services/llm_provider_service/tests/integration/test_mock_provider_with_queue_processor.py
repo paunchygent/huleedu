@@ -231,8 +231,8 @@ class ErrorTriggeringMockProvider:
         )
 
 
-class TestProvider(Provider):
-    """Test DI provider."""
+class MockQueueProcessorProvider(Provider):
+    """DI provider for queue processor integration tests."""
 
     @provide(scope=Scope.APP)
     def provide_settings(self) -> Settings:
@@ -305,7 +305,7 @@ class TestProvider(Provider):
 @pytest.fixture
 async def di_container() -> AsyncGenerator[AsyncContainer, None]:
     """Create DI container for testing."""
-    container = make_async_container(TestProvider())
+    container = make_async_container(MockQueueProcessorProvider())
     yield container
     await container.close()
 
