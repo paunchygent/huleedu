@@ -762,3 +762,111 @@ class TestQueueProcessorMetrics:
             result="success",
         )
         callbacks_counter.labels.return_value.inc.assert_called_once_with()
+
+
+class TestQueueProcessorMetadataEnrichment:
+    """Tests for provider-side metadata enrichment on queued requests."""
+
+    def _create_queue_processor(
+        self,
+        *,
+        mode: QueueProcessingMode,
+    ) -> QueueProcessorImpl:
+        settings = Settings()
+        settings.QUEUE_PROCESSING_MODE = mode
+        return QueueProcessorImpl(
+            comparison_processor=AsyncMock(spec=ComparisonProcessorProtocol),
+            queue_manager=AsyncMock(),
+            event_publisher=AsyncMock(),
+            trace_context_manager=Mock(spec=TraceContextManagerImpl),
+            settings=settings,
+            queue_processing_mode=mode,
+        )
+
+    def test_enrich_request_metadata_preserves_existing_keys_and_adds_provider_model_and_mode(
+        self,
+    ) -> None:
+        queue_processor = self._create_queue_processor(
+            mode=QueueProcessingMode.PER_REQUEST,
+        )
+
+        base_metadata = {
+            "essay_a_id": "essay-a",
+            "essay_b_id": "essay-b",
+            "bos_batch_id": "bos-123",
+            "cj_batch_id": "42",
+            "cj_source": "eng5_runner",
+            "cj_request_type": "cj_comparison",
+            "cj_llm_batching_mode": "serial_bundle",
+        }
+
+        request_data = LLMComparisonRequest(
+            user_prompt="prompt",
+            callback_topic="topic",
+            correlation_id=uuid.uuid4(),
+            llm_config_overrides=LLMConfigOverrides(
+                provider_override=LLMProviderType.MOCK,
+                model_override="mock-model-v1",
+            ),
+            metadata=base_metadata.copy(),
+        )
+
+        queued_request = QueuedRequest(
+            queue_id=uuid.uuid4(),
+            request_data=request_data,
+            status=QueueStatus.QUEUED,
+            queued_at=datetime.now(timezone.utc),
+            size_bytes=len(request_data.model_dump_json()),
+            callback_topic="topic",
+        )
+
+        queue_processor._enrich_request_metadata(
+            queued_request,
+            provider=LLMProviderType.MOCK,
+            model="mock-model-v1",
+        )
+
+        metadata = queued_request.request_data.metadata or {}
+
+        # Existing keys preserved
+        for key, value in base_metadata.items():
+            assert metadata[key] == value
+
+        # Additive provider-side keys
+        assert metadata["resolved_provider"] == LLMProviderType.MOCK.value
+        assert metadata["queue_processing_mode"] == queue_processor.queue_processing_mode.value
+        assert metadata["resolved_model"] == "mock-model-v1"
+
+    def test_enrich_request_metadata_omits_resolved_model_when_not_provided_and_uses_mode_label(
+        self,
+    ) -> None:
+        queue_processor = self._create_queue_processor(
+            mode=QueueProcessingMode.SERIAL_BUNDLE,
+        )
+
+        request_data = LLMComparisonRequest(
+            user_prompt="prompt",
+            callback_topic="topic",
+            correlation_id=uuid.uuid4(),
+        )
+
+        queued_request = QueuedRequest(
+            queue_id=uuid.uuid4(),
+            request_data=request_data,
+            status=QueueStatus.QUEUED,
+            queued_at=datetime.now(timezone.utc),
+            size_bytes=len(request_data.model_dump_json()),
+            callback_topic="topic",
+        )
+
+        queue_processor._enrich_request_metadata(
+            queued_request,
+            provider=LLMProviderType.OPENAI,
+            model=None,
+        )
+
+        metadata = queued_request.request_data.metadata or {}
+
+        assert metadata["resolved_provider"] == LLMProviderType.OPENAI.value
+        assert metadata["queue_processing_mode"] == queue_processor.queue_processing_mode.value
+        assert "resolved_model" not in metadata

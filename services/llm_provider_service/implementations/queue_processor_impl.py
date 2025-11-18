@@ -188,6 +188,13 @@ class QueueProcessorImpl:
             provider = self._resolve_provider_from_request(request)
             overrides = self._build_override_kwargs(request)
 
+            model_hint = overrides.get("model_override")
+            self._enrich_request_metadata(
+                request,
+                provider=provider,
+                model=model_hint,
+            )
+
             # Restore trace context for queue processing to maintain unbroken spans
             trace_context = request.trace_context or {}
 
@@ -314,6 +321,12 @@ class QueueProcessorImpl:
         primary_overrides = self._build_override_kwargs(first_request)
         primary_hint = self._get_cj_batching_mode_hint(first_request)
 
+        self._enrich_request_metadata(
+            first_request,
+            provider=primary_provider,
+            model=primary_overrides.get("model_override"),
+        )
+
         processing_started[str(first_request.queue_id)] = time.perf_counter()
         await self._mark_request_processing(first_request)
         bundle_requests.append(first_request)
@@ -356,6 +369,12 @@ class QueueProcessorImpl:
             ):
                 self._pending_request = next_request
                 break
+
+            self._enrich_request_metadata(
+                next_request,
+                provider=candidate_provider,
+                model=candidate_overrides.get("model_override"),
+            )
 
             processing_started[str(next_request.queue_id)] = time.perf_counter()
             await self._mark_request_processing(next_request)
@@ -466,6 +485,28 @@ class QueueProcessorImpl:
                         request=queued_request,
                         processing_started=processing_started[str(queued_request.queue_id)],
                     )
+
+    def _enrich_request_metadata(
+        self,
+        request: QueuedRequest,
+        *,
+        provider: LLMProviderType,
+        model: str | None,
+    ) -> None:
+        """Enrich queued request metadata with provider-side context.
+
+        This helper is additive-only: it preserves any existing CJ metadata keys and
+        overlays resolved provider/model and the active queue processing mode.
+        """
+
+        metadata = request.request_data.metadata or {}
+
+        metadata["resolved_provider"] = provider.value
+        metadata["queue_processing_mode"] = self.queue_processing_mode.value
+        if model is not None:
+            metadata["resolved_model"] = model
+
+        request.request_data.metadata = metadata
 
     def _build_override_kwargs(self, request: QueuedRequest) -> Dict[str, Any]:
         """Create overrides dict for comparison processor calls."""
