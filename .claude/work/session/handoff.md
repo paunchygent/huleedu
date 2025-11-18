@@ -47,46 +47,38 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 ## LLM Batch Strategy Implementation Status (2025-11-18)
 
 ### Overview
-**Progress**: ~30% complete (9 items complete, 5 partial, 16 not started)
+**Progress**: ~95% complete - ALL IMPLEMENTATION DONE, VALIDATION PENDING
 **Primary Document**: `.claude/work/tasks/TASK-LLM-BATCH-STRATEGY-IMPLEMENTATION-CHECKLIST.md`
 
-### What's Actually Implemented
+### ✅ ALL IMPLEMENTATION COMPLETE
 
-**Phase 1 (CJ Configuration)** - 20% complete:
-- ✅ `LLMBatchingMode` enum in common_core (PER_REQUEST, SERIAL_BUNDLE, PROVIDER_BATCH_API)
-- ✅ `Settings.LLM_BATCHING_MODE` with correct default (PER_REQUEST)
-- ⚠️ Metadata model partial: `cj_llm_batching_mode` field exists
-- ⚠️ Tests partial: metadata propagation tested for existing fields
+**Phase 1 (CJ Configuration)** - ✅ 100% COMPLETE:
+- ✅ `LLMBatchingMode` enum in common_core
+- ✅ `Settings.LLM_BATCHING_MODE` with PER_REQUEST default
+- ✅ `BatchConfigOverrides.llm_batching_mode_override`
+- ✅ `resolve_effective_llm_batching_mode()` with provider guardrails
+- ✅ Metadata propagation: `cj_batch_id`, `cj_source`, `cj_request_type`, `cj_llm_batching_mode`
+- ✅ Full test coverage for config resolution and metadata
 
-**Phase 2 (LPS Serial Bundling)** - ~75% complete:
-- ✅ `ComparisonProcessorProtocol.process_comparison_batch` method implemented
-- ✅ Queue routing to batch/serial mode (when `QUEUE_PROCESSING_MODE != per_request`)
+**Phase 2 (LPS Serial Bundling)** - ✅ 100% COMPLETE:
+- ✅ `ComparisonProcessorProtocol.process_comparison_batch` implemented
+- ✅ `QueueProcessingMode` and `BatchApiMode` enums
+- ✅ `_process_request_serial_bundle` with fairness and compatibility checks
+- ✅ Provider-side metadata enrichment (`resolved_provider`, `resolved_model`, `queue_processing_mode`)
 - ✅ Result mapping back to individual callbacks
-- ✅ Config now exposes `QueueProcessingMode`, `BatchApiMode`, and `SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL`
-- ✅ `_process_request_serial_bundle` drains multiple compatible requests per loop (fairness safeguard + `_pending_request` handoff)
-- ✅ Provider-side metadata enrichment in `QueueProcessorImpl` adds `resolved_provider`, `resolved_model` (when available), and `queue_processing_mode` into `request_data.metadata` for both per-request and serial-bundle paths, with dedicated unit tests in LPS.
-- ⚠️ Serial-bundle metrics and production rollout docs still pending
+- ✅ Comprehensive unit test coverage
 
-**Phase 3 (Metrics)** - queue expiry + serial-bundle metrics in LPS:
-- ✅ `llm_provider_queue_expiry_total{provider, queue_processing_mode, expiry_reason}` implemented for both dequeued TTL expiries (`expiry_reason="ttl"`) and manager-level cleanup (`expiry_reason="cleanup"`, `provider="unknown"`).
-- ✅ `llm_provider_queue_expiry_age_seconds{provider, queue_processing_mode}` implemented for dequeue-time expiries (age-at-expiry histogram).
-- ✅ Queue completion metrics corrected so expired requests no longer contribute to processing-time or callback totals but still update wait-time metrics.
-- ✅ Serial-bundle metrics in LLM Provider Service implemented: `llm_provider_serial_bundle_calls_total{provider, model}` and `llm_provider_serial_bundle_items_per_call{provider, model}` are emitted only in `QueueProcessingMode.SERIAL_BUNDLE` and validated via unit tests and dedicated integration coverage in `services/llm_provider_service/tests/integration/test_serial_bundle_integration.py`.
+**Phase 3 (Metrics & Observability)** - ✅ 100% COMPLETE:
+- ✅ Queue expiry metrics: `llm_provider_queue_expiry_total`, `llm_provider_queue_expiry_age_seconds`
+- ✅ Serial bundle metrics: `llm_provider_serial_bundle_calls_total`, `llm_provider_serial_bundle_items_per_call`
+- ✅ CJ batching metrics: `cj_llm_requests_total`, `cj_llm_batches_started_total`
+- ✅ Batch state diagnostics: `inspect_batch_state.py` shows batching mode
+- ✅ ENG5 runner diagnostics: cost summaries + Prometheus query hints
+- ✅ Documentation: LPS/CJ READMEs + `docs/operations/eng5-np-runbook.md`
 
-- ✅ CJ-side batching metrics implemented in CJ Assessment Service: `cj_llm_requests_total{batching_mode}` and `cj_llm_batches_started_total{batching_mode}` are emitted from `comparison_processing` with dedicated unit coverage and a clean CJ unit test run.
+### ⏳ ONLY VALIDATION REMAINING
 
-### Critical Missing Items
-
-**Phase 1 (✅ complete)**:
-- `BatchConfigOverrides.llm_batching_mode_override`, `resolve_effective_llm_batching_mode()`, and `LLM_BATCH_API_ALLOWED_PROVIDERS` are in place with guardrail logging and docs.
-- CJ now emits `cj_batch_id`, `cj_source`, `cj_request_type`, and the effective `cj_llm_batching_mode` for both initial submissions and retry batches.
-- Config resolution + metadata propagation tests live in `tests/unit/test_llm_batching_config.py`, `test_llm_interaction_impl_unit.py`, and `test_batch_retry_processor.py`.
-
-**Phase 2 (1 major item missing)**:
-1. ⚠️ Observability/runbook updates + rollout guidance (doc + Phase 3 metrics linkage)
-
-**Phase 3 (remaining gaps)**:
-1. ⚠️ Rollout documentation and ENG5-focused diagnostics to make batching modes safe to enable in production.
+All code, tests, metrics, diagnostics, and documentation are complete. The single remaining item is:
 
 ### Key Findings
 
@@ -105,9 +97,26 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 - CJ batching metrics (per-batch and per-request) to complement LPS serial-bundle metrics.
 - Rollout documentation and ENG5-focused diagnostics to make serial_bundle safe to enable in production.
 
-### Next Steps
+### Next Steps: ENG5 Validation Run
 
-1. Rollout/runbook guidance and ENG5-focused diagnostics are now in place (PR 5 in `TASK-LLM-SERIAL-BUNDLE-METRICS-AND-DIAGNOSTICS-FIX.md`). The remaining work is to run at least one ENG5 execute batch with `serial_bundle` enabled against real providers and review the serial-bundle and CJ batching metrics for regressions.
+**Single remaining task**: Execute one ENG5 batch with `serial_bundle` mode enabled
+
+**Environment setup**:
+```bash
+export CJ_ASSESSMENT_SERVICE_LLM_BATCHING_MODE=serial_bundle
+export LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE=serial_bundle
+export LLM_PROVIDER_SERVICE_BATCH_API_MODE=disabled
+```
+
+**Validation checklist**:
+1. CJ metrics increment correctly (`cj_llm_requests_total`, `cj_llm_batches_started_total`)
+2. LPS serial-bundle metrics increment (`llm_provider_serial_bundle_calls_total`, `llm_provider_serial_bundle_items_per_call`)
+3. No regressions in callbacks or batch completion
+4. Serial bundling achieves expected efficiency gains (fewer external HTTP calls)
+5. `inspect_batch_state.py` shows correct batching mode
+6. ENG5 runner displays cost summary and metrics hints
+
+**Documentation**: All procedures documented in `docs/operations/eng5-np-runbook.md`
 
 ---
 
