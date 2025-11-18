@@ -46,9 +46,8 @@ export PATH=$PATH:/root/.local/bin && pdm <command>
 **Code Quality Tools**
 ```bash
 # These work perfectly:
-export PATH=$PATH:/root/.local/bin && pdm run lint-all
-export PATH=$PATH:/root/.local/bin && pdm run lint-fix
 export PATH=$PATH:/root/.local/bin && pdm run format-all
+export PATH=$PATH:/root/.local/bin && pdm run lint-fix --unsafe-fixes
 export PATH=$PATH:/root/.local/bin && pdm run typecheck-all
 export PATH=$PATH:/root/.local/bin && pdm run typecheck-libs
 
@@ -168,11 +167,11 @@ git status
 # 2. Read the code to review
 # Use Read, Glob, Grep tools
 
-# 3. Run linting
-export PATH=$PATH:/root/.local/bin && pdm run lint-all
-
-# 4. Run formatting check
+# 3. Run formatting check
 export PATH=$PATH:/root/.local/bin && pdm run format-all --check
+
+# 4. Run linting
+export PATH=$PATH:/root/.local/bin && pdm run lint-fix --unsafe-fixes
 
 # 5. Run type checking
 export PATH=$PATH:/root/.local/bin && pdm run typecheck-all
@@ -194,7 +193,7 @@ export PATH=$PATH:/root/.local/bin && pdm run typecheck-all
 export PATH=$PATH:/root/.local/bin && pdm run format-all
 
 # 4. Run linters and fix issues
-export PATH=$PATH:/root/.local/bin && pdm run lint-fix
+export PATH=$PATH:/root/.local/bin && pdm run lint-fix --unsafe-fixes
 
 # 5. Run type checking
 export PATH=$PATH:/root/.local/bin && pdm run typecheck-all
@@ -343,7 +342,7 @@ git push -u origin <branch-name>
 
 2. **Use absolute paths if needed:**
    ```bash
-   /root/.local/bin/pdm run lint-all
+   /root/.local/bin/pdm run lint-fix --unsafe-fixes
    .venv/bin/pytest tests/
    ```
 
@@ -439,7 +438,7 @@ git push -u origin <branch-name>
 
 **Always run:**
 1. Format: `pdm run format-all`
-2. Lint: `pdm run lint-fix`
+2. Lint: `pdm run lint-fix --unsafe-fixes`
 3. Type check: `pdm run typecheck-all`
 4. Tests: `.venv/bin/pytest <relevant_path> -v`
 

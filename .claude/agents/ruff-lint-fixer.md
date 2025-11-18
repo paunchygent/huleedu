@@ -37,7 +37,7 @@ When asked to fix lint issues, you MUST follow this exact sequence:
    - Do NOT manually adjust formatting before this step
 
 3. **Capture Current Lint State**
-   - Run: `pdm run lint-fix`
+   - Run: `pdm run lint-fix --unsafe-fixes`
    - This executes `ruff check --fix --force-exclude .`
    - Record all remaining diagnostics: file, line number, Ruff code (e.g., F401, E501), message
    - This output is your single source of truth for what needs fixing
@@ -68,7 +68,7 @@ When asked to fix lint issues, you MUST follow this exact sequence:
 6. **Verify Resolution**
    - After edits, re-run the complete sequence:
      - `pdm run format-all`
-     - `pdm run lint-fix`
+     - `pdm run lint-fix --unsafe-fixes`
    - Confirm that:
      - Previously reported issues are resolved, OR
      - Remaining issues have clear explanations

@@ -12,7 +12,6 @@ from uuid import uuid4
 
 import pytest
 from common_core import (
-    LLMBatchingMode,
     LLMComparisonRequest,
     LLMProviderType,
     QueueStatus,
@@ -26,7 +25,7 @@ from common_core.events.envelope import EventEnvelope
 from common_core.events.llm_provider_events import LLMComparisonResultV1, TokenUsage
 from common_core.models.error_models import ErrorDetail
 
-from services.llm_provider_service.config import Settings
+from services.llm_provider_service.config import QueueProcessingMode, Settings
 from services.llm_provider_service.exceptions import HuleEduError
 from services.llm_provider_service.implementations.queue_processor_impl import QueueProcessorImpl
 from services.llm_provider_service.internal_models import LLMOrchestratorResponse
@@ -41,7 +40,7 @@ def mock_settings() -> Mock:
     settings = Mock(spec=Settings)
     settings.QUEUE_POLL_INTERVAL_SECONDS = 1
     settings.QUEUE_MAX_RETRIES = 3
-    settings.QUEUE_PROCESSING_MODE = LLMBatchingMode.PER_REQUEST
+    settings.QUEUE_PROCESSING_MODE = QueueProcessingMode.PER_REQUEST
     return settings
 
 

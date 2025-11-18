@@ -117,6 +117,19 @@ def _create_metrics() -> dict[str, Any]:
                 ["queue_processing_mode", "result"],
                 registry=REGISTRY,
             ),
+            "llm_queue_expiry_total": Counter(
+                "llm_provider_queue_expiry_total",
+                "Total expired queue requests",
+                ["provider", "queue_processing_mode", "expiry_reason"],
+                registry=REGISTRY,
+            ),
+            "llm_queue_expiry_age_seconds": Histogram(
+                "llm_provider_queue_expiry_age_seconds",
+                "Age of requests at expiry in seconds",
+                ["provider", "queue_processing_mode"],
+                buckets=(1, 5, 10, 30, 60, 120, 300, 600, 1800, 3600),
+                registry=REGISTRY,
+            ),
             "circuit_breaker_state_changes": Counter(
                 "llm_provider_circuit_breaker_state_changes_total",
                 "Total circuit breaker state changes",
@@ -220,6 +233,8 @@ def get_queue_metrics() -> dict[str, Any]:
         ),
         "llm_queue_wait_time_seconds": all_metrics.get("llm_queue_wait_time_seconds"),
         "llm_comparison_callbacks_total": all_metrics.get("llm_comparison_callbacks_total"),
+        "llm_queue_expiry_total": all_metrics.get("llm_queue_expiry_total"),
+        "llm_queue_expiry_age_seconds": all_metrics.get("llm_queue_expiry_age_seconds"),
     }
 
 
@@ -255,6 +270,8 @@ def _get_existing_metrics() -> dict[str, Any]:
         "llm_provider_availability_percentage": "llm_provider_availability_percentage",
         "llm_queue_wait_time_seconds": "llm_provider_queue_wait_time_seconds",
         "llm_comparison_callbacks_total": "llm_provider_comparison_callbacks_total",
+        "llm_queue_expiry_total": "llm_provider_queue_expiry_total",
+        "llm_queue_expiry_age_seconds": "llm_provider_queue_expiry_age_seconds",
     }
 
     existing: dict[str, Any] = {}

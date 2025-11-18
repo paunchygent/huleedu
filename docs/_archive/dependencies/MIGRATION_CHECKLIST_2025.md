@@ -130,7 +130,7 @@ Verify these scripts in `pyproject.toml`:
 pdm run format-all
 
 # Test linting
-pdm run lint-all
+pdm run lint-fix --unsafe-fixes
 
 # Test type checking
 pdm run typecheck-all

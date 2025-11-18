@@ -10,12 +10,12 @@ import time
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-from common_core import LLMBatchingMode, LLMProviderType, QueueStatus
+from common_core import LLMProviderType, QueueStatus
 from common_core.events.envelope import EventEnvelope
 from common_core.events.llm_provider_events import LLMComparisonResultV1, TokenUsage
 from huleedu_service_libs.logging_utils import create_service_logger
 
-from services.llm_provider_service.config import Settings
+from services.llm_provider_service.config import QueueProcessingMode, Settings
 from services.llm_provider_service.exceptions import (
     HuleEduError,
     raise_processing_error,
@@ -52,7 +52,7 @@ class QueueProcessorImpl:
         event_publisher: LLMEventPublisherProtocol,
         trace_context_manager: TraceContextManagerImpl,
         settings: Settings,
-        queue_processing_mode: LLMBatchingMode | None = None,
+        queue_processing_mode: QueueProcessingMode | None = None,
     ):
         """Initialize queue processor.
 
@@ -80,6 +80,7 @@ class QueueProcessorImpl:
         self._cleanup_interval = 300  # 5 minutes
         self.queue_metrics = get_queue_metrics()
         self._last_queue_metrics_log = 0.0
+        self._pending_request: Optional[QueuedRequest] = None
 
     async def start(self) -> None:
         """Start the queue processor."""
@@ -116,9 +117,14 @@ class QueueProcessorImpl:
                 await self._periodic_cleanup()
                 await self._record_queue_stats()
 
-                # Get next request from queue
-                request = await self.queue_manager.dequeue()
-                if not request:
+                # Get next request from queue (respecting any deferred item)
+                request: Optional[QueuedRequest]
+                if self._pending_request is not None:
+                    request = self._pending_request
+                    self._pending_request = None
+                else:
+                    request = await self.queue_manager.dequeue()
+                if request is None:
                     # No requests, wait a bit
                     await asyncio.sleep(self.settings.QUEUE_POLL_INTERVAL_SECONDS)
                     continue
@@ -127,16 +133,26 @@ class QueueProcessorImpl:
                 if self._is_expired(request):
                     await self._handle_expired_request(request)
                     provider = self._resolve_provider_from_request(request)
+                    self._record_expiry_metrics(
+                        request=request,
+                        provider=provider,
+                        expiry_reason="ttl",
+                    )
                     self._record_completion_metrics(
                         provider=provider,
                         result="expired",
                         request=request,
-                        processing_started=time.perf_counter(),
+                        processing_started=None,
                     )
                     continue
 
                 # Process the request
-                await self._process_request(request)
+                if self.queue_processing_mode is QueueProcessingMode.PER_REQUEST:
+                    await self._process_request(request)
+                else:
+                    await self._process_request_serial_bundle(request)
+                    # Yield control so other tasks/providers can run between bundles
+                    await asyncio.sleep(0)
 
             except asyncio.CancelledError:
                 logger.info("Queue processing cancelled")
@@ -170,18 +186,7 @@ class QueueProcessorImpl:
 
             # Extract provider and overrides
             provider = self._resolve_provider_from_request(request)
-            overrides: Dict[str, Any] = {}
-
-            if req_data.llm_config_overrides:
-                config = req_data.llm_config_overrides
-                if config.model_override:
-                    overrides["model_override"] = config.model_override
-                if config.temperature_override is not None:
-                    overrides["temperature_override"] = config.temperature_override
-                if config.system_prompt_override:
-                    overrides["system_prompt_override"] = config.system_prompt_override
-                if config.max_tokens_override:
-                    overrides["max_tokens_override"] = config.max_tokens_override
+            overrides = self._build_override_kwargs(request)
 
             # Restore trace context for queue processing to maintain unbroken spans
             trace_context = request.trace_context or {}
@@ -200,7 +205,7 @@ class QueueProcessorImpl:
                 )
 
                 result: LLMOrchestratorResponse | LLMQueuedResult
-                if self.queue_processing_mode is LLMBatchingMode.PER_REQUEST:
+                if self.queue_processing_mode is QueueProcessingMode.PER_REQUEST:
                     result = await self.comparison_processor.process_comparison(
                         provider=provider,
                         user_prompt=req_data.user_prompt,
@@ -298,6 +303,244 @@ class QueueProcessorImpl:
                     processing_started=processing_started,
                 )
 
+    async def _process_request_serial_bundle(self, first_request: QueuedRequest) -> None:
+        """Process multiple queued requests under serial bundle mode."""
+
+        bundle_requests: list[QueuedRequest] = []
+        batch_items: list[BatchComparisonItem] = []
+        processing_started: dict[str, float] = {}
+
+        primary_provider = self._resolve_provider_from_request(first_request)
+        primary_overrides = self._build_override_kwargs(first_request)
+        primary_hint = self._get_cj_batching_mode_hint(first_request)
+
+        processing_started[str(first_request.queue_id)] = time.perf_counter()
+        await self._mark_request_processing(first_request)
+        bundle_requests.append(first_request)
+        batch_items.append(
+            self._build_batch_item(first_request, primary_provider, primary_overrides)
+        )
+
+        while len(bundle_requests) < self.settings.SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL:
+            next_request = await self.queue_manager.dequeue()
+            if not next_request:
+                break
+
+            if self._is_expired(next_request):
+                await self._handle_expired_request(next_request)
+                expired_provider = self._resolve_provider_from_request(next_request)
+                self._record_expiry_metrics(
+                    request=next_request,
+                    provider=expired_provider,
+                    expiry_reason="ttl",
+                )
+                self._record_completion_metrics(
+                    provider=expired_provider,
+                    result="expired",
+                    request=next_request,
+                    processing_started=None,
+                )
+                continue
+
+            candidate_provider = self._resolve_provider_from_request(next_request)
+            candidate_overrides = self._build_override_kwargs(next_request)
+            candidate_hint = self._get_cj_batching_mode_hint(next_request)
+
+            if not self._requests_are_compatible(
+                base_provider=primary_provider,
+                candidate_provider=candidate_provider,
+                base_overrides=primary_overrides,
+                candidate_overrides=candidate_overrides,
+                base_hint=primary_hint,
+                candidate_hint=candidate_hint,
+            ):
+                self._pending_request = next_request
+                break
+
+            processing_started[str(next_request.queue_id)] = time.perf_counter()
+            await self._mark_request_processing(next_request)
+            bundle_requests.append(next_request)
+            batch_items.append(
+                self._build_batch_item(next_request, candidate_provider, candidate_overrides)
+            )
+
+        logger.info(
+            "serial_bundle_dispatch",
+            extra={
+                "bundle_size": len(bundle_requests),
+                "queue_processing_mode": self.queue_processing_mode.value,
+                "provider": primary_provider.value,
+                "model_override": primary_overrides.get("model_override"),
+                "cj_llm_batching_mode": primary_hint,
+            },
+        )
+
+        try:
+            batch_results = await self.comparison_processor.process_comparison_batch(batch_items)
+            if len(batch_results) != len(bundle_requests):
+                raise_processing_error(
+                    service="llm_provider_service",
+                    operation="serial_bundle_processing",
+                    message="Batch processor returned mismatched result count",
+                    correlation_id=first_request.request_data.correlation_id
+                    or first_request.queue_id,
+                    details={
+                        "expected": len(bundle_requests),
+                        "actual": len(batch_results),
+                        "queue_processing_mode": self.queue_processing_mode.value,
+                    },
+                )
+
+            for queued_request, result in zip(bundle_requests, batch_results, strict=True):
+                if isinstance(result, LLMOrchestratorResponse):
+                    await self._handle_request_success(queued_request, result)
+                    self._record_completion_metrics(
+                        provider=result.provider,
+                        result="success",
+                        request=queued_request,
+                        processing_started=processing_started[str(queued_request.queue_id)],
+                    )
+                elif isinstance(result, LLMQueuedResult):
+                    raise_processing_error(
+                        service="llm_provider_service",
+                        operation="serial_bundle_processing",
+                        message="Unexpected queued result in serial bundle path",
+                        correlation_id=queued_request.request_data.correlation_id
+                        or queued_request.queue_id,
+                        details={
+                            "provider": primary_provider.value,
+                            "queue_id": str(queued_request.queue_id),
+                            "queue_processing_mode": self.queue_processing_mode.value,
+                        },
+                    )
+                else:
+                    raise_processing_error(
+                        service="llm_provider_service",
+                        operation="serial_bundle_processing",
+                        message="Unexpected result type returned from batch processor",
+                        correlation_id=queued_request.request_data.correlation_id
+                        or queued_request.queue_id,
+                        details={
+                            "provider": primary_provider.value,
+                            "result_type": str(type(result)),
+                        },
+                    )
+
+        except HuleEduError as error:
+            logger.error(
+                "Serial bundle processing hit provider error",
+                exc_info=True,
+                extra={
+                    "queue_processing_mode": self.queue_processing_mode.value,
+                    "bundle_size": len(bundle_requests),
+                },
+            )
+            for queued_request in bundle_requests:
+                await self._handle_request_hule_error(queued_request, error)
+                self._record_completion_metrics(
+                    provider=primary_provider,
+                    result="failure",
+                    request=queued_request,
+                    processing_started=processing_started[str(queued_request.queue_id)],
+                )
+        except Exception as exc:
+            logger.error("Unexpected error while processing serial bundle", exc_info=True)
+            try:
+                raise_processing_error(
+                    service="llm_provider_service",
+                    operation="serial_bundle_processing",
+                    message=str(exc),
+                    correlation_id=first_request.request_data.correlation_id
+                    or first_request.queue_id,
+                    details={
+                        "provider": primary_provider.value,
+                        "bundle_size": len(bundle_requests),
+                    },
+                )
+            except HuleEduError as processing_error:
+                for queued_request in bundle_requests:
+                    await self._handle_request_hule_error(queued_request, processing_error)
+                    self._record_completion_metrics(
+                        provider=primary_provider,
+                        result="failure",
+                        request=queued_request,
+                        processing_started=processing_started[str(queued_request.queue_id)],
+                    )
+
+    def _build_override_kwargs(self, request: QueuedRequest) -> Dict[str, Any]:
+        """Create overrides dict for comparison processor calls."""
+
+        overrides: Dict[str, Any] = {}
+        config = request.request_data.llm_config_overrides
+        if not config:
+            return overrides
+
+        if config.model_override:
+            overrides["model_override"] = config.model_override
+        if config.temperature_override is not None:
+            overrides["temperature_override"] = config.temperature_override
+        if config.system_prompt_override:
+            overrides["system_prompt_override"] = config.system_prompt_override
+        if config.max_tokens_override is not None:
+            overrides["max_tokens_override"] = config.max_tokens_override
+
+        return overrides
+
+    def _build_batch_item(
+        self,
+        request: QueuedRequest,
+        provider: LLMProviderType,
+        overrides: Dict[str, Any],
+    ) -> BatchComparisonItem:
+        """Create a BatchComparisonItem for the supplied queued request."""
+
+        return BatchComparisonItem(
+            provider=provider,
+            user_prompt=request.request_data.user_prompt,
+            correlation_id=request.request_data.correlation_id or request.queue_id,
+            overrides=overrides or None,
+        )
+
+    async def _mark_request_processing(self, request: QueuedRequest) -> None:
+        """Mark a queued request as processing."""
+
+        await self.queue_manager.update_status(
+            queue_id=request.queue_id,
+            status=QueueStatus.PROCESSING,
+        )
+
+    def _requests_are_compatible(
+        self,
+        *,
+        base_provider: LLMProviderType,
+        candidate_provider: LLMProviderType,
+        base_overrides: Dict[str, Any],
+        candidate_overrides: Dict[str, Any],
+        base_hint: str | None,
+        candidate_hint: str | None,
+    ) -> bool:
+        """Determine if two requests can be bundled together."""
+
+        if candidate_provider is not base_provider:
+            return False
+
+        if base_overrides != candidate_overrides:
+            return False
+
+        if base_hint is None and candidate_hint is None:
+            return True
+
+        return base_hint == candidate_hint
+
+    def _get_cj_batching_mode_hint(self, request: QueuedRequest) -> str | None:
+        """Return the CJ-provided batching hint if present."""
+
+        metadata = request.request_data.metadata or {}
+        hint = metadata.get("cj_llm_batching_mode")
+        if isinstance(hint, str):
+            return hint
+        return None
+
     def _resolve_provider_from_request(self, request: QueuedRequest) -> LLMProviderType:
         """Determine which provider should service the request."""
         overrides = request.request_data.llm_config_overrides
@@ -325,7 +568,7 @@ class QueueProcessorImpl:
 
         now = time.time()
         if (
-            self.queue_processing_mode is not LLMBatchingMode.PER_REQUEST
+            self.queue_processing_mode is not QueueProcessingMode.PER_REQUEST
             and now - self._last_queue_metrics_log >= self._QUEUE_METRICS_LOG_INTERVAL_SECONDS
         ):
             logger.info(
@@ -340,20 +583,56 @@ class QueueProcessorImpl:
             )
             self._last_queue_metrics_log = now
 
+    def _record_expiry_metrics(
+        self,
+        *,
+        request: QueuedRequest,
+        provider: LLMProviderType,
+        expiry_reason: str,
+    ) -> None:
+        """Record dedicated metrics for expired queue requests."""
+        if not self.queue_metrics:
+            return
+
+        expiry_counter = self.queue_metrics.get("llm_queue_expiry_total")
+        expiry_age_hist = self.queue_metrics.get("llm_queue_expiry_age_seconds")
+
+        age_seconds = max(
+            (datetime.now(timezone.utc) - request.queued_at).total_seconds(),
+            0.0,
+        )
+
+        if expiry_counter is not None:
+            expiry_counter.labels(
+                provider=provider.value,
+                queue_processing_mode=self.queue_processing_mode.value,
+                expiry_reason=expiry_reason,
+            ).inc()
+
+        if expiry_age_hist is not None:
+            expiry_age_hist.labels(
+                provider=provider.value,
+                queue_processing_mode=self.queue_processing_mode.value,
+            ).observe(age_seconds)
+
     def _record_completion_metrics(
         self,
         *,
         provider: LLMProviderType,
         result: str,
         request: QueuedRequest,
-        processing_started: float,
+        processing_started: float | None,
     ) -> None:
-        """Record per-request timing metrics for queue processing."""
+        """Record per-request timing metrics for queue processing.
+
+        Expired requests should not contribute to processing-time or callback metrics but
+        still update queue wait-time metrics for observability.
+        """
         if not self.queue_metrics:
             return
 
         wait_hist = self.queue_metrics.get("llm_queue_wait_time_seconds")
-        if wait_hist:
+        if wait_hist is not None:
             wait_seconds = max(
                 (datetime.now(timezone.utc) - request.queued_at).total_seconds(),
                 0.0,
@@ -363,13 +642,19 @@ class QueueProcessorImpl:
                 result=result,
             ).observe(wait_seconds)
 
+        # Only record processing time and callbacks for actual work that produced or attempted
+        # a callback (success/failure). Expired or otherwise short-circuited requests should not
+        # affect these metrics.
+        if processing_started is None or result not in {"success", "failure"}:
+            return
+
         proc_hist = self.queue_metrics.get("llm_queue_processing_time_seconds")
-        if proc_hist:
+        if proc_hist is not None:
             duration = max(time.perf_counter() - processing_started, 0.0)
             proc_hist.labels(provider=provider.value, status=result).observe(duration)
 
         callbacks_counter = self.queue_metrics.get("llm_comparison_callbacks_total")
-        if callbacks_counter:
+        if callbacks_counter is not None:
             callbacks_counter.labels(
                 queue_processing_mode=self.queue_processing_mode.value,
                 result=result,

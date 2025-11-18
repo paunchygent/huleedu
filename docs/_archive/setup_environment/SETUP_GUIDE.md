@@ -70,10 +70,10 @@ After setup, you have access to these PDM scripts:
 ### 🔧 Code Quality
 
 ```bash
-pdm run format-all      # Format code with Ruff
-pdm run lint-all        # Lint with Ruff
-pdm run typecheck-all   # Type check with mypy
-pdm run test-all        # Run all tests with pytest
+pdm run format-all              # Format code with Ruff
+pdm run lint-fix --unsafe-fixes # Lint with Ruff
+pdm run typecheck-all           # Type check with mypy
+pdm run test-all                # Run all tests with pytest
 ```
 
 ### 🐳 Docker Operations
@@ -102,8 +102,8 @@ When making changes to any service:
 
 ```bash
 # Format and check your code
-pdm run format-all      # Ruff formatting
-pdm run lint-all        # Ruff linting
+pdm run format-all              # Ruff formatting
+pdm run lint-fix --unsafe-fixes # Ruff linting
 pdm run typecheck-all
 
 # Run tests

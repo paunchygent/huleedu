@@ -149,8 +149,8 @@ pdm run dev-bcs
 pdm run pytest services/batch_conductor_service/ -v
 
 # Lint and format
-pdm run lint-all
 pdm run format-all
+pdm run lint-fix --unsafe-fixes
 ```
 
 ### Docker

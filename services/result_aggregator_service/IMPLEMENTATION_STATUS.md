@@ -294,7 +294,7 @@ The next AI agent working on this service MUST read these files and understand t
 
 ### BEFORE MAKING CHANGES
 
-1. Run `pdm run lint-all` and `pdm run typecheck-all` to see current issues
+1. Run `pdm run lint-fix --unsafe-fixes` and `pdm run typecheck-all` to see current issues
 2. Read the cache design flaw section carefully
 3. Understand that the service works but doesn't achieve its performance goals
 4. Check existing patterns in other services (BCS, CJ Assessment) for reference

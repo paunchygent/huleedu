@@ -7,7 +7,7 @@ delete methods to prevent queue clogging.
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
 
 import pytest
@@ -121,3 +121,59 @@ class TestResilientQueueManagerRemove:
 
         # Verify migration tracking was cleaned up
         assert queue_id not in queue_manager._migrated_to_local
+
+    @pytest.mark.asyncio
+    async def test_cleanup_expired_records_expiry_counter_for_total_cleaned(
+        self,
+        queue_manager: ResilientQueueManagerImpl,
+        mock_redis_queue: AsyncMock,
+        mock_local_queue: AsyncMock,
+    ) -> None:
+        """Cleanup should increment llm_queue_expiry_total for all cleaned items."""
+
+        queue_manager.queue_metrics = {"llm_queue_expiry_total": Mock()}
+        expiry_counter = queue_manager.queue_metrics["llm_queue_expiry_total"]
+        expiry_counter.labels.return_value = Mock()
+
+        mock_redis_queue.cleanup_expired = AsyncMock(return_value=2)
+        mock_local_queue.cleanup_expired = AsyncMock(return_value=3)
+        mock_redis_queue.get_all_queued = AsyncMock(return_value=[])
+        mock_local_queue.get_all_queued = AsyncMock(return_value=[])
+
+        queue_manager._redis_healthy = True
+
+        total_cleaned = await queue_manager.cleanup_expired()
+
+        assert total_cleaned == 5
+
+        expiry_counter.labels.assert_called_once_with(
+            provider="unknown",
+            queue_processing_mode=queue_manager.settings.QUEUE_PROCESSING_MODE.value,
+            expiry_reason="cleanup",
+        )
+        expiry_counter.labels.return_value.inc.assert_called_once_with(5)
+
+    @pytest.mark.asyncio
+    async def test_cleanup_expired_does_not_record_metrics_when_zero_cleaned(
+        self,
+        queue_manager: ResilientQueueManagerImpl,
+        mock_redis_queue: AsyncMock,
+        mock_local_queue: AsyncMock,
+    ) -> None:
+        """Cleanup should not touch metrics when no expired items are removed."""
+
+        queue_manager.queue_metrics = {"llm_queue_expiry_total": Mock()}
+        expiry_counter = queue_manager.queue_metrics["llm_queue_expiry_total"]
+        expiry_counter.labels.return_value = Mock()
+
+        mock_redis_queue.cleanup_expired = AsyncMock(return_value=0)
+        mock_local_queue.cleanup_expired = AsyncMock(return_value=0)
+        mock_redis_queue.get_all_queued = AsyncMock(return_value=[])
+        mock_local_queue.get_all_queued = AsyncMock(return_value=[])
+
+        queue_manager._redis_healthy = True
+
+        total_cleaned = await queue_manager.cleanup_expired()
+
+        assert total_cleaned == 0
+        expiry_counter.labels.assert_not_called()

@@ -477,7 +477,7 @@ pdm run pytest-root services/llm_provider_service/tests/ -v
 
 # 4. Typecheck & Lint
 pdm run typecheck-all
-pdm run lint
+pdm run lint-fix --unsafe-fixes
 # Expected: No new errors
 ```
 

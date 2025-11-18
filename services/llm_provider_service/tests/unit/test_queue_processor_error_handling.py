@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from typing import cast
 from unittest.mock import AsyncMock, Mock
 
 import pytest
 from common_core import (
     EssayComparisonWinner,
-    LLMBatchingMode,
     LLMComparisonRequest,
     LLMProviderType,
     QueueStatus,
@@ -20,8 +20,8 @@ from common_core import (
 from common_core.error_enums import ErrorCode
 from common_core.models.error_models import ErrorDetail
 
-from services.llm_provider_service.config import Settings
-from services.llm_provider_service.exceptions import HuleEduError
+from services.llm_provider_service.config import QueueProcessingMode, Settings
+from services.llm_provider_service.exceptions import HuleEduError, raise_processing_error
 from services.llm_provider_service.implementations.queue_processor_impl import QueueProcessorImpl
 from services.llm_provider_service.implementations.trace_context_manager_impl import (
     TraceContextManagerImpl,
@@ -31,55 +31,60 @@ from services.llm_provider_service.protocols import ComparisonProcessorProtocol
 from services.llm_provider_service.queue_models import QueuedRequest, QueueStats
 
 
+@pytest.fixture
+def mock_comparison_processor() -> AsyncMock:
+    """Create mock comparison processor."""
+    return AsyncMock(spec=ComparisonProcessorProtocol)
+
+
+@pytest.fixture
+def mock_queue_manager() -> AsyncMock:
+    """Create mock queue manager."""
+    manager = AsyncMock()
+    manager.get_queue_stats = AsyncMock(
+        return_value=QueueStats(
+            current_size=0,
+            max_size=1000,
+            memory_usage_mb=0.0,
+            max_memory_mb=100.0,
+            usage_percent=0.0,
+            queued_count=0,
+            is_accepting_requests=True,
+        )
+    )
+    return manager
+
+
+@pytest.fixture
+def mock_event_publisher() -> AsyncMock:
+    """Create mock event publisher."""
+    return AsyncMock()
+
+
+@pytest.fixture
+def mock_trace_context_manager() -> Mock:
+    """Create mock trace context manager."""
+    trace_manager = Mock(spec=TraceContextManagerImpl)
+    # Create a mock context manager for restore_trace_context_for_queue_processing
+    mock_span = Mock()
+    mock_span.add_event = Mock()
+    context_manager = Mock()
+    context_manager.__enter__ = Mock(return_value=mock_span)
+    context_manager.__exit__ = Mock(return_value=None)
+    trace_manager.restore_trace_context_for_queue_processing.return_value = context_manager
+    return trace_manager
+
+
+@pytest.fixture
+def settings() -> Settings:
+    """Create test settings."""
+    settings = Settings()
+    settings.QUEUE_POLL_INTERVAL_SECONDS = 0.1
+    return settings
+
+
 class TestQueueProcessorErrorHandling:
     """Tests for queue processor error handling."""
-
-    @pytest.fixture
-    def mock_comparison_processor(self) -> AsyncMock:
-        """Create mock comparison processor."""
-        return AsyncMock(spec=ComparisonProcessorProtocol)
-
-    @pytest.fixture
-    def mock_queue_manager(self) -> AsyncMock:
-        """Create mock queue manager."""
-        manager = AsyncMock()
-        manager.get_queue_stats = AsyncMock(
-            return_value=QueueStats(
-                current_size=0,
-                max_size=1000,
-                memory_usage_mb=0.0,
-                max_memory_mb=100.0,
-                usage_percent=0.0,
-                queued_count=0,
-                is_accepting_requests=True,
-            )
-        )
-        return manager
-
-    @pytest.fixture
-    def mock_event_publisher(self) -> AsyncMock:
-        """Create mock event publisher."""
-        return AsyncMock()
-
-    @pytest.fixture
-    def mock_trace_context_manager(self) -> Mock:
-        """Create mock trace context manager."""
-        trace_manager = Mock(spec=TraceContextManagerImpl)
-        # Create a mock context manager for restore_trace_context_for_queue_processing
-        mock_span = Mock()
-        mock_span.add_event = Mock()
-        context_manager = Mock()
-        context_manager.__enter__ = Mock(return_value=mock_span)
-        context_manager.__exit__ = Mock(return_value=None)
-        trace_manager.restore_trace_context_for_queue_processing.return_value = context_manager
-        return trace_manager
-
-    @pytest.fixture
-    def settings(self) -> Settings:
-        """Create test settings."""
-        settings = Settings()
-        settings.QUEUE_POLL_INTERVAL_SECONDS = 0.1
-        return settings
 
     @pytest.fixture
     def queue_processor(
@@ -312,9 +317,9 @@ Essay B content""",
         mock_event_publisher: AsyncMock,
         mock_trace_context_manager: Mock,
     ) -> None:
-        """Serial bundle mode should call process_comparison_batch instead of per-request."""
+        """Serial bundle helper should call process_comparison_batch for bundled work."""
         settings = Settings()
-        settings.QUEUE_PROCESSING_MODE = LLMBatchingMode.SERIAL_BUNDLE
+        settings.QUEUE_PROCESSING_MODE = QueueProcessingMode.SERIAL_BUNDLE
         settings.QUEUE_POLL_INTERVAL_SECONDS = 0.1
 
         queue_processor = QueueProcessorImpl(
@@ -343,6 +348,7 @@ Essay B content""",
 
         mock_queue_manager.update_status = AsyncMock()
         mock_queue_manager.remove = AsyncMock()
+        mock_queue_manager.dequeue = AsyncMock(return_value=None)
         mock_comparison_processor.process_comparison_batch.return_value = [
             LLMOrchestratorResponse(
                 winner=EssayComparisonWinner.ESSAY_A,
@@ -357,8 +363,402 @@ Essay B content""",
                 metadata={"prompt_sha256": "abc"},
             )
         ]
+        setattr(queue_processor, "_publish_callback_event", AsyncMock())
 
-        await queue_processor._process_request(queued_request)
+        await queue_processor._process_request_serial_bundle(queued_request)
 
         mock_comparison_processor.process_comparison_batch.assert_called_once()
         mock_comparison_processor.process_comparison.assert_not_called()
+
+
+class TestSerialBundleProcessing:
+    """Focused tests for the serial bundle helper."""
+
+    @pytest.mark.asyncio
+    async def test_serial_bundle_collects_multiple_requests(
+        self,
+        mock_comparison_processor: AsyncMock,
+        mock_queue_manager: AsyncMock,
+        mock_event_publisher: AsyncMock,
+        mock_trace_context_manager: Mock,
+    ) -> None:
+        settings = Settings()
+        settings.QUEUE_PROCESSING_MODE = QueueProcessingMode.SERIAL_BUNDLE
+        settings.SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL = 3
+
+        queue_processor = QueueProcessorImpl(
+            comparison_processor=mock_comparison_processor,
+            queue_manager=mock_queue_manager,
+            event_publisher=mock_event_publisher,
+            trace_context_manager=mock_trace_context_manager,
+            settings=settings,
+            queue_processing_mode=settings.QUEUE_PROCESSING_MODE,
+        )
+
+        first_request = QueuedRequest(
+            queue_id=uuid.uuid4(),
+            request_data=LLMComparisonRequest(
+                user_prompt="prompt-a",
+                callback_topic="topic",
+                correlation_id=uuid.uuid4(),
+                llm_config_overrides=LLMConfigOverrides(provider_override=LLMProviderType.MOCK),
+                metadata={"cj_llm_batching_mode": "serial_bundle"},
+            ),
+            status=QueueStatus.QUEUED,
+            queued_at=datetime.now(timezone.utc),
+            size_bytes=10,
+            callback_topic="topic",
+        )
+
+        second_request = QueuedRequest(
+            queue_id=uuid.uuid4(),
+            request_data=LLMComparisonRequest(
+                user_prompt="prompt-b",
+                callback_topic="topic",
+                correlation_id=uuid.uuid4(),
+                llm_config_overrides=LLMConfigOverrides(provider_override=LLMProviderType.MOCK),
+                metadata={"cj_llm_batching_mode": "serial_bundle"},
+            ),
+            status=QueueStatus.QUEUED,
+            queued_at=datetime.now(timezone.utc),
+            size_bytes=10,
+            callback_topic="topic",
+        )
+
+        mock_queue_manager.dequeue = AsyncMock(side_effect=[second_request, None])
+        mock_queue_manager.update_status = AsyncMock()
+        mock_queue_manager.remove = AsyncMock()
+        setattr(queue_processor, "_publish_callback_event", AsyncMock())
+        setattr(queue_processor, "_handle_request_success", AsyncMock())
+        setattr(queue_processor, "_record_completion_metrics", Mock())
+
+        mock_comparison_processor.process_comparison_batch.return_value = [
+            LLMOrchestratorResponse(
+                winner=EssayComparisonWinner.ESSAY_A,
+                justification="A",
+                confidence=0.5,
+                provider=LLMProviderType.MOCK,
+                model="mock",
+                correlation_id=first_request.queue_id,
+                response_time_ms=10,
+                token_usage={"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+                cost_estimate=0.0,
+                metadata={"prompt_sha256": "abc"},
+            ),
+            LLMOrchestratorResponse(
+                winner=EssayComparisonWinner.ESSAY_B,
+                justification="B",
+                confidence=0.6,
+                provider=LLMProviderType.MOCK,
+                model="mock",
+                correlation_id=second_request.queue_id,
+                response_time_ms=12,
+                token_usage={"prompt_tokens": 2, "completion_tokens": 1, "total_tokens": 3},
+                cost_estimate=0.0,
+                metadata={"prompt_sha256": "def"},
+            ),
+        ]
+
+        await queue_processor._process_request_serial_bundle(first_request)
+
+        mock_comparison_processor.process_comparison_batch.assert_awaited_once()
+        assert queue_processor._pending_request is None
+        handle_success_mock = cast(AsyncMock, getattr(queue_processor, "_handle_request_success"))
+        assert handle_success_mock.await_count == 2
+
+    @pytest.mark.asyncio
+    async def test_serial_bundle_defers_incompatible_request(
+        self,
+        mock_comparison_processor: AsyncMock,
+        mock_queue_manager: AsyncMock,
+        mock_event_publisher: AsyncMock,
+        mock_trace_context_manager: Mock,
+    ) -> None:
+        settings = Settings()
+        settings.QUEUE_PROCESSING_MODE = QueueProcessingMode.SERIAL_BUNDLE
+
+        queue_processor = QueueProcessorImpl(
+            comparison_processor=mock_comparison_processor,
+            queue_manager=mock_queue_manager,
+            event_publisher=mock_event_publisher,
+            trace_context_manager=mock_trace_context_manager,
+            settings=settings,
+            queue_processing_mode=settings.QUEUE_PROCESSING_MODE,
+        )
+
+        first_request = QueuedRequest(
+            queue_id=uuid.uuid4(),
+            request_data=LLMComparisonRequest(
+                user_prompt="prompt-a",
+                callback_topic="topic",
+                llm_config_overrides=LLMConfigOverrides(provider_override=LLMProviderType.MOCK),
+            ),
+            status=QueueStatus.QUEUED,
+            queued_at=datetime.now(timezone.utc),
+            size_bytes=10,
+            callback_topic="topic",
+        )
+        incompatible_request = QueuedRequest(
+            queue_id=uuid.uuid4(),
+            request_data=LLMComparisonRequest(
+                user_prompt="prompt-b",
+                callback_topic="topic",
+                llm_config_overrides=LLMConfigOverrides(provider_override=LLMProviderType.OPENAI),
+            ),
+            status=QueueStatus.QUEUED,
+            queued_at=datetime.now(timezone.utc),
+            size_bytes=10,
+            callback_topic="topic",
+        )
+
+        mock_queue_manager.dequeue = AsyncMock(side_effect=[incompatible_request])
+        mock_queue_manager.update_status = AsyncMock()
+        mock_queue_manager.remove = AsyncMock()
+        setattr(queue_processor, "_publish_callback_event", AsyncMock())
+        setattr(queue_processor, "_handle_request_success", AsyncMock())
+        setattr(queue_processor, "_record_completion_metrics", Mock())
+
+        mock_comparison_processor.process_comparison_batch.return_value = [
+            LLMOrchestratorResponse(
+                winner=EssayComparisonWinner.ESSAY_A,
+                justification="A",
+                confidence=0.5,
+                provider=LLMProviderType.MOCK,
+                model="mock",
+                correlation_id=first_request.queue_id,
+                response_time_ms=10,
+                token_usage={"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+                cost_estimate=0.0,
+                metadata={"prompt_sha256": "abc"},
+            )
+        ]
+
+        await queue_processor._process_request_serial_bundle(first_request)
+
+        assert queue_processor._pending_request is incompatible_request
+        mock_comparison_processor.process_comparison_batch.assert_awaited_once()
+        awaited_call = mock_comparison_processor.process_comparison_batch.await_args
+        assert len(awaited_call.args[0]) == 1
+
+    @pytest.mark.asyncio
+    async def test_serial_bundle_handles_batch_errors_per_request(
+        self,
+        mock_comparison_processor: AsyncMock,
+        mock_queue_manager: AsyncMock,
+        mock_event_publisher: AsyncMock,
+        mock_trace_context_manager: Mock,
+    ) -> None:
+        settings = Settings()
+        settings.QUEUE_PROCESSING_MODE = QueueProcessingMode.SERIAL_BUNDLE
+
+        queue_processor = QueueProcessorImpl(
+            comparison_processor=mock_comparison_processor,
+            queue_manager=mock_queue_manager,
+            event_publisher=mock_event_publisher,
+            trace_context_manager=mock_trace_context_manager,
+            settings=settings,
+            queue_processing_mode=settings.QUEUE_PROCESSING_MODE,
+        )
+
+        first_request = QueuedRequest(
+            queue_id=uuid.uuid4(),
+            request_data=LLMComparisonRequest(
+                user_prompt="prompt-a",
+                callback_topic="topic",
+                llm_config_overrides=LLMConfigOverrides(provider_override=LLMProviderType.MOCK),
+            ),
+            status=QueueStatus.QUEUED,
+            queued_at=datetime.now(timezone.utc),
+            size_bytes=10,
+            callback_topic="topic",
+        )
+        second_request = QueuedRequest(
+            queue_id=uuid.uuid4(),
+            request_data=LLMComparisonRequest(
+                user_prompt="prompt-b",
+                callback_topic="topic",
+                llm_config_overrides=LLMConfigOverrides(provider_override=LLMProviderType.MOCK),
+            ),
+            status=QueueStatus.QUEUED,
+            queued_at=datetime.now(timezone.utc),
+            size_bytes=10,
+            callback_topic="topic",
+        )
+
+        mock_queue_manager.dequeue = AsyncMock(side_effect=[second_request, None])
+        mock_queue_manager.update_status = AsyncMock()
+        setattr(queue_processor, "_record_completion_metrics", Mock())
+        setattr(queue_processor, "_handle_request_hule_error", AsyncMock())
+
+        try:
+            raise_processing_error(
+                service="llm_provider_service",
+                operation="serial_bundle_processing",
+                message="provider error",
+                correlation_id=first_request.queue_id,
+            )
+        except HuleEduError as error:
+            mock_comparison_processor.process_comparison_batch.side_effect = error
+
+        await queue_processor._process_request_serial_bundle(first_request)
+
+        handle_error_mock = cast(AsyncMock, getattr(queue_processor, "_handle_request_hule_error"))
+        assert handle_error_mock.await_count == 2
+
+
+class TestQueueProcessorMetrics:
+    """Tests for queue processor metrics semantics."""
+
+    def test_expired_request_records_expiry_metrics_not_processing_or_callbacks(
+        self,
+    ) -> None:
+        settings = Settings()
+        settings.QUEUE_POLL_INTERVAL_SECONDS = 0.1
+        queue_processor = QueueProcessorImpl(
+            comparison_processor=AsyncMock(spec=ComparisonProcessorProtocol),
+            queue_manager=AsyncMock(),
+            event_publisher=AsyncMock(),
+            trace_context_manager=Mock(spec=TraceContextManagerImpl),
+            settings=settings,
+        )
+
+        queue_processor.queue_metrics = {
+            "llm_queue_expiry_total": Mock(),
+            "llm_queue_expiry_age_seconds": Mock(),
+            "llm_queue_wait_time_seconds": Mock(),
+            "llm_queue_processing_time_seconds": Mock(),
+            "llm_comparison_callbacks_total": Mock(),
+        }
+
+        expiry_counter = queue_processor.queue_metrics["llm_queue_expiry_total"]
+        expiry_age_hist = queue_processor.queue_metrics["llm_queue_expiry_age_seconds"]
+        wait_hist = queue_processor.queue_metrics["llm_queue_wait_time_seconds"]
+        proc_hist = queue_processor.queue_metrics["llm_queue_processing_time_seconds"]
+        callbacks_counter = queue_processor.queue_metrics["llm_comparison_callbacks_total"]
+
+        expiry_counter.labels.return_value = Mock()
+        expiry_age_hist.labels.return_value = Mock()
+        wait_hist.labels.return_value = Mock()
+        proc_hist.labels.return_value = Mock()
+        callbacks_counter.labels.return_value = Mock()
+
+        request_data = LLMComparisonRequest(
+            user_prompt="prompt",
+            callback_topic="topic",
+            correlation_id=uuid.uuid4(),
+        )
+        queued_request = QueuedRequest(
+            queue_id=uuid.uuid4(),
+            request_data=request_data,
+            status=QueueStatus.QUEUED,
+            queued_at=datetime.now(timezone.utc) - timedelta(seconds=30),
+            size_bytes=len(request_data.model_dump_json()),
+            callback_topic="topic",
+        )
+
+        provider = LLMProviderType.MOCK
+
+        queue_processor._record_expiry_metrics(
+            request=queued_request,
+            provider=provider,
+            expiry_reason="ttl",
+        )
+        queue_processor._record_completion_metrics(
+            provider=provider,
+            result="expired",
+            request=queued_request,
+            processing_started=None,
+        )
+
+        expiry_counter.labels.assert_called_once_with(
+            provider=provider.value,
+            queue_processing_mode=queue_processor.queue_processing_mode.value,
+            expiry_reason="ttl",
+        )
+        expiry_counter.labels.return_value.inc.assert_called_once_with()
+
+        expiry_age_hist.labels.assert_called_once_with(
+            provider=provider.value,
+            queue_processing_mode=queue_processor.queue_processing_mode.value,
+        )
+        age_call = expiry_age_hist.labels.return_value.observe.call_args
+        assert age_call is not None
+        assert age_call.args[0] >= 0.0
+
+        wait_hist.labels.assert_called_once_with(
+            queue_processing_mode=queue_processor.queue_processing_mode.value,
+            result="expired",
+        )
+        wait_hist.labels.return_value.observe.assert_called_once_with(  # type: ignore[call-arg]
+            pytest.approx(wait_hist.labels.return_value.observe.call_args.args[0])
+        )
+
+        proc_hist.labels.return_value.observe.assert_not_called()
+        callbacks_counter.labels.return_value.inc.assert_not_called()
+
+    def test_success_request_records_processing_and_callbacks_metrics(
+        self,
+    ) -> None:
+        settings = Settings()
+        settings.QUEUE_POLL_INTERVAL_SECONDS = 0.1
+        queue_processor = QueueProcessorImpl(
+            comparison_processor=AsyncMock(spec=ComparisonProcessorProtocol),
+            queue_manager=AsyncMock(),
+            event_publisher=AsyncMock(),
+            trace_context_manager=Mock(spec=TraceContextManagerImpl),
+            settings=settings,
+        )
+
+        queue_processor.queue_metrics = {
+            "llm_queue_expiry_total": Mock(),
+            "llm_queue_expiry_age_seconds": Mock(),
+            "llm_queue_wait_time_seconds": Mock(),
+            "llm_queue_processing_time_seconds": Mock(),
+            "llm_comparison_callbacks_total": Mock(),
+        }
+
+        wait_hist = queue_processor.queue_metrics["llm_queue_wait_time_seconds"]
+        proc_hist = queue_processor.queue_metrics["llm_queue_processing_time_seconds"]
+        callbacks_counter = queue_processor.queue_metrics["llm_comparison_callbacks_total"]
+
+        wait_hist.labels.return_value = Mock()
+        proc_hist.labels.return_value = Mock()
+        callbacks_counter.labels.return_value = Mock()
+
+        request_data = LLMComparisonRequest(
+            user_prompt="prompt",
+            callback_topic="topic",
+            correlation_id=uuid.uuid4(),
+        )
+        queued_request = QueuedRequest(
+            queue_id=uuid.uuid4(),
+            request_data=request_data,
+            status=QueueStatus.QUEUED,
+            queued_at=datetime.now(timezone.utc) - timedelta(seconds=10),
+            size_bytes=len(request_data.model_dump_json()),
+            callback_topic="topic",
+        )
+
+        provider = LLMProviderType.MOCK
+
+        queue_processor._record_completion_metrics(
+            provider=provider,
+            result="success",
+            request=queued_request,
+            processing_started=0.0,
+        )
+
+        wait_hist.labels.assert_called_once_with(
+            queue_processing_mode=queue_processor.queue_processing_mode.value,
+            result="success",
+        )
+        wait_hist.labels.return_value.observe.assert_called_once()
+
+        proc_hist.labels.assert_called_once_with(provider=provider.value, status="success")
+        proc_hist.labels.return_value.observe.assert_called_once()
+
+        callbacks_counter.labels.assert_called_once_with(
+            queue_processing_mode=queue_processor.queue_processing_mode.value,
+            result="success",
+        )
+        callbacks_counter.labels.return_value.inc.assert_called_once_with()

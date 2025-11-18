@@ -41,8 +41,8 @@ pdm run dev-logs [service]
 
 # Code quality
 pdm run typecheck-all
-pdm run lint
 pdm run format-all
+pdm run lint-fix --unsafe-fixes
 
 # Run tests
 pdm run pytest-root services/<service>/tests/
@@ -100,8 +100,11 @@ CJ_ASSESSMENT_SERVICE_LLM_BATCH_API_ALLOWED_PROVIDERS="openai,anthropic"  # guar
 
 **LLM Provider Service**:
 ```bash
-LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE=per_request  # or serial_bundle
+LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE=per_request  # QueueProcessingMode: per_request|serial_bundle|batch_api
+LLM_PROVIDER_SERVICE_SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL=8  # clamp to 1-64
+LLM_PROVIDER_SERVICE_BATCH_API_MODE=disabled  # BatchApiMode: disabled|nightly|opportunistic
 ```
+The new enums live inside LPS so CJ's `LLMBatchingMode` remains an external hint. Serial bundling is now active when non-`per_request` modes are enabled: the queue processor drains compatible requests (same provider/model + optional CJ hint) up to the configured per-call limit and processes them in a single queue-loop iteration.
 
 **Observability**: Queue metrics available via Prometheus:
 - `llm_provider_queue_depth` - Current queue size

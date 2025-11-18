@@ -322,7 +322,7 @@ pdm run docker-logs        # View logs
 
 # Code quality
 pdm run format-all         # Format code
-pdm run lint-all           # Run linter
+pdm run lint-fix --unsafe-fixes  # Run linter
 pdm run typecheck-all      # Type checking
 
 # Testing

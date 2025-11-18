@@ -185,7 +185,8 @@ Note: Finalize all DTOs via a contract workshop before coding. Placeholders belo
   - `pdm run test-unit` (unit tests)
   - `pdm run test-integration` (when available)
   - `pdm run typecheck-all` after models/tests added
-  - `pdm run lint` (Ruff)
+  - `pdm run format-all` (Ruff formatting)
+  - `pdm run lint-fix --unsafe-fixes` (Ruff linting)
 
 ## Observability & Security (Reused Patterns)
 

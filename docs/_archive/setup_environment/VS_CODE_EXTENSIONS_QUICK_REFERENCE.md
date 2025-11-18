@@ -91,7 +91,7 @@ Your IDE settings mirror these PDM commands:
 | PDM Command | IDE Equivalent |
 |-------------|----------------|
 | `pdm run format-all` | Format on Save |
-| `pdm run lint-all` | Problems Panel (Ruff) |
+| `pdm run lint-fix --unsafe-fixes` | Problems Panel (Ruff) |
 | `pdm run typecheck-all` | Problems Panel (MyPy) |
 
 ## 🚨 Deprecated Settings (2025 Update)

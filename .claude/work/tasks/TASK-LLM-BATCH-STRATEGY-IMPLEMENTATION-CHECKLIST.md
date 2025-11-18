@@ -21,22 +21,25 @@ configuration.
   - Metadata now includes `cj_batch_id`, `cj_source`, `cj_request_type`, and always reflects the effective batching mode
   - Tests cover config resolution, metadata adapter behaviour, LLM interaction metadata, retry metadata, and continuation persistence
 
-- **Phase 2 (LPS Serial Bundling)**: 3 complete, 4 partial, 6 incomplete
-  - ✅ process_comparison_batch method exists
+- **Phase 2 (LPS Serial Bundling)**: 6 complete, 3 partial, 4 incomplete
+  - ✅ `process_comparison_batch` method wired end-to-end
   - ✅ Result mapping to callbacks implemented
-  - ✅ Basic batch processing tests exist
-  - ⚠️ Queue routing exists but only wraps single requests
-  - ⚠️ QUEUE_PROCESSING_MODE setting exists (uses LLMBatchingMode, not separate enum)
-  - ❌ Missing: actual multi-request bundling, bundle size limit, metadata enrichment
+  - ✅ Basic + targeted serial bundle unit tests exist
+  - ✅ Queue config + `SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL` enforcement live in Settings/README
+  - ✅ Serial bundle path now drains multiple compatible requests per loop iteration with fairness + pending-request handoff
+  - ⚠️ Metadata enrichment + diagnostics still WIP (Phase 3 dependency)
+  - ❌ Missing: provider-side metadata echo, batch metrics, and production rollout docs
 
 - **Phase 3 (Metrics)**: 0 complete, 0 partial, 8 incomplete
   - ❌ No metrics implemented
 
 ### Critical Gaps
 
-1. **LPS still dequeues one request at a time** – "serial bundle" mode remains a thin wrapper
-2. **LLM Provider lacks batching metadata** – needs resolved provider/model + queue mode in metrics/logs
-3. **No observability** – CJ/LPS batching metrics still missing
+1. **LLM Provider metadata trail still thin** – need to enrich queued requests + callbacks with `resolved_provider`, `resolved_model`, and `queue_processing_mode` for diagnostics/tests.
+2. **Observability gap** – serial bundle metrics (bundle size, per-provider counts) still missing pending Phase 3 work.
+3. **Rollout/runbook guidance** – need ENG5-first rollout plan + doc updates before enabling serial bundling in production.
+
+**Related task:** `.claude/work/tasks/TASK-LLM-QUEUE-EXPIRY-METRICS-FIX.md` – LLM queue expiry metrics and observability.
 
 ### Next Steps
 
@@ -205,47 +208,44 @@ For the full implementation plan and design rationale, see
 
 ### 1. Add queue processing modes and serial-bundle limits
 
-- [~] **Introduce `QueueProcessingMode` and `BatchApiMode` enums in LPS config** ⚠️ ARCHITECTURE DEVIATION
-  - File: `services/llm_provider_service/config.py`.
-  - STATUS: Uses `LLMBatchingMode` enum from common_core instead of separate enums
-  - `QueueProcessingMode` values: ❌ NOT IMPLEMENTED (using LLMBatchingMode instead)
-    - `PER_REQUEST`
-    - `SERIAL_BUNDLE`
-    - `BATCH_API`
-  - `BatchApiMode` values: ❌ NOT IMPLEMENTED
-    - `DISABLED`
-    - `NIGHTLY`
-    - `OPPORTUNISTIC`
-  - NOTE: Current architecture reuses LLMBatchingMode enum across both services
+- [x] **Introduce `QueueProcessingMode` and `BatchApiMode` enums in LPS config** ✅ COMPLETE (2025-11-17)
+  - File: `services/llm_provider_service/config.py` now defines `QueueProcessingMode` (`per_request`, `serial_bundle`, `batch_api`) and `BatchApiMode` (`disabled`, `nightly`, `opportunistic`).
+  - `QueueProcessorImpl` and DI wiring no longer import or depend on CJ's `LLMBatchingMode`; the CJ hint remains metadata-only and is mapped internally to the LPS-specific enum.
+  - This unblocks future per-service evolution without leaking CJ enums into LPS internals.
 
-- [~] **Extend LPS `Settings` with queue/batch fields** ⚠️ PARTIAL
-  - Add:
-    - `QUEUE_PROCESSING_MODE: QueueProcessingMode = PER_REQUEST`. ✅ EXISTS (config.py:222-228, but uses LLMBatchingMode type)
-    - `SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL: int` (default ~8, constrained within [1, 64]). ❌ MISSING
-  - Keep batch API mode fields present but initially unused for behaviour changes in this phase.
+- [x] **Extend LPS `Settings` with queue/batch fields** ✅ COMPLETE (2025-11-17)
+  - `QUEUE_PROCESSING_MODE` now uses the new enum while keeping the default `per_request` value and env prefix.
+  - Added `SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL: int = 8` with a validator that clamps inputs to `[1, 64]`.
+  - Added `BATCH_API_MODE: BatchApiMode = disabled` as a Phase-2 placeholder for later provider batch rollout.
 
 ### 2. Implement `QueueProcessingMode.SERIAL_BUNDLE`
 
-- [~] **Dispatch to serial-bundle path in `_process_queue_loop`** ⚠️ PARTIAL
-  - File: `services/llm_provider_service/implementations/queue_processor_impl.py:203-232`.
-  - STATUS: Routes to batch processor when not PER_REQUEST ✅
-  - LIMITATION: Only wraps single requests in list, doesn't actually bundle multiple ❌
-  - When `QUEUE_PROCESSING_MODE == SERIAL_BUNDLE`:
-    - Use a new helper method (e.g. `_process_request_serial_bundle`) instead of
-      `_process_request(request)`. ❌ MISSING (inline logic used instead)
+- [x] **Dispatch to serial-bundle path in `_process_queue_loop`** ✅ COMPLETE (2025-11-18)
+  - File: `services/llm_provider_service/implementations/queue_processor_impl.py:110-180` now
+    drains `_pending_request` before touching Redis/local queues and branches to
+    `_process_request_serial_bundle` whenever the configured mode is not
+    `per_request`.
+  - After each bundle the loop yields (`await asyncio.sleep(0)`) to avoid starving
+    other providers/models.
 
-- [ ] **Implement `_process_request_serial_bundle`** ❌ MISSING
+- [x] **Implement `_process_request_serial_bundle`** ✅ COMPLETE (2025-11-18)
   - Behaviour:
-    - Dequeue the first `QueuedRequest`.
-    - Resolve provider + overrides exactly as in `_process_request`.
-    - Dequeue additional requests until either:
-      - `SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL` is reached, or
-      - No more compatible requests are available.
-    - Compatibility criteria:
-      - Same resolved provider and model.
-      - Optionally same `cj_llm_batching_mode` when present in `request_data.metadata`.
-    - Invoke a batch processing method on `ComparisonProcessorImpl`.
-  - CURRENT: Only single-request wrapping exists (queue_processor_impl.py:215-219)
+    - Seeds a bundle with the lead request, marks it `PROCESSING`, and records a
+      per-request processing timer.
+    - Dequeues additional requests until hitting
+      `SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL` (default 8) or the first incompatible
+      entry. Compatibility requires matching provider, identical override dict,
+      and, when present, identical `cj_llm_batching_mode`. The first
+      incompatible request is stored in `_pending_request` so the queue loop can
+      process it on the next iteration without re-enqueueing.
+    - Expired dequeues are handled inline (status update + metrics) without
+      breaking the bundle.
+    - Invokes `comparison_processor.process_comparison_batch(items)` once per
+      bundle. Results are length-checked, fed back through
+      `_handle_request_success`, and metrics are tagged with the correct mode.
+    - Provider errors bubble as `HuleEduError`; the queue processor now fans that
+      failure out to every queued request so callbacks/state stay consistent even
+      though partial successes cannot yet be separated.
 
 - [x] **Add `ComparisonProcessorImpl.process_comparison_batch`** ✅ COMPLETE
   - File: `services/llm_provider_service/protocols.py` (protocol definition)
@@ -279,14 +279,11 @@ For the full implementation plan and design rationale, see
     - `queue_processing_mode` to `request.request_data.metadata`. ❌ NOT IMPLEMENTED
   - These fields should be visible in logs and can be used for bundle grouping and diagnostics.
 
-- [~] **Serial-bundling tests** ⚠️ PARTIAL
-  - File: `services/llm_provider_service/tests/unit/test_queue_processor_error_handling.py:315-364` ✅
-  - File: `services/llm_provider_service/tests/unit/test_comparison_processor.py:131-204` ✅
-  - Add unit tests for `_process_request_serial_bundle` that:
-    - Simulate a queue with multiple compatible and incompatible requests. ❌ NOT TESTED (method doesn't exist yet)
-    - Assert that compatible requests are processed together and incompatible ones are left for a
-      later batch or processed separately. ❌ NOT TESTED (no multi-request bundling)
-    - Verify that per-request callbacks and queue status updates remain correct. ✅ TESTED (for single-request wrapping)
+- [~] **Serial-bundling tests** ⚠️ PARTIAL (expanded 2025-11-18)
+  - File: `services/llm_provider_service/tests/unit/test_queue_processor_error_handling.py`
+    now covers multi-request bundles, incompatibility deferral, and bundle-wide error handling.
+  - Still pending: integration-level coverage that exercises redis/local queue interplay and
+    per-request telemetry once metadata enrichment lands (targeted for PR 4/5).
 
 ---
 

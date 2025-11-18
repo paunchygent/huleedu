@@ -13,7 +13,7 @@ alwaysApply: true
 ## 2. Tooling & Formatting
 
 ### 2.1. Ruff (Formatting and Linting)
-- **Commands**: `pdm run format-all`, `pdm run lint-all`
+- **Commands**: `pdm run format-all`, `pdm run lint-fix --unsafe-fixes`
 - **Auto-fix**: `ruff check --fix --force-exclude .`
 - **Configuration**: `pyproject.toml` under `[tool.ruff]`
 - **MUST** use `--force-exclude` flag

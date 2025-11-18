@@ -102,13 +102,22 @@ LLM_PROVIDER_SERVICE_ACTIVE_MODEL_FAMILIES='{"anthropic":["claude-haiku","claude
 through the comparison processor:
 
 - `per_request` (default): call `process_comparison` exactly once per dequeued item.
-- `serial_bundle`: wrap each dequeued item in a `BatchComparisonItem` and invoke
-  `process_comparison_batch` with a single-item list. This keeps behaviour
-  identical today but exercises the batch API so future serial bundling only needs
-  to change the bundling logic, not the queue processor wiring.
-- `provider_batch_api`: reserved for native provider batch endpoints. Until that
-  lands, it behaves the same as `serial_bundle` but allows end-to-end plumbing to
-  be validated ahead of time.
+- `serial_bundle`: dequeue the leading request plus up to
+  `LLM_PROVIDER_SERVICE_SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL` compatible follow-ups,
+  then invoke `process_comparison_batch` once for the entire group. Requests are
+  considered compatible when the resolved provider, model override, and optional
+  `cj_llm_batching_mode` hint all match. This keeps provider calls sequential
+  while dramatically reducing queue round-trips.
+- `batch_api` (previously labeled `provider_batch_api` in CJ hints): reserved for
+  native provider batch endpoints. Until that lands, it behaves the same as
+  `serial_bundle` but remains separately configurable via
+  `LLM_PROVIDER_SERVICE_BATCH_API_MODE` (disabled/nightly/opportunistic).
+
+Use `LLM_PROVIDER_SERVICE_SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL` (default `8`, range
+`1-64`) to cap how many compatible queued items can be drained per bundle. Each
+bundle is processed within a single queue-loop iteration, and an incompatible
+request is held in-memory so it becomes the next iteration's lead item rather
+than being re-enqueued.
 
 The queue processor logs `queue_processing_mode` for every dequeued request and the
 callback payload is identical in all modes, so you can safely flip the flag in
@@ -125,9 +134,9 @@ When `LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE=serial_bundle` (or
 
 In addition to the Prometheus metrics, a `queue_metrics_snapshot` log line is
 written every 30 seconds whenever a non-`per_request` mode is active. This log
-includes the queue depth, usage percentage, and whether the queue is still
-accepting new requests so you can correlate rollouts with Redis/local backlog
-changes.
+includes the queue depth, usage percentage, whether the queue is still accepting
+new requests, and (for serial bundles) the bundle size/provider metadata so you
+can correlate rollouts with Redis/local backlog changes.
 
 ## Development
 
@@ -498,6 +507,10 @@ Common breaking changes:
 - `llm_tokens_used_total` - Token usage by provider
 - `llm_cost_dollars_total` - Cumulative cost by provider
 - `llm_circuit_breaker_state` - Circuit breaker states
+- `llm_provider_queue_expiry_total{provider, queue_processing_mode, expiry_reason}` - Dedicated counter for expired queue requests.
+- `llm_provider_queue_expiry_age_seconds{provider, queue_processing_mode}` - Histogram of request age at expiry.
+
+`expiry_reason="ttl"` is emitted from `QueueProcessorImpl` when a dequeued request has passed its TTL; `expiry_reason="cleanup"` is emitted from `ResilientQueueManagerImpl.cleanup_expired()` when Redis/local cleanup purges entries that never reached the processor (using `provider="unknown"` to avoid extra lookup and cardinality).
 
 ### Kafka Events
 

@@ -7,7 +7,7 @@ to ensure queue functionality during Redis outages.
 
 import time
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Optional
 from uuid import UUID
 
 from common_core import QueueStatus
@@ -20,6 +20,7 @@ from services.llm_provider_service.implementations.local_queue_manager_impl impo
 from services.llm_provider_service.implementations.redis_queue_repository_impl import (
     RedisQueueRepositoryImpl,
 )
+from services.llm_provider_service.metrics import get_queue_metrics
 from services.llm_provider_service.protocols import QueueManagerProtocol
 from services.llm_provider_service.queue_models import QueuedRequest, QueueStats
 
@@ -48,6 +49,8 @@ class ResilientQueueManagerImpl(QueueManagerProtocol):
 
         # Migration tracking
         self._migrated_to_local: set[UUID] = set()  # Track items migrated to local
+
+        self.queue_metrics: dict[str, Any] | None = get_queue_metrics()
 
     async def _check_redis_health(self, force: bool = False) -> bool:
         """Check if Redis is available."""
@@ -277,12 +280,23 @@ class ResilientQueueManagerImpl(QueueManagerProtocol):
         # Cleanup Redis if healthy
         if self._redis_healthy and await self._check_redis_health():
             try:
-                total_cleaned += await self.redis_queue.cleanup_expired()
+                cleaned = await self.redis_queue.cleanup_expired()
+                total_cleaned += cleaned
             except Exception as e:
                 logger.warning(f"Redis cleanup failed: {e}")
 
         # Always cleanup local
-        total_cleaned += await self.local_queue.cleanup_expired()
+        local_cleaned = await self.local_queue.cleanup_expired()
+        total_cleaned += local_cleaned
+
+        if total_cleaned > 0 and self.queue_metrics:
+            expiry_counter = self.queue_metrics.get("llm_queue_expiry_total")
+            if expiry_counter is not None:
+                expiry_counter.labels(
+                    provider="unknown",
+                    queue_processing_mode=self.settings.QUEUE_PROCESSING_MODE.value,
+                    expiry_reason="cleanup",
+                ).inc(total_cleaned)
 
         # Clean up migration tracking for expired items
         if total_cleaned > 0:

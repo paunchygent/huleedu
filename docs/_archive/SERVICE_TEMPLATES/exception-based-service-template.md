@@ -886,7 +886,7 @@ pdm run typecheck-all
 
 # Code formatting and linting
 pdm run format-all
-pdm run lint-all
+pdm run lint-fix --unsafe-fixes
 
 # Testing
 pdm run pytest services/<service_name>/tests/

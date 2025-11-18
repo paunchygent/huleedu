@@ -196,8 +196,8 @@ Run these commands and compare output:
 
 ```bash
 # Command line
-pdm run lint-all
 pdm run format-all
+pdm run lint-fix --unsafe-fixes
 pdm run typecheck-all
 
 # Should match what you see in Cursor's Problems panel
@@ -318,7 +318,7 @@ When properly configured, you should see:
 Your Cursor settings will run the same checks as these PDM commands:
 
 - `pdm run format-all` ↔ Format on Save in Cursor
-- `pdm run lint-all` ↔ Ruff linting in Problems panel
+- `pdm run lint-fix --unsafe-fixes` ↔ Ruff linting in Problems panel
 - `pdm run typecheck-all` ↔ MyPy type checking in Problems panel
 
 ## Summary

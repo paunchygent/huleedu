@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import Any, Dict, Optional
 
 from common_core import LLMProviderType
-from common_core.config_enums import Environment, LLMBatchingMode
+from common_core.config_enums import Environment
 from huleedu_service_libs.config import SecureServiceSettings
 from pydantic import AliasChoices, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -16,6 +17,22 @@ from services.llm_provider_service.model_manifest import (
     ProviderName,
     get_model_config,
 )
+
+
+class QueueProcessingMode(StrEnum):
+    """Queue-level batching strategies internal to the LLM Provider Service."""
+
+    PER_REQUEST = "per_request"
+    SERIAL_BUNDLE = "serial_bundle"
+    BATCH_API = "batch_api"
+
+
+class BatchApiMode(StrEnum):
+    """Feature-flag style modes for provider-native batch APIs."""
+
+    DISABLED = "disabled"
+    NIGHTLY = "nightly"
+    OPPORTUNISTIC = "opportunistic"
 
 
 class ProviderConfig(BaseSettings):
@@ -219,11 +236,25 @@ class Settings(SecureServiceSettings):
         default=3,
         description="Maximum number of retries for failed requests",
     )
-    QUEUE_PROCESSING_MODE: LLMBatchingMode = Field(
-        default=LLMBatchingMode.PER_REQUEST,
+    SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL: int = Field(
+        default=8,
+        description=(
+            "Upper bound on how many compatible dequeued items can be bundled into a single"
+            " comparison_batch call."
+        ),
+    )
+    QUEUE_PROCESSING_MODE: QueueProcessingMode = Field(
+        default=QueueProcessingMode.PER_REQUEST,
         description=(
             "How dequeued requests are processed: per_request (direct), serial_bundle "
-            "(single-item batch wrapper), or provider_batch_api (future native batching)."
+            "(bundled queue processing), or batch_api (future provider-native batching)."
+        ),
+    )
+    BATCH_API_MODE: BatchApiMode = Field(
+        default=BatchApiMode.DISABLED,
+        description=(
+            "Phase 2 placeholder toggle describing when provider-native batch APIs should be"
+            " invoked once implemented."
         ),
     )
 
@@ -240,6 +271,14 @@ class Settings(SecureServiceSettings):
         if "QUEUE_HIGH_WATERMARK" in info.data and v >= info.data["QUEUE_HIGH_WATERMARK"]:
             raise ValueError("QUEUE_LOW_WATERMARK must be less than QUEUE_HIGH_WATERMARK")
         return v
+
+    @field_validator("SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL")
+    @classmethod
+    def validate_serial_bundle_limit(cls, value: int) -> int:
+        """Clamp serial bundle size to a safe operational window."""
+        if not 1 <= value <= 64:
+            raise ValueError("SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL must be between 1 and 64")
+        return value
 
     @field_validator("RECORD_LLM_RESPONSES")
     @classmethod

@@ -87,7 +87,7 @@ Extend the D-optimal pair optimizer so that multi-session runs truly continue fr
 
 ### 8. Verification
 
-- Run `pdm run format-all` (if necessary), `pdm run lint-all` (or scoped Ruff) and `pdm run typecheck-all`.
+- Run `pdm run format-all` (if necessary), `pdm run lint-fix --unsafe-fixes` (or scoped Ruff) and `pdm run typecheck-all`.
 - Manual smoke test:
   - Baseline CSV with multiple comparison types.
   - Run CLI (`redistribute_pairs optimize-pairs`) and TUI to verify diagnostics and CSV output.

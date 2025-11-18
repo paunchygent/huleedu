@@ -212,8 +212,8 @@ labels: []
     - `pdm run test-unit`
     - `pdm run test-integration`
   - Lint/format:
-    - `pdm run lint`
-    - `pdm run format-all` (if configured)
+    - `pdm run format-all`
+    - `pdm run lint-fix --unsafe-fixes`
   - Typechecking:
     - `pdm run typecheck-all`
 - Restart services (dev only) as needed:
@@ -401,7 +401,8 @@ After successful identity threading implementation, tests need updates for new m
 ## Commands Reference (from repo root)
 
 - Tests: `pdm run test-all` | `pdm run test-unit` | `pdm run test-integration`
-- Lint: `pdm run lint`
+- Format: `pdm run format-all`
+- Lint: `pdm run lint-fix --unsafe-fixes`
 - Typecheck: `pdm run typecheck-all`
 - Restart services (dev):
   - `pdm run restart essay_lifecycle_service`

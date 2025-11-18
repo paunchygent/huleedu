@@ -141,8 +141,8 @@ pdm run dev
 pdm run test
 
 # Lint and format
-pdm run lint
-pdm run format
+pdm run format-all
+pdm run lint-fix --unsafe-fixes
 ```
 
 ### Testing

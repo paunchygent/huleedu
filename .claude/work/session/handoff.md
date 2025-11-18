@@ -44,7 +44,7 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 
 ---
 
-## LLM Batch Strategy Implementation Status (2025-11-17)
+## LLM Batch Strategy Implementation Status (2025-11-18)
 
 ### Overview
 **Progress**: ~30% complete (9 items complete, 5 partial, 16 not started)
@@ -58,15 +58,18 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 - ⚠️ Metadata model partial: `cj_llm_batching_mode` field exists
 - ⚠️ Tests partial: metadata propagation tested for existing fields
 
-**Phase 2 (LPS Serial Bundling)** - 38% complete:
+**Phase 2 (LPS Serial Bundling)** - 65% complete:
 - ✅ `ComparisonProcessorProtocol.process_comparison_batch` method implemented
-- ✅ Queue routing to batch mode (when QUEUE_PROCESSING_MODE != PER_REQUEST)
+- ✅ Queue routing to batch/serial mode (when `QUEUE_PROCESSING_MODE != per_request`)
 - ✅ Result mapping back to individual callbacks
-- ⚠️ `Settings.QUEUE_PROCESSING_MODE` exists (uses LLMBatchingMode enum)
-- ⚠️ Basic batch processing tests exist
+- ✅ Config now exposes `QueueProcessingMode`, `BatchApiMode`, and `SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL`
+- ✅ `_process_request_serial_bundle` drains multiple compatible requests per loop (fairness safeguard + `_pending_request` handoff)
+- ⚠️ Metadata/diagnostics + production rollout docs still pending
 
-**Phase 3 (Metrics)** - 0% complete:
-- ❌ No metrics implemented
+**Phase 3 (Metrics)** - expiry semantics complete for LLM Provider queue:
+- ✅ `llm_provider_queue_expiry_total{provider, queue_processing_mode, expiry_reason}` implemented for both dequeued TTL expiries (`expiry_reason="ttl"`) and manager-level cleanup (`expiry_reason="cleanup"`, `provider="unknown"`).
+- ✅ `llm_provider_queue_expiry_age_seconds{provider, queue_processing_mode}` implemented for dequeue-time expiries (age-at-expiry histogram).
+- ✅ Queue completion metrics corrected so expired requests no longer contribute to processing-time or callback totals but still update wait-time metrics.
 
 ### Critical Missing Items
 
@@ -75,11 +78,9 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 - CJ now emits `cj_batch_id`, `cj_source`, `cj_request_type`, and the effective `cj_llm_batching_mode` for both initial submissions and retry batches.
 - Config resolution + metadata propagation tests live in `tests/unit/test_llm_batching_config.py`, `test_llm_interaction_impl_unit.py`, and `test_batch_retry_processor.py`.
 
-**Phase 2 (6 items missing)**:
-1. ❌ `SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL` setting
-2. ❌ `_process_request_serial_bundle()` method
-3. ❌ Multi-request dequeue logic (currently only wraps single requests!)
-4. ❌ Metadata enrichment (resolved_provider, resolved_model, queue_processing_mode)
+**Phase 2 (2 items missing)**:
+1. ❌ Metadata enrichment (resolved_provider, resolved_model, queue_processing_mode)
+2. ⚠️ Observability/runbook updates + rollout guidance (doc + Phase 3 metrics linkage)
 
 **Phase 3 (8 items missing)**:
 1. ❌ All serial bundling metrics
@@ -93,19 +94,19 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 - Both are separate; metadata currently uses `bos_batch_id` correctly
 - Checklist requires adding `cj_batch_id` as `str(internal_id)` to metadata
 
-**Architecture Deviation**:
-- LPS uses `LLMBatchingMode` enum instead of separate `QueueProcessingMode` enum
-- Single enum reused across both services (simpler but differs from checklist)
+**Architecture Update**:
+- LPS now defines its own `QueueProcessingMode` + `BatchApiMode` enums and keeps CJ's `LLMBatchingMode` as an external hint only.
+- Serial bundle mode actually drains multiple compatible requests (provider + override + CJ hint) per queue-loop iteration; incompatible dequeues are held in-memory for the next iteration.
+- `SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL` (default 8) actively bounds bundle size and rejects invalid env inputs.
 
-**Critical Gap**:
-- Current "serial bundling" only wraps single requests in a list
-- Does NOT actually bundle multiple compatible requests together
-- Real bundling logic not yet implemented
+**Critical Focus Areas**:
+- Provider-side metadata enrichment (resolved provider/model + queue mode) still outstanding.
+- Serial bundle metrics + rollout documentation remain blocked on Phase 3 work.
 
 ### Next Steps
 
-1. Implement actual multi-request bundling in Phase 2
-2. Add observability metrics in Phase 3
+1. Enrich queued request metadata + callback payloads with resolved provider/model/mode (Phase 2 checklist)
+2. Add observability/metrics in Phase 3 once metadata is present
 
 ---
 

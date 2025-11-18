@@ -174,7 +174,7 @@ When asked to launch two or more agents in parallel: launch all agents in a sing
 ### Code Quality
 
 ```markdown
-- **Linting**: `pdm run lint` (Ruff)
+- **Linting**: *run `pdm run format-all` and `pdm run lint-fix --unsafe-fixes` (Ruff) after each file edit*
 - **Pre-commit**: `pdm run pre-commit install`
 ```
 
