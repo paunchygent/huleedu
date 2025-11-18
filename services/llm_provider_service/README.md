@@ -94,6 +94,15 @@ LLM_PROVIDER_SERVICE_LLM_CACHE_TTL=3600
 LLM_PROVIDER_SERVICE_ACTIVE_MODEL_FAMILIES='{"anthropic":["claude-haiku","claude-sonnet"],"openai":["gpt-5","gpt-4.1","gpt-4o"],"google":["gemini-2.5-flash"]}'
 ```
 
+### Queue & batching configuration
+
+```bash
+# Queue / serial-bundle configuration
+LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE=per_request    # per_request | serial_bundle | batch_api
+LLM_PROVIDER_SERVICE_SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL=8
+LLM_PROVIDER_SERVICE_BATCH_API_MODE=disabled              # disabled | nightly | opportunistic
+```
+
 **Model Family Tracking**: Configure which model families trigger actionable alerts (exit code 4) in the model checker CLI. New models in tracked families are prioritized for testing and manifest updates, while untracked families are shown as informational only (exit code 5). Use JSON format with lowercase provider names as keys.
 
 ### Queue Processing Mode
@@ -131,12 +140,26 @@ When `LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE=serial_bundle` (or
 - `llm_provider_queue_depth{queue_type="total"|"queued"}` — instantaneous queue size.
 - `llm_provider_queue_wait_time_seconds{queue_processing_mode="serial_bundle",result="success"|"failure"|"expired"}` — time spent waiting in the queue before a callback is published.
 - `llm_provider_comparison_callbacks_total{queue_processing_mode, result}` — processed comparison throughput split by outcome.
+- `llm_provider_serial_bundle_calls_total{provider, model}` — total serial-bundle comparison calls.
+- `llm_provider_serial_bundle_items_per_call{provider, model}` — number of items per serial-bundle call.
 
 In addition to the Prometheus metrics, a `queue_metrics_snapshot` log line is
 written every 30 seconds whenever a non-`per_request` mode is active. This log
 includes the queue depth, usage percentage, whether the queue is still accepting
 new requests, and (for serial bundles) the bundle size/provider metadata so you
 can correlate rollouts with Redis/local backlog changes.
+
+#### Rolling out `serial_bundle` safely (ENG5-first sketch)
+
+- Start in **development** or ENG5-only environments by setting:
+  - `LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE=serial_bundle`
+  - `LLM_PROVIDER_SERVICE_BATCH_API_MODE=disabled`
+- Verify serial-bundle behaviour via tests:
+  - `pdm run pytest-root services/llm_provider_service/tests/integration/test_serial_bundle_integration.py`
+- During trial runs, watch:
+  - `llm_provider_serial_bundle_calls_total{provider,model}` and `llm_provider_serial_bundle_items_per_call{provider,model}`
+  - `llm_provider_queue_wait_time_seconds{queue_processing_mode="serial_bundle",result=...}`
+- To roll back, set `LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE=per_request` and redeploy; callbacks and HTTP contracts remain unchanged across modes.
 
 ## Development
 
@@ -509,6 +532,8 @@ Common breaking changes:
 - `llm_circuit_breaker_state` - Circuit breaker states
 - `llm_provider_queue_expiry_total{provider, queue_processing_mode, expiry_reason}` - Dedicated counter for expired queue requests.
 - `llm_provider_queue_expiry_age_seconds{provider, queue_processing_mode}` - Histogram of request age at expiry.
+- `llm_provider_serial_bundle_calls_total{provider, model}` - Total serial-bundle comparison calls.
+- `llm_provider_serial_bundle_items_per_call{provider, model}` - Items-per-call histogram for serial bundling.
 
 `expiry_reason="ttl"` is emitted from `QueueProcessorImpl` when a dequeued request has passed its TTL; `expiry_reason="cleanup"` is emitted from `ResilientQueueManagerImpl.cleanup_expired()` when Redis/local cleanup purges entries that never reached the processor (using `provider="unknown"` to avoid extra lookup and cardinality).
 

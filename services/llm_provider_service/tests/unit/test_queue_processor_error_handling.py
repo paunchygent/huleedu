@@ -763,6 +763,194 @@ class TestQueueProcessorMetrics:
         )
         callbacks_counter.labels.return_value.inc.assert_called_once_with()
 
+    @pytest.mark.asyncio
+    async def test_serial_bundle_metrics_emitted_for_serial_mode(
+        self,
+        mock_comparison_processor: AsyncMock,
+        mock_queue_manager: AsyncMock,
+        mock_event_publisher: AsyncMock,
+        mock_trace_context_manager: Mock,
+    ) -> None:
+        settings = Settings()
+        settings.QUEUE_PROCESSING_MODE = QueueProcessingMode.SERIAL_BUNDLE
+
+        queue_processor = QueueProcessorImpl(
+            comparison_processor=mock_comparison_processor,
+            queue_manager=mock_queue_manager,
+            event_publisher=mock_event_publisher,
+            trace_context_manager=mock_trace_context_manager,
+            settings=settings,
+            queue_processing_mode=settings.QUEUE_PROCESSING_MODE,
+        )
+
+        queue_processor.queue_metrics = {
+            "llm_serial_bundle_calls_total": Mock(),
+            "llm_serial_bundle_items_per_call": Mock(),
+        }
+
+        calls_counter = queue_processor.queue_metrics["llm_serial_bundle_calls_total"]
+        items_hist = queue_processor.queue_metrics["llm_serial_bundle_items_per_call"]
+
+        calls_counter.labels.return_value = Mock()
+        items_hist.labels.return_value = Mock()
+
+        first_request = QueuedRequest(
+            queue_id=uuid.uuid4(),
+            request_data=LLMComparisonRequest(
+                user_prompt="prompt-a",
+                callback_topic="topic",
+                correlation_id=uuid.uuid4(),
+                llm_config_overrides=LLMConfigOverrides(
+                    provider_override=LLMProviderType.MOCK,
+                    model_override="mock-model-v1",
+                ),
+            ),
+            status=QueueStatus.QUEUED,
+            queued_at=datetime.now(timezone.utc),
+            size_bytes=10,
+            callback_topic="topic",
+        )
+
+        second_request = QueuedRequest(
+            queue_id=uuid.uuid4(),
+            request_data=LLMComparisonRequest(
+                user_prompt="prompt-b",
+                callback_topic="topic",
+                correlation_id=uuid.uuid4(),
+                llm_config_overrides=LLMConfigOverrides(
+                    provider_override=LLMProviderType.MOCK,
+                    model_override="mock-model-v1",
+                ),
+            ),
+            status=QueueStatus.QUEUED,
+            queued_at=datetime.now(timezone.utc),
+            size_bytes=10,
+            callback_topic="topic",
+        )
+
+        mock_queue_manager.dequeue = AsyncMock(side_effect=[second_request, None])
+        mock_queue_manager.update_status = AsyncMock()
+        mock_queue_manager.remove = AsyncMock()
+        setattr(queue_processor, "_publish_callback_event", AsyncMock())
+        setattr(queue_processor, "_handle_request_success", AsyncMock())
+        setattr(queue_processor, "_record_completion_metrics", Mock())
+
+        mock_comparison_processor.process_comparison_batch.return_value = [
+            LLMOrchestratorResponse(
+                winner=EssayComparisonWinner.ESSAY_A,
+                justification="A",
+                confidence=0.5,
+                provider=LLMProviderType.MOCK,
+                model="mock-model-v1",
+                correlation_id=first_request.queue_id,
+                response_time_ms=10,
+                token_usage={"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+                cost_estimate=0.0,
+                metadata={"prompt_sha256": "abc"},
+            ),
+            LLMOrchestratorResponse(
+                winner=EssayComparisonWinner.ESSAY_B,
+                justification="B",
+                confidence=0.6,
+                provider=LLMProviderType.MOCK,
+                model="mock-model-v1",
+                correlation_id=second_request.queue_id,
+                response_time_ms=12,
+                token_usage={"prompt_tokens": 2, "completion_tokens": 1, "total_tokens": 3},
+                cost_estimate=0.0,
+                metadata={"prompt_sha256": "def"},
+            ),
+        ]
+
+        await queue_processor._process_request_serial_bundle(first_request)
+
+        calls_counter.labels.assert_called_once_with(
+            provider="mock",
+            model="mock-model-v1",
+        )
+        calls_counter.labels.return_value.inc.assert_called_once_with()
+
+        items_hist.labels.assert_called_once_with(
+            provider="mock",
+            model="mock-model-v1",
+        )
+        items_hist.labels.return_value.observe.assert_called_once_with(2)
+
+    @pytest.mark.asyncio
+    async def test_serial_bundle_metrics_not_emitted_for_per_request_mode(
+        self,
+        mock_comparison_processor: AsyncMock,
+        mock_queue_manager: AsyncMock,
+        mock_event_publisher: AsyncMock,
+        mock_trace_context_manager: Mock,
+    ) -> None:
+        settings = Settings()
+        settings.QUEUE_PROCESSING_MODE = QueueProcessingMode.PER_REQUEST
+
+        queue_processor = QueueProcessorImpl(
+            comparison_processor=mock_comparison_processor,
+            queue_manager=mock_queue_manager,
+            event_publisher=mock_event_publisher,
+            trace_context_manager=mock_trace_context_manager,
+            settings=settings,
+            queue_processing_mode=settings.QUEUE_PROCESSING_MODE,
+        )
+
+        queue_processor.queue_metrics = {
+            "llm_serial_bundle_calls_total": Mock(),
+            "llm_serial_bundle_items_per_call": Mock(),
+        }
+
+        calls_counter = queue_processor.queue_metrics["llm_serial_bundle_calls_total"]
+        items_hist = queue_processor.queue_metrics["llm_serial_bundle_items_per_call"]
+
+        calls_counter.labels.return_value = Mock()
+        items_hist.labels.return_value = Mock()
+
+        first_request = QueuedRequest(
+            queue_id=uuid.uuid4(),
+            request_data=LLMComparisonRequest(
+                user_prompt="prompt-a",
+                callback_topic="topic",
+                correlation_id=uuid.uuid4(),
+                llm_config_overrides=LLMConfigOverrides(
+                    provider_override=LLMProviderType.MOCK,
+                    model_override="mock-model-v1",
+                ),
+            ),
+            status=QueueStatus.QUEUED,
+            queued_at=datetime.now(timezone.utc),
+            size_bytes=10,
+            callback_topic="topic",
+        )
+
+        mock_queue_manager.dequeue = AsyncMock(return_value=None)
+        mock_queue_manager.update_status = AsyncMock()
+        mock_queue_manager.remove = AsyncMock()
+        setattr(queue_processor, "_publish_callback_event", AsyncMock())
+        setattr(queue_processor, "_handle_request_success", AsyncMock())
+        setattr(queue_processor, "_record_completion_metrics", Mock())
+
+        mock_comparison_processor.process_comparison_batch.return_value = [
+            LLMOrchestratorResponse(
+                winner=EssayComparisonWinner.ESSAY_A,
+                justification="A",
+                confidence=0.5,
+                provider=LLMProviderType.MOCK,
+                model="mock-model-v1",
+                correlation_id=first_request.queue_id,
+                response_time_ms=10,
+                token_usage={"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+                cost_estimate=0.0,
+                metadata={"prompt_sha256": "abc"},
+            ),
+        ]
+
+        await queue_processor._process_request_serial_bundle(first_request)
+
+        calls_counter.labels.assert_not_called()
+        items_hist.labels.assert_not_called()
+
 
 class TestQueueProcessorMetadataEnrichment:
     """Tests for provider-side metadata enrichment on queued requests."""

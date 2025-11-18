@@ -410,6 +410,23 @@ class QueueProcessorImpl:
                     },
                 )
 
+            if (
+                self.queue_processing_mode is QueueProcessingMode.SERIAL_BUNDLE
+                and self.queue_metrics
+            ):
+                bundle_calls = self.queue_metrics.get("llm_serial_bundle_calls_total")
+                bundle_items_hist = self.queue_metrics.get("llm_serial_bundle_items_per_call")
+                if bundle_calls is not None or bundle_items_hist is not None:
+                    provider_label = primary_provider.value
+                    model_label = primary_overrides.get("model_override") or "unknown"
+                    if bundle_calls is not None:
+                        bundle_calls.labels(provider=provider_label, model=model_label).inc()
+                    if bundle_items_hist is not None:
+                        bundle_items_hist.labels(
+                            provider=provider_label,
+                            model=model_label,
+                        ).observe(len(bundle_requests))
+
             for queued_request, result in zip(bundle_requests, batch_results, strict=True):
                 if isinstance(result, LLMOrchestratorResponse):
                     await self._handle_request_success(queued_request, result)

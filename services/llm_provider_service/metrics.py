@@ -130,6 +130,19 @@ def _create_metrics() -> dict[str, Any]:
                 buckets=(1, 5, 10, 30, 60, 120, 300, 600, 1800, 3600),
                 registry=REGISTRY,
             ),
+            "llm_serial_bundle_calls_total": Counter(
+                "llm_provider_serial_bundle_calls_total",
+                "Total serial-bundle comparison calls",
+                ["provider", "model"],
+                registry=REGISTRY,
+            ),
+            "llm_serial_bundle_items_per_call": Histogram(
+                "llm_provider_serial_bundle_items_per_call",
+                "Number of items per serial-bundle call",
+                ["provider", "model"],
+                buckets=(1, 2, 4, 8, 16, 32, 64),
+                registry=REGISTRY,
+            ),
             "circuit_breaker_state_changes": Counter(
                 "llm_provider_circuit_breaker_state_changes_total",
                 "Total circuit breaker state changes",
@@ -235,6 +248,8 @@ def get_queue_metrics() -> dict[str, Any]:
         "llm_comparison_callbacks_total": all_metrics.get("llm_comparison_callbacks_total"),
         "llm_queue_expiry_total": all_metrics.get("llm_queue_expiry_total"),
         "llm_queue_expiry_age_seconds": all_metrics.get("llm_queue_expiry_age_seconds"),
+        "llm_serial_bundle_calls_total": all_metrics.get("llm_serial_bundle_calls_total"),
+        "llm_serial_bundle_items_per_call": all_metrics.get("llm_serial_bundle_items_per_call"),
     }
 
 
@@ -272,6 +287,8 @@ def _get_existing_metrics() -> dict[str, Any]:
         "llm_comparison_callbacks_total": "llm_provider_comparison_callbacks_total",
         "llm_queue_expiry_total": "llm_provider_queue_expiry_total",
         "llm_queue_expiry_age_seconds": "llm_provider_queue_expiry_age_seconds",
+        "llm_serial_bundle_calls_total": "llm_provider_serial_bundle_calls_total",
+        "llm_serial_bundle_items_per_call": "llm_provider_serial_bundle_items_per_call",
     }
 
     existing: dict[str, Any] = {}
