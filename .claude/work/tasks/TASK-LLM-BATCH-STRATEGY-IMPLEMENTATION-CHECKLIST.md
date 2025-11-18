@@ -39,7 +39,9 @@ configuration.
 2. **Observability gap** – serial bundle metrics (bundle size, per-provider counts) still missing pending Phase 3 work.
 3. **Rollout/runbook guidance** – need ENG5-first rollout plan + doc updates before enabling serial bundling in production.
 
-**Related task:** `.claude/work/tasks/TASK-LLM-QUEUE-EXPIRY-METRICS-FIX.md` – LLM queue expiry metrics and observability.
+**Related tasks:**
+ - `.claude/work/tasks/TASK-LLM-QUEUE-EXPIRY-METRICS-FIX.md` – LLM queue expiry metrics and observability.
+ - `.claude/work/tasks/TASK-LLM-SERIAL-BUNDLE-METRICS-AND-DIAGNOSTICS-FIX.md` – Serial bundle metadata, metrics, integration tests, and rollout diagnostics.
 
 ### Next Steps
 

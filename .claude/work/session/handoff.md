@@ -58,13 +58,14 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 - ⚠️ Metadata model partial: `cj_llm_batching_mode` field exists
 - ⚠️ Tests partial: metadata propagation tested for existing fields
 
-**Phase 2 (LPS Serial Bundling)** - 65% complete:
+**Phase 2 (LPS Serial Bundling)** - ~75% complete:
 - ✅ `ComparisonProcessorProtocol.process_comparison_batch` method implemented
 - ✅ Queue routing to batch/serial mode (when `QUEUE_PROCESSING_MODE != per_request`)
 - ✅ Result mapping back to individual callbacks
 - ✅ Config now exposes `QueueProcessingMode`, `BatchApiMode`, and `SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL`
 - ✅ `_process_request_serial_bundle` drains multiple compatible requests per loop (fairness safeguard + `_pending_request` handoff)
-- ⚠️ Metadata/diagnostics + production rollout docs still pending
+- ✅ Provider-side metadata enrichment in `QueueProcessorImpl` adds `resolved_provider`, `resolved_model` (when available), and `queue_processing_mode` into `request_data.metadata` for both per-request and serial-bundle paths, with dedicated unit tests in LPS.
+- ⚠️ Serial-bundle metrics and production rollout docs still pending
 
 **Phase 3 (Metrics)** - expiry semantics complete for LLM Provider queue:
 - ✅ `llm_provider_queue_expiry_total{provider, queue_processing_mode, expiry_reason}` implemented for both dequeued TTL expiries (`expiry_reason="ttl"`) and manager-level cleanup (`expiry_reason="cleanup"`, `provider="unknown"`).
@@ -78,9 +79,8 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 - CJ now emits `cj_batch_id`, `cj_source`, `cj_request_type`, and the effective `cj_llm_batching_mode` for both initial submissions and retry batches.
 - Config resolution + metadata propagation tests live in `tests/unit/test_llm_batching_config.py`, `test_llm_interaction_impl_unit.py`, and `test_batch_retry_processor.py`.
 
-**Phase 2 (2 items missing)**:
-1. ❌ Metadata enrichment (resolved_provider, resolved_model, queue_processing_mode)
-2. ⚠️ Observability/runbook updates + rollout guidance (doc + Phase 3 metrics linkage)
+**Phase 2 (1 major item missing)**:
+1. ⚠️ Observability/runbook updates + rollout guidance (doc + Phase 3 metrics linkage)
 
 **Phase 3 (8 items missing)**:
 1. ❌ All serial bundling metrics
@@ -100,13 +100,13 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 - `SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL` (default 8) actively bounds bundle size and rejects invalid env inputs.
 
 **Critical Focus Areas**:
-- Provider-side metadata enrichment (resolved provider/model + queue mode) still outstanding.
-- Serial bundle metrics + rollout documentation remain blocked on Phase 3 work.
+- Serial bundle metrics in LLM Provider Service (bundle counts and sizes) and CJ batching metrics.
+- Rollout documentation and ENG5-focused diagnostics to make serial_bundle safe to enable in production.
 
 ### Next Steps
 
-1. Enrich queued request metadata + callback payloads with resolved provider/model/mode (Phase 2 checklist)
-2. Add observability/metrics in Phase 3 once metadata is present
+1. Implement serial-bundle metrics in LLM Provider Service and CJ batching metrics (Phase 3 checklist; see PR 2/3 in `TASK-LLM-SERIAL-BUNDLE-METRICS-AND-DIAGNOSTICS-FIX.md`).
+2. Add rollout/runbook guidance and ENG5 diagnostics once metrics are in place.
 
 ---
 
