@@ -117,6 +117,35 @@ docker compose -f docker-compose.yml -f docker-compose.eng5-runner.yml run --rm 
 - **Runner summary**: after completion the CLI prints provider/model token and cost totals plus
   whether partial data occurred.
 
+### LLM batching & serial-bundle diagnostics
+
+- **When to use**
+  - Prefer these checks when LLM Provider Service is configured to call *real* providers (not
+    mock mode) and `serial_bundle` is enabled for ENG5 trials.
+- **CLI output**
+  - After a successful EXECUTE run with `--await-completion`, the runner prints:
+    - `LLM batching diagnostics (Prometheus query hints)` followed by example Prometheus queries.
+  - Copy/paste these into Grafana Explore to inspect:
+    - `cj_llm_requests_total{batching_mode}` and `cj_llm_batches_started_total{batching_mode}` for
+      CJ-side mode usage.
+    - `llm_provider_serial_bundle_calls_total{provider,model}` and
+      `llm_provider_serial_bundle_items_per_call{provider,model}` for bundle usage.
+    - `llm_provider_queue_expiry_total{provider,queue_processing_mode,expiry_reason}` and
+      `llm_provider_queue_wait_time_seconds{queue_processing_mode,result}` for queue health.
+- **ENG5-first rollout guardrails (summary)**
+  - Enable trial runs by setting:
+    - `CJ_ASSESSMENT_SERVICE_LLM_BATCHING_MODE=serial_bundle`
+    - `LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE=serial_bundle`
+    - `LLM_PROVIDER_SERVICE_BATCH_API_MODE=disabled`
+  - For each trial batch:
+    - Confirm error rates and queue wait-time percentiles remain close to per-request baselines.
+    - Check that serial-bundle metrics move only for the expected provider/model pair used by ENG5.
+  - To roll back:
+    - Set `CJ_ASSESSMENT_SERVICE_LLM_BATCHING_MODE=per_request`
+    - Set `LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE=per_request`
+    - Leave `LLM_PROVIDER_SERVICE_BATCH_API_MODE=disabled`
+    - Redeploy CJ and LLM Provider; HTTP contracts and callbacks are unchanged across modes.
+
 ### Structured JSON Logging
 
 - The runner configures `structlog` via `logging_support.configure_cli_logging()` with

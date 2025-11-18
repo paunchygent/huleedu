@@ -43,6 +43,7 @@ from scripts.cj_experiments_runners.eng5_np.logging_support import (
     configure_cli_logging,
     load_artefact_data,
     log_validation_state,
+    print_batching_metrics_hints,
     print_run_summary,
     setup_cli_logger,
 )
@@ -688,6 +689,9 @@ def main(
                         )
                     )
                     summary = print_run_summary(artefact_path)
+                    print_batching_metrics_hints(
+                        llm_batching_mode_hint=settings.llm_batching_mode_hint,
+                    )
                     logger.info(
                         "runner_execution_complete",
                         artefact_path=str(artefact_path),

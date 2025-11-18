@@ -208,6 +208,18 @@ def _create_metrics(database_metrics: Optional[DatabaseMetrics] = None) -> dict[
                 "Total successful prompt hydrations in CJ Assessment Service",
                 registry=REGISTRY,
             ),
+            "cj_llm_requests_total": Counter(
+                "cj_llm_requests_total",
+                "Total CJ LLM requests by batching mode",
+                ["batching_mode"],
+                registry=REGISTRY,
+            ),
+            "cj_llm_batches_started_total": Counter(
+                "cj_llm_batches_started_total",
+                "Total CJ batches started by batching mode",
+                ["batching_mode"],
+                registry=REGISTRY,
+            ),
         }
 
         # Add database metrics if provided

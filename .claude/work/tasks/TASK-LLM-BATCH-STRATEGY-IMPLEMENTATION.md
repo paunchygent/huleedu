@@ -60,6 +60,21 @@ production environments:
   - `OPENAI_BATCH_API_MODE = disabled` and `ANTHROPIC_BATCH_API_MODE = disabled` – async batch APIs
     remain opt-in and are off by default until implemented and explicitly enabled.
 
+## Batching mode mapping & trade-offs
+
+The logical CJ `LLMBatchingMode` hint and the LLM Provider Service queue configuration map as
+follows:
+
+| CJ `LLMBatchingMode`              | LPS `QueueProcessingMode` | LPS `BatchApiMode`             | Recommended usage & trade-offs |
+|-----------------------------------|---------------------------|--------------------------------|--------------------------------|
+| `PER_REQUEST`                     | `per_request`             | `DISABLED`                     | **Default for standard BOS/ELS flows.** One queued request per comparison and one provider call per request. Simplest failure surface and debugging story, but highest HTTP call volume and queue round-trips. Metrics focus on per-request latency and error rates. |
+| `PROVIDER_SERIAL_BUNDLE`         | `SERIAL_BUNDLE`           | `DISABLED`                     | **Primary candidate for ENG5-heavy workloads.** CJ still generates stability-driven bundles, but LPS groups compatible dequeues into multi-item provider calls. Reduces HTTP calls and queue churn at the cost of shared failure domains per bundle. Operators must watch serial-bundle metrics plus queue latency/expiry to catch regressions. |
+| `PROVIDER_BATCH_API`             | `SERIAL_BUNDLE`           | `NIGHTLY` / `OPPORTUNISTIC`    | **Future-facing mode for provider-native async batch APIs.** CJ prefers fully batched submissions while LPS decides when to flip on real batch jobs per provider. Higher operational complexity and delayed error surface (job polling), but best suited for large offline workloads once APIs are stable. |
+
+In all modes, CJ remains responsible for *when* and *how many* comparisons are generated per
+iteration, and LLM Provider Service remains the source of truth for the physical batching
+strategy, queue-processing mode, and provider-specific batch endpoints.
+
 ## CJ Assessment Service Configuration
 
 ### New enum: `LLMBatchingMode`

@@ -554,6 +554,11 @@ pdm run python app.py
   - `cj_llm_requests_total{batching_mode}` records total LLM comparisons by effective batching mode (`per_request`, `serial_bundle`, `provider_batch_api`).
   - `cj_llm_batches_started_total{batching_mode}` increments once per logical CJ batch when initial `cj_comparison` work is submitted (retries do not affect this counter).
   - Existing counters/histograms for CJ workflow throughput, callbacks, retries, and circuit breakers remain unchanged
+  
+  For ENG5 NP execute runs, pair these metrics with the ENG5 runner runbook in
+  `docs/operations/eng5-np-runbook.md`, which documents how to use the CLI's batching diagnostics
+  output and example Prometheus queries during serial-bundle rollouts.
+
 - **Logging**: Structured logging via `huleedu_service_libs.logging_utils`
 - **Health Checks**: Service responsiveness (extensible to database/Kafka connectivity)
 - **Correlation IDs**: Full request tracing across service boundaries

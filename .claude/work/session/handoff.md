@@ -107,7 +107,7 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 
 ### Next Steps
 
-1. Add rollout/runbook guidance and ENG5 diagnostics now that metrics and serial-bundle integration tests are in place (see PR 5 in `TASK-LLM-SERIAL-BUNDLE-METRICS-AND-DIAGNOSTICS-FIX.md`).
+1. Rollout/runbook guidance and ENG5-focused diagnostics are now in place (PR 5 in `TASK-LLM-SERIAL-BUNDLE-METRICS-AND-DIAGNOSTICS-FIX.md`). The remaining work is to run at least one ENG5 execute batch with `serial_bundle` enabled against real providers and review the serial-bundle and CJ batching metrics for regressions.
 
 ---
 

@@ -96,6 +96,39 @@ def print_run_summary(artefact_path: Path) -> dict[str, Any] | None:
     return data
 
 
+def print_batching_metrics_hints(*, llm_batching_mode_hint: str | None) -> None:
+    """Print Prometheus query hints for LLM batching and serial-bundle metrics.
+
+    These hints are intended for execute-mode runs once CJ and LLM Provider are
+    talking to real providers rather than mocks. They do *not* query Prometheus
+    directly, only print example queries operators can paste into Grafana.
+    """
+
+    mode_label = llm_batching_mode_hint or "(none – services use their own defaults)"
+
+    print("", flush=True)
+    print("LLM batching diagnostics (Prometheus query hints)")
+    print(f"  Requested CJ LLM batching mode hint: {mode_label}")
+    print("  NOTE: Use these in environments where LLM Provider calls real APIs, not mocks.")
+
+    print("\n  # CJ batching usage by mode (5m rate)")
+    print("  sum by (batching_mode)(rate(cj_llm_requests_total[5m]))")
+    print("  sum by (batching_mode)(rate(cj_llm_batches_started_total[5m]))")
+
+    print("\n  # LLM Provider serial-bundle usage by provider/model (5m rate)")
+    print("  sum by (provider, model)(rate(llm_provider_serial_bundle_calls_total[5m]))")
+    print("  avg_over_time(llm_provider_serial_bundle_items_per_call[5m])")
+
+    print("\n  # Queue latency and expiry (serial_bundle focus, 5m rate)")
+    print(
+        "  sum by (queue_processing_mode, result) (rate(llm_provider_queue_wait_time_seconds[5m]))"
+    )
+    print(
+        "  sum by (provider, queue_processing_mode, expiry_reason) "
+        "(rate(llm_provider_queue_expiry_total[5m]))"
+    )
+
+
 def log_validation_state(
     *,
     logger: BoundLogger,

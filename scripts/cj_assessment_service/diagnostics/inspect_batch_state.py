@@ -35,6 +35,7 @@ class BatchSnapshot:
     totals: dict[str, Any]
     grade_projection_count: int
     anchor_counts: dict[str, int]
+    batching_metadata: dict[str, Any]
 
 
 async def _fetch_one(engine: AsyncEngine, query: str, **params: Any) -> Result:
@@ -64,7 +65,8 @@ async def capture_snapshot(engine: AsyncEngine, batch_id: int) -> BatchSnapshot:
                failed_comparisons,
                partial_scoring_triggered,
                completion_threshold_pct,
-               current_iteration
+               current_iteration,
+               processing_metadata
         FROM cj_batch_states
         WHERE batch_id = :batch_id
         """,
@@ -74,6 +76,7 @@ async def capture_snapshot(engine: AsyncEngine, batch_id: int) -> BatchSnapshot:
 
     totals: dict[str, Any] = {}
     state_value = None
+    batching_metadata: dict[str, Any] = {}
     if state_values:
         totals = {
             "total": state_values.total_comparisons,
@@ -85,6 +88,24 @@ async def capture_snapshot(engine: AsyncEngine, batch_id: int) -> BatchSnapshot:
             "iteration": state_values.current_iteration,
         }
         state_value = state_values.state
+
+        processing_metadata = getattr(state_values, "processing_metadata", None) or {}
+        config_overrides = processing_metadata.get("config_overrides") or {}
+
+        llm_batching_mode: str | None = processing_metadata.get("llm_batching_mode")
+        if llm_batching_mode is None:
+            try:
+                settings = Settings()
+                mode = getattr(settings, "LLM_BATCHING_MODE", None)
+                if mode is not None:
+                    llm_batching_mode = getattr(mode, "value", str(mode))
+            except Exception:  # pragma: no cover - defensive best-effort
+                llm_batching_mode = None
+
+        batching_metadata = {
+            "llm_batching_mode": llm_batching_mode or "unknown",
+            "has_overrides": bool(config_overrides),
+        }
 
     projection_count_result = await _fetch_one(
         engine,
@@ -118,6 +139,7 @@ async def capture_snapshot(engine: AsyncEngine, batch_id: int) -> BatchSnapshot:
         totals=totals,
         grade_projection_count=grade_projection_count,
         anchor_counts=anchor_counts,
+        batching_metadata=batching_metadata,
     )
 
 
@@ -132,10 +154,15 @@ def format_snapshot(snapshot: BatchSnapshot) -> str:
     total_essays = snapshot.anchor_counts["total_essays"]
     anchors_by_id = snapshot.anchor_counts["anchors_by_id"]
 
+    batching_mode = snapshot.batching_metadata.get("llm_batching_mode", "unknown")
+    has_overrides = snapshot.batching_metadata.get("has_overrides", False)
+
     lines = [
         f"CJ Batch {snapshot.batch_id}",
         f"  upload_status        : {snapshot.upload_status}",
         f"  state                : {snapshot.state}",
+        f"  LLM batching mode    : {batching_mode}",
+        f"  has config overrides : {has_overrides}",
         f"  total/submitted      : {total} / {submitted}",
         f"  completed/failed     : {completed} / {failed}",
         f"  completion threshold : {threshold}%",
