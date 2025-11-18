@@ -27,6 +27,7 @@ from services.cj_assessment_service.cj_core_logic.llm_batching import (
 )
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
+from services.cj_assessment_service.metrics import get_business_metrics
 from services.cj_assessment_service.models_api import (
     CJAssessmentRequestData,
     ComparisonTask,
@@ -148,6 +149,34 @@ def _build_budget_metadata(
     return metadata
 
 
+def _record_llm_batching_metrics(
+    effective_mode: LLMBatchingMode,
+    request_count: int,
+    *,
+    request_type: str | None,
+) -> None:
+    try:
+        business_metrics = get_business_metrics()
+    except Exception:  # pragma: no cover - defensive
+        logger.debug("Unable to retrieve business metrics for batching counters", exc_info=True)
+        return
+
+    requests_metric = business_metrics.get("cj_llm_requests_total")
+    batches_metric = business_metrics.get("cj_llm_batches_started_total")
+
+    if requests_metric and request_count > 0:
+        try:
+            requests_metric.labels(batching_mode=effective_mode.value).inc(request_count)
+        except Exception:  # pragma: no cover - defensive
+            logger.debug("Unable to increment cj_llm_requests_total metric", exc_info=True)
+
+    if request_type == "cj_comparison" and batches_metric:
+        try:
+            batches_metric.labels(batching_mode=effective_mode.value).inc()
+        except Exception:  # pragma: no cover - defensive
+            logger.debug("Unable to increment cj_llm_batches_started_total metric", exc_info=True)
+
+
 async def submit_comparisons_for_async_processing(
     essays_for_api_model: list[EssayForComparison],
     cj_batch_id: int,
@@ -264,6 +293,12 @@ async def submit_comparisons_for_async_processing(
                 extra=log_extra_with_mode,
             )
             return False
+
+        _record_llm_batching_metrics(
+            effective_mode=effective_batching_mode,
+            request_count=len(comparison_tasks),
+            request_type=request_data.cj_request_type,
+        )
 
         # Create batch processor and submit all comparisons
         batch_processor = BatchProcessor(
@@ -530,23 +565,11 @@ async def _process_comparison_iteration(
     if not comparison_tasks_for_llm:
         return None
 
-    # Create batch processor and submit batch for async processing
-    batch_processor = BatchProcessor(
-        database=database,
-        llm_interaction=llm_interaction,
-        settings=settings,
-    )
-
-    iteration_metadata_context = _build_iteration_metadata_context(
-        settings, current_iteration=current_iteration
-    )
-
-    # Extract batch config overrides from request_data if available
+    # Extract batch config overrides and LLM overrides to determine effective batching mode
     batch_config_overrides = None
     if request_data.batch_config_overrides is not None:
         batch_config_overrides = BatchConfigOverrides(**request_data.batch_config_overrides)
 
-    # Extract LLM config overrides and system_prompt_override from request_data if available
     llm_config_overrides = request_data.llm_config_overrides
     # Use CJ's canonical system prompt as default (can be overridden by event)
     system_prompt_override = settings.SYSTEM_PROMPT
@@ -561,6 +584,23 @@ async def _process_comparison_iteration(
         settings=settings,
         batch_config_overrides=batch_config_overrides,
         provider_override=provider_override,
+    )
+
+    _record_llm_batching_metrics(
+        effective_mode=effective_batching_mode,
+        request_count=len(comparison_tasks_for_llm),
+        request_type=request_data.cj_request_type,
+    )
+
+    # Create batch processor and submit batch for async processing
+    batch_processor = BatchProcessor(
+        database=database,
+        llm_interaction=llm_interaction,
+        settings=settings,
+    )
+
+    iteration_metadata_context = _build_iteration_metadata_context(
+        settings, current_iteration=current_iteration
     )
 
     metadata_context = build_llm_metadata_context(

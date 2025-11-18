@@ -276,6 +276,8 @@ def _get_existing_metrics() -> dict[str, Any]:
         "cj_failed_pool_size": "cj_failed_pool_size",
         "prompt_fetch_failures": "huleedu_cj_prompt_fetch_failures_total",
         "prompt_fetch_success": "huleedu_cj_prompt_fetch_success_total",
+        "cj_llm_requests_total": "cj_llm_requests_total",
+        "cj_llm_batches_started_total": "cj_llm_batches_started_total",
     }
 
     existing: dict[str, Any] = {}
@@ -310,6 +312,8 @@ def get_business_metrics() -> dict[str, Any]:
         "cj_assessment_duration_seconds": all_metrics.get("cj_assessment_duration_seconds"),
         "kafka_queue_latency_seconds": all_metrics.get("kafka_queue_latency_seconds"),
         "llm_api_calls": all_metrics.get("llm_api_calls"),
+        "cj_llm_requests_total": all_metrics.get("cj_llm_requests_total"),
+        "cj_llm_batches_started_total": all_metrics.get("cj_llm_batches_started_total"),
         # Callback Processing Metrics
         "cj_callbacks_processed_total": all_metrics.get("cj_callbacks_processed_total"),
         "cj_callback_latency_seconds": all_metrics.get("cj_callback_latency_seconds"),

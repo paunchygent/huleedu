@@ -6,6 +6,7 @@ This module handles low-level batch submission operations and database state man
 from __future__ import annotations
 
 import json
+from collections.abc import Awaitable
 from datetime import datetime
 from typing import Any
 from uuid import UUID
@@ -341,6 +342,8 @@ async def merge_batch_processing_metadata(
         stmt = select(CJBatchState.processing_metadata).where(CJBatchState.batch_id == cj_batch_id)
         result = await session.execute(stmt)
         existing_metadata = result.scalar_one_or_none()
+        if isinstance(existing_metadata, Awaitable):
+            existing_metadata = await existing_metadata
         if not isinstance(existing_metadata, dict):
             existing_metadata = {}
         updated_metadata = {**existing_metadata, **metadata_updates}
@@ -380,6 +383,8 @@ async def merge_batch_upload_metadata(
         stmt = select(CJBatchUpload.processing_metadata).where(CJBatchUpload.id == cj_batch_id)
         result = await session.execute(stmt)
         existing_metadata = result.scalar_one_or_none()
+        if isinstance(existing_metadata, Awaitable):
+            existing_metadata = await existing_metadata
         if not isinstance(existing_metadata, dict):
             existing_metadata = {}
         updated_metadata = {**existing_metadata, **metadata_updates}
