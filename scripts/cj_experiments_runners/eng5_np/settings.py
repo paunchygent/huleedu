@@ -44,3 +44,4 @@ class RunnerSettings:
     max_comparisons: int | None = None
     await_completion: bool = False
     completion_timeout: float = 1800.0
+    llm_batching_mode_hint: str | None = None

@@ -92,6 +92,8 @@ def compose_cj_assessment_request(
     }
     if settings.max_comparisons is not None:
         metadata["max_comparisons"] = settings.max_comparisons
+    if settings.llm_batching_mode_hint:
+        metadata["llm_batching_mode_hint"] = settings.llm_batching_mode_hint
 
     envelope = EventEnvelope[ELS_CJAssessmentRequestV1](
         event_type=topic_name(ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED),

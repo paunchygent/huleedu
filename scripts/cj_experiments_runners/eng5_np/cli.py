@@ -395,6 +395,17 @@ def main(
         False,
         help="Enable debug-level logging for troubleshooting",
     ),
+    llm_batching_mode: str | None = typer.Option(
+        None,
+        help=(
+            "Hint for CJ/LPS LLM batching mode: per_request, serial_bundle, "
+            "provider_batch_api. This does not directly change service "
+            "configuration; services remain authoritative via their own env "
+            "vars. If you are using this runner via an AI assistant or "
+            "automation, you must consult a human operator before deciding "
+            "or changing this mode."
+        ),
+    ),
 ) -> None:
     if ctx.invoked_subcommand is not None:
         return
@@ -402,6 +413,19 @@ def main(
     paths = RunnerPaths.from_repo_root(repo_root)
 
     configure_cli_logging(verbose=verbose)
+
+    if llm_batching_mode is not None:
+        typer.echo(
+            "⚠️  LLM batching mode hint set to "
+            f"'{llm_batching_mode}'. This is an advanced rollout control.\n"
+            "   Services remain authoritative via their own env vars "
+            "(CJ_ASSESSMENT_SERVICE_LLM_BATCHING_MODE, "
+            "LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE).\n"
+            "   If you are using this runner via an AI assistant or "
+            "automation, you must consult a human operator before "
+            "changing batching modes.",
+            err=True,
+        )
 
     # Validate LLM model override against manifest before proceeding
     validate_llm_overrides(provider=llm_provider, model=llm_model)
@@ -438,6 +462,7 @@ def main(
         max_comparisons=max_comparisons,
         await_completion=await_completion,
         completion_timeout=completion_timeout,
+        llm_batching_mode_hint=llm_batching_mode,
     )
 
     logger = setup_cli_logger(settings=settings)

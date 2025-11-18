@@ -281,6 +281,22 @@ docker compose -f docker-compose.yml -f docker-compose.eng5-runner.yml run --rm 
 - `--assignment-id`: Must match the `assignment_id` created in Step 1
 - `--course-id`: Course identifier for metadata
 
+You may optionally supply a **batching mode hint** for observability-only via:
+
+```bash
+  --llm-batching-mode per_request|serial_bundle|provider_batch_api
+```
+
+This flag does **not** override service configuration; CJ and LLM Provider remain
+authoritative via their own environment variables
+(`CJ_ASSESSMENT_SERVICE_LLM_BATCHING_MODE`,
+`LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE`,
+`LLM_PROVIDER_SERVICE_BATCH_API_MODE`). It exists to make the runner's intent
+visible in envelope metadata during ENG5 experiments.
+
+If you are driving this CLI via an AI assistant or automation, you **must**
+consult a human operator before deciding or changing batching modes.
+
 ### System Prompt Override & Comparison Budget Metadata
 
 The runner now exposes `--cj-system-prompt/--no-cj-system-prompt`. Keep the default (`--cj-system-prompt`) to inject the canonical Comparative Judgement system instructions defined in `scripts/cj_experiments_runners/eng5_np/system_prompt.py`. Disable it only if you plan to supply a different override downstream; otherwise the provider falls back to the generic “LLM comparison engine” prompt.
