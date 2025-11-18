@@ -123,6 +123,14 @@ A typical mapping is:
 In all cases, the LLM Provider Service remains the **source of truth** for physical batching;
 CJ only controls *when* and *how many* `ComparisonTask`s are generated and handed off.
 
+#### Batching mode mapping matrix (sketch)
+
+| CJ `LLMBatchingMode`       | Typical LPS `QueueProcessingMode` | Typical LPS `BatchApiMode` | Notes |
+|----------------------------|-----------------------------------|----------------------------|-------|
+| `PER_REQUEST`              | `per_request`                     | `disabled`                 | Default for most BOS/ELS flows. CJ may still generate small bundles per stability loop, but each comparison is expected to be an independent provider call. |
+| `SERIAL_BUNDLE`            | `serial_bundle`                   | `disabled`                 | CJ uses bundled, stability-driven submission while LPS groups compatible dequeues into serial bundles. Primary candidate for ENG5-heavy workloads once metrics look healthy. |
+| `PROVIDER_BATCH_API`       | `serial_bundle`                   | `nightly` / `opportunistic`| Future-facing mode for provider-native batch APIs. CJ prefers fully batched submissions; LPS decides when to flip on true batch endpoints per provider. |
+
 ---
 
 For the full implementation plan and design rationale, see  

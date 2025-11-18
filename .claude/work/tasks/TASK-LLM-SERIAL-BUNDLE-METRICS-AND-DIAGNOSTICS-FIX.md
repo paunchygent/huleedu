@@ -108,8 +108,8 @@ metadata contracts.
   - **[x]** Cover both `QueueProcessingMode.PER_REQUEST` and `QueueProcessingMode.SERIAL_BUNDLE`.
 
 - **Validation**
-  - **[ ]** Run `pdm run pytest-root services/llm_provider_service/tests/unit`.
-  - **[ ]** Run `pdm run typecheck-all` and `pdm run lint-fix --unsafe-fixes`.
+  - **[x]** Run `pdm run pytest-root services/llm_provider_service/tests/unit`.
+  - **[x]** Run `pdm run typecheck-all` and `pdm run lint-fix --unsafe-fixes`.
 
 ---
 
@@ -127,20 +127,20 @@ Service, using low-cardinality labels and aligning with existing observability s
 ### Checklist
 
 - **Metric definitions (registry)**
-  - **[ ]** Add `llm_serial_bundle_calls_total` counter:
+  - **[x]** Add `llm_serial_bundle_calls_total` counter:
     - Name: `llm_provider_serial_bundle_calls_total`.
     - Help: `"Total serial-bundle comparison calls"`.
     - Labels: `provider`, `model`.
-  - **[ ]** Add `llm_serial_bundle_items_per_call_bucket` histogram:
+  - **[x]** Add `llm_serial_bundle_items_per_call_bucket` histogram:
     - Name: `llm_provider_serial_bundle_items_per_call`.
     - Help: `"Number of items per serial-bundle call"`.
     - Labels: `provider`, `model`.
     - Buckets: e.g. `(1, 2, 4, 8, 16, 32, 64)`.
-  - **[ ]** Expose new metrics from `get_metrics()` and `get_queue_metrics()` as needed, keeping
+  - **[x]** Expose new metrics from `get_metrics()` and `get_queue_metrics()` as needed, keeping
     naming aligned with `.windsurf/rules/071.2-prometheus-metrics-patterns.md`.
 
 - **Instrumentation point (serial bundle path)**
-  - **[ ]** In `_process_request_serial_bundle`, after a **successful** call to
+  - **[x]** In `_process_request_serial_bundle`, after a **successful** call to
     `process_comparison_batch` (i.e. no exception):
     - Derive `bundle_size = len(bundle_requests)`.
     - Derive `provider_label = primary_provider.value`.
@@ -148,10 +148,10 @@ Service, using low-cardinality labels and aligning with existing observability s
     - Increment:
       - `llm_serial_bundle_calls_total.labels(provider=provider_label, model=model_label).inc()`.
       - `llm_serial_bundle_items_per_call_bucket.labels(provider=provider_label, model=model_label).observe(bundle_size)`.
-  - **[ ]** Ensure no serial-bundle metrics are emitted in `QueueProcessingMode.PER_REQUEST`.
+  - **[x]** Ensure no serial-bundle metrics are emitted in `QueueProcessingMode.PER_REQUEST`.
 
 - **Unit tests**
-  - **[ ]** Add tests that:
+  - **[x]** Add tests that:
     - Run `_process_request_serial_bundle` with a mocked `comparison_processor` and metrics
       registry populated via `get_queue_metrics()` / `get_metrics()`.
     - Assert that one bundle-processing run increments `llm_serial_bundle_calls_total` and
@@ -159,8 +159,8 @@ Service, using low-cardinality labels and aligning with existing observability s
     - Confirm that per-request mode does **not** produce serial-bundle metrics.
 
 - **Validation**
-  - **[ ]** Run `pdm run pytest-root services/llm_provider_service/tests/unit`.
-  - **[ ]** Run `pdm run typecheck-all` and `pdm run lint-fix --unsafe-fixes`.
+  - **[x]** Run `pdm run pytest-root services/llm_provider_service/tests/unit`.
+  - **[x]** Run `pdm run typecheck-all` and `pdm run lint-fix --unsafe-fixes`.
 
 ---
 
@@ -180,41 +180,36 @@ operational dashboards can see how often each batching mode is exercised.
 ### Checklist
 
 - **Metric definitions (CJ metrics module)**
-  - **[ ]** Add `cj_llm_requests_total` counter:
+  - **[x]** Add `cj_llm_requests_total` counter:
     - Name: `cj_llm_requests_total`.
     - Help: `"Total CJ LLM requests by batching mode"`.
     - Labels: `batching_mode`.
-  - **[ ]** Add `cj_llm_batches_started_total` counter:
+  - **[x]** Add `cj_llm_batches_started_total` counter:
     - Name: `cj_llm_batches_started_total`.
     - Help: `"Total CJ batches started by batching mode"`.
     - Labels: `batching_mode`.
-  - **[ ]** Register these metrics in `_create_metrics()` and `_get_existing_metrics()` and expose
-    them via `get_business_metrics()` if appropriate.
+  - **[x]** Register these metrics in `_create_metrics()` and `_get_existing_metrics()` and expose
+    them via `get_business_metrics()`.
 
 - **Instrumentation (per-request counts)**
-  - **[ ]** In `comparison_processing.submit_comparisons_for_async_processing` (or equivalent
-    entry point):
-    - After resolving `effective_mode` from `batch_config_overrides.llm_batching_mode_override`
-      and `settings.LLM_BATCHING_MODE`, increment:
-      - `cj_llm_requests_total.labels(batching_mode=effective_mode.value).inc(len(comparison_tasks_for_llm))`.
+  - **[x]** In `comparison_processing.submit_comparisons_for_async_processing` (or equivalent
+    entry point): implemented via `_record_llm_batching_metrics` helper after resolving
+    `effective_mode`.
 
 - **Instrumentation (per-batch counts)**
-  - **[ ]** Identify the point where a CJ batch is first opened / started (typically when the first
-    set of comparisons is submitted for a given batch):
-    - Increment `cj_llm_batches_started_total.labels(batching_mode=effective_mode.value).inc()`
-      once per logical CJ batch.
-    - Ensure that retries / continuation runs do **not** double-count unless intentionally treated
-      as separate batches.
+  - **[x]** Identify the point where a CJ batch is first opened / started (typically when the first
+    set of comparisons is submitted for a given batch) and increment
+    `cj_llm_batches_started_total.labels(batching_mode=effective_mode.value).inc()` once per
+    logical CJ batch (initial `cj_comparison` submissions only).
 
 - **Unit tests**
-  - **[ ]** Add tests that configure different `LLM_BATCHING_MODE` values and overrides, then
-    assert that:
-      - The correct `batching_mode` label is used when incrementing metrics.
-      - Metrics counts match the number of tasks and batches created.
+  - **[x]** Add tests that configure different `LLM_BATCHING_MODE` values and overrides, then
+    assert that batching metrics increment correctly (see
+    `services/cj_assessment_service/tests/unit/test_llm_batching_metrics.py`).
 
 - **Validation**
-  - **[ ]** Run `pdm run pytest-root services/cj_assessment_service/tests/unit`.
-  - **[ ]** Run `pdm run typecheck-all` and `pdm run lint-fix --unsafe-fixes`.
+  - **[x]** Run `pdm run pytest-root services/cj_assessment_service/tests/unit`.
+  - **[x]** Run `pdm run typecheck-all` and `pdm run lint-fix --unsafe-fixes`.
 
 ---
 
@@ -232,7 +227,7 @@ operational dashboards can see how often each batching mode is exercised.
 ### Checklist
 
 - **Happy-path serial bundle scenario**
-  - **[ ]** Create an integration test that:
+  - **[x]** Create an integration test that:
     - Starts a queue processor with `QUEUE_PROCESSING_MODE=serial_bundle` and a deterministic
       Local/Redis queue backend.
     - Enqueues multiple **compatible** requests (same provider, same overrides, same
@@ -243,24 +238,24 @@ operational dashboards can see how often each batching mode is exercised.
       - Serial-bundle metrics reflect 1 call and N items.
 
 - **Fairness / compatibility scenario**
-  - **[ ]** Add a test where the queue contains requests with mixed providers/models/hints:
+  - **[x]** Add a test where the queue contains requests with mixed providers/models/hints:
     - Verify that compatible requests are bundled.
     - Verify that the first incompatible request is stored in `_pending_request` and processed on
       a later iteration (no loss, no starvation of other providers).
 
 - **Expired + active mix scenario**
-  - **[ ]** Add a test where at least one request is already expired when dequeued:
+  - **[x]** Add a test where at least one request is already expired when dequeued:
     - Confirm that expiry metrics (`llm_provider_queue_expiry_*`) are recorded correctly.
     - Confirm that only non-expired requests contribute to processing/callback and serial-bundle
       metrics.
 
 - **Regression coverage**
-  - **[ ]** Ensure integration tests validate that per-request mode is unaffected when
+  - **[x]** Ensure integration tests validate that per-request mode is unaffected when
     `QUEUE_PROCESSING_MODE=per_request` (no serial-bundle metrics, same behaviour as before).
 
 - **Validation**
-  - **[ ]** Run `pdm run pytest-root services/llm_provider_service/tests/integration`.
-  - **[ ]** Run `pdm run typecheck-all` and `pdm run lint-fix --unsafe-fixes`.
+  - **[x]** Run `pdm run pytest-root services/llm_provider_service/tests/integration`.
+  - **[x]** Run `pdm run typecheck-all` and `pdm run lint-fix --unsafe-fixes`.
 
 ---
 

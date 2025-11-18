@@ -67,10 +67,13 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 - ✅ Provider-side metadata enrichment in `QueueProcessorImpl` adds `resolved_provider`, `resolved_model` (when available), and `queue_processing_mode` into `request_data.metadata` for both per-request and serial-bundle paths, with dedicated unit tests in LPS.
 - ⚠️ Serial-bundle metrics and production rollout docs still pending
 
-**Phase 3 (Metrics)** - expiry semantics complete for LLM Provider queue:
+**Phase 3 (Metrics)** - queue expiry + serial-bundle metrics in LPS:
 - ✅ `llm_provider_queue_expiry_total{provider, queue_processing_mode, expiry_reason}` implemented for both dequeued TTL expiries (`expiry_reason="ttl"`) and manager-level cleanup (`expiry_reason="cleanup"`, `provider="unknown"`).
 - ✅ `llm_provider_queue_expiry_age_seconds{provider, queue_processing_mode}` implemented for dequeue-time expiries (age-at-expiry histogram).
 - ✅ Queue completion metrics corrected so expired requests no longer contribute to processing-time or callback totals but still update wait-time metrics.
+- ✅ Serial-bundle metrics in LLM Provider Service implemented: `llm_provider_serial_bundle_calls_total{provider, model}` and `llm_provider_serial_bundle_items_per_call{provider, model}` are emitted only in `QueueProcessingMode.SERIAL_BUNDLE` and validated via unit tests and dedicated integration coverage in `services/llm_provider_service/tests/integration/test_serial_bundle_integration.py`.
+
+- ✅ CJ-side batching metrics implemented in CJ Assessment Service: `cj_llm_requests_total{batching_mode}` and `cj_llm_batches_started_total{batching_mode}` are emitted from `comparison_processing` with dedicated unit coverage and a clean CJ unit test run.
 
 ### Critical Missing Items
 
@@ -82,9 +85,8 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 **Phase 2 (1 major item missing)**:
 1. ⚠️ Observability/runbook updates + rollout guidance (doc + Phase 3 metrics linkage)
 
-**Phase 3 (8 items missing)**:
-1. ❌ All serial bundling metrics
-2. ❌ All CJ batching metrics
+**Phase 3 (remaining gaps)**:
+1. ⚠️ Rollout documentation and ENG5-focused diagnostics to make batching modes safe to enable in production.
 
 ### Key Findings
 
@@ -100,13 +102,12 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 - `SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL` (default 8) actively bounds bundle size and rejects invalid env inputs.
 
 **Critical Focus Areas**:
-- Serial bundle metrics in LLM Provider Service (bundle counts and sizes) and CJ batching metrics.
+- CJ batching metrics (per-batch and per-request) to complement LPS serial-bundle metrics.
 - Rollout documentation and ENG5-focused diagnostics to make serial_bundle safe to enable in production.
 
 ### Next Steps
 
-1. Implement serial-bundle metrics in LLM Provider Service and CJ batching metrics (Phase 3 checklist; see PR 2/3 in `TASK-LLM-SERIAL-BUNDLE-METRICS-AND-DIAGNOSTICS-FIX.md`).
-2. Add rollout/runbook guidance and ENG5 diagnostics once metrics are in place.
+1. Add rollout/runbook guidance and ENG5 diagnostics now that metrics and serial-bundle integration tests are in place (see PR 5 in `TASK-LLM-SERIAL-BUNDLE-METRICS-AND-DIAGNOSTICS-FIX.md`).
 
 ---
 
