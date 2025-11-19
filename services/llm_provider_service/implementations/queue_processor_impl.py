@@ -395,7 +395,21 @@ class QueueProcessorImpl:
         )
 
         try:
+            start_time = time.monotonic()
             batch_results = await self.comparison_processor.process_comparison_batch(batch_items)
+            duration_ms = (time.monotonic() - start_time) * 1000
+
+            if duration_ms > 30000:
+                logger.warning(
+                    "Serial bundle processing took >30s",
+                    extra={
+                        "duration_ms": duration_ms,
+                        "bundle_size": len(bundle_requests),
+                        "provider": primary_provider.value,
+                        "queue_processing_mode": self.queue_processing_mode.value,
+                    },
+                )
+
             if len(batch_results) != len(bundle_requests):
                 raise_processing_error(
                     service="llm_provider_service",
@@ -407,6 +421,7 @@ class QueueProcessorImpl:
                         "expected": len(bundle_requests),
                         "actual": len(batch_results),
                         "queue_processing_mode": self.queue_processing_mode.value,
+                        "duration_ms": duration_ms,
                     },
                 )
 

@@ -18,27 +18,19 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 
 **Primary Document**: `.claude/work/tasks/TASK-LOKI-LOGGING-OTEL-ALIGNMENT-AND-CARDINALITY-FIX.md`
 
-**Status**: PR 1 (P0 CRITICAL) ✅ COMPLETE | PR 2 (P1 HIGH) ✅ COMPLETE
+**Status**: PR 1 (P0) ✅ | PR 2 (P1) ✅ | PR 3 (P2) ✅ COMPLETE
 
-**PR 1 Completion Summary (2025-11-19)**:
-- ✅ Commit: 8bd4e04d345ff338c033ae99d513df695219d2fc
-- ✅ Cardinality: Reduced from ~7.5M streams/day → **25 total streams** (300,000x improvement, exceeded target)
-- ✅ Files Modified: 6 (Promtail config, Troubleshooting dashboard, 3 docs, rule file)
-- ✅ Validation: Zero Promtail errors, JSON parsing working, correlation ID filtering validated
-- ✅ Breaking Change: Documented with migration guide (`{correlation_id="..."}` → `{service=~".*"} | json | correlation_id="..."`)
-
-**PR 2 Completion Summary (2025-11-19)**:
-- ✅ Implementation: Added `add_service_context()` processor to both production and development chains
-- ✅ Files Modified: 2 (logging_utils.py, test_logging_utils.py)
-- ✅ Tests: 6 unit tests created and passing
-- ✅ Validation: Docker logs confirmed OTEL fields present (`service.name`, `deployment.environment`)
-- ✅ Validation Command: `docker logs huleedu_cj_assessment_service 2>&1 | grep '^{' | tail -1`
-- ✅ Non-breaking: All 19 services will get fields via library update (no service code changes needed)
-- ⏳ Commit Pending: Ready to commit PR 2 changes
+**Completion Summary (2025-11-19)**:
+- ✅ **PR 1**: Loki cardinality fix (7.5M → 25 streams, 300,000x improvement)
+- ✅ **PR 2**: OTEL service context (`service.name`, `deployment.environment`)
+- ✅ **PR 3**: OTEL trace context (`trace_id`, `span_id` when span active)
+- ✅ Files Modified: 3 (logging_utils.py, test_logging_utils.py, test_anthropic_error_diagnostics.py)
+- ✅ Tests: 12 unit tests passing (6 for PR 2, 6 for PR 3)
+- ✅ All quality checks: typecheck, lint, format ✅
 
 **What Remains**:
-- **PR 2 Commit**: Commit the OTEL service context changes
-- **PR 3-4 (P2 OPTIONAL)**: Trace context integration, logcli documentation
+- **Commit**: Ready to commit all 3 PRs
+- **PR 4 (P2 OPTIONAL)**: logcli CLI documentation
 
 ---
 

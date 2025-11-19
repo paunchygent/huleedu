@@ -27,6 +27,14 @@ from common_core.events.envelope import EventEnvelope
 from structlog.contextvars import bind_contextvars, clear_contextvars, merge_contextvars
 from structlog.typing import Processor
 
+# Module-level import for trace context (avoid repeated lazy imports)
+try:
+    from huleedu_service_libs.observability.tracing import get_current_span
+
+    TRACING_AVAILABLE = True
+except ImportError:
+    TRACING_AVAILABLE = False
+
 
 def add_service_context(
     logger: Any, method_name: str, event_dict: dict[str, Any]
@@ -52,6 +60,51 @@ def add_service_context(
     """
     event_dict["service.name"] = os.getenv("SERVICE_NAME", "unknown")
     event_dict["deployment.environment"] = os.getenv("ENVIRONMENT", "development")
+    return event_dict
+
+
+def add_trace_context(logger: Any, method_name: str, event_dict: dict[str, Any]) -> dict[str, Any]:
+    """
+    Add OpenTelemetry trace context to logs if active span exists.
+
+    Enables correlation between logs and distributed traces in Jaeger.
+    Uses OTEL-compatible field names and formats for future-proof integration.
+
+    Performance optimizations:
+    - Module-level import (no repeated lazy imports)
+    - Early exit for services without tracing
+    - Single span lookup (extracts both trace_id and span_id)
+
+    Fields added (when span exists):
+    - trace_id: OpenTelemetry trace ID (32-char hex string, format 032x)
+    - span_id: Current span ID (16-char hex string, format 016x)
+
+    Args:
+        logger: The logger instance (unused but required by structlog)
+        method_name: The logging method name (unused but required by structlog)
+        event_dict: The log event dictionary to enrich
+
+    Returns:
+        Enriched event dictionary with trace context fields (if span exists)
+    """
+    # Early exit if tracing not available (no overhead for services without tracing)
+    if not TRACING_AVAILABLE:
+        return event_dict
+
+    try:
+        # Single span lookup (efficient - extracts both IDs from same context)
+        span = get_current_span()
+        if span:
+            span_context = span.get_span_context()
+            if span_context.is_valid:
+                # OTEL-compatible hex formatting (matches OTEL LoggingHandler)
+                event_dict["trace_id"] = format(span_context.trace_id, "032x")
+                event_dict["span_id"] = format(span_context.span_id, "016x")
+
+    except Exception:
+        # Gracefully handle errors without logging (would cause recursion)
+        pass
+
     return event_dict
 
 
@@ -105,6 +158,7 @@ def configure_service_logging(
         processors: list[Processor] = [
             merge_contextvars,
             add_service_context,  # Add OTEL service context
+            add_trace_context,  # Add OTEL trace context (trace_id, span_id)
             structlog.processors.TimeStamper(fmt="iso"),
             structlog.processors.add_log_level,
             structlog.processors.CallsiteParameterAdder(
@@ -122,6 +176,7 @@ def configure_service_logging(
         processors = [
             merge_contextvars,
             add_service_context,  # Add OTEL service context
+            add_trace_context,  # Add OTEL trace context (trace_id, span_id)
             structlog.processors.TimeStamper(fmt="iso"),
             structlog.processors.add_log_level,
             structlog.processors.CallsiteParameterAdder(

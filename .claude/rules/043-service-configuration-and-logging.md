@@ -167,3 +167,9 @@ async def endpoint(corr: FromDishka[CorrelationContext]):
 ### 3.5. Consistent Log Levels & Clear Messages
 - Use appropriate levels (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`)
 - Log messages **MUST** be clear, concise, and contextual
+
+### 3.6. OpenTelemetry Log Enrichment
+
+All logs automatically include:
+- `service.name`, `deployment.environment`
+- `trace_id`, `span_id` (when active OpenTelemetry span - enables Jaeger correlation)

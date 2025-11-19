@@ -416,7 +416,16 @@ os.environ.setdefault("ENVIRONMENT", environment)
 
 **Root Cause**: Tracing is initialized (observability/tracing.py) and spans are created, but trace context is not propagated to logs. Functions `get_current_trace_id()` and `get_current_span()` exist but are not called by logging processors.
 
-**Status**: `todo`
+**Status**: `complete` (2025-11-19)
+
+**Completion Details** (Optimized Design - Option B+):
+- Implementation: Module-level import + single span lookup + OTEL-compatible formatting
+- Files Modified: 2 (logging_utils.py, test_logging_utils.py)
+- Tests: 6 unit tests created and passing
+- Validation: Docker logs confirmed (services with/without tracing)
+- Performance: Module-level import (no repeated lazy imports), early exit for non-traced services, single span lookup
+- OTEL Compliance: Field names and hex formatting match OpenTelemetry LoggingHandler spec
+- Non-breaking: All services work correctly (tracing enabled or disabled)
 
 ### Files
 
@@ -574,7 +583,15 @@ os.environ.setdefault("ENVIRONMENT", environment)
 
 **Root Cause**: Current documentation only covers Grafana UI queries. No CLI patterns documented for automation, LLM integration, or background job log access.
 
-**Status**: `todo`
+**Status**: `complete` (2025-11-20)
+
+**Completion Details** (LLM-Focused):
+- Implementation: Programmatic log access documentation for LLM agents
+- Files Modified: 2 (playbook, Loki patterns rule)
+- Focus: LLM log export workflow, background job monitoring (ENG5 runner)
+- Accuracy: Based on official Grafana Loki documentation (Context7)
+- Key Patterns: JSONL export for structured parsing, jq filtering, batch monitoring
+- Installation: Build from source OR download pre-built binary (factually correct)
 
 ### Files
 
@@ -786,10 +803,10 @@ os.environ.setdefault("ENVIRONMENT", environment)
 
 | PR | Title | Priority | Status | Effort | Blocks |
 |----|-------|----------|--------|--------|--------|
-| 1 | Remove High-Cardinality Labels from Promtail | **P0 CRITICAL** | `todo` | 1-2h | - |
-| 2 | Add OpenTelemetry Service Context to Logs | P1 HIGH | `todo` | 2-4h | - |
-| 3 | Add OpenTelemetry Trace Context to Logs | P2 OPTIONAL | `todo` | 2-3h | PR2 |
-| 4 | Add logcli CLI Integration Documentation | P2 OPTIONAL | `todo` | 1-2h | PR1 |
+| 1 | Remove High-Cardinality Labels from Promtail | **P0 CRITICAL** | `complete` | 1-2h | - |
+| 2 | Add OpenTelemetry Service Context to Logs | P1 HIGH | `complete` | 2-4h | - |
+| 3 | Add OpenTelemetry Trace Context to Logs | P2 OPTIONAL | `complete` | 2-3h | PR2 |
+| 4 | Add logcli CLI Integration Documentation | P2 OPTIONAL | `complete` | 1-2h | PR1 |
 
 ### Phase 1 - Critical Performance Fix (URGENT - Do First)
 

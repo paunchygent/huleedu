@@ -133,3 +133,57 @@ async def test_anchor_positions_are_balanced(
     assert anchor_pair_total > 0
     ratio = anchor_a_total / anchor_pair_total
     assert 0.35 <= ratio <= 0.65
+
+
+@pytest.mark.asyncio
+async def test_anchor_position_chi_squared(
+    sample_session: AsyncMock, sample_essays: list[EssayForComparison]
+) -> None:
+    """Formal statistical test for randomization fairness using Chi-Squared test.
+
+    Null Hypothesis (H0): The probability of an anchor being in position A is 0.5.
+    We fail to reject H0 if p-value > 0.05.
+    """
+    from scipy.stats import chisquare
+
+    anchor_a_count = 0
+    anchor_b_count = 0
+
+    # Generate enough samples for statistical significance
+    # 200 seeds * ~2 anchor pairs per batch = ~400 observations
+    for seed in range(200):
+        tasks = await pair_generation.generate_comparison_tasks(
+            essays_for_comparison=sample_essays,
+            db_session=sample_session,
+            cj_batch_id=seed,
+            existing_pairs_threshold=10,
+            randomization_seed=seed,
+        )
+
+        for task in tasks:
+            is_anchor_a = task.essay_a.id.startswith("anchor-")
+            is_anchor_b = task.essay_b.id.startswith("anchor-")
+
+            # Only count pairs where exactly one is an anchor (mixed pair)
+            if is_anchor_a != is_anchor_b:
+                if is_anchor_a:
+                    anchor_a_count += 1
+                else:
+                    anchor_b_count += 1
+
+    total_observations = anchor_a_count + anchor_b_count
+    assert total_observations > 100, "Insufficient sample size for statistical test"
+
+    observed = [anchor_a_count, anchor_b_count]
+    expected = [total_observations / 2, total_observations / 2]
+
+    # Perform Chi-Squared test
+    chi2_stat, p_value = chisquare(f_obs=observed, f_exp=expected)
+
+    # Check if p-value > 0.05 (significance level)
+    # If p < 0.05, we reject H0 and conclude the distribution is biased
+    # We want to FAIL to reject H0 (i.e., it IS random)
+    assert p_value > 0.05, (
+        f"Randomization failed Chi-Squared test: p={p_value:.4f} < 0.05. "
+        f"Observed: A={anchor_a_count}, B={anchor_b_count}"
+    )

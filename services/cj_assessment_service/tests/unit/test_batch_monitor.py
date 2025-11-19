@@ -72,6 +72,7 @@ class TestBatchMonitor:
         mock_batch_state.last_activity_at = datetime.now(UTC) - timedelta(hours=5)
         mock_batch_state.correlation_id = UUID("00000000-0000-0000-0000-000000000123")
         mock_batch_state.processing_metadata = None
+        mock_batch_state.completion_denominator.return_value = 100
 
         # Mock database operations
         mock_session = AsyncMock()
@@ -101,6 +102,7 @@ class TestBatchMonitor:
         mock_batch_state.last_activity_at = datetime.now(UTC) - timedelta(hours=5)
         mock_batch_state.correlation_id = UUID("00000000-0000-0000-0000-000000000456")
         mock_batch_state.processing_metadata = None
+        mock_batch_state.completion_denominator.return_value = 100
 
         # Mock database operations
         mock_session = AsyncMock()

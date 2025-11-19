@@ -204,6 +204,133 @@ Docker Container → json-file driver → /var/lib/docker/containers/*.log
 4. Enter LogQL query in query editor
 5. Click **Run Query** to view results
 
+### Programmatic Log Access with logcli (LLM Integration)
+
+For LLM agents and automation scripts that need programmatic log access, use `logcli` to query Loki from the command line and export structured log data.
+
+#### Installation & Configuration
+
+**Build from Source**:
+```bash
+git clone https://github.com/grafana/loki.git
+cd loki
+make logcli
+sudo cp cmd/logcli/logcli /usr/local/bin/logcli
+```
+
+**Download Pre-built Binary**:
+```bash
+# Download from Grafana releases (check for latest version)
+wget https://github.com/grafana/loki/releases/download/v3.1.0/logcli-linux-amd64.zip
+unzip logcli-linux-amd64.zip
+sudo mv logcli-linux-amd64 /usr/local/bin/logcli
+chmod +x /usr/local/bin/logcli
+```
+
+**Required Configuration**:
+```bash
+# Set Loki endpoint (required)
+export LOKI_ADDR=http://localhost:3100
+
+# Optional: Multi-tenant setups
+export LOKI_ORG_ID=tenant1
+export LOKI_USERNAME=user
+export LOKI_PASSWORD=pass
+```
+
+#### LLM Log Export Workflow
+
+**Use Case**: Export bounded log chunks for LLM analysis
+
+**Workflow**: Query → Export JSONL → Filter (jq) → Feed to LLM
+
+**Example** - Export CJ Assessment errors for batch 33 analysis:
+```bash
+# Step 1: Query Loki with label filters (fast), export as JSONL
+logcli query '{service="cj_assessment_service", level="error"}' \
+  --from="2025-11-19T10:00:00Z" \
+  --to="2025-11-19T20:00:00Z" \
+  --limit=500 \
+  --output=jsonl \
+  > cj_errors.jsonl
+
+# Step 2: Filter by high-cardinality field (batch_id) using jq
+jq -r 'select(.batch_id == "33")' < cj_errors.jsonl > batch_33_errors.jsonl
+
+# Step 3: Format for LLM readability (TSV with key fields)
+jq -r '[.timestamp, .level, .event, .message, .correlation_id] | @tsv' \
+  < batch_33_errors.jsonl > batch_33_for_llm.txt
+
+# Step 4: Feed to LLM agent for analysis
+# (LLM reads batch_33_for_llm.txt and provides diagnostic analysis)
+```
+
+**Key Patterns for LLM Agents**:
+- **Always use `--output=jsonl`** for structured data (easiest to parse)
+- **Filter by labels first** (`{service="...", level="..."}`) to minimize scan volume
+- **Use absolute time ranges** (`--from`/`--to`) for reproducible queries
+- **Bound result sets** (`--limit`) to prevent overwhelming LLM context windows
+- **Extract with jq** for high-cardinality field filtering (correlation_id, batch_id, user_id)
+
+#### Background Job Monitoring (ENG5 Runner)
+
+**Use Case**: Real-time monitoring of long-running batch jobs
+
+**Pattern**: Tail logs with `--tail` flag, filter with grep
+
+**Example** - Monitor ENG5 serial-bundle batch progress:
+```bash
+# Real-time tail of CJ + LLM Provider services for specific batch
+logcli query --tail \
+  '{service=~"cj_assessment|llm_provider"} | json | bos_batch_id="serial-bundle-20251119"' \
+  | grep -E "batch_submitted|comparison_completed|batch_completed|error"
+```
+
+**Export batch timeline** for post-execution analysis:
+```bash
+# Export all events for batch (structured JSONL)
+logcli query '{service=~".*"} | json | bos_batch_id="serial-bundle-20251119"' \
+  --from="2025-11-19T14:00:00Z" \
+  --to="2025-11-19T16:00:00Z" \
+  --output=jsonl \
+  > batch_timeline.jsonl
+
+# Create sorted timeline (timestamp, service, event)
+jq -r '[.timestamp, ."service.name", .event] | @tsv' \
+  < batch_timeline.jsonl | sort > timeline.txt
+```
+
+#### Output Format Reference
+
+**JSONL (for LLM/automation)** - Structured, one JSON object per line:
+```bash
+logcli query '{service="cj_assessment_service"}' --output=jsonl
+```
+
+**Raw (messages only)** - Just log message content, no metadata:
+```bash
+logcli query '{service="cj_assessment_service"}' --output=raw
+```
+
+**Default (formatted)** - Human-readable with timestamps and labels (not ideal for automation)
+
+#### Query Label Metadata
+
+**List all available labels**:
+```bash
+logcli labels
+```
+
+**List values for a specific label** (e.g., discover all service names):
+```bash
+logcli labels service --since=24h
+```
+
+**Analyze label cardinality**:
+```bash
+logcli series '{service="cj_assessment_service"}' --analyze-labels
+```
+
 ## Alert Runbooks
 
 ### ServiceDown Alert
@@ -277,5 +404,5 @@ When running comprehensive tests:
 
 ---
 
-**Last Updated**: 2025-11-19 – Loki Cardinality Reduction Complete (25 streams, correlation_id in JSON body)
+**Last Updated**: 2025-11-20 – Added logcli CLI documentation for programmatic access, LLM integration, and background job monitoring
 **Next Review**: After service log volume increases

@@ -20,15 +20,32 @@ labels: []
 
 # TASK-CJ-LLM-SERIAL-BUNDLE-VALIDATION-FIXES – CJ Batch State, Fairness & Provider Diagnostics
 
-This task decomposes the **validation issues** found during ENG5 serial-bundle runs
-into focused PRs. Implementation of batching and metrics is complete; these PRs
-focus on correctness, fairness, and diagnostics.
+**Scope:**  
+- Correctness and observability issues discovered during ENG5 serial-bundle validation runs.  
+- Services: **CJ Assessment Service** (batch state, pair generation, callbacks) and **LLM Provider Service** (queue hygiene, provider diagnostics).
 
-Context (ENG5 runs):
-- `per_request` baseline: 4/4 comparisons, stable BT + projections.
-- `serial_bundle` batch 33: 100 pairs, 66 Anthropic errors, degenerate BT scores,
-  completion logs >100%.
-- `serial_bundle` batch 34: 10/10 success, but one stray callback correlation ID.
+**Background:**  
+- `per_request` baseline: 4/4 comparisons, stable BT + projections.  
+- `serial_bundle` batch 33: 100 pairs → 66 Anthropic errors, degenerate BT scores, completion logs >100%.  
+- `serial_bundle` batch 34: 10/10 success, but one stray callback correlation ID and evidence of orphan callbacks / stuck queue items.
+
+**Problem Areas (from investigation docs):**  
+1. Batch completion semantics and metrics divergence from DB reality.  
+2. Pair generation position bias (anchors overrepresented as `essay_a`).  
+3. Poorly classified Anthropic provider errors during serial_bundle runs (rate limits vs server errors vs overload).  
+4. Queue hygiene issues: stuck `PROCESSING` items and orphan callbacks.
+
+**This task decomposes the above into PRs:**  
+- **PR 1 – CJ Batch Completion & Metrics Semantics Fix**  
+- **PR 2 – Pair Generation Fairness & Anchor Position Balancing**  
+- **PR 3 – Anthropic Error Diagnostics for Serial-Bundle ENG5 Runs**  
+- **PR 4 – Queue Hygiene & Orphan Callback Handling**
+
+**Success Criteria:**  
+- Serial-bundle runs never report >100% completion and match DB counts.  
+- A/B positions are balanced for anchors and students across runs.  
+- Anthropic failures are classified with structured `ErrorDetail` + Prometheus metrics by `error_type`.  
+- Stuck queue items and orphan callbacks are surfaced via metrics/logs and cleaned up deterministically.
 
 ---
 

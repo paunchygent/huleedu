@@ -18,6 +18,7 @@ from services.llm_provider_service.exceptions import (
     raise_rate_limit_error,
 )
 from services.llm_provider_service.internal_models import LLMProviderResponse
+from services.llm_provider_service.metrics import get_llm_metrics
 from services.llm_provider_service.model_manifest import ProviderName
 from services.llm_provider_service.protocols import LLMProviderProtocol, LLMRetryManagerProtocol
 from services.llm_provider_service.response_validator import validate_and_normalize_response
@@ -67,6 +68,8 @@ class AnthropicProviderImpl(LLMProviderProtocol):
                 "Failed to load manifest configuration; using hardcoded defaults",
                 extra={"error": str(e)},
             )
+
+        self.metrics = get_llm_metrics()
 
     async def generate_comparison(
         self,
@@ -241,6 +244,144 @@ class AnthropicProviderImpl(LLMProviderProtocol):
             "tool_choice": {"type": "tool", "name": "comparison_result"},
         }
 
+        response_text = await self._perform_http_request_with_metrics(
+            endpoint=endpoint,
+            headers=headers,
+            payload=payload,
+            correlation_id=correlation_id,
+        )
+
+        try:
+            response_data = json.loads(response_text)
+        except json.JSONDecodeError as e:
+            logger.error(
+                f"Failed to parse Anthropic response as JSON: {e}",
+                extra={"response_text": response_text[:500]},
+            )
+            raise_parsing_error(
+                service="llm_provider_service",
+                operation="anthropic_api_request",
+                parse_target="json",
+                message=f"Failed to parse Anthropic response: {str(e)}",
+                correlation_id=correlation_id,
+                details={"provider": "anthropic"},
+            )
+
+        # Log the structure for debugging
+        logger.debug(
+            "Anthropic response structure",
+            extra={
+                "has_content": "content" in response_data,
+                "content_type": type(response_data.get("content")).__name__,
+                "content_length": len(response_data.get("content", []))
+                if isinstance(response_data.get("content"), list)
+                else 0,
+            },
+        )
+
+        # Extract tool use from Anthropic response
+        tool_result = None
+        if isinstance(response_data.get("content"), list):
+            for block in response_data["content"]:
+                if block.get("type") == "tool_use" and block.get("name") == "comparison_result":
+                    tool_result = block.get("input", {})
+                    break
+
+        if tool_result:
+            try:
+                # Validate and normalize response using centralized validator
+                validated_response = validate_and_normalize_response(
+                    tool_result, provider="anthropic", correlation_id=correlation_id
+                )
+
+                # Use validated response directly
+                # (already in assessment domain language)
+
+                # Convert winner string to enum value
+                if validated_response.winner == "Essay A":
+                    winner = EssayComparisonWinner.ESSAY_A
+                elif validated_response.winner == "Essay B":
+                    winner = EssayComparisonWinner.ESSAY_B
+                else:
+                    winner = EssayComparisonWinner.ERROR
+
+                # Get token usage
+                usage = response_data.get("usage", {})
+                prompt_tokens = usage.get("input_tokens", 0)
+                completion_tokens = usage.get("output_tokens", 0)
+                total_tokens = prompt_tokens + completion_tokens
+
+                # Convert confidence from 1-5 scale to 0-1 scale for internal model
+                confidence_normalized = (validated_response.confidence - 1.0) / 4.0
+
+                # Create response model
+                metadata: dict[str, Any] = {}
+                if prompt_sha256:
+                    metadata["prompt_sha256"] = prompt_sha256
+
+                response_model = LLMProviderResponse(
+                    winner=winner,
+                    justification=validated_response.justification,
+                    confidence=confidence_normalized,
+                    provider=LLMProviderType.ANTHROPIC,
+                    model=model,
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    total_tokens=total_tokens,
+                    raw_response=response_data,
+                    metadata=metadata,
+                )
+
+                return response_model
+
+            except (ValueError, KeyError, TypeError) as e:
+                error_msg = f"Failed to parse Anthropic tool response: {str(e)}"
+                logger.error(error_msg, extra={"tool_result": str(tool_result)[:500]})
+                raise_parsing_error(
+                    service="llm_provider_service",
+                    operation="anthropic_api_request",
+                    parse_target="tool_response",
+                    message=error_msg,
+                    correlation_id=correlation_id,
+                    details={"provider": "anthropic"},
+                )
+        else:
+            # Log the full response for debugging
+            logger.error(
+                "No tool use found in Anthropic response",
+                extra={"response_data": str(response_data)[:1000]},
+            )
+
+            if self.metrics and "llm_provider_api_errors_total" in self.metrics:
+                # error_type values:
+                # - rate_limit, authentication, server_error, client_error
+                # - connection_error, unexpected (non-HTTP failures)
+                # - invalid_response (HTTP 200 with malformed or missing tool payload)
+                self.metrics["llm_provider_api_errors_total"].labels(
+                    provider="anthropic",
+                    error_type="invalid_response",
+                    http_status_code="200",
+                ).inc()
+
+            raise_external_service_error(
+                service="llm_provider_service",
+                operation="anthropic_api_request",
+                external_service="anthropic_api",
+                message="No tool use found in Anthropic response",
+                correlation_id=correlation_id,
+                details={"provider": "anthropic"},
+            )
+
+    async def _perform_http_request_with_metrics(
+        self,
+        *,
+        endpoint: str,
+        headers: dict[str, str],
+        payload: dict[str, Any],
+        correlation_id: UUID,
+    ) -> str:
+        """Make a request to the Anthropic API and record error diagnostics."""
+
         try:
             async with self.session.post(
                 endpoint,
@@ -248,164 +389,101 @@ class AnthropicProviderImpl(LLMProviderProtocol):
                 json=payload,
             ) as response:
                 if response.status == 200:
-                    response_text = await response.text()
-                    try:
-                        response_data = json.loads(response_text)
-                    except json.JSONDecodeError as e:
-                        logger.error(
-                            f"Failed to parse Anthropic response as JSON: {e}",
-                            extra={"response_text": response_text[:500]},
-                        )
-                        raise_parsing_error(
-                            service="llm_provider_service",
-                            operation="anthropic_api_request",
-                            parse_target="json",
-                            message=f"Failed to parse Anthropic response: {str(e)}",
-                            correlation_id=correlation_id,
-                            details={"provider": "anthropic"},
-                        )
+                    return await response.text()
 
-                    # Log the structure for debugging
-                    logger.debug(
-                        "Anthropic response structure",
-                        extra={
-                            "has_content": "content" in response_data,
-                            "content_type": type(response_data.get("content")).__name__,
-                            "content_length": len(response_data.get("content", []))
-                            if isinstance(response_data.get("content"), list)
-                            else 0,
-                        },
-                    )
+                error_text = await response.text()
+                error_msg = f"Anthropic API error: {response.status} - {error_text}"
 
-                    # Extract tool use from Anthropic response
-                    tool_result = None
-                    if isinstance(response_data.get("content"), list):
-                        for block in response_data["content"]:
-                            if (
-                                block.get("type") == "tool_use"
-                                and block.get("name") == "comparison_result"
-                            ):
-                                tool_result = block.get("input", {})
-                                break
-
-                    if tool_result:
-                        try:
-                            # Validate and normalize response using centralized validator
-                            validated_response = validate_and_normalize_response(
-                                tool_result, provider="anthropic", correlation_id=correlation_id
-                            )
-
-                            # Use validated response directly
-                            # (already in assessment domain language)
-
-                            # Convert winner string to enum value
-                            if validated_response.winner == "Essay A":
-                                winner = EssayComparisonWinner.ESSAY_A
-                            elif validated_response.winner == "Essay B":
-                                winner = EssayComparisonWinner.ESSAY_B
-                            else:
-                                winner = EssayComparisonWinner.ERROR
-
-                            # Get token usage
-                            usage = response_data.get("usage", {})
-                            prompt_tokens = usage.get("input_tokens", 0)
-                            completion_tokens = usage.get("output_tokens", 0)
-                            total_tokens = prompt_tokens + completion_tokens
-
-                            # Convert confidence from 1-5 scale to 0-1 scale for internal model
-                            confidence_normalized = (validated_response.confidence - 1.0) / 4.0
-
-                            # Create response model
-                            metadata: dict[str, Any] = {}
-                            if prompt_sha256:
-                                metadata["prompt_sha256"] = prompt_sha256
-
-                            response_model = LLMProviderResponse(
-                                winner=winner,
-                                justification=validated_response.justification,
-                                confidence=confidence_normalized,
-                                provider=LLMProviderType.ANTHROPIC,
-                                model=model,
-                                prompt_tokens=prompt_tokens,
-                                completion_tokens=completion_tokens,
-                                total_tokens=total_tokens,
-                                raw_response=response_data,
-                                metadata=metadata,
-                            )
-
-                            return response_model
-
-                        except (ValueError, KeyError, TypeError) as e:
-                            error_msg = f"Failed to parse Anthropic tool response: {str(e)}"
-                            logger.error(error_msg, extra={"tool_result": str(tool_result)[:500]})
-                            raise_parsing_error(
-                                service="llm_provider_service",
-                                operation="anthropic_api_request",
-                                parse_target="tool_response",
-                                message=error_msg,
-                                correlation_id=correlation_id,
-                                details={"provider": "anthropic"},
-                            )
-                    else:
-                        # Log the full response for debugging
-                        logger.error(
-                            "No tool use found in Anthropic response",
-                            extra={"response_data": str(response_data)[:1000]},
-                        )
-                        raise_external_service_error(
-                            service="llm_provider_service",
-                            operation="anthropic_api_request",
-                            external_service="anthropic_api",
-                            message="No tool use found in Anthropic response",
-                            correlation_id=correlation_id,
-                            details={"provider": "anthropic"},
-                        )
-
-                else:
-                    error_text = await response.text()
-                    error_msg = f"Anthropic API error: {response.status} - {error_text}"
-
-                    # Raise for retryable status codes to trigger retry
-                    if response.status in {429, 500, 502, 503, 504}:
-                        response.raise_for_status()
-
-                    # Handle specific HTTP errors with appropriate exceptions
+                # Record API error metric. error_type semantics:
+                # - rate_limit, authentication, server_error, client_error
+                # - connection_error, unexpected (non-HTTP failures)
+                # - invalid_response (HTTP 200 with malformed body, recorded separately)
+                if self.metrics and "llm_provider_api_errors_total" in self.metrics:
+                    error_type = "unknown"
                     if response.status == 429:
-                        raise_rate_limit_error(
-                            service="llm_provider_service",
-                            operation="anthropic_api_request",
-                            limit=0,  # Unknown limit from API
-                            window_seconds=60,
-                            message=f"Rate limit exceeded: {error_text}",
-                            correlation_id=correlation_id,
-                            details={"provider": "anthropic", "retry_after": 60},
-                        )
+                        error_type = "rate_limit"
                     elif response.status == 401:
-                        raise_authentication_error(
-                            service="llm_provider_service",
-                            operation="anthropic_api_request",
-                            message=f"Authentication failed: {error_text}",
-                            correlation_id=correlation_id,
-                            details={"provider": "anthropic"},
-                        )
-                    else:
-                        raise_external_service_error(
-                            service="llm_provider_service",
-                            operation="anthropic_api_request",
-                            external_service="anthropic_api",
-                            message=error_msg,
-                            correlation_id=correlation_id,
-                            details={"provider": "anthropic", "status_code": response.status},
-                        )
+                        error_type = "authentication"
+                    elif response.status >= 500:
+                        error_type = "server_error"
+                    elif response.status >= 400:
+                        error_type = "client_error"
+
+                    self.metrics["llm_provider_api_errors_total"].labels(
+                        provider="anthropic",
+                        error_type=error_type,
+                        http_status_code=str(response.status),
+                    ).inc()
+
+                # Log detailed error info
+                log_extra = {
+                    "status_code": response.status,
+                    "error_text": error_text[:1000],
+                    "correlation_id": str(correlation_id),
+                    "provider": "anthropic",
+                }
+
+                # Capture rate limit headers if present
+                for header in ["x-ratelimit-remaining", "x-ratelimit-reset", "retry-after"]:
+                    if val := response.headers.get(header):
+                        log_extra[header] = val
+
+                logger.error(f"Anthropic API failure: {response.status}", extra=log_extra)
+
+                # Raise for retryable status codes to trigger retry
+                if response.status in {429, 500, 502, 503, 504}:
+                    response.raise_for_status()
+
+                # Handle specific HTTP errors with appropriate exceptions
+                if response.status == 429:
+                    raise_rate_limit_error(
+                        service="llm_provider_service",
+                        operation="anthropic_api_request",
+                        limit=0,  # Unknown limit from API
+                        window_seconds=60,
+                        message=f"Rate limit exceeded: {error_text}",
+                        correlation_id=correlation_id,
+                        details={"provider": "anthropic", "retry_after": 60},
+                    )
+                elif response.status == 401:
+                    raise_authentication_error(
+                        service="llm_provider_service",
+                        operation="anthropic_api_request",
+                        message=f"Authentication failed: {error_text}",
+                        correlation_id=correlation_id,
+                        details={"provider": "anthropic"},
+                    )
+                else:
+                    raise_external_service_error(
+                        service="llm_provider_service",
+                        operation="anthropic_api_request",
+                        external_service="anthropic_api",
+                        message=error_msg,
+                        correlation_id=correlation_id,
+                        details={"provider": "anthropic", "status_code": response.status},
+                    )
 
         except aiohttp.ClientResponseError:
             # Will be retried by retry manager
             raise
         except aiohttp.ClientError:
             # Connection errors, timeouts, etc.
+            if self.metrics and "llm_provider_api_errors_total" in self.metrics:
+                self.metrics["llm_provider_api_errors_total"].labels(
+                    provider="anthropic",
+                    error_type="connection_error",
+                    http_status_code="0",
+                ).inc()
             raise
         except Exception as e:
             # Unexpected errors
+            if self.metrics and "llm_provider_api_errors_total" in self.metrics:
+                self.metrics["llm_provider_api_errors_total"].labels(
+                    provider="anthropic",
+                    error_type="unexpected",
+                    http_status_code="0",
+                ).inc()
+
             error_msg = f"Unexpected error calling Anthropic API: {str(e)}"
             logger.error(error_msg, exc_info=True)
             raise_external_service_error(
