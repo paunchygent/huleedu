@@ -51,7 +51,7 @@ class TestCompatibilityReporterJSON:
     def test_json_report_with_new_models(self) -> None:
         """JSON report should list new models with recommendations."""
         new_model = DiscoveredModel(
-            model_id="claude-3-5-sonnet-20241022",
+            model_id="claude-sonnet-4-5-20250929",
             display_name="Claude 3.5 Sonnet",
             capabilities=["tool_use", "vision"],
             max_tokens=8192,
@@ -77,7 +77,7 @@ class TestCompatibilityReporterJSON:
         assert len(report["discovered_models"]) == 1
 
         discovered = report["discovered_models"][0]
-        assert discovered["model_id"] == "claude-3-5-sonnet-20241022"
+        assert discovered["model_id"] == "claude-sonnet-4-5-20250929"
         assert discovered["display_name"] == "Claude 3.5 Sonnet"
         assert discovered["compatibility_status"] == "unknown"
         assert discovered["recommendation"] == "requires_testing"
@@ -205,7 +205,7 @@ class TestCompatibilityReporterMarkdown:
     def test_markdown_report_with_new_models(self) -> None:
         """Markdown report should format new models with details."""
         new_model = DiscoveredModel(
-            model_id="claude-3-5-sonnet-20241022",
+            model_id="claude-sonnet-4-5-20250929",
             display_name="Claude 3.5 Sonnet",
             capabilities=["tool_use", "vision", "function_calling"],
             max_tokens=8192,
@@ -227,7 +227,7 @@ class TestCompatibilityReporterMarkdown:
         markdown = reporter.generate_markdown_report(result)
 
         assert "## New Models Discovered" in markdown
-        assert "### claude-3-5-sonnet-20241022" in markdown
+        assert "### claude-sonnet-4-5-20250929" in markdown
         assert "Claude 3.5 Sonnet" in markdown
         assert "tool_use, vision, function_calling" in markdown
         assert "8,192" in markdown

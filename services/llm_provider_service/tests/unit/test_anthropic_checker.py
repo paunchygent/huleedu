@@ -76,7 +76,7 @@ class TestCheckLatestModels:
         """Should parse Anthropic ModelInfo into DiscoveredModel."""
         mock_client = Mock()
         mock_model_info = ModelInfo(
-            id="claude-3-5-haiku-20241022",
+            id="claude-haiku-4-5-20251001",
             display_name="Claude 3.5 Haiku",
             type="model",
             created_at=date(2024, 10, 22),
@@ -90,7 +90,7 @@ class TestCheckLatestModels:
         models = await checker.check_latest_models()
 
         assert len(models) == 1
-        assert models[0].model_id == "claude-3-5-haiku-20241022"
+        assert models[0].model_id == "claude-haiku-4-5-20251001"
         assert models[0].display_name == "Claude 3.5 Haiku"
 
     @pytest.mark.asyncio
@@ -105,7 +105,7 @@ class TestCheckLatestModels:
                 created_at=date(2023, 1, 1),
             ),
             ModelInfo(
-                id="claude-3-5-haiku-20241022",
+                id="claude-haiku-4-5-20251001",
                 display_name="Claude 3.5 Haiku",
                 type="model",
                 created_at=date(2024, 10, 22),
@@ -121,7 +121,7 @@ class TestCheckLatestModels:
 
         # Should only include Claude 3+ model
         assert len(models) == 1
-        assert models[0].model_id == "claude-3-5-haiku-20241022"
+        assert models[0].model_id == "claude-haiku-4-5-20251001"
 
     @pytest.mark.asyncio
     async def test_filters_claude_instant_models(self, mocker: Mock, settings: Settings) -> None:
@@ -135,7 +135,7 @@ class TestCheckLatestModels:
                 created_at=date(2023, 1, 1),
             ),
             ModelInfo(
-                id="claude-3-5-haiku-20241022",
+                id="claude-haiku-4-5-20251001",
                 display_name="Claude 3.5 Haiku",
                 type="model",
                 created_at=date(2024, 10, 22),
@@ -151,7 +151,7 @@ class TestCheckLatestModels:
 
         # Should only include Claude 3+ model
         assert len(models) == 1
-        assert models[0].model_id == "claude-3-5-haiku-20241022"
+        assert models[0].model_id == "claude-haiku-4-5-20251001"
 
     @pytest.mark.asyncio
     async def test_includes_claude_3_models(self, mocker: Mock, settings: Settings) -> None:
@@ -165,13 +165,13 @@ class TestCheckLatestModels:
                 created_at=date(2024, 2, 29),
             ),
             ModelInfo(
-                id="claude-3-5-sonnet-20241022",
+                id="claude-sonnet-4-5-20250929",
                 display_name="Claude 3.5 Sonnet",
                 type="model",
                 created_at=date(2024, 10, 22),
             ),
             ModelInfo(
-                id="claude-3-5-haiku-20241022",
+                id="claude-haiku-4-5-20251001",
                 display_name="Claude 3.5 Haiku",
                 type="model",
                 created_at=date(2024, 10, 22),
@@ -189,8 +189,8 @@ class TestCheckLatestModels:
         assert len(models) == 3
         model_ids = {m.model_id for m in models}
         assert "claude-3-opus-20240229" in model_ids
-        assert "claude-3-5-sonnet-20241022" in model_ids
-        assert "claude-3-5-haiku-20241022" in model_ids
+        assert "claude-sonnet-4-5-20250929" in model_ids
+        assert "claude-haiku-4-5-20251001" in model_ids
 
     @pytest.mark.asyncio
     async def test_handles_api_error_gracefully(self, mocker: Mock, settings: Settings) -> None:
@@ -279,7 +279,7 @@ class TestCompareWithManifest:
 
         # Mock discovered model matching manifest
         matching_model = DiscoveredModel(
-            model_id="claude-3-5-haiku-20241022",
+            model_id="claude-haiku-4-5-20251001",
             display_name="Claude 3.5 Haiku",
             api_version=None,
             capabilities=[],

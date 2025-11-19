@@ -450,7 +450,7 @@ class Settings(SecureServiceSettings):
             >>> settings = Settings()
             >>> config = settings.get_model_from_manifest(ProviderName.ANTHROPIC)
             >>> config.model_id
-            'claude-3-5-haiku-20241022'
+            'claude-haiku-4-5-20251001'
         """
         return get_model_config(provider, model_id)
 

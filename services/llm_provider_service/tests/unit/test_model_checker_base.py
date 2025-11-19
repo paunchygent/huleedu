@@ -49,7 +49,7 @@ class TestDiscoveredModel:
     def test_all_fields_populated(self) -> None:
         """DiscoveredModel should accept all fields."""
         model = DiscoveredModel(
-            model_id="claude-3-5-haiku-20241022",
+            model_id="claude-haiku-4-5-20251001",
             display_name="Claude 3.5 Haiku",
             api_version="2023-06-01",
             capabilities=["tool_use", "vision"],
@@ -63,7 +63,7 @@ class TestDiscoveredModel:
             notes="Latest Haiku model",
         )
 
-        assert model.model_id == "claude-3-5-haiku-20241022"
+        assert model.model_id == "claude-haiku-4-5-20251001"
         assert model.display_name == "Claude 3.5 Haiku"
         assert model.api_version == "2023-06-01"
         assert model.capabilities == ["tool_use", "vision"]

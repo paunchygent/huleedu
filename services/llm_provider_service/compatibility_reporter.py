@@ -66,13 +66,13 @@ class CompatibilityReporter:
                 "check_date": "2025-11-09T02:30:00Z",
                 "provider": "anthropic",
                 "current_model": {
-                    "model_id": "claude-3-5-haiku-20241022",
+                    "model_id": "claude-haiku-4-5-20251001",
                     "status": "compatible",
                     "last_tested": "2025-11-09T02:30:00Z"
                 },
                 "discovered_models": [
                     {
-                        "model_id": "claude-3-5-sonnet-20241022",
+                        "model_id": "claude-sonnet-4-5-20250929",
                         "compatibility_status": "unknown",
                         "issues": [],
                         "recommendation": "requires_testing"
@@ -122,13 +122,13 @@ class CompatibilityReporter:
 
             ## Current Model
 
-            - **Model ID**: `claude-3-5-haiku-20241022`
+            - **Model ID**: `claude-haiku-4-5-20251001`
             - **Status**: Compatible
             - **Last Tested**: 2025-11-09 02:30:00 UTC
 
             ## New Models Discovered
 
-            ### claude-3-5-sonnet-20241022
+            ### claude-sonnet-4-5-20250929
             - **Display Name**: Claude 3.5 Sonnet
             - **Recommendation**: Requires compatibility testing
             - **Capabilities**: tool_use, vision, function_calling

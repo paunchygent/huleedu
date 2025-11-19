@@ -57,7 +57,7 @@ class ModelConfig(BaseModel):
     # Identity
     model_id: str = Field(
         ...,
-        description="Provider-specific model identifier (e.g., 'claude-3-5-haiku-20241022')",
+        description="Provider-specific model identifier (e.g., 'claude-haiku-4-5-20251001')",
     )
     provider: ProviderName = Field(..., description="Provider hosting this model")
     display_name: str = Field(

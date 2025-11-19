@@ -118,7 +118,7 @@ class TestCheckLatestModels:
             return_value={
                 "data": [
                     {
-                        "id": "anthropic/claude-3-5-haiku-20241022",
+                        "id": "anthropic/claude-haiku-4-5-20251001",
                         "name": "Claude 3.5 Haiku",
                         "context_length": 200000,
                         "description": "Fast and efficient",
@@ -142,7 +142,7 @@ class TestCheckLatestModels:
         models = await checker.check_latest_models()
 
         assert len(models) == 1
-        assert models[0].model_id == "anthropic/claude-3-5-haiku-20241022"
+        assert models[0].model_id == "anthropic/claude-haiku-4-5-20251001"
 
     @pytest.mark.asyncio
     async def test_filters_non_anthropic_models(self, mocker: Mock, settings: Settings) -> None:
@@ -159,7 +159,7 @@ class TestCheckLatestModels:
                         "context_length": 128000,
                     },
                     {
-                        "id": "anthropic/claude-3-5-haiku-20241022",
+                        "id": "anthropic/claude-haiku-4-5-20251001",
                         "name": "Claude 3.5 Haiku",
                         "context_length": 200000,
                     },
@@ -183,7 +183,7 @@ class TestCheckLatestModels:
 
         # Should only include Anthropic model
         assert len(models) == 1
-        assert models[0].model_id == "anthropic/claude-3-5-haiku-20241022"
+        assert models[0].model_id == "anthropic/claude-haiku-4-5-20251001"
 
     @pytest.mark.asyncio
     async def test_filters_claude_2_models(self, mocker: Mock, settings: Settings) -> None:
@@ -200,7 +200,7 @@ class TestCheckLatestModels:
                         "context_length": 100000,
                     },
                     {
-                        "id": "anthropic/claude-3-5-haiku-20241022",
+                        "id": "anthropic/claude-haiku-4-5-20251001",
                         "name": "Claude 3.5 Haiku",
                         "context_length": 200000,
                     },
@@ -224,7 +224,7 @@ class TestCheckLatestModels:
 
         # Should only include Claude 3 model
         assert len(models) == 1
-        assert models[0].model_id == "anthropic/claude-3-5-haiku-20241022"
+        assert models[0].model_id == "anthropic/claude-haiku-4-5-20251001"
 
     @pytest.mark.asyncio
     async def test_includes_all_claude_3_models(self, mocker: Mock, settings: Settings) -> None:
@@ -241,12 +241,12 @@ class TestCheckLatestModels:
                         "context_length": 200000,
                     },
                     {
-                        "id": "anthropic/claude-3-5-sonnet-20241022",
+                        "id": "anthropic/claude-sonnet-4-5-20250929",
                         "name": "Claude 3.5 Sonnet",
                         "context_length": 200000,
                     },
                     {
-                        "id": "anthropic/claude-3-5-haiku-20241022",
+                        "id": "anthropic/claude-haiku-4-5-20251001",
                         "name": "Claude 3.5 Haiku",
                         "context_length": 200000,
                     },
@@ -272,8 +272,8 @@ class TestCheckLatestModels:
         assert len(models) == 3
         model_ids = {m.model_id for m in models}
         assert "anthropic/claude-3-opus-20240229" in model_ids
-        assert "anthropic/claude-3-5-sonnet-20241022" in model_ids
-        assert "anthropic/claude-3-5-haiku-20241022" in model_ids
+        assert "anthropic/claude-sonnet-4-5-20250929" in model_ids
+        assert "anthropic/claude-haiku-4-5-20251001" in model_ids
 
     @pytest.mark.asyncio
     async def test_handles_api_error_gracefully(self, mocker: Mock, settings: Settings) -> None:
@@ -371,7 +371,7 @@ class TestCompareWithManifest:
 
         # Mock discovered model matching manifest
         matching_model = DiscoveredModel(
-            model_id="anthropic/claude-3-5-haiku-20241022",
+            model_id="anthropic/claude-haiku-4-5-20251001",
             display_name="Claude 3.5 Haiku",
             api_version="v1",
             capabilities=["json_mode"],

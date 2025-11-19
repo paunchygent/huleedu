@@ -223,7 +223,7 @@ async with session.post(
         "essay_b": essay_b_content,
         "llm_config_overrides": {
             "provider_override": "anthropic",  # Required
-            "model_override": "claude-3-5-haiku-20241022",
+            "model_override": "claude-haiku-4-5-20251001",
             "temperature_override": 0.1,
         },
         "correlation_id": str(correlation_id),
@@ -375,12 +375,12 @@ When the CLI returns exit code `3`, `4`, or `5`, review the generated report:
   "check_date": "2025-11-09T02:30:00Z",
   "provider": "anthropic",
   "current_model": {
-    "model_id": "claude-3-5-haiku-20241022",
+    "model_id": "claude-haiku-4-5-20251001",
     "status": "compatible"
   },
   "discovered_models": [
     {
-      "model_id": "claude-3-5-sonnet-20250101",
+      "model_id": "claude-sonnet-4-5-20250929",
       "compatibility_status": "unknown",
       "recommendation": "requires_testing"
     }
