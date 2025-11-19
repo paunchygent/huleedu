@@ -132,7 +132,7 @@ pdm run python -m scripts.cj_experiments_runners.eng5_np.cli \
   --mode execute \
   --assignment-id <uuid> \
   --llm-provider anthropic \
-  --llm-model claude-3-5-sonnet-20241022 \
+  --llm-model claude-sonnet-4-5-20250929 \
   --llm-temperature 0.3
 ```
 
@@ -191,6 +191,7 @@ pdm run python -m scripts.cj_experiments_runners.eng5_np.cli \
 - Preparing reproducible research bundles for empirical validation
 - Hardening CJ batch throughput before serial_bundle rollout: total_budget tracking + denominator-aware completion logic merged (tests: `test_batch_state_tracking.py`, `test_completion_threshold.py`; commands: `pdm run format-all`, `pdm run lint-fix --unsafe-fixes`, `pdm run typecheck-all`).
 - Eliminating CJ pair-position bias: per-pair randomization + optional `CJ_ASSESSMENT_SERVICE_PAIR_GENERATION_SEED` shipped with `test_pair_generation_randomization.py` guarding deterministic + statistical behavior.
+- **2025-11-19**: Batch-state locking regression fixed by routing `_update_batch_state_with_totals()` through `get_batch_state(..., for_update=True)`; new unit test `TestBatchProcessor.test_update_batch_state_with_totals_uses_locked_fetch` plus `pdm run pytest-root services/cj_assessment_service/tests/unit/test_batch_processor.py` + repo-wide format/lint/typecheck runs are green.
 
 **Reference**: See `TASKS/phase3_cj_confidence/PHASE3_CJ_CONFIDENCE_HUB.md` for complete task breakdown and `TASKS/phase3_cj_confidence/TASK-CJ-CONFIDENCE-PHASE3-GRADE-SCALE-DATA-PIPELINE.md` for implementation details.
 

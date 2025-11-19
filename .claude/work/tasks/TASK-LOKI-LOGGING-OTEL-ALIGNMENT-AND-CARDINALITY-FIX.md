@@ -88,7 +88,13 @@ os.environ.setdefault("ENVIRONMENT", environment)
 
 **Root Cause**: Promtail configuration (observability/promtail/promtail-config.yml:65-69) promotes `correlation_id` (unbounded UUID) and `logger_name` (~50-100 values) to Loki labels, causing stream multiplication. Loki indexes labels, so high-cardinality labels create millions of separate streams.
 
-**Status**: `todo`
+**Status**: `complete` (2025-11-19)
+
+**Completion Details**:
+- Commit: 8bd4e04d345ff338c033ae99d513df695219d2fc
+- Validation: 25 streams (exceeded target of ~75, achieved 300,000x improvement)
+- Files Modified: 6 (promtail config, dashboard, 3 docs, rule file)
+- Breaking Change: Documented with migration guide
 
 ### Files
 

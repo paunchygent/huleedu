@@ -12,7 +12,35 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 
 ---
 
-## Current Session (2025-11-17)
+## 🎯 Next Session Entry Point (2025-11-20+)
+
+### Task: Loki Logging Infrastructure - OTEL Alignment (Optional Enhancement)
+
+**Primary Document**: `.claude/work/tasks/TASK-LOKI-LOGGING-OTEL-ALIGNMENT-AND-CARDINALITY-FIX.md`
+
+**Status**: PR 1 (P0 CRITICAL) ✅ COMPLETE | PR 2 (P1 HIGH) Ready for implementation
+
+**PR 1 Completion Summary (2025-11-19)**:
+- ✅ Commit: 8bd4e04d345ff338c033ae99d513df695219d2fc
+- ✅ Cardinality: Reduced from ~7.5M streams/day → **25 total streams** (300,000x improvement, exceeded target)
+- ✅ Files Modified: 6 (Promtail config, Troubleshooting dashboard, 3 docs, rule file)
+- ✅ Validation: Zero Promtail errors, JSON parsing working, correlation ID filtering validated
+- ✅ Breaking Change: Documented with migration guide (`{correlation_id="..."}` → `{service=~".*"} | json | correlation_id="..."`)
+
+**What Remains**:
+- **PR 2 (P1 HIGH)**: Add OTEL service context fields (`service.name`, `deployment.environment`) to logs
+  - Non-breaking, backward compatible
+  - 2-4 hours effort
+  - Enables OTEL-native tooling integration
+- **PR 3-4 (P2 OPTIONAL)**: Trace context integration, logcli documentation
+
+**Quick Start for PR 2**:
+1. Read task document PR 2 section (comprehensive checklist)
+2. Add `add_service_context()` processor to `logging_utils.py`
+3. Test with pilot service, validate fields in Loki
+4. Roll out to all 19 services via library update
+
+---
 
 ### ✅ Phase 4: Validation & Cleanup (COMPLETE)
 
@@ -49,6 +77,7 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 - Completion logic now references the immutable budget and only counts valid winners: `workflow_continuation.check_workflow_continuation()` filters `winner IN ('essay_a','essay_b')`, heuristics + `BatchCompletionChecker` divide by `batch_state.completion_denominator()`, and stuck-batch monitoring logs budget-aware progress.
 - Diagnostics script surfaces `total_budget`/`comparison_budget` so ENG5 can audit live batches quickly.
 - Tests/type-safety: `pdm run pytest-root services/cj_assessment_service/tests/unit/test_batch_state_tracking.py`, `pdm run pytest-root services/cj_assessment_service/tests/unit/test_completion_threshold.py`, `pdm run typecheck-all`, `pdm run format-all`, `pdm run lint-fix --unsafe-fixes` (all green).
+- 2025-11-19: `_update_batch_state_with_totals()` now reuses `get_batch_state(..., for_update=True)` to avoid the Postgres `FOR UPDATE` + outer join error, plus regression coverage `TestBatchProcessor.test_update_batch_state_with_totals_uses_locked_fetch` and green runs for `pdm run pytest-root services/cj_assessment_service/tests/unit/test_batch_processor.py`, `pdm run format-all`, `pdm run lint-fix --unsafe-fixes`, `pdm run typecheck-all`.
 
 **Next focus**: wire remaining TASK-CJ-BATCH-STATE-AND-COMPLETION-FIXES items (PR3 randomization + PR4 threshold unification + PR5 provider diagnostics) once user priorities confirmed. No DB migrations pending beyond the new `total_budget` addition.
 
@@ -253,3 +282,84 @@ export LLM_PROVIDER_SERVICE_BATCH_API_MODE=disabled
 2. **Serial bundle implementation is correct**: All LPS/CJ metrics, metadata, and queue processing logic validated in unit tests
 3. **Position bias violates CJ methodology**: Must fix before any production CJ batches (regardless of batching mode)
 4. **Database queries available**: Investigation documents contain all SQL to verify fixes against real data
+
+---
+
+## ✅ Current Session (2025-11-19) - Loki Cardinality Reduction Validation COMPLETE
+
+### Objective
+
+Validate that removing `correlation_id` and `logger_name` from Loki labels reduced cardinality without breaking JSON log parsing.
+
+### Configuration Changes
+
+1. ✅ Added `LOG_FORMAT=json` to all 18 services in `docker-compose.services.yml`
+2. ✅ Updated `libs/huleedu_service_libs/src/huleedu_service_libs/logging_utils.py`:
+   - Added LOG_FORMAT env var check (line 72-73)
+   - Logic: `use_json = log_format == "json" or (not log_format and environment == "production")`
+3. ✅ Separated `dev-recreate` (services only) from `dev-db-recreate` (databases)
+
+### Promtail Pipeline Fix
+
+**Root Cause Identified**: The `output` stage was causing pipeline failures for non-JSON lines, resulting in "context canceled" errors.
+
+**Solution Implemented** (using Context7 official docs):
+Updated `observability/promtail/promtail-config.yml` with correct pipeline:
+```yaml
+pipeline_stages:
+  - json:           # Extracts fields, preserves original line
+      expressions:
+        timestamp: timestamp
+        level: level
+        event: event
+        correlation_id: correlation_id
+        event_id: event_id
+        event_type: event_type
+        source_service: source_service
+        logger_name: logger_name
+  - timestamp:      # Parse timestamp from JSON
+      source: timestamp
+      format: RFC3339
+  - labels:         # Promote only low-cardinality fields
+      level:
+      service:
+```
+
+**Key Insight**: Removed `output` stage to preserve original log lines. JSON fields are extracted and queryable with `{service="..."} | json | field="value"`.
+
+### Validation Results
+
+1. ✅ **No Pipeline Errors**: Zero "could not transfer logs" errors
+2. ✅ **JSON Logs Visible**: Full JSON structure preserved in Loki
+3. ✅ **Fields Extractable**: Query with `| json` accesses all fields
+4. ✅ **Filtering Works**: `{service="content_service"} | json | event="Content Service startup completed successfully"` returns results
+5. ✅ **Cardinality Maintained**: 25 streams total (only `service` and `level` labels)
+6. ✅ **High-Cardinality Fields**: `correlation_id` and `logger_name` remain in JSON body only
+
+### Query Patterns
+
+**Basic log retrieval**:
+```logql
+{service="content_service"}
+```
+
+**JSON field filtering**:
+```logql
+{service="content_service"} | json | correlation_id="<uuid>"
+{service="content_service"} | json | event="Content Service startup completed successfully"
+{service="content_service"} | json | logger_name="content.app"
+```
+
+**Cross-service correlation**:
+```logql
+{service=~".*"} | json | correlation_id="<uuid>"
+```
+
+### Success Criteria: ALL MET ✅
+
+- [✅] Cardinality reduced to 25 streams
+- [✅] JSON log parsing functional
+- [✅] Correlation ID filtering works via `| json | correlation_id="..."`
+- [✅] No Promtail pipeline errors
+- [✅] Labels `correlation_id` and `logger_name` removed from index
+- [✅] High-cardinality fields queryable in JSON body
