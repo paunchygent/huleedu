@@ -201,7 +201,7 @@ class TestBatchProcessor:
 
         batch_state = CJBatchState()
         batch_state.batch_id = 2
-        batch_state.state = CJBatchStateEnum.IN_PROGRESS
+        batch_state.state = CJBatchStateEnum.WAITING_CALLBACKS
         batch_state.total_comparisons = 0
         batch_state.submitted_comparisons = 0
         batch_state.current_iteration = 0
@@ -212,22 +212,22 @@ class TestBatchProcessor:
             mock_get_batch_state,
         )
 
+        mock_session = mock_database.session.return_value.__aenter__.return_value
+
         await batch_processor._update_batch_state_with_totals(
             cj_batch_id=batch_state.batch_id,
-            state=CJBatchStateEnum.IN_PROGRESS,
+            state=CJBatchStateEnum.WAITING_CALLBACKS,
             iteration_comparisons=iteration_size,
             correlation_id=correlation_id,
         )
 
-        assert mock_get_batch_state.await_count == 1
-        assert mock_get_batch_state.await_args.kwargs == {
-            "session": mock_database.session.return_value.__aenter__.return_value,
-            "cj_batch_id": batch_state.batch_id,
-            "correlation_id": correlation_id,
-            "for_update": True,
-        }
+        mock_get_batch_state.assert_awaited_once_with(
+            session=mock_session,
+            cj_batch_id=batch_state.batch_id,
+            correlation_id=correlation_id,
+            for_update=True,
+        )
 
-        mock_session = mock_database.session.return_value.__aenter__.return_value
         mock_session.commit.assert_awaited_once()
 
         assert batch_state.total_comparisons == iteration_size
