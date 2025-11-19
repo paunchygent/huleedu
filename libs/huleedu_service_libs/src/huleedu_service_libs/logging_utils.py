@@ -28,6 +28,33 @@ from structlog.contextvars import bind_contextvars, clear_contextvars, merge_con
 from structlog.typing import Processor
 
 
+def add_service_context(
+    logger: Any, method_name: str, event_dict: dict[str, Any]
+) -> dict[str, Any]:
+    """
+    Add OpenTelemetry service context to all logs.
+
+    This processor adds service.name and deployment.environment fields
+    to align with OpenTelemetry semantic conventions, enabling
+    OTEL-native tooling integration and consistent service identification.
+
+    Fields added:
+    - service.name: Logical service name (from SERVICE_NAME env var)
+    - deployment.environment: Environment (development/staging/production)
+
+    Args:
+        logger: The logger instance (unused but required by structlog)
+        method_name: The logging method name (unused but required by structlog)
+        event_dict: The log event dictionary to enrich
+
+    Returns:
+        Enriched event dictionary with service context fields
+    """
+    event_dict["service.name"] = os.getenv("SERVICE_NAME", "unknown")
+    event_dict["deployment.environment"] = os.getenv("ENVIRONMENT", "development")
+    return event_dict
+
+
 def configure_service_logging(
     service_name: str,
     environment: str | None = None,
@@ -77,6 +104,7 @@ def configure_service_logging(
         # JSON output for log aggregation (Docker containers, production)
         processors: list[Processor] = [
             merge_contextvars,
+            add_service_context,  # Add OTEL service context
             structlog.processors.TimeStamper(fmt="iso"),
             structlog.processors.add_log_level,
             structlog.processors.CallsiteParameterAdder(
@@ -93,6 +121,7 @@ def configure_service_logging(
         # Human-readable console output (local development, tests)
         processors = [
             merge_contextvars,
+            add_service_context,  # Add OTEL service context
             structlog.processors.TimeStamper(fmt="iso"),
             structlog.processors.add_log_level,
             structlog.processors.CallsiteParameterAdder(

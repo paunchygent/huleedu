@@ -246,7 +246,15 @@ os.environ.setdefault("ENVIRONMENT", environment)
 
 **Root Cause**: Environment variables `SERVICE_NAME` and `ENVIRONMENT` are set (logging_utils.py:63-64) but not added to log output. Tracing configuration includes these fields (observability/tracing.py:19-36) but logging does not.
 
-**Status**: `todo`
+**Status**: `complete` (2025-11-19)
+
+**Completion Details**:
+- Implementation: Added `add_service_context()` processor function
+- Files Modified: 2 (logging_utils.py, test_logging_utils.py)
+- Tests: 6 unit tests created and passing
+- Validation: Docker logs confirmed fields present
+- Validation Command: `docker logs huleedu_cj_assessment_service 2>&1 | grep '^{' | tail -1`
+- Non-breaking: Library-only change, all services get fields automatically
 
 ### Files
 

@@ -18,7 +18,7 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 
 **Primary Document**: `.claude/work/tasks/TASK-LOKI-LOGGING-OTEL-ALIGNMENT-AND-CARDINALITY-FIX.md`
 
-**Status**: PR 1 (P0 CRITICAL) ✅ COMPLETE | PR 2 (P1 HIGH) Ready for implementation
+**Status**: PR 1 (P0 CRITICAL) ✅ COMPLETE | PR 2 (P1 HIGH) ✅ COMPLETE
 
 **PR 1 Completion Summary (2025-11-19)**:
 - ✅ Commit: 8bd4e04d345ff338c033ae99d513df695219d2fc
@@ -27,18 +27,18 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 - ✅ Validation: Zero Promtail errors, JSON parsing working, correlation ID filtering validated
 - ✅ Breaking Change: Documented with migration guide (`{correlation_id="..."}` → `{service=~".*"} | json | correlation_id="..."`)
 
-**What Remains**:
-- **PR 2 (P1 HIGH)**: Add OTEL service context fields (`service.name`, `deployment.environment`) to logs
-  - Non-breaking, backward compatible
-  - 2-4 hours effort
-  - Enables OTEL-native tooling integration
-- **PR 3-4 (P2 OPTIONAL)**: Trace context integration, logcli documentation
+**PR 2 Completion Summary (2025-11-19)**:
+- ✅ Implementation: Added `add_service_context()` processor to both production and development chains
+- ✅ Files Modified: 2 (logging_utils.py, test_logging_utils.py)
+- ✅ Tests: 6 unit tests created and passing
+- ✅ Validation: Docker logs confirmed OTEL fields present (`service.name`, `deployment.environment`)
+- ✅ Validation Command: `docker logs huleedu_cj_assessment_service 2>&1 | grep '^{' | tail -1`
+- ✅ Non-breaking: All 19 services will get fields via library update (no service code changes needed)
+- ⏳ Commit Pending: Ready to commit PR 2 changes
 
-**Quick Start for PR 2**:
-1. Read task document PR 2 section (comprehensive checklist)
-2. Add `add_service_context()` processor to `logging_utils.py`
-3. Test with pilot service, validate fields in Loki
-4. Roll out to all 19 services via library update
+**What Remains**:
+- **PR 2 Commit**: Commit the OTEL service context changes
+- **PR 3-4 (P2 OPTIONAL)**: Trace context integration, logcli documentation
 
 ---
 
@@ -79,7 +79,13 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 - Tests/type-safety: `pdm run pytest-root services/cj_assessment_service/tests/unit/test_batch_state_tracking.py`, `pdm run pytest-root services/cj_assessment_service/tests/unit/test_completion_threshold.py`, `pdm run typecheck-all`, `pdm run format-all`, `pdm run lint-fix --unsafe-fixes` (all green).
 - 2025-11-19: `_update_batch_state_with_totals()` now reuses `get_batch_state(..., for_update=True)` to avoid the Postgres `FOR UPDATE` + outer join error, plus regression coverage `TestBatchProcessor.test_update_batch_state_with_totals_uses_locked_fetch` and green runs for `pdm run pytest-root services/cj_assessment_service/tests/unit/test_batch_processor.py`, `pdm run format-all`, `pdm run lint-fix --unsafe-fixes`, `pdm run typecheck-all`.
 
-**Next focus**: wire remaining TASK-CJ-BATCH-STATE-AND-COMPLETION-FIXES items (PR3 randomization + PR4 threshold unification + PR5 provider diagnostics) once user priorities confirmed. No DB migrations pending beyond the new `total_budget` addition.
+- **Validation Complete (2025-11-19)**:
+  - **PR 1 (Batch State)**: Multi-round integration test `test_batch_state_multi_round_integration.py` passed. Verified accumulation of `total_comparisons` and `submitted_comparisons` across 10 iterations.
+  - **PR 2 (Completion Logic)**: `test_completion_threshold.py` passed. Fixed regression in `BatchMonitor` tests (mocked `completion_denominator`).
+  - **PR 3 (Randomization)**: Added `test_anchor_position_chi_squared` to `test_pair_generation_randomization.py`. Statistical test (N=200) confirms p > 0.05 (unbiased distribution).
+  - **Regressions**: Full CJ service regression suite passed.
+
+**Next focus**: PR 5 (Investigate Anthropic API Failure Rate) - P0 Critical. Then PR 4 (Threshold Unification) and PR 6/7.
 
 ### 🚧 Task: CJ Pair Randomization (2025-11-19)
 
