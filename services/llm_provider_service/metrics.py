@@ -51,6 +51,12 @@ def _create_metrics() -> dict[str, Any]:
                 ["provider", "error_type", "http_status_code"],
                 registry=REGISTRY,
             ),
+            "llm_provider_errors_total": Counter(
+                "llm_provider_errors_total",
+                "Total provider errors by provider, model, and error type",
+                ["provider", "model", "error_type"],
+                registry=REGISTRY,
+            ),
             "llm_response_duration_seconds": Histogram(
                 "llm_provider_response_duration_seconds",
                 "LLM API response time in seconds",
@@ -218,6 +224,7 @@ def get_llm_metrics() -> dict[str, Any]:
     return {
         "llm_requests_total": all_metrics.get("llm_requests_total"),
         "llm_provider_api_errors_total": all_metrics.get("llm_provider_api_errors_total"),
+        "llm_provider_errors_total": all_metrics.get("llm_provider_errors_total"),
         "llm_response_duration_seconds": all_metrics.get("llm_response_duration_seconds"),
         "llm_tokens_used_total": all_metrics.get("llm_tokens_used_total"),
         "llm_cost_dollars_total": all_metrics.get("llm_cost_dollars_total"),
@@ -274,6 +281,7 @@ def _get_existing_metrics() -> dict[str, Any]:
         "http_request_duration_seconds": "llm_provider_http_request_duration_seconds",
         "llm_requests_total": "llm_provider_requests_total",
         "llm_provider_api_errors_total": "llm_provider_api_errors_total",
+        "llm_provider_errors_total": "llm_provider_errors_total",
         "llm_response_duration_seconds": "llm_provider_response_duration_seconds",
         "llm_tokens_used_total": "llm_provider_tokens_used_total",
         "llm_cost_dollars_total": "llm_provider_cost_dollars_total",

@@ -1,7 +1,7 @@
 """Integration tests for Anthropic API error diagnostics."""
 
 from typing import Any
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import ANY, AsyncMock, Mock
 from uuid import uuid4
 
 import pytest
@@ -28,6 +28,12 @@ class MockResponse:
         self.status = status
         self._text = text
         self.headers = headers or {}
+        # Minimal request info used when constructing ClientResponseError
+        self.request_info = RequestInfo(
+            url=URL("http://example.com"),
+            method="POST",
+            headers=CIMultiDictProxy(CIMultiDict()),
+        )
 
     async def text(self) -> str:
         return self._text
@@ -93,10 +99,12 @@ async def test_anthropic_api_error_metrics_and_logging() -> None:
         retry_manager=mock_retry_manager,
     )
 
-    # Ensure metrics are initialized and patch the same counter instance
+    # Ensure metrics are initialized and patch the same counter instances
     get_llm_metrics()
     error_counter = provider.metrics["llm_provider_api_errors_total"]
     error_counter.labels = Mock(return_value=Mock(inc=Mock()))
+    provider_error_counter = provider.metrics["llm_provider_errors_total"]
+    provider_error_counter.labels = Mock(return_value=Mock(inc=Mock()))
 
     # Test Case 1: 429 Rate Limit
     mock_session.post.return_value = MockResponse(
@@ -121,6 +129,17 @@ async def test_anthropic_api_error_metrics_and_logging() -> None:
     error_counter.labels.assert_any_call(
         provider="anthropic", error_type="rate_limit", http_status_code="429"
     )
+    provider_error_counter.labels.assert_any_call(
+        provider="anthropic", model=ANY, error_type="rate_limit"
+    )
+
+    # Verify enriched error details
+    details_429 = exc_info.value.error_detail.details
+    assert details_429.get("provider") == "anthropic"
+    assert details_429.get("http_status") == 429
+    assert details_429.get("error_type") == "rate_limit"
+    assert details_429.get("retryable") is True
+    assert details_429.get("provider_error_code") == "unknown"
 
     # Test Case 2: 500 Server Error
     mock_session.post.return_value = MockResponse(status=500, text="Internal Server Error")
@@ -137,6 +156,17 @@ async def test_anthropic_api_error_metrics_and_logging() -> None:
     error_counter.labels.assert_any_call(
         provider="anthropic", error_type="server_error", http_status_code="500"
     )
+    provider_error_counter.labels.assert_any_call(
+        provider="anthropic", model=ANY, error_type="server_error"
+    )
+
+    # Verify enriched error details
+    details_500 = exc_info.value.error_detail.details
+    assert details_500.get("provider") == "anthropic"
+    assert details_500.get("http_status") == 500
+    assert details_500.get("error_type") == "server_error"
+    assert details_500.get("retryable") is True
+    assert details_500.get("provider_error_code") == "unknown"
 
     # Test Case 3: Connection Error
     mock_session.post.side_effect = ClientError("Connection failed")
@@ -153,3 +183,14 @@ async def test_anthropic_api_error_metrics_and_logging() -> None:
     error_counter.labels.assert_any_call(
         provider="anthropic", error_type="connection_error", http_status_code="0"
     )
+    provider_error_counter.labels.assert_any_call(
+        provider="anthropic", model=ANY, error_type="connection_error"
+    )
+
+    # Verify enriched error details
+    details_conn = exc_info.value.error_detail.details
+    assert details_conn.get("provider") == "anthropic"
+    assert details_conn.get("http_status") == 0
+    assert details_conn.get("error_type") == "connection_error"
+    assert details_conn.get("retryable") is True
+    assert details_conn.get("provider_error_code") == "unknown"

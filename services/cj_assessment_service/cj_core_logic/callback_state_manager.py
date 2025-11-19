@@ -100,11 +100,17 @@ async def update_comparison_result(
             comparison_pair.error_service = comparison_result.error_detail.service
             comparison_pair.error_details = comparison_result.error_detail.details
 
+            error_details = comparison_result.error_detail.details or {}
             logger.warning(
                 f"Updated comparison pair {comparison_pair.id} with error result",
                 extra={
                     "correlation_id": str(correlation_id),
                     "error_code": comparison_result.error_detail.error_code.value,
+                    "error_provider": error_details.get("provider"),
+                    "error_http_status": error_details.get("http_status"),
+                    "error_type": error_details.get("error_type"),
+                    "error_retryable": error_details.get("retryable"),
+                    "error_provider_error_code": error_details.get("provider_error_code"),
                 },
             )
 

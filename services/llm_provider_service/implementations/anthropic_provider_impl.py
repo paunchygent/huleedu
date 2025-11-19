@@ -11,11 +11,10 @@ from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.llm_provider_service.config import Settings
 from services.llm_provider_service.exceptions import (
-    raise_authentication_error,
+    HuleEduError,
     raise_configuration_error,
     raise_external_service_error,
     raise_parsing_error,
-    raise_rate_limit_error,
 )
 from services.llm_provider_service.internal_models import LLMProviderResponse
 from services.llm_provider_service.metrics import get_llm_metrics
@@ -131,15 +130,109 @@ class AnthropicProviderImpl(LLMProviderProtocol):
             )
             # Type assert since retry manager returns Any
             return result  # type: ignore
+        except HuleEduError:
+            # Preserve existing structured error details from deeper layers
+            raise
         except Exception as e:
+            error_details = self._build_error_details_from_exception(e)
+            http_status = error_details.get("http_status")
             raise_external_service_error(
                 service="llm_provider_service",
                 operation="anthropic_api_request",
                 external_service="anthropic_api",
                 message=f"Anthropic API call failed: {str(e)}",
                 correlation_id=correlation_id,
-                details={"provider": "anthropic"},
+                status_code=http_status
+                if isinstance(http_status, int) and http_status > 0
+                else None,
+                **error_details,
             )
+
+    def _build_error_details_from_exception(self, exc: Exception) -> dict[str, Any]:
+        """Construct Anthropic-specific error detail context from an exception.
+
+        This enriches ErrorDetail.details for CJ-facing diagnostics without
+        changing the high-level ErrorCode semantics (EXTERNAL_SERVICE_ERROR, etc.).
+        """
+
+        details: dict[str, Any] = {"provider": "anthropic"}
+        http_status: int = 0
+        error_type = "unexpected"
+        retryable = False
+        error_text: str | None = None
+
+        if isinstance(exc, aiohttp.ClientResponseError):
+            http_status = exc.status or 0
+            # When we construct ClientResponseError ourselves we set message to the raw body
+            error_text = getattr(exc, "message", None)
+            if http_status == 429:
+                error_type = "rate_limit"
+                retryable = True
+            elif http_status == 401:
+                error_type = "authentication"
+            elif http_status >= 500:
+                error_type = "server_error"
+                retryable = http_status in {500, 502, 503, 504}
+            elif http_status >= 400:
+                error_type = "client_error"
+        elif isinstance(exc, aiohttp.ClientError):
+            http_status = 0
+            error_type = "connection_error"
+            retryable = True
+            error_text = str(exc)
+        else:
+            http_status = 0
+            error_type = "unexpected"
+            retryable = False
+            error_text = str(exc)
+
+        provider_error_code = "unknown"
+        provider_error_type: str | None = None
+        provider_error_message: str | None = None
+        if error_text:
+            code, err_type, msg = self._parse_anthropic_error_json(error_text)
+            if code:
+                provider_error_code = code
+            provider_error_type = err_type
+            provider_error_message = msg
+
+        details.update(
+            {
+                "http_status": http_status,
+                "error_type": error_type,
+                "retryable": retryable,
+                "provider_error_code": provider_error_code,
+            }
+        )
+        if provider_error_type:
+            details["provider_error_type"] = provider_error_type
+        if provider_error_message:
+            details["provider_error_message"] = provider_error_message[:500]
+        return details
+
+    @staticmethod
+    def _parse_anthropic_error_json(raw: str) -> tuple[str | None, str | None, str | None]:
+        """Best-effort parsing of Anthropic JSON error payloads.
+
+        Expected shape: {"error": {"type": "...", "code": "...", "message": "..."}}.
+        Returns (code, type, message) when available, otherwise (None, None, None).
+        """
+
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            return None, None, None
+        if not isinstance(data, dict):
+            return None, None, None
+        err = data.get("error")
+        if not isinstance(err, dict):
+            return None, None, None
+
+        code_val = err.get("code") or err.get("type")
+        code = code_val if isinstance(code_val, str) else None
+        err_type = err.get("type") if isinstance(err.get("type"), str) else None
+        msg = err.get("message") if isinstance(err.get("message"), str) else None
+        return code, err_type, msg
 
     async def _make_api_request(
         self,
@@ -249,6 +342,7 @@ class AnthropicProviderImpl(LLMProviderProtocol):
             headers=headers,
             payload=payload,
             correlation_id=correlation_id,
+            model=model,
         )
 
         try:
@@ -352,16 +446,25 @@ class AnthropicProviderImpl(LLMProviderProtocol):
                 extra={"response_data": str(response_data)[:1000]},
             )
 
-            if self.metrics and "llm_provider_api_errors_total" in self.metrics:
+            if self.metrics:
                 # error_type values:
                 # - rate_limit, authentication, server_error, client_error
                 # - connection_error, unexpected (non-HTTP failures)
                 # - invalid_response (HTTP 200 with malformed or missing tool payload)
-                self.metrics["llm_provider_api_errors_total"].labels(
-                    provider="anthropic",
-                    error_type="invalid_response",
-                    http_status_code="200",
-                ).inc()
+                api_errors = self.metrics.get("llm_provider_api_errors_total")
+                provider_errors = self.metrics.get("llm_provider_errors_total")
+                if api_errors is not None:
+                    api_errors.labels(
+                        provider="anthropic",
+                        error_type="invalid_response",
+                        http_status_code="200",
+                    ).inc()
+                if provider_errors is not None:
+                    provider_errors.labels(
+                        provider="anthropic",
+                        model=model,
+                        error_type="invalid_response",
+                    ).inc()
 
             raise_external_service_error(
                 service="llm_provider_service",
@@ -369,7 +472,13 @@ class AnthropicProviderImpl(LLMProviderProtocol):
                 external_service="anthropic_api",
                 message="No tool use found in Anthropic response",
                 correlation_id=correlation_id,
-                details={"provider": "anthropic"},
+                details={
+                    "provider": "anthropic",
+                    "http_status": 200,
+                    "error_type": "invalid_response",
+                    "retryable": False,
+                    "provider_error_code": "invalid_response",
+                },
             )
 
     async def _perform_http_request_with_metrics(
@@ -379,6 +488,7 @@ class AnthropicProviderImpl(LLMProviderProtocol):
         headers: dict[str, str],
         payload: dict[str, Any],
         correlation_id: UUID,
+        model: str,
     ) -> str:
         """Make a request to the Anthropic API and record error diagnostics."""
 
@@ -394,26 +504,35 @@ class AnthropicProviderImpl(LLMProviderProtocol):
                 error_text = await response.text()
                 error_msg = f"Anthropic API error: {response.status} - {error_text}"
 
-                # Record API error metric. error_type semantics:
+                # Record API error metrics. error_type semantics:
                 # - rate_limit, authentication, server_error, client_error
                 # - connection_error, unexpected (non-HTTP failures)
                 # - invalid_response (HTTP 200 with malformed body, recorded separately)
-                if self.metrics and "llm_provider_api_errors_total" in self.metrics:
-                    error_type = "unknown"
-                    if response.status == 429:
-                        error_type = "rate_limit"
-                    elif response.status == 401:
-                        error_type = "authentication"
-                    elif response.status >= 500:
-                        error_type = "server_error"
-                    elif response.status >= 400:
-                        error_type = "client_error"
+                error_type = "unknown"
+                if response.status == 429:
+                    error_type = "rate_limit"
+                elif response.status == 401:
+                    error_type = "authentication"
+                elif response.status >= 500:
+                    error_type = "server_error"
+                elif response.status >= 400:
+                    error_type = "client_error"
 
-                    self.metrics["llm_provider_api_errors_total"].labels(
-                        provider="anthropic",
-                        error_type=error_type,
-                        http_status_code=str(response.status),
-                    ).inc()
+                if self.metrics:
+                    api_errors = self.metrics.get("llm_provider_api_errors_total")
+                    provider_errors = self.metrics.get("llm_provider_errors_total")
+                    if api_errors is not None:
+                        api_errors.labels(
+                            provider="anthropic",
+                            error_type=error_type,
+                            http_status_code=str(response.status),
+                        ).inc()
+                    if provider_errors is not None:
+                        provider_errors.labels(
+                            provider="anthropic",
+                            model=model,
+                            error_type=error_type,
+                        ).inc()
 
                 # Log detailed error info
                 log_extra = {
@@ -430,59 +549,54 @@ class AnthropicProviderImpl(LLMProviderProtocol):
 
                 logger.error(f"Anthropic API failure: {response.status}", extra=log_extra)
 
-                # Raise for retryable status codes to trigger retry
-                if response.status in {429, 500, 502, 503, 504}:
-                    response.raise_for_status()
-
-                # Handle specific HTTP errors with appropriate exceptions
-                if response.status == 429:
-                    raise_rate_limit_error(
-                        service="llm_provider_service",
-                        operation="anthropic_api_request",
-                        limit=0,  # Unknown limit from API
-                        window_seconds=60,
-                        message=f"Rate limit exceeded: {error_text}",
-                        correlation_id=correlation_id,
-                        details={"provider": "anthropic", "retry_after": 60},
-                    )
-                elif response.status == 401:
-                    raise_authentication_error(
-                        service="llm_provider_service",
-                        operation="anthropic_api_request",
-                        message=f"Authentication failed: {error_text}",
-                        correlation_id=correlation_id,
-                        details={"provider": "anthropic"},
-                    )
-                else:
-                    raise_external_service_error(
-                        service="llm_provider_service",
-                        operation="anthropic_api_request",
-                        external_service="anthropic_api",
-                        message=error_msg,
-                        correlation_id=correlation_id,
-                        details={"provider": "anthropic", "status_code": response.status},
-                    )
+                # For HTTP error statuses, raise ClientResponseError so the retry
+                # manager can apply its policies based on the status code.
+                raise aiohttp.ClientResponseError(
+                    request_info=response.request_info,
+                    history=(),
+                    status=response.status,
+                    message=error_text,
+                    headers=response.headers,
+                )
 
         except aiohttp.ClientResponseError:
             # Will be retried by retry manager
             raise
         except aiohttp.ClientError:
             # Connection errors, timeouts, etc.
-            if self.metrics and "llm_provider_api_errors_total" in self.metrics:
-                self.metrics["llm_provider_api_errors_total"].labels(
-                    provider="anthropic",
-                    error_type="connection_error",
-                    http_status_code="0",
-                ).inc()
+            if self.metrics:
+                api_errors = self.metrics.get("llm_provider_api_errors_total")
+                provider_errors = self.metrics.get("llm_provider_errors_total")
+                if api_errors is not None:
+                    api_errors.labels(
+                        provider="anthropic",
+                        error_type="connection_error",
+                        http_status_code="0",
+                    ).inc()
+                if provider_errors is not None:
+                    provider_errors.labels(
+                        provider="anthropic",
+                        model=model,
+                        error_type="connection_error",
+                    ).inc()
             raise
         except Exception as e:
             # Unexpected errors
-            if self.metrics and "llm_provider_api_errors_total" in self.metrics:
-                self.metrics["llm_provider_api_errors_total"].labels(
-                    provider="anthropic",
-                    error_type="unexpected",
-                    http_status_code="0",
-                ).inc()
+            if self.metrics:
+                api_errors = self.metrics.get("llm_provider_api_errors_total")
+                provider_errors = self.metrics.get("llm_provider_errors_total")
+                if api_errors is not None:
+                    api_errors.labels(
+                        provider="anthropic",
+                        error_type="unexpected",
+                        http_status_code="0",
+                    ).inc()
+                if provider_errors is not None:
+                    provider_errors.labels(
+                        provider="anthropic",
+                        model=model,
+                        error_type="unexpected",
+                    ).inc()
 
             error_msg = f"Unexpected error calling Anthropic API: {str(e)}"
             logger.error(error_msg, exc_info=True)
