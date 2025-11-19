@@ -33,9 +33,11 @@
 
 ### ✅ Loki Integration Status
 - **Loki Service**: Ready and operational
-- **Available Labels**: container, correlation_id, level, logger_name, service, service_name
-- **Log Ingestion**: Active for all 32 Docker containers
-- **API Accessibility**: http://localhost:3100 responding correctly
+- **Available Labels**: container, level, service, service_name (LOW cardinality only)
+- **JSON Fields**: correlation_id, logger_name, event, timestamp (queryable with `| json`)
+- **Log Ingestion**: Active for all Docker containers
+- **API Accessibility**: <http://localhost:3100> responding correctly
+- **Cardinality**: 25 streams (optimized for performance)
 
 ### ✅ Dashboard Panel Status
 - **Panel Type**: Logs panel using Loki datasource
@@ -90,7 +92,7 @@ Loki is collecting logs from all services:
 - **Testing**: LogQL queries working in Loki API
 
 ### Access Information
-- **Grafana Dashboard**: http://localhost:3000/d/huleedu-service-deep-dive
+- **Grafana Dashboard**: <http://localhost:3000/d/huleedu-service-deep-dive>
 - **Live Logs Panel**: Now functional without syntax errors
 - **Log Filtering**: Use log_filter variable for dynamic filtering
 

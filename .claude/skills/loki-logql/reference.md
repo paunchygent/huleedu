@@ -247,15 +247,9 @@ scrape_configs:
 - `container_name` → `container` label
 - `service` from docker-compose → `service` label
 
-### Pipeline Stages
+### Pipeline Stages (Current HuleEdu Configuration)
 
-**JSON Detection**:
-```yaml
-- regex:
-    expression: '^(?P<json_line>\{.+\})$'
-```
-
-**JSON Parsing**:
+**JSON Parsing** (extracts fields, preserves original line):
 ```yaml
 - json:
     expressions:
@@ -267,33 +261,45 @@ scrape_configs:
       event_type: event_type
       source_service: source_service
       logger_name: logger_name
-    source: json_line
 ```
 
-**Label Promotion** (for fast queries):
+**Timestamp Parsing**:
+```yaml
+- timestamp:
+    source: timestamp
+    format: RFC3339
+    fallback_formats:
+      - RFC3339Nano
+      - "2006-01-02T15:04:05.000Z"
+```
+
+**Label Promotion** (LOW cardinality only):
 ```yaml
 - labels:
     level:
-    correlation_id:
     service:
-    logger_name:
 ```
 
-### Label Strategy
+### Label Strategy (2025-11-19: Cardinality Optimized)
 
-**Promoted Labels** (fast queries, low cardinality):
-- `level` - Log level
-- `correlation_id` - Request correlation ID
-- `service` - Service name
-- `logger_name` - Logger instance
+**Promoted Labels** (indexed, fast queries, 25 streams total):
+- `level` - Log level (5 values: debug, info, warning, error, critical)
+- `service` - Service name (~15-20 services)
+- `container` - Docker container name (auto-promoted by Promtail)
 
-**Message Content** (avoid high cardinality):
-- `user_id` - User identifiers
-- `batch_id` - Batch identifiers
-- `essay_id` - Essay identifiers
-- Request details
+**JSON Body Fields** (queryable with `| json` filter):
+- `correlation_id` - Request correlation ID (UUID per request - unbounded)
+- `logger_name` - Logger instance (~50-100 Python loggers)
+- `event` - Log message content (unbounded)
+- `event_id`, `event_type`, `source_service` - Event metadata
+- `timestamp` - ISO timestamp
 
-**Rationale**: Loki performs best with low-cardinality labels. High-cardinality fields (user IDs, request IDs) should stay in log messages and be extracted via JSON parser.
+**Query Pattern for High-Cardinality Fields**:
+```logql
+{service="content_service"} | json | correlation_id="<uuid>"
+```
+
+**Rationale**: Fields with >100 unique values/day stay in JSON body to prevent Loki index explosion (millions of streams). The current configuration maintains 25 streams for optimal performance.
 
 ---
 
