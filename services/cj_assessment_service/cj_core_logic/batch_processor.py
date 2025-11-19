@@ -318,6 +318,8 @@ class BatchProcessor:
 
         try:
             async with self.database.session() as session:
+                # Lock batch state row without eager-loading nullable relationships to
+                # avoid Postgres "FOR UPDATE" + outer join restrictions.
                 batch_state = await get_batch_state(
                     session=session,
                     cj_batch_id=cj_batch_id,

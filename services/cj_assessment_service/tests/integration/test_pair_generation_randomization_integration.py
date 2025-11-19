@@ -12,15 +12,14 @@ ComparisonPair rows, not just in-memory tasks.
 
 from __future__ import annotations
 
-from uuid import uuid4
+from typing import Any
+from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from services.cj_assessment_service.cj_core_logic import pair_generation
-from services.cj_assessment_service.cj_core_logic.batch_submission_tracking import (
-    create_tracking_records,
+from services.cj_assessment_service.cj_core_logic.comparison_processing import (
+    submit_comparisons_for_async_processing,
 )
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
@@ -30,7 +29,10 @@ from services.cj_assessment_service.models_api import (
     EssayToProcess,
 )
 from services.cj_assessment_service.models_db import ComparisonPair, ProcessedEssay
-from services.cj_assessment_service.protocols import CJRepositoryProtocol
+from services.cj_assessment_service.protocols import (
+    CJRepositoryProtocol,
+    LLMInteractionProtocol,
+)
 
 
 @pytest.mark.integration
@@ -45,77 +47,80 @@ class TestPairGenerationRandomizationIntegration:
     async def _create_12x12_batch(
         self,
         repository: CJRepositoryProtocol,
-        session: AsyncSession,
     ) -> tuple[int, str]:
         """Create a CJ batch with 12 anchors and 12 student essays.
 
         Returns:
             Tuple of (cj_batch_id, bos_batch_id)
         """
-
         bos_batch_id = str(uuid4())
 
-        # Create batch upload record
-        cj_batch = await repository.create_new_cj_batch(
-            session=session,
-            bos_batch_id=bos_batch_id,
-            event_correlation_id=str(uuid4()),
-            language="en",
-            course_code="ENG5",
-            initial_status=CJBatchStatusEnum.PENDING,
-            expected_essay_count=24,
-        )
-        # Minimal processing metadata to keep alignment with other tests
-        cj_batch.processing_metadata = {"student_prompt_text": "Randomization integration test"}
-        await session.flush()
-
-        # Create 12 student essays
-        for i in range(12):
-            await repository.create_or_update_cj_processed_essay(
+        async with repository.session() as session:
+            # Create batch upload record (also creates CJBatchState inside impl)
+            cj_batch = await repository.create_new_cj_batch(
                 session=session,
-                cj_batch_id=cj_batch.id,
-                els_essay_id=f"student_{i:02d}",
-                text_storage_id=f"student_storage_{i:02d}",
-                assessment_input_text=f"Student essay content {i}",
+                bos_batch_id=bos_batch_id,
+                event_correlation_id=str(uuid4()),
+                language="en",
+                course_code="ENG5",
+                initial_status=CJBatchStatusEnum.PENDING,
+                expected_essay_count=24,
             )
+            # Minimal processing metadata to keep alignment with other tests
+            cj_batch.processing_metadata = {
+                "student_prompt_text": "Randomization integration test",
+            }
+            await session.flush()
 
-        # Create 12 anchor essays and mark them as anchors
-        for i in range(12):
-            essay = await repository.create_or_update_cj_processed_essay(
-                session=session,
-                cj_batch_id=cj_batch.id,
-                els_essay_id=f"anchor_{i:02d}",
-                text_storage_id=f"anchor_storage_{i:02d}",
-                assessment_input_text=f"Anchor essay content {i}",
-                processing_metadata={"anchor_label": f"A{i:02d}"},
-            )
-            essay.is_anchor = True
+            # Create 12 student essays
+            for i in range(12):
+                await repository.create_or_update_cj_processed_essay(
+                    session=session,
+                    cj_batch_id=cj_batch.id,
+                    els_essay_id=f"student_{i:02d}",
+                    text_storage_id=f"student_storage_{i:02d}",
+                    assessment_input_text=f"Student essay content {i}",
+                )
 
-        await session.flush()
-        return cj_batch.id, bos_batch_id
+            # Create 12 anchor essays and mark them as anchors
+            for i in range(12):
+                essay = await repository.create_or_update_cj_processed_essay(
+                    session=session,
+                    cj_batch_id=cj_batch.id,
+                    els_essay_id=f"anchor_{i:02d}",
+                    text_storage_id=f"anchor_storage_{i:02d}",
+                    assessment_input_text=f"Anchor essay content {i}",
+                    processing_metadata={"anchor_label": f"A{i:02d}"},
+                )
+                essay.is_anchor = True
+
+            await session.flush()
+            cj_batch_id = cj_batch.id
+
+        return cj_batch_id, bos_batch_id
 
     async def _load_essays_for_api_model(
         self,
         repository: CJRepositoryProtocol,
-        session: AsyncSession,
         cj_batch_id: int,
     ) -> tuple[list[EssayForComparison], list[ProcessedEssay]]:
         """Load ProcessedEssay rows and convert them to EssayForComparison models."""
 
-        processed_essays = await repository.get_essays_for_cj_batch(
-            session=session,
-            cj_batch_id=cj_batch_id,
-        )
-
-        essays_for_api_model: list[EssayForComparison] = []
-        for processed in processed_essays:
-            essays_for_api_model.append(
-                EssayForComparison(
-                    id=processed.els_essay_id,
-                    text_content=processed.assessment_input_text,
-                    current_bt_score=processed.current_bt_score or 0.0,
-                )
+        async with repository.session() as session:
+            processed_essays = await repository.get_essays_for_cj_batch(
+                session=session,
+                cj_batch_id=cj_batch_id,
             )
+
+            essays_for_api_model: list[EssayForComparison] = []
+            for processed in processed_essays:
+                essays_for_api_model.append(
+                    EssayForComparison(
+                        id=processed.els_essay_id,
+                        text_content=processed.assessment_input_text,
+                        current_bt_score=processed.current_bt_score or 0.0,
+                    )
+                )
 
         return essays_for_api_model, processed_essays
 
@@ -144,10 +149,38 @@ class TestPairGenerationRandomizationIntegration:
             cj_request_type="cj_comparison",
         )
 
+    async def _submit_comparisons(
+        self,
+        *,
+        cj_batch_id: int,
+        repository: CJRepositoryProtocol,
+        llm_interaction: LLMInteractionProtocol,
+        settings: Settings,
+        essays_for_api_model: list[EssayForComparison],
+        request_data: CJAssessmentRequestData,
+        correlation_id: UUID,
+    ) -> bool:
+        """Call the real comparison submission entry point used in production."""
+
+        log_extra: dict[str, Any] = {
+            "test_name": "test_anchor_positions_are_balanced_in_db",
+        }
+
+        return await submit_comparisons_for_async_processing(
+            essays_for_api_model=essays_for_api_model,
+            cj_batch_id=cj_batch_id,
+            database=repository,
+            llm_interaction=llm_interaction,
+            request_data=request_data,
+            settings=settings,
+            correlation_id=correlation_id,
+            log_extra=log_extra,
+        )
+
     async def test_anchor_positions_are_balanced_in_db(
         self,
         postgres_repository: CJRepositoryProtocol,
-        postgres_session: AsyncSession,
+        mock_llm_interaction_async: LLMInteractionProtocol,
         test_settings: Settings,
     ) -> None:
         """Anchors should occupy essay_a about half the time in persisted pairs.
@@ -173,69 +206,66 @@ class TestPairGenerationRandomizationIntegration:
         # Step 1: Create a CJ batch with 12 anchors and 12 students
         cj_batch_id, bos_batch_id = await self._create_12x12_batch(
             repository=postgres_repository,
-            session=postgres_session,
         )
 
         # Step 2: Load essays for API model and build request data
         essays_for_api_model, processed_essays = await self._load_essays_for_api_model(
             repository=postgres_repository,
-            session=postgres_session,
             cj_batch_id=cj_batch_id,
         )
-        await self._build_request_data(
+        request_data = await self._build_request_data(
             bos_batch_id=bos_batch_id,
             processed_essays=processed_essays,
         )
 
         correlation_id = uuid4()
 
-        # Step 3: Generate comparison tasks using real pair generation logic
-        comparison_tasks = await pair_generation.generate_comparison_tasks(
-            essays_for_comparison=essays_for_api_model,
-            db_session=postgres_session,
+        # Step 3: Submit comparisons via the real entry point
+        submitted = await self._submit_comparisons(
             cj_batch_id=cj_batch_id,
-            existing_pairs_threshold=test_settings.COMPARISONS_PER_STABILITY_CHECK_ITERATION,
-            max_pairwise_comparisons=test_settings.MAX_PAIRWISE_COMPARISONS,
-            correlation_id=correlation_id,
-            randomization_seed=test_settings.PAIR_GENERATION_SEED,
-        )
-
-        assert comparison_tasks, "Expected at least one comparison task to be generated"
-
-        # Step 4: Persist ComparisonPair tracking records for generated tasks
-        await create_tracking_records(
-            session=postgres_session,
-            batch_tasks=comparison_tasks,
-            cj_batch_id=cj_batch_id,
+            repository=postgres_repository,
+            llm_interaction=mock_llm_interaction_async,
+            settings=test_settings,
+            essays_for_api_model=essays_for_api_model,
+            request_data=request_data,
             correlation_id=correlation_id,
         )
 
-        # Step 5: Inspect persisted ComparisonPair rows for this batch
-        stmt = select(
-            ComparisonPair.essay_a_els_id,
-            ComparisonPair.essay_b_els_id,
-        ).where(ComparisonPair.cj_batch_id == cj_batch_id)
+        assert submitted is True, "Expected comparisons to be submitted successfully"
 
-        result = await postgres_session.execute(stmt)
-        rows = result.all()
+        # Step 4: Inspect persisted ComparisonPair rows for this batch
+        async with postgres_repository.session() as session:
+            stmt = select(
+                ComparisonPair.essay_a_els_id,
+                ComparisonPair.essay_b_els_id,
+            ).where(ComparisonPair.cj_batch_id == cj_batch_id)
+
+            result = await session.execute(stmt)
+            rows = result.all()
 
         assert rows, "Expected at least one persisted comparison pair"
 
-        anchor_pair_total = 0
-        anchor_a_total = 0
+        one_anchor_pair_total = 0
+        one_anchor_in_a_total = 0
 
         for essay_a_id, essay_b_id in rows:
             is_anchor_a = essay_a_id.startswith("anchor_")
             is_anchor_b = essay_b_id.startswith("anchor_")
 
-            if is_anchor_a or is_anchor_b:
-                anchor_pair_total += 1
+            # Only consider anchor–student pairs (exactly one anchor per pair)
+            if is_anchor_a ^ is_anchor_b:
+                one_anchor_pair_total += 1
                 if is_anchor_a:
-                    anchor_a_total += 1
+                    one_anchor_in_a_total += 1
 
-        assert anchor_pair_total > 0, "Expected at least one pair involving an anchor"
+        assert one_anchor_pair_total > 0, "Expected at least one anchor–student pair"
 
-        ratio = anchor_a_total / anchor_pair_total
+        ratio = one_anchor_in_a_total / one_anchor_pair_total
+
+        print(
+            f"[RANDOMIZATION] one_anchor_in_a_total={one_anchor_in_a_total}, "
+            f"one_anchor_pair_total={one_anchor_pair_total}, ratio={ratio:.3f}",
+        )
 
         # Wide but meaningful assertion band to avoid flakiness while
         # still catching systematic bias (e.g. anchors always in essay_a).
