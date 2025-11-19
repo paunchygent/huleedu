@@ -222,25 +222,112 @@ restart_dev() {
     echo_dev "Development containers restarted"
 }
 
-# Force recreate development containers (picks up env var changes)
+# Force recreate development SERVICE containers only (excludes databases)
+# Use this when environment variables changed - databases won't be reset
 recreate_dev() {
     local services=("$@")
-    local display="all containers"
+    local display="all service containers"
     if [ ${#services[@]} -gt 0 ]; then
         display="${services[*]}"
     fi
-    echo_dev "Force recreating DEVELOPMENT containers: ${display}"
-    echo_warn "This will recreate containers to pick up configuration changes"
+    echo_dev "Force recreating DEVELOPMENT service containers (databases excluded): ${display}"
+    echo_warn "This will recreate service containers to pick up configuration changes"
     echo_info "Use this when docker-compose.yml environment variables changed"
+    echo_info "Databases will NOT be reset - use 'pdm run dev-db-recreate' to reset databases"
+
+    # Database services to exclude from recreation
+    local db_services=(
+        "batch_orchestrator_db"
+        "essay_lifecycle_db"
+        "cj_assessment_db"
+        "class_management_db"
+        "file_service_db"
+        "content_service_db"
+        "redis"
+        "spellchecker_db"
+        "result_aggregator_db"
+        "nlp_db"
+        "batch_conductor_db"
+        "identity_db"
+        "email_db"
+        "entitlements_db"
+        "zookeeper"
+        "kafka"
+    )
 
     if [ ${#services[@]} -gt 0 ]; then
+        # User specified services - recreate only those
         docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d --force-recreate --no-build "${services[@]}"
     else
-        docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d --force-recreate --no-build
+        # Get all service names and exclude databases
+        local all_services=$(docker-compose -f docker-compose.yml -f docker-compose.dev.yml config --services)
+        local services_to_recreate=()
+
+        for service in $all_services; do
+            local is_db=false
+            for db_service in "${db_services[@]}"; do
+                if [ "$service" = "$db_service" ]; then
+                    is_db=true
+                    break
+                fi
+            done
+
+            if [ "$is_db" = false ]; then
+                services_to_recreate+=("$service")
+            fi
+        done
+
+        if [ ${#services_to_recreate[@]} -gt 0 ]; then
+            docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d --force-recreate --no-build "${services_to_recreate[@]}"
+        else
+            echo_warn "No service containers found to recreate"
+        fi
     fi
 
-    echo_dev "Development containers recreated"
+    echo_dev "Development service containers recreated"
     echo_info "Containers will use updated environment variables"
+    echo_info "Database data preserved"
+}
+
+# Force recreate database containers (resets data)
+recreate_db_dev() {
+    local services=("$@")
+    local display="all database containers"
+    if [ ${#services[@]} -gt 0 ]; then
+        display="${services[*]}"
+    fi
+    echo_dev "Force recreating DEVELOPMENT database containers: ${display}"
+    echo_warn "⚠️  WARNING: This will RESET database data!"
+    echo_info "Use this only when you need to reset database state"
+
+    # Database services
+    local db_services=(
+        "batch_orchestrator_db"
+        "essay_lifecycle_db"
+        "cj_assessment_db"
+        "class_management_db"
+        "file_service_db"
+        "content_service_db"
+        "redis"
+        "spellchecker_db"
+        "result_aggregator_db"
+        "nlp_db"
+        "batch_conductor_db"
+        "identity_db"
+        "email_db"
+        "entitlements_db"
+    )
+
+    if [ ${#services[@]} -gt 0 ]; then
+        # User specified services - recreate only those
+        docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d --force-recreate --no-build "${services[@]}"
+    else
+        # Recreate all database services
+        docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d --force-recreate --no-build "${db_services[@]}"
+    fi
+
+    echo_dev "Development database containers recreated"
+    echo_warn "Database data has been reset"
 }
 
 # Remove development containers (preserves images)
@@ -344,7 +431,8 @@ show_help() {
     echo "  start-nobuild [services] Start with hot-reload (no rebuild, fast)"
     echo "  stop [services]          Stop containers"
     echo "  restart [services]       Restart containers (does NOT pick up env changes)"
-    echo "  recreate [services]      Force recreate containers (picks up env var changes)"
+    echo "  recreate [services]      Force recreate SERVICE containers only (preserves databases)"
+    echo "  recreate-db [services]   Force recreate DATABASE containers (⚠️  RESETS DATA)"
     echo "  remove [services]        Remove containers (keeps images)"
     echo "  logs [services]          Follow logs (Ctrl+C to exit)"
     echo "  ps [services]            Show container status"
@@ -386,6 +474,9 @@ case "$1" in
         ;;
     "recreate")
         recreate_dev "${@:2}"
+        ;;
+    "recreate-db")
+        recreate_db_dev "${@:2}"
         ;;
     "remove")
         remove_dev "${@:2}"

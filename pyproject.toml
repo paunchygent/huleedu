@@ -379,7 +379,8 @@ dev-start = {shell = "scripts/dev.sh start-nobuild $@"}  # Start development env
 dev-build-start = {shell = "scripts/dev.sh start $@"}  # Build with cache then start development environment
 dev-stop = {shell = "scripts/dev.sh stop $@"}  # Stop development containers
 dev-restart = {shell = "scripts/dev.sh restart $@"}  # Restart development containers (does NOT pick up env var changes)
-dev-recreate = {shell = "scripts/dev.sh recreate $@"}  # Force recreate containers (picks up env var changes)
+dev-recreate = {shell = "scripts/dev.sh recreate $@"}  # Force recreate SERVICE containers only (preserves databases)
+dev-db-recreate = {shell = "scripts/dev.sh recreate-db $@"}  # Force recreate DATABASE containers (⚠️ RESETS DATA)
 dev-logs = {shell = "scripts/dev.sh logs $@"}  # Follow development logs
 dev-ps = {shell = "scripts/dev.sh ps $@"}  # Show development container status
 dev-check = "scripts/dev.sh check"  # Check what needs rebuilding

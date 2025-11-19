@@ -51,6 +51,7 @@ def configure_service_logging(
             or /app/logs/{service_name}.log)
 
     Environment Variables:
+        LOG_FORMAT: Output format - "json" for JSON, "console" for human-readable (default: console)
         LOG_TO_FILE: Enable file logging (default: false)
         LOG_FILE_PATH: Custom log file path (default: /app/logs/{service_name}.log)
         LOG_MAX_BYTES: Max bytes per log file before rotation (default: 104857600 = 100MB)
@@ -67,9 +68,13 @@ def configure_service_logging(
     if log_to_file is None:
         log_to_file = os.getenv("LOG_TO_FILE", "false").lower() in ("true", "1", "yes")
 
-    # Choose processors based on environment
-    if environment == "production":
-        # Production: JSON output for log aggregation
+    # Determine log format: check LOG_FORMAT env var first, then fall back to environment
+    log_format = os.getenv("LOG_FORMAT", "").lower()
+    use_json = log_format == "json" or (not log_format and environment == "production")
+
+    # Choose processors based on format
+    if use_json:
+        # JSON output for log aggregation (Docker containers, production)
         processors: list[Processor] = [
             merge_contextvars,
             structlog.processors.TimeStamper(fmt="iso"),
@@ -85,7 +90,7 @@ def configure_service_logging(
             structlog.processors.JSONRenderer(),
         ]
     else:
-        # Development: Human-readable console output
+        # Human-readable console output (local development, tests)
         processors = [
             merge_contextvars,
             structlog.processors.TimeStamper(fmt="iso"),

@@ -55,6 +55,7 @@ services:
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=${ENVIRONMENT:-production}
+      - LOG_FORMAT=json
       - CONTENT_STORE_ROOT_PATH=/data/huleedu_content_store
       - PORT=8000
       - LOG_LEVEL=INFO
@@ -95,6 +96,7 @@ services:
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=${ENVIRONMENT:-production}
+      - LOG_FORMAT=json
       - HULEEDU_DB_USER=${HULEEDU_DB_USER}
       - HULEEDU_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
@@ -137,6 +139,7 @@ services:
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=${ENVIRONMENT:-production}
+      - LOG_FORMAT=json
       - BCS_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - BCS_KAFKA_CONSUMER_GROUP_ID=batch-conductor-service-group
       - BCS_LOG_LEVEL=INFO
@@ -178,11 +181,14 @@ services:
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=${ENVIRONMENT:-production}
+      - LOG_FORMAT=json
       - SPELLCHECKER_SERVICE_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - SPELLCHECKER_SERVICE_CONTENT_SERVICE_URL=http://content_service:8000/v1/content
       - SPELLCHECKER_SERVICE_LOG_LEVEL=DEBUG
       - SPELLCHECKER_SERVICE_HTTP_PORT=8002
       - SPELLCHECKER_SERVICE_REDIS_URL=redis://redis:6379
+      - HULEEDU_DB_USER=${HULEEDU_DB_USER}
+      - HULEEDU_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
       - OTEL_SERVICE_NAME=spellchecker_service
       - OTEL_TRACES_EXPORTER=otlp
@@ -220,6 +226,7 @@ services:
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=${ENVIRONMENT:-production}
+      - LOG_FORMAT=json
       - BATCH_ORCHESTRATOR_SERVICE_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - BATCH_ORCHESTRATOR_SERVICE_CONTENT_SERVICE_URL=http://content_service:8000/v1/content
       - BATCH_ORCHESTRATOR_SERVICE_PORT=5000
@@ -267,6 +274,7 @@ services:
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=${ENVIRONMENT:-production}
+      - LOG_FORMAT=json
       - ESSAY_LIFECYCLE_SERVICE_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - ESSAY_LIFECYCLE_SERVICE_REDIS_URL=redis://redis:6379
       - CONTENT_SERVICE_URL=http://content_service:8000/v1/content
@@ -318,6 +326,7 @@ services:
       - huleedu_internal_network
     environment:
       - ENV_TYPE=docker
+      - LOG_FORMAT=json
       - ESSAY_LIFECYCLE_SERVICE_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - ESSAY_LIFECYCLE_SERVICE_REDIS_URL=redis://redis:6379
       - ESSAY_LIFECYCLE_SERVICE_CONTENT_SERVICE_URL=http://content_service:8000/v1/content
@@ -363,6 +372,7 @@ services:
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=${ENVIRONMENT:-production}
+      - LOG_FORMAT=json
       - FILE_SERVICE_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - FILE_SERVICE_CONTENT_SERVICE_URL=http://content_service:8000/v1/content
       - FILE_SERVICE_HTTP_PORT=7001
@@ -409,6 +419,7 @@ services:
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=${ENVIRONMENT:-production}
+      - LOG_FORMAT=json
       - CJ_ASSESSMENT_SERVICE_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - CJ_ASSESSMENT_SERVICE_CONTENT_SERVICE_URL=http://content_service:8000/v1/content
       - CJ_ASSESSMENT_SERVICE_LOG_LEVEL=INFO
@@ -462,6 +473,7 @@ services:
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=${ENVIRONMENT:-production}
+      - LOG_FORMAT=json
       - API_GATEWAY_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - API_GATEWAY_LOG_LEVEL=INFO
       - API_GATEWAY_SERVICE_PORT=8080
@@ -507,6 +519,7 @@ services:
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=${ENVIRONMENT:-production}
+      - LOG_FORMAT=json
       - CLASS_MANAGEMENT_SERVICE_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - CLASS_MANAGEMENT_SERVICE_REDIS_URL=redis://redis:6379
       - CLASS_MANAGEMENT_SERVICE_LOG_LEVEL=INFO
@@ -551,6 +564,7 @@ services:
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=${ENVIRONMENT:-production}
+      - LOG_FORMAT=json
       - LLM_PROVIDER_SERVICE_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - LLM_PROVIDER_SERVICE_LOG_LEVEL=INFO
       - LLM_PROVIDER_SERVICE_PORT=8080
@@ -613,6 +627,7 @@ services:
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=${ENVIRONMENT:-production}
+      - LOG_FORMAT=json
       - SERVICE_NAME=websocket_service
       - WEBSOCKET_PORT=8080
       - REDIS_URL=redis://redis:6379
@@ -658,6 +673,7 @@ services:
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=${ENVIRONMENT:-production}
+      - LOG_FORMAT=json
       - NLP_SERVICE_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - NLP_SERVICE_CONTENT_SERVICE_URL=http://content_service:8000/v1/content
       - NLP_SERVICE_LOG_LEVEL=INFO
@@ -689,6 +705,7 @@ services:
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=${ENVIRONMENT:-production}
+      - LOG_FORMAT=json
       - IDENTITY_SERVICE_DB_HOST=identity_db
       - IDENTITY_SERVICE_DB_PORT=5432
       - IDENTITY_SERVICE_DB_NAME=huleedu_identity
@@ -749,6 +766,7 @@ services:
       # Core environment
       - ENV_TYPE=docker
       - ENVIRONMENT=${ENVIRONMENT:-production}
+      - LOG_FORMAT=json
       # Database configuration
       - EMAIL_SERVICE_DB_HOST=email_db
       - EMAIL_SERVICE_DB_PORT=5432
@@ -813,6 +831,7 @@ services:
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=${ENVIRONMENT:-production}
+      - LOG_FORMAT=json
       - HULEEDU_DB_USER=${HULEEDU_DB_USER}
       - HULEEDU_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
       - ENTITLEMENTS_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
@@ -854,6 +873,7 @@ services:
       # Core environment
       - ENV_TYPE=docker
       - ENVIRONMENT=${ENVIRONMENT:-production}
+      - LOG_FORMAT=json
       # Service configuration
       - LANGUAGE_TOOL_SERVICE_PORT=8085
       - LANGUAGE_TOOL_SERVICE_HOST=0.0.0.0
