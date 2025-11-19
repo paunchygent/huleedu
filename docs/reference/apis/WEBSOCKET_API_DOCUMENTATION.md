@@ -50,7 +50,7 @@ Notifies when files are successfully uploaded to a batch.
 ```json
 {
     "notification_type": "batch_files_uploaded",
-    "timestamp": "2024-01-15T10:35:00Z",
+    "timestamp": "2025-01-15T10:35:00Z",
     "category": "file_operations",
     "priority": "standard",
     "action_required": false,
@@ -71,7 +71,7 @@ Notifies when a file is removed from a batch.
 ```json
 {
     "notification_type": "batch_file_removed",
-    "timestamp": "2024-01-15T10:40:00Z",
+    "timestamp": "2025-01-15T10:40:00Z",
     "category": "file_operations", 
     "priority": "standard",
     "action_required": false,
@@ -91,7 +91,7 @@ Notifies when batch validation fails.
 ```json
 {
     "notification_type": "batch_validation_failed",
-    "timestamp": "2024-01-15T10:45:00Z",
+    "timestamp": "2025-01-15T10:45:00Z",
     "category": "system_alerts",
     "priority": "immediate", 
     "action_required": true,
@@ -113,7 +113,7 @@ Notifies when a new class is created.
 ```json
 {
     "notification_type": "class_created",
-    "timestamp": "2024-01-15T09:15:00Z",
+    "timestamp": "2025-01-15T09:15:00Z",
     "category": "class_management",
     "priority": "standard",
     "action_required": false,
@@ -133,7 +133,7 @@ Notifies when a student is added to a class.
 ```json
 {
     "notification_type": "student_added_to_class",
-    "timestamp": "2024-01-15T09:30:00Z",
+    "timestamp": "2025-01-15T09:30:00Z",
     "category": "class_management",
     "priority": "low",
     "action_required": false,
@@ -153,7 +153,7 @@ Notifies when validation timeout has been processed.
 ```json
 {
     "notification_type": "validation_timeout_processed",
-    "timestamp": "2024-01-15T11:00:00Z",
+    "timestamp": "2025-01-15T11:00:00Z",
     "category": "student_workflow",
     "priority": "immediate",
     "action_required": false,
@@ -173,7 +173,7 @@ Notifies when student associations have been confirmed.
 ```json
 {
     "notification_type": "student_associations_confirmed",
-    "timestamp": "2024-01-15T11:15:00Z",
+    "timestamp": "2025-01-15T11:15:00Z",
     "category": "student_workflow", 
     "priority": "high",
     "action_required": false,
@@ -195,7 +195,7 @@ Notifies when spellcheck is completed for a batch.
 ```json
 {
     "notification_type": "batch_spellcheck_completed",
-    "timestamp": "2024-01-15T10:42:00Z",
+    "timestamp": "2025-01-15T10:42:00Z",
     "category": "batch_progress",
     "priority": "low",
     "action_required": false,
@@ -216,7 +216,7 @@ Notifies when content judgment assessment is completed for a batch.
 ```json
 {
     "notification_type": "batch_cj_assessment_completed",
-    "timestamp": "2024-01-15T11:15:00Z",
+    "timestamp": "2025-01-15T11:15:00Z",
     "category": "batch_progress",
     "priority": "standard",
     "action_required": false,
@@ -237,7 +237,7 @@ Notifies when batch processing begins.
 ```json
 {
     "notification_type": "batch_processing_started",
-    "timestamp": "2024-01-15T10:00:00Z",
+    "timestamp": "2025-01-15T10:00:00Z",
     "category": "batch_progress",
     "priority": "low",
     "action_required": false,
@@ -257,7 +257,7 @@ Notifies when batch processing results are ready.
 ```json
 {
     "notification_type": "batch_results_ready",
-    "timestamp": "2024-01-15T12:00:00Z",
+    "timestamp": "2025-01-15T12:00:00Z",
     "category": "processing_results",
     "priority": "high",
     "action_required": false,
@@ -277,7 +277,7 @@ Notifies when all assessments for a batch are completed.
 ```json
 {
     "notification_type": "batch_assessment_completed",
-    "timestamp": "2024-01-15T12:30:00Z",
+    "timestamp": "2025-01-15T12:30:00Z",
     "category": "processing_results",
     "priority": "standard",
     "action_required": false,
@@ -300,7 +300,7 @@ Notifies when all requested pipeline phases have completed for a batch.
 ```json
 {
     "notification_type": "batch_pipeline_completed",
-    "timestamp": "2024-01-15T13:00:00Z",
+    "timestamp": "2025-01-15T13:00:00Z",
     "category": "processing_results",
     "priority": "high",
     "action_required": false,
@@ -324,7 +324,7 @@ Notifies when a pipeline phase is skipped due to prior completion (optimization)
 ```json
 {
     "notification_type": "phase_skipped",
-    "timestamp": "2024-01-15T10:05:00Z",
+    "timestamp": "2025-01-15T10:05:00Z",
     "category": "batch_progress",
     "priority": "low",
     "action_required": false,

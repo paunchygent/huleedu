@@ -226,13 +226,13 @@ Complete Pipeline Architecture Map: From Client Request to Completion
       "requested_pipelines": ["spellcheck", "cj_assessment"],
       "spellcheck": {
           "status": "COMPLETED",  # PipelineExecutionStatus enum
-          "started_at": "2024-01-15T10:25:00Z",
-          "completed_at": "2024-01-15T10:25:40Z"
+          "started_at": "2025-01-15T10:25:00Z",
+          "completed_at": "2025-01-15T10:25:40Z"
       },
       "cj_assessment": {
           "status": "COMPLETED",
-          "started_at": "2024-01-15T10:25:42Z",
-          "completed_at": "2024-01-15T10:25:43Z"
+          "started_at": "2025-01-15T10:25:42Z",
+          "completed_at": "2025-01-15T10:25:43Z"
       }
   }
 

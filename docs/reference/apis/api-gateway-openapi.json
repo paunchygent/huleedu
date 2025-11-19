@@ -105,7 +105,7 @@
                           "class_id": "class_123",
                           "name": "Advanced Writing",
                           "description": "Advanced essay writing course",
-                          "created_at": "2024-01-15T10:30:00Z",
+                          "created_at": "2025-01-15T10:30:00Z",
                           "student_count": 25
                         }
                       ],
@@ -118,15 +118,15 @@
                       "class_id": "class_123",
                       "name": "Advanced Writing",
                       "description": "Advanced essay writing course",
-                      "created_at": "2024-01-15T10:30:00Z",
-                      "updated_at": "2024-01-15T11:00:00Z",
+                      "created_at": "2025-01-15T10:30:00Z",
+                      "updated_at": "2025-01-15T11:00:00Z",
                       "student_count": 25,
                       "students": [
                         {
                           "student_id": "student_456",
                           "name": "John Doe",
                           "email": "john@example.com",
-                          "enrolled_at": "2024-01-10T09:00:00Z"
+                          "enrolled_at": "2025-01-10T09:00:00Z"
                         }
                       ]
                     }
@@ -143,7 +143,7 @@
                   "class_id": "class_789",
                   "name": "Creative Writing",
                   "description": "Creative writing workshop",
-                  "created_at": "2024-01-15T12:00:00Z",
+                  "created_at": "2025-01-15T12:00:00Z",
                   "message": "Class created successfully"
                 }
               }
@@ -289,7 +289,7 @@
                           "class_id": "class_123",
                           "name": "Advanced Writing",
                           "description": "Advanced essay writing course",
-                          "created_at": "2024-01-15T10:30:00Z",
+                          "created_at": "2025-01-15T10:30:00Z",
                           "student_count": 25
                         }
                       ],
@@ -302,15 +302,15 @@
                       "class_id": "class_123",
                       "name": "Advanced Writing",
                       "description": "Advanced essay writing course",
-                      "created_at": "2024-01-15T10:30:00Z",
-                      "updated_at": "2024-01-15T11:00:00Z",
+                      "created_at": "2025-01-15T10:30:00Z",
+                      "updated_at": "2025-01-15T11:00:00Z",
                       "student_count": 25,
                       "students": [
                         {
                           "student_id": "student_456",
                           "name": "John Doe",
                           "email": "john@example.com",
-                          "enrolled_at": "2024-01-10T09:00:00Z"
+                          "enrolled_at": "2025-01-10T09:00:00Z"
                         }
                       ]
                     }
@@ -327,7 +327,7 @@
                   "class_id": "class_789",
                   "name": "Creative Writing",
                   "description": "Creative writing workshop",
-                  "created_at": "2024-01-15T12:00:00Z",
+                  "created_at": "2025-01-15T12:00:00Z",
                   "message": "Class created successfully"
                 }
               }
@@ -473,7 +473,7 @@
                           "class_id": "class_123",
                           "name": "Advanced Writing",
                           "description": "Advanced essay writing course",
-                          "created_at": "2024-01-15T10:30:00Z",
+                          "created_at": "2025-01-15T10:30:00Z",
                           "student_count": 25
                         }
                       ],
@@ -486,15 +486,15 @@
                       "class_id": "class_123",
                       "name": "Advanced Writing",
                       "description": "Advanced essay writing course",
-                      "created_at": "2024-01-15T10:30:00Z",
-                      "updated_at": "2024-01-15T11:00:00Z",
+                      "created_at": "2025-01-15T10:30:00Z",
+                      "updated_at": "2025-01-15T11:00:00Z",
                       "student_count": 25,
                       "students": [
                         {
                           "student_id": "student_456",
                           "name": "John Doe",
                           "email": "john@example.com",
-                          "enrolled_at": "2024-01-10T09:00:00Z"
+                          "enrolled_at": "2025-01-10T09:00:00Z"
                         }
                       ]
                     }
@@ -511,7 +511,7 @@
                   "class_id": "class_789",
                   "name": "Creative Writing",
                   "description": "Creative writing workshop",
-                  "created_at": "2024-01-15T12:00:00Z",
+                  "created_at": "2025-01-15T12:00:00Z",
                   "message": "Class created successfully"
                 }
               }
@@ -657,7 +657,7 @@
                           "class_id": "class_123",
                           "name": "Advanced Writing",
                           "description": "Advanced essay writing course",
-                          "created_at": "2024-01-15T10:30:00Z",
+                          "created_at": "2025-01-15T10:30:00Z",
                           "student_count": 25
                         }
                       ],
@@ -670,15 +670,15 @@
                       "class_id": "class_123",
                       "name": "Advanced Writing",
                       "description": "Advanced essay writing course",
-                      "created_at": "2024-01-15T10:30:00Z",
-                      "updated_at": "2024-01-15T11:00:00Z",
+                      "created_at": "2025-01-15T10:30:00Z",
+                      "updated_at": "2025-01-15T11:00:00Z",
                       "student_count": 25,
                       "students": [
                         {
                           "student_id": "student_456",
                           "name": "John Doe",
                           "email": "john@example.com",
-                          "enrolled_at": "2024-01-10T09:00:00Z"
+                          "enrolled_at": "2025-01-10T09:00:00Z"
                         }
                       ]
                     }
@@ -695,7 +695,7 @@
                   "class_id": "class_789",
                   "name": "Creative Writing",
                   "description": "Creative writing workshop",
-                  "created_at": "2024-01-15T12:00:00Z",
+                  "created_at": "2025-01-15T12:00:00Z",
                   "message": "Class created successfully"
                 }
               }
@@ -825,7 +825,7 @@
                 "schema": {},
                 "example": {
                   "message": "Success - no auth required",
-                  "timestamp": "2024-01-15T10:30:00Z",
+                  "timestamp": "2025-01-15T10:30:00Z",
                   "service": "api_gateway_service"
                 }
               }
@@ -851,7 +851,7 @@
                 "example": {
                   "message": "Success - authenticated as user_123",
                   "user_id": "user_123",
-                  "timestamp": "2024-01-15T10:30:00Z",
+                  "timestamp": "2025-01-15T10:30:00Z",
                   "token_valid": true
                 }
               }
@@ -903,13 +903,13 @@
                   "status": "processing",
                   "details": {
                     "batch_id": "batch_123",
-                    "created_at": "2024-01-15T10:30:00Z",
-                    "updated_at": "2024-01-15T10:45:00Z",
+                    "created_at": "2025-01-15T10:30:00Z",
+                    "updated_at": "2025-01-15T10:45:00Z",
                     "total_essays": 5,
                     "processed_essays": 3,
                     "current_phase": "CONTENT_JUDGMENT",
                     "progress_percentage": 60,
-                    "estimated_completion": "2024-01-15T11:15:00Z"
+                    "estimated_completion": "2025-01-15T11:15:00Z"
                   }
                 }
               }

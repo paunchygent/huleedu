@@ -137,7 +137,7 @@ request_body = {
     },
     "llm_config_overrides": {
         "provider_override": "anthropic",
-        "model_override": "claude-3-5-sonnet-20241022",
+        "model_override": "claude-sonnet-4-5-20250929",
         "temperature_override": 0.3
     },
     "correlation_id": "4d6fe37b-74d4-4df1-bb50-34e1c8b3f5c2",
@@ -187,7 +187,7 @@ request_body = {
     },
     "llm_config_overrides": {
         "provider_override": "anthropic",
-        "model_override": "claude-3-5-sonnet-20241022",
+        "model_override": "claude-sonnet-4-5-20250929",
         "temperature_override": 0.3
     },
     "correlation_id": "4d6fe37b-74d4-4df1-bb50-34e1c8b3f5c2",
