@@ -34,7 +34,12 @@ class RunnerPaths:
             anchor_docs_dir=role_models_root / "anchor_essays",
             student_docs_dir=role_models_root / "student_essays",
             schema_path=(
-                repo_root / "Documentation" / "schemas" / "eng5_np" / "assessment_run.schema.json"
+                repo_root
+                / "docs"
+                / "reference"
+                / "schemas"
+                / "eng5_np"
+                / "assessment_run.schema.json"
             ),
             artefact_output_dir=repo_root / ".claude" / "research" / "data" / "eng5_np_2016",
         )

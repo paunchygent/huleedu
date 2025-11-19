@@ -535,7 +535,9 @@ def test_hydrator_raises_when_prompt_hash_missing(tmp_path: Path) -> None:
 
 def test_stub_validates_against_schema(tmp_path: Path) -> None:
     repo_root = repo_root_from_package()
-    schema_path = repo_root / "Documentation" / "schemas" / "eng5_np" / "assessment_run.schema.json"
+    schema_path = (
+        repo_root / "docs" / "reference" / "schemas" / "eng5_np" / "assessment_run.schema.json"
+    )
     if not schema_path.exists():
         pytest.skip("Schema file missing")
 

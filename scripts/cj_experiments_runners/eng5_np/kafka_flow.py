@@ -162,7 +162,7 @@ class AssessmentEventCollector:
             bootstrap_servers=self.settings.kafka_bootstrap,
             group_id=f"{self.settings.kafka_client_id}-eng5np-{self.settings.batch_uuid}",
             enable_auto_commit=False,
-            auto_offset_reset="latest",
+            auto_offset_reset="earliest",
             session_timeout_ms=45000,
             max_poll_records=50,
         )

@@ -231,6 +231,7 @@ services:
       - LOG_LEVEL=DEBUG
       - HULEEDU_DB_USER=${HULEEDU_DB_USER}
       - HULEEDU_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
+      - CJ_ASSESSMENT_SERVICE_LLM_BATCHING_MODE=${CJ_ASSESSMENT_SERVICE_LLM_BATCHING_MODE}
 
   # Spellchecker Service (add missing services that we already optimized)
   spellchecker_service:

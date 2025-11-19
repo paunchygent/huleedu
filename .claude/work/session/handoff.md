@@ -120,8 +120,56 @@ export LLM_PROVIDER_SERVICE_BATCH_API_MODE=disabled
 
 ---
 
+---
+
+## Current Session (2025-11-18) - Validation Execution
+
+### ✅ Schema Path Fix (COMPLETE)
+**Issue**: Documentation migration `Documentation/` → `docs/` broke schema loading
+**Files Modified**:
+- `scripts/cj_experiments_runners/eng5_np/paths.py` line 37
+- `scripts/tests/test_eng5_np_runner.py` line 538
+- `scripts/tests/test_eng5_np_execute_integration.py` line 73
+
+**Result**: ✅ Schema loads from `docs/reference/schemas/eng5_np/assessment_run.schema.json`
+
+### ✅ Baseline Test (COMPLETE)
+**Mode**: per_request
+**Results**:
+- Comparisons: 4/4
+- Cost: $0.13 (12,548 prompt + 445 completion tokens)
+- Model: claude-haiku-4-5-20251001
+- Status: Full BT analysis, grade projections, no partial data
+
+### ✅ Serial Bundle Configuration (COMPLETE)
+**Issue**: `CJ_ASSESSMENT_SERVICE_LLM_BATCHING_MODE` not passed to container
+**Fix**: Added env var to `docker-compose.dev.yml` line 234
+**Result**: ✅ Both services configured correctly
+
+### ⏳ Serial Bundle Test (RUNNING)
+**Started**: 2025-11-18 23:18 UTC
+**Batch ID**: serial-bundle-20251119-0018
+**Parameters**: 100 comparisons, 900s timeout, serial_bundle mode
+**Background Task**: 84ebf6
+**Expected Completion**: ~23:33-23:48 UTC (15-30 minutes)
+
+---
+
+## Remaining Work (Next Session Continuation)
+
+1. **Monitor serial bundle test completion** (task 84ebf6)
+2. **Validate results**: Check comparisons, costs, bundling efficiency
+3. **Check metrics**: Grafana + Prometheus (bundle sizes, API call reduction)
+4. **Update task documentation**: Mark validation complete
+5. **Commit changes**: Schema paths + docker-compose env var
+
+**Test Location**: `.claude/research/data/eng5_np_2016/assessment_run.execute.json`
+
+---
+
 ## Notes for Next Session
 
 1. **Monitoring Ready**: LLM Provider queue metrics (`llm_provider_queue_depth`, `llm_provider_queue_wait_time_seconds`) are instrumented and ready for serial_bundle mode testing
 2. **ENG5 Runner Validated**: Dry-run mode works with `LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE=serial_bundle`
 3. **Iteration Metadata**: Infrastructure ready for stability loop (gated behind `CJ_ASSESSMENT_SERVICE_ENABLE_ITERATIVE_BATCHING_LOOP`)
+4. **Runbook Reference**: `docs/operations/eng5-np-runbook.md` has complete serial bundle configuration and diagnostics

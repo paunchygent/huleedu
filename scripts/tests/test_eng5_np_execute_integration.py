@@ -70,7 +70,9 @@ def _create_test_environment(tmp_path: Path) -> tuple[RunnerPaths, RunnerSetting
     output_dir.mkdir()
 
     repo_root = repo_root_from_package()
-    schema_path = repo_root / "Documentation" / "schemas" / "eng5_np" / "assessment_run.schema.json"
+    schema_path = (
+        repo_root / "docs" / "reference" / "schemas" / "eng5_np" / "assessment_run.schema.json"
+    )
 
     paths = RunnerPaths(
         repo_root=tmp_path,
