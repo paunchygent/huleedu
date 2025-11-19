@@ -23,51 +23,29 @@ scrape_configs:
     - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
       target_label: 'service'
   pipeline_stages:
-    # First, detect if the line is JSON
-    - regex:
-        expression: '^(?P<json_line>\{.+\})$'
-    
-    # If it's JSON, parse it
+    # Stage 1: Parse JSON (extracts fields but preserves original line content)
+    # Non-JSON lines pass through unchanged
     - json:
         expressions:
           timestamp: timestamp
           level: level
           event: event
-          message: message
-          msg: msg
           correlation_id: correlation_id
           event_id: event_id
           event_type: event_type
           source_service: source_service
           logger_name: logger_name
-        source: json_line
-    
-    # Handle different message field names (structlog uses 'event', some use 'message' or 'msg')
-    - template:
-        source: message
-        template: '{{ or .event .message .msg .json_line }}'
-    
-    # Ensure we have a timestamp
+
+    # Stage 2: Parse timestamp from JSON when available
     - timestamp:
         source: timestamp
         format: RFC3339
         fallback_formats:
           - RFC3339Nano
           - "2006-01-02T15:04:05.000Z"
-          - "2006-01-02 15:04:05"
-    
-    # Set default level if not present
-    - template:
-        source: level
-        template: '{{ or .level "info" }}'
-    
-    # Promote key fields to Loki labels for fast querying
+
+    # Stage 3: Promote ONLY low-cardinality fields to labels (25 streams total)
+    # High-cardinality fields remain in JSON for filtering: {service="..."} | json | correlation_id="..."
     - labels:
         level:
-        correlation_id:
         service:
-        logger_name:
-    
-    # Output the processed log line
-    - output:
-        source: message

@@ -114,10 +114,10 @@ sum(rate(cj_admin_instruction_operations_total{status="failure"}[5m])) by (opera
 
 ```logql
 # Trace by Correlation ID
-{correlation_id="<correlation-id>"}
+{service=~".*"} | json | correlation_id="<correlation-id>"
 
 # All Error Logs
-{service=~".+"} | json | level="error" or level="critical"
+{level="error"} | json
 
 # Service-Specific Logs
 {service="batch_orchestrator_service"} | json
@@ -125,6 +125,35 @@ sum(rate(cj_admin_instruction_operations_total{status="failure"}[5m])) by (opera
 # Recent Failed Events
 {service=~".+"} | json | level="error" | line_format "{{.timestamp}} [{{.level}}] {{.event}}"
 ```
+
+### Query Best Practices
+
+**Label-First Pattern** (Use labels to narrow scope, then JSON for filtering):
+
+```logql
+# ✅ CORRECT: Filter by labels first (uses index)
+{service="cj_assessment_service", level="error"} | json | correlation_id="abc-123"
+
+# ❌ WRONG: Scan all logs then filter (slow, no longer supported)
+{correlation_id="abc-123"}  # This will fail - correlation_id is not a label
+```
+
+**Why This Matters**:
+- **Labels are indexed**: Fast filtering (milliseconds) - use for service, level
+- **JSON body fields are not indexed**: Require scanning filtered results (seconds) - use for correlation_id, batch_id, etc.
+- **Always filter by labels first** to minimize scan volume
+
+**Breaking Change (2025-11-19)**: Correlation ID Label Removed
+
+**What changed**: `correlation_id` and `logger_name` are no longer Loki labels (removed for performance).
+
+**Impact**: Queries using `{correlation_id="..."}` or `{logger_name="..."}` will fail.
+
+**Migration**: Update all queries to use JSON parsing:
+- **Old**: `{correlation_id="abc-123"}`
+- **New**: `{service=~".*"} | json | correlation_id="abc-123"`
+
+**Why**: High-cardinality labels (UUIDs) cause Loki index explosion. With 100K+ requests/day, correlation_id as a label would create millions of streams, causing severe performance degradation and potential Loki crashes.
 
 ### Accessing Loki Logs via Grafana
 
@@ -248,5 +277,5 @@ When running comprehensive tests:
 
 ---
 
-**Last Updated**: 2025-11-09 – Phase 3.2 Admin Docs & Observability
-**Next Review**: After CJ admin login/Identity rollout
+**Last Updated**: 2025-11-19 – Loki Cardinality Reduction Complete (25 streams, correlation_id in JSON body)
+**Next Review**: After service log volume increases

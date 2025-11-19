@@ -207,11 +207,11 @@ Import the dashboards in this specific order to ensure proper navigation links:
 Loki automatically extracts these labels from all service logs:
 
 - `container` - Docker container name
-- `correlation_id` - Request correlation UUID
 - `level` - Log level (info, error, warning, debug)
-- `logger_name` - Python logger hierarchy
 - `service` - Service identifier
 - `service_name` - Full service name
+
+**Note**: High-cardinality fields like `correlation_id` and `logger_name` are available in the JSON body (use `| json | correlation_id="..."` to filter)
 
 #### **Common Loki Queries**
 
@@ -223,7 +223,7 @@ Loki automatically extracts these labels from all service logs:
 {level="error"}
 
 # Trace a specific request by correlation ID
-{correlation_id="550e8400-e29b-41d4-a716-446655440000"}
+{service=~".*"} | json | correlation_id="550e8400-e29b-41d4-a716-446655440000"
 
 # Container-specific logs
 {container="huleedu_batch_orchestrator_service"}
