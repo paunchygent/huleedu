@@ -70,14 +70,15 @@ async def check_workflow_continuation(
             .select_from(ComparisonPair)
             .where(
                 ComparisonPair.cj_batch_id == batch_id,
-                ComparisonPair.winner.isnot(None),
+                ComparisonPair.winner.in_(["essay_a", "essay_b"]),
             )
         )
         completed_count = (await session.execute(completed_count_stmt)).scalar_one()
 
         # Support both periodic continuation (every 5) and threshold-based
         should_continue: bool = False
-        if batch_state.total_comparisons > 0:
+        denominator = batch_state.completion_denominator()
+        if denominator > 0:
             # Periodic continuation every 5 completions
             if completed_count > 0 and completed_count % 5 == 0:
                 should_continue = True
@@ -87,7 +88,7 @@ async def check_workflow_continuation(
                 and batch_state.completion_threshold_pct
                 and batch_state.completion_threshold_pct > 0
             ):
-                completion_percentage = (completed_count / batch_state.total_comparisons) * 100
+                completion_percentage = (completed_count / denominator) * 100
                 if completion_percentage >= batch_state.completion_threshold_pct:
                     should_continue = True
 
@@ -98,6 +99,8 @@ async def check_workflow_continuation(
                 "batch_id": batch_id,
                 "completed_pairs": completed_count,
                 "total_comparisons": batch_state.total_comparisons,
+                "total_budget": batch_state.total_budget,
+                "completion_denominator": denominator,
                 "should_continue": should_continue,
             },
         )

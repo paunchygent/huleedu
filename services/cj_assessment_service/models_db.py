@@ -249,8 +249,16 @@ class CJBatchState(Base):
     )
 
     # Progress tracking
+    total_budget: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+        doc="Original requested comparison budget (never overwritten)",
+    )
     total_comparisons: Mapped[int] = mapped_column(
-        Integer, nullable=False, doc="Total comparisons to process"
+        Integer,
+        nullable=False,
+        default=0,
+        doc="Cumulative comparisons submitted across all iterations",
     )
     submitted_comparisons: Mapped[int] = mapped_column(
         Integer, default=0, doc="Comparisons sent to LLM provider"
@@ -281,7 +289,10 @@ class CJBatchState(Base):
 
     # Processing metadata
     current_iteration: Mapped[int] = mapped_column(
-        Integer, default=1, nullable=False, doc="Current comparison iteration"
+        Integer,
+        default=0,
+        nullable=False,
+        doc="Comparison iteration counter (0 before first submission)",
     )
     processing_metadata: Mapped[dict | None] = mapped_column(
         JSON, nullable=True, doc="Stores previous scores, settings, etc."
@@ -292,6 +303,31 @@ class CJBatchState(Base):
         back_populates="batch_state",
         lazy="joined",  # Always load with state
     )
+
+    def completion_denominator(self) -> int:
+        """Return the denominator to use for completion math."""
+
+        if self.total_budget and self.total_budget > 0:
+            return self.total_budget
+        if self.total_comparisons and self.total_comparisons > 0:
+            return self.total_comparisons
+        return 0
+
+    def __repr__(self) -> str:  # pragma: no cover - string helper
+        """String representation including key progress fields."""
+
+        return (
+            "<CJBatchState("
+            f"batch_id={self.batch_id}, "
+            f"state={self.state.value if self.state else 'unknown'}, "
+            f"total_budget={self.total_budget}, "
+            f"total_comparisons={self.total_comparisons}, "
+            f"submitted={self.submitted_comparisons}, "
+            f"completed={self.completed_comparisons}, "
+            f"failed={self.failed_comparisons}, "
+            f"current_iteration={self.current_iteration}"
+            ")>"
+        )
 
 
 class EventOutbox(Base):

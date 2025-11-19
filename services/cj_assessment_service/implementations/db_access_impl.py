@@ -140,6 +140,7 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
         batch_state = CJBatchState(
             batch_id=cj_batch.id,
             state=CJBatchStateEnum.INITIALIZING,
+            total_budget=None,
             total_comparisons=0,
             submitted_comparisons=0,
             completed_comparisons=0,

@@ -59,6 +59,7 @@ async def capture_snapshot(engine: AsyncEngine, batch_id: int) -> BatchSnapshot:
         engine,
         """
         SELECT state::text,
+               total_budget,
                total_comparisons,
                submitted_comparisons,
                completed_comparisons,
@@ -79,6 +80,7 @@ async def capture_snapshot(engine: AsyncEngine, batch_id: int) -> BatchSnapshot:
     batching_metadata: dict[str, Any] = {}
     if state_values:
         totals = {
+            "budget": state_values.total_budget,
             "total": state_values.total_comparisons,
             "submitted": state_values.submitted_comparisons,
             "completed": state_values.completed_comparisons,
@@ -105,6 +107,7 @@ async def capture_snapshot(engine: AsyncEngine, batch_id: int) -> BatchSnapshot:
         batching_metadata = {
             "llm_batching_mode": llm_batching_mode or "unknown",
             "has_overrides": bool(config_overrides),
+            "comparison_budget": processing_metadata.get("comparison_budget"),
         }
 
     projection_count_result = await _fetch_one(

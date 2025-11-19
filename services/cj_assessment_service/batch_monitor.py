@@ -184,12 +184,10 @@ class BatchMonitor:
         """
         try:
             # Calculate progress percentage
-            if batch_state.total_comparisons > 0:
-                progress_pct = (
-                    batch_state.completed_comparisons / batch_state.total_comparisons
-                ) * 100
-            else:
-                progress_pct = 0
+            denominator = batch_state.completion_denominator()
+            progress_pct = (
+                (batch_state.completed_comparisons / denominator) * 100 if denominator else 0
+            )
 
             batch_id = batch_state.batch_id
             current_state = batch_state.state
@@ -220,6 +218,7 @@ class BatchMonitor:
                     "current_state": current_state.value,
                     "progress_pct": progress_pct,
                     "completed_comparisons": batch_state.completed_comparisons,
+                    "total_budget": batch_state.total_budget,
                     "total_comparisons": batch_state.total_comparisons,
                     "last_activity_at": batch_state.last_activity_at.isoformat(),
                 },

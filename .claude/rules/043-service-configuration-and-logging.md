@@ -100,12 +100,44 @@ logger = logging.getLogger(__name__)
 - **Rationale**: Alembic runs outside service context (no DI container), migration logs don't need correlation IDs or structured format
 - **Restriction**: ONLY `alembic/env.py` - all other service code MUST use `create_service_logger()`
 
-### 3.2. Mandatory Correlation IDs
+### 3.2. File-Based Logging (Optional)
+
+**Purpose**: Persistent on-disk logs for production runs, batch operations, and audit trails.
+
+**Default Behavior**: Disabled (stdout-only logging via structlog).
+
+**Enable via Environment Variables**:
+```bash
+# Enable file logging
+LOG_TO_FILE=true
+LOG_FILE_PATH=/var/log/huleedu/service-name.log
+
+# Optional rotation settings (defaults shown)
+LOG_MAX_BYTES=104857600    # 100MB per file
+LOG_BACKUP_COUNT=10        # Keep 10 rotated files
+```
+
+**Interaction with Docker Logging**:
+- **Stdout logs** → captured by Docker json-file driver → scraped by Promtail → indexed in Loki
+- **File logs** → persist in container filesystem or mounted volumes
+- Both streams contain identical structured log data
+
+**Docker Logging Configuration** (applied to all production services):
+- Driver: `json-file` with bounded rotation (100MB × 10 files = 1GB/container)
+- Defined in `docker-compose.services.yml` via `x-logging` anchor
+- Automatically scraped by Promtail for Loki indexing
+
+**Use Cases**:
+- Production services requiring audit trails
+- Batch runners (e.g., ENG5 NP execute mode with persistent `.log` files)
+- Diagnostic deep-dives requiring large log retention
+
+### 3.3. Mandatory Correlation IDs
 - For any operation chain (request/event), a `correlation_id` **MUST** be established or propagated
 - This `correlation_id` **MUST** be in all log messages across all involved services
 - Use `log_event_processing()` for EventEnvelope processing
 
-### 3.3. CorrelationContext Middleware (Quart)
+### 3.4. CorrelationContext Middleware (Quart)
 - **Purpose**: Normalize inbound correlation to a canonical `UUID` while preserving the original string for logs and responses
 - **Library**: `huleedu_service_libs.error_handling.correlation`
 - **Middleware**: `setup_correlation_middleware(app)` attaches `g.correlation_context`

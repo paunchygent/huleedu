@@ -42,6 +42,23 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 - [✅] All existing tests pass (991 > 801+)
 - [✅] Zero new type/lint errors
 
+### 🚧 Task: CJ Batch State & Completion Fixes (2025-11-19)
+
+- Rebased PR1/PR2 requirements onto current main: added `total_budget` + `completion_denominator()` on `CJBatchState`, normalized `current_iteration` default to 0, and shipped Alembic migration `20251119_1200_add_total_budget_and_iteration_defaults.py` (auto-populates legacy rows).
+- Batch submission now accumulates totals instead of overwriting: `_update_batch_state_with_totals()` locks the row, resolves requested budget from `comparison_budget` metadata, and increments `current_iteration`. Removed the redundant per-chunk submitted counter writes to prevent double counting.
+- Completion logic now references the immutable budget and only counts valid winners: `workflow_continuation.check_workflow_continuation()` filters `winner IN ('essay_a','essay_b')`, heuristics + `BatchCompletionChecker` divide by `batch_state.completion_denominator()`, and stuck-batch monitoring logs budget-aware progress.
+- Diagnostics script surfaces `total_budget`/`comparison_budget` so ENG5 can audit live batches quickly.
+- Tests/type-safety: `pdm run pytest-root services/cj_assessment_service/tests/unit/test_batch_state_tracking.py`, `pdm run pytest-root services/cj_assessment_service/tests/unit/test_completion_threshold.py`, `pdm run typecheck-all`, `pdm run format-all`, `pdm run lint-fix --unsafe-fixes` (all green).
+
+**Next focus**: wire remaining TASK-CJ-BATCH-STATE-AND-COMPLETION-FIXES items (PR3 randomization + PR4 threshold unification + PR5 provider diagnostics) once user priorities confirmed. No DB migrations pending beyond the new `total_budget` addition.
+
+### 🚧 Task: CJ Pair Randomization (2025-11-19)
+
+- Implemented per-pair A/B shuffling via `_should_swap_positions()` and a deterministic RNG; `comparison_processing` now injects `settings.PAIR_GENERATION_RANDOMIZATION_SEED` so ENG5 can reproduce ordering when needed.
+- Added `CJ_ASSESSMENT_SERVICE_PAIR_GENERATION_SEED` setting + README entry; leaving it unset keeps unbiased randomness, setting an int seeds Python's RNG per generation call.
+- New suite `services/cj_assessment_service/tests/unit/test_pair_generation_randomization.py` verifies deterministic seeds, forced swaps, anchor balance across 200 deterministic seeds, and maintains the expected nC2 task count. Command: `pdm run pytest-root services/cj_assessment_service/tests/unit/test_pair_generation_randomization.py`.
+- Outstanding per task doc: chi-squared validation + integration test to sample live DB pairs once serial_bundle validation resumes.
+
 ---
 
 ## LLM Batch Strategy Implementation Status (2025-11-18)
@@ -155,21 +172,84 @@ export LLM_PROVIDER_SERVICE_BATCH_API_MODE=disabled
 
 ---
 
-## Remaining Work (Next Session Continuation)
+---
 
-1. **Monitor serial bundle test completion** (task 84ebf6)
-2. **Validate results**: Check comparisons, costs, bundling efficiency
-3. **Check metrics**: Grafana + Prometheus (bundle sizes, API call reduction)
-4. **Update task documentation**: Mark validation complete
-5. **Commit changes**: Schema paths + docker-compose env var
+## Current Session (2025-11-19) - Serial Bundle Validation Failure Investigation
 
-**Test Location**: `.claude/research/data/eng5_np_2016/assessment_run.execute.json`
+### ✅ Critical Bug Discovery (COMPLETE)
+
+**Investigation**: Serial bundle validation runs (batches 33, 34) revealed **7 critical bugs** in CJ Assessment Service that were masked by per_request mode's lower throughput.
+
+**Key Finding**: Issues are NOT caused by serial_bundle itself, but by pre-existing bugs in CJ batch state logic that become catastrophic under higher load.
+
+### Evidence from Batch 33 (100 comparisons, serial_bundle mode)
+
+**Database Reality**:
+- 66 errors (`winner='error'`), 11 essay_a wins, 23 essay_b wins = 100 total pairs
+- Batch state shows: `submitted=10, completed=34` (wrong - should be 100 submitted)
+- Completion logs show: 110%, 120%, 160% completion rates (impossible)
+
+**Root Causes Identified**:
+
+1. **Runaway completion loop** - Uses `completed_callbacks / submitted_this_iteration` instead of `valid_comparisons / total_budget`
+2. **Metrics mismatch** - `total_comparisons` overwritten each iteration instead of accumulated
+3. **Errors count as complete** - SQL filter `winner IS NOT NULL` includes `winner='error'`
+4. **Position bias** - No randomization; anchors dominate essay_a position (86% vs expected 50%)
+5. **66% API failure rate** - Genuine Anthropic provider errors (cause requires investigation)
+6. **Stray callback race** - Database commit before queue submission allows fast responses to fail lookup
+7. **Stuck queue items** - No automatic expiry for indefinitely "processing" requests
+
+### ✅ Deliverables (COMPLETE)
+
+**Investigation Documents**:
+- `.claude/research/validation/llm-batching-mode-investigation-2025-11-19.md` - Data-driven findings
+- `.claude/research/validation/llm-batching-mode-code-analysis-2025-11-19.md` - Code path analysis with file/line numbers
+
+**Task Document**:
+- `.claude/work/tasks/TASK-CJ-BATCH-STATE-AND-COMPLETION-FIXES.md` - 7 focused PRs with detailed checklists
+
+### PR Summary
+
+**Phase 1 (P0 - Blocks Serial Bundle)**:
+- PR 1: Fix batch state tracking (accumulate across iterations)
+- PR 2: Exclude error callbacks from completion count
+- PR 5: Investigate Anthropic API failure rate (diagnostic)
+
+**Phase 2 (P1 - Quality)**:
+- PR 3: Add position randomization to pair generation
+- PR 4: Unify completion threshold configuration
+
+**Phase 3 (P2 - Reliability)**:
+- PR 6: Fix stray callback race condition
+- PR 7: Queue hygiene (auto-expire stuck requests)
+
+---
+
+## Remaining Work (Next Session)
+
+**Immediate**:
+1. Implement Phase 1 PRs (P0 critical fixes)
+2. Validate fixes against batch 33 scenario
+3. Re-run serial_bundle validation with fixes applied
+
+**Follow-up**:
+4. Implement Phase 2 PRs (quality improvements)
+5. Implement Phase 3 PRs (reliability enhancements)
+6. Complete original serial_bundle validation checklist
+
+---
+
+### ✅ Logging Infrastructure Complete (2025-11-19)
+
+**Status**: All 5 PRs complete. See `.claude/work/tasks/TASK-LOGGING-FILE-PERSISTENCE-AND-DOCKER-CONFIG.md` for details.
+
+**Summary**: File-based logging + Docker bounded rotation + ENG5 persistence + validation tests + docs (Rule 043, Grafana playbook).
 
 ---
 
 ## Notes for Next Session
 
-1. **Monitoring Ready**: LLM Provider queue metrics (`llm_provider_queue_depth`, `llm_provider_queue_wait_time_seconds`) are instrumented and ready for serial_bundle mode testing
-2. **ENG5 Runner Validated**: Dry-run mode works with `LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE=serial_bundle`
-3. **Iteration Metadata**: Infrastructure ready for stability loop (gated behind `CJ_ASSESSMENT_SERVICE_ENABLE_ITERATIVE_BATCHING_LOOP`)
-4. **Runbook Reference**: `docs/operations/eng5-np-runbook.md` has complete serial bundle configuration and diagnostics
+1. **All bugs pre-exist serial_bundle**: They exist in per_request mode too, just harder to trigger with lower throughput
+2. **Serial bundle implementation is correct**: All LPS/CJ metrics, metadata, and queue processing logic validated in unit tests
+3. **Position bias violates CJ methodology**: Must fix before any production CJ batches (regardless of batching mode)
+4. **Database queries available**: Investigation documents contain all SQL to verify fixes against real data

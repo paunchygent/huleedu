@@ -126,6 +126,55 @@ sum(rate(cj_admin_instruction_operations_total{status="failure"}[5m])) by (opera
 {service=~".+"} | json | level="error" | line_format "{{.timestamp}} [{{.level}}] {{.event}}"
 ```
 
+### Accessing Loki Logs via Grafana
+
+**Loki Stack Configuration**:
+- **Service**: Deployed in `observability/docker-compose.observability.yml`
+- **Grafana Access**: <http://localhost:3000>
+- **Data Source**: Loki (pre-configured in Grafana)
+
+**Log Collection Pipeline**:
+```
+Docker Container → json-file driver → /var/lib/docker/containers/*.log
+                                           ↓
+                                      Promtail (scrapes)
+                                           ↓
+                                      Loki (indexes)
+                                           ↓
+                                   Grafana (queries via LogQL)
+```
+
+**Docker Logging Driver Configuration**:
+- All production services use `json-file` driver with bounded rotation
+- Config: 100MB per file × 10 files = 1GB total per container
+- Logs compressed and automatically scraped by Promtail
+- No manual log shipping required
+
+**Common Query Patterns**:
+```logql
+# All logs for a specific service
+{container_name="huleedu_cj_assessment_service"}
+
+# Filter by correlation ID across all services
+{container_name=~"huleedu_.*"} |= "correlation_id" | json | correlation_id="abc-123"
+
+# Error logs across all services
+{container_name=~"huleedu_.*"} | json | level="error"
+
+# Filter by service and log level
+{container_name="huleedu_llm_provider_service"} | json | level="info" or level="debug"
+
+# Trace a specific batch operation
+{container_name=~"huleedu_.*"} | json | batch_id="ENG5-2016" | line_format "{{.timestamp}} {{.service}} {{.event}}"
+```
+
+**Accessing Logs via Grafana Explore**:
+1. Navigate to Grafana: <http://localhost:3000>
+2. Click **Explore** (compass icon in left sidebar)
+3. Select **Loki** as the data source
+4. Enter LogQL query in query editor
+5. Click **Run Query** to view results
+
 ## Alert Runbooks
 
 ### ServiceDown Alert

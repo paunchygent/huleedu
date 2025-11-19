@@ -1,4 +1,14 @@
 # This file defines the custom HuleEdu application microservices.
+
+# Shared logging configuration for all services
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "100m"      # 100MB per file
+    max-file: "10"        # Keep 10 files = 1GB total per container
+    compress: "true"      # Compress rotated logs
+    labels: "service,environment"
+
 services:
   kafka_topic_setup:
     build:
@@ -25,6 +35,7 @@ services:
       - KAFKA_CONNECT_RETRY_DELAY=2.0
       - KAFKA_DEFAULT_PARTITIONS=3
       - KAFKA_DEFAULT_REPLICATION_FACTOR=1
+    logging: *default-logging
 
   content_service:
     build:
@@ -53,6 +64,7 @@ services:
       - OTEL_SERVICE_NAME=content_service
       - OTEL_TRACES_EXPORTER=otlp
       - OTEL_METRICS_EXPORTER=none
+    logging: *default-logging
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8000/healthz || exit 1"]
       interval: 15s
@@ -97,6 +109,7 @@ services:
       - OTEL_SERVICE_NAME=result_aggregator
       - OTEL_TRACES_EXPORTER=otlp
       - OTEL_METRICS_EXPORTER=none
+    logging: *default-logging
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:4003/healthz || exit 1"]
       interval: 15s
@@ -136,6 +149,7 @@ services:
       - OTEL_SERVICE_NAME=batch_conductor_service
       - OTEL_TRACES_EXPORTER=otlp
       - OTEL_METRICS_EXPORTER=none
+    logging: *default-logging
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:4002/healthz || exit 1"]
       interval: 15s
@@ -173,6 +187,7 @@ services:
       - OTEL_SERVICE_NAME=spellchecker_service
       - OTEL_TRACES_EXPORTER=otlp
       - OTEL_METRICS_EXPORTER=none
+    logging: *default-logging
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8002/healthz || exit 1"]
       interval: 15s
@@ -218,6 +233,7 @@ services:
       - OTEL_SERVICE_NAME=batch_orchestrator_service
       - OTEL_TRACES_EXPORTER=otlp
       - OTEL_METRICS_EXPORTER=none
+    logging: *default-logging
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5000/healthz || exit 1"]
       interval: 15s
@@ -271,6 +287,7 @@ services:
       - OTEL_SERVICE_NAME=essay_lifecycle_api
       - OTEL_TRACES_EXPORTER=otlp
       - OTEL_METRICS_EXPORTER=none
+    logging: *default-logging
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:6000/healthz || exit 1"]
       interval: 15s
@@ -321,6 +338,7 @@ services:
       - OTEL_SERVICE_NAME=essay_lifecycle_worker
       - OTEL_TRACES_EXPORTER=otlp
       - OTEL_METRICS_EXPORTER=none
+    logging: *default-logging
     # Note: essay_lifecycle_worker is a worker service, no health check needed
 
   file_service:
@@ -358,6 +376,7 @@ services:
       - OTEL_SERVICE_NAME=file_service
       - OTEL_TRACES_EXPORTER=otlp
       - OTEL_METRICS_EXPORTER=none
+    logging: *default-logging
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:7001/healthz || exit 1"]
       interval: 15s
@@ -410,6 +429,7 @@ services:
       - OTEL_METRICS_EXPORTER=none
       # JWT authentication for admin endpoints
       - CJ_ASSESSMENT_SERVICE_JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-secret-key-here}
+    logging: *default-logging
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:9090/healthz || exit 1"]
       interval: 15s
@@ -458,6 +478,7 @@ services:
       - OTEL_SERVICE_NAME=api_gateway_service
       - OTEL_TRACES_EXPORTER=otlp
       - OTEL_METRICS_EXPORTER=none
+    logging: *default-logging
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/healthz || exit 1"]
       interval: 15s
@@ -501,6 +522,7 @@ services:
       - OTEL_SERVICE_NAME=class_management_service
       - OTEL_TRACES_EXPORTER=otlp
       - OTEL_METRICS_EXPORTER=none
+    logging: *default-logging
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5002/healthz || exit 1"]
       interval: 15s
@@ -563,6 +585,7 @@ services:
       - OTEL_SERVICE_NAME=llm_provider_service
       - OTEL_TRACES_EXPORTER=otlp
       - OTEL_METRICS_EXPORTER=none
+    logging: *default-logging
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/healthz || exit 1"]
       interval: 15s
@@ -607,6 +630,7 @@ services:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - KAFKA_CONSUMER_GROUP=websocket-service-consumer
       - KAFKA_CONSUMER_CLIENT_ID=websocket-service-client
+    logging: *default-logging
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/healthz || exit 1"]
       interval: 15s
@@ -642,6 +666,7 @@ services:
       - OTEL_SERVICE_NAME=nlp_service
       - OTEL_TRACES_EXPORTER=otlp
       - OTEL_METRICS_EXPORTER=none
+    logging: *default-logging
 
   identity_service:
     build:
@@ -692,6 +717,7 @@ services:
       - OTEL_SERVICE_NAME=identity_service
       - OTEL_TRACES_EXPORTER=otlp
       - OTEL_METRICS_EXPORTER=none
+    logging: *default-logging
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:7005/healthz || exit 1"]
       interval: 15s
@@ -757,6 +783,7 @@ services:
       - OTEL_SERVICE_NAME=email_service
       - OTEL_TRACES_EXPORTER=otlp
       - OTEL_METRICS_EXPORTER=none
+    logging: *default-logging
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/healthz || exit 1"]
       interval: 15s
@@ -800,6 +827,7 @@ services:
       - OTEL_SERVICE_NAME=entitlements_service
       - OTEL_TRACES_EXPORTER=otlp
       - OTEL_METRICS_EXPORTER=none
+    logging: *default-logging
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8083/healthz"]
       interval: 30s
@@ -843,6 +871,7 @@ services:
       - OTEL_SERVICE_NAME=language_tool_service
       - OTEL_TRACES_EXPORTER=otlp
       - OTEL_METRICS_EXPORTER=none
+    logging: *default-logging
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8085/healthz || exit 1"]
       interval: 30s

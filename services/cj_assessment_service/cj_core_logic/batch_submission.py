@@ -195,41 +195,6 @@ async def update_batch_state_in_session(
     await session.commit()
 
 
-async def update_submitted_count_in_session(
-    session: AsyncSession,
-    cj_batch_id: int,
-    submitted_count: int,
-    correlation_id: UUID,
-) -> None:
-    """Update submitted count within a database session.
-
-    Args:
-        session: Database session
-        cj_batch_id: CJ batch ID
-        submitted_count: New submitted count
-        correlation_id: Request correlation ID for tracing
-    """
-    from sqlalchemy import update
-
-    from services.cj_assessment_service.models_db import CJBatchState
-
-    logger.debug(
-        f"Updating submitted count to {submitted_count}",
-        extra={
-            "correlation_id": str(correlation_id),
-            "cj_batch_id": cj_batch_id,
-            "submitted_count": submitted_count,
-        },
-    )
-
-    await session.execute(
-        update(CJBatchState)
-        .where(CJBatchState.batch_id == cj_batch_id)
-        .values(submitted_comparisons=submitted_count)
-    )
-    await session.commit()
-
-
 async def get_batch_state(
     session: AsyncSession, cj_batch_id: int, correlation_id: UUID, for_update: bool = False
 ) -> Any:

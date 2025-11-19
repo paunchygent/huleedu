@@ -45,6 +45,21 @@ class TestBatchProcessor:
         mock_session.add = Mock()
         mock_session.flush = AsyncMock()
         mock_session.commit = AsyncMock()
+
+        default_state = CJBatchState()
+        default_state.batch_id = 1
+        default_state.state = CJBatchStateEnum.WAITING_CALLBACKS
+        default_state.total_budget = None
+        default_state.total_comparisons = 0
+        default_state.submitted_comparisons = 0
+        default_state.completed_comparisons = 0
+        default_state.failed_comparisons = 0
+        default_state.current_iteration = 0
+        default_state.processing_metadata = {}
+
+        state_result = Mock()
+        state_result.scalar_one_or_none.return_value = default_state
+        mock_session.execute = AsyncMock(return_value=state_result)
         mock_db.session.return_value.__aenter__.return_value = mock_session
         mock_db.session.return_value.__aexit__.return_value = None
         return mock_db
@@ -172,6 +187,53 @@ class TestBatchProcessor:
 
         # Verify LLM interaction was called
         mock_llm_interaction.perform_comparisons.assert_called_once()
+
+    async def test_update_batch_state_with_totals_uses_locked_fetch(
+        self,
+        batch_processor: BatchProcessor,
+        mock_database: AsyncMock,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Ensure batch state updates fetch the row with a FOR UPDATE lock."""
+
+        iteration_size = 25
+        correlation_id = uuid4()
+
+        batch_state = CJBatchState()
+        batch_state.batch_id = 2
+        batch_state.state = CJBatchStateEnum.IN_PROGRESS
+        batch_state.total_comparisons = 0
+        batch_state.submitted_comparisons = 0
+        batch_state.current_iteration = 0
+
+        mock_get_batch_state = AsyncMock(return_value=batch_state)
+        monkeypatch.setattr(
+            "services.cj_assessment_service.cj_core_logic.batch_processor.get_batch_state",
+            mock_get_batch_state,
+        )
+
+        await batch_processor._update_batch_state_with_totals(
+            cj_batch_id=batch_state.batch_id,
+            state=CJBatchStateEnum.IN_PROGRESS,
+            iteration_comparisons=iteration_size,
+            correlation_id=correlation_id,
+        )
+
+        assert mock_get_batch_state.await_count == 1
+        assert mock_get_batch_state.await_args.kwargs == {
+            "session": mock_database.session.return_value.__aenter__.return_value,
+            "cj_batch_id": batch_state.batch_id,
+            "correlation_id": correlation_id,
+            "for_update": True,
+        }
+
+        mock_session = mock_database.session.return_value.__aenter__.return_value
+        mock_session.commit.assert_awaited_once()
+
+        assert batch_state.total_comparisons == iteration_size
+        assert batch_state.submitted_comparisons == iteration_size
+        assert batch_state.total_budget == iteration_size
+        assert batch_state.current_iteration == 1
 
     async def test_submit_comparison_batch_with_config_overrides(
         self,

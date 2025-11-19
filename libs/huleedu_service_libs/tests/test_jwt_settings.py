@@ -23,12 +23,15 @@ class RSSettings(BaseSettings, JWTValidationSettings):
 class TestJWTValidationSettings:
     """Validate shared JWT configuration helpers."""
 
-    def test_hs_algorithm_requires_secret_key(self) -> None:
+    def test_hs_algorithm_requires_secret_key(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # Ensure JWT_SECRET_KEY is not in environment
+        monkeypatch.delenv("JWT_SECRET_KEY", raising=False)
+
         settings = HSSettings(
             JWT_ALGORITHM="HS256", JWT_AUDIENCE="test-audience", JWT_ISSUER="test-issuer"
         )
 
-        with pytest.raises(ValueError, match="JWT_SECRET_KEY must be configured"):
+        with pytest.raises(ValueError, match="JWT_SECRET_KEY must be configured when using an HS"):
             settings.get_jwt_verification_key()
 
     def test_hs_algorithm_with_secret_key(self) -> None:

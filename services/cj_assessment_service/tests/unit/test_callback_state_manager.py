@@ -30,6 +30,7 @@ from huleedu_service_libs.error_handling import HuleEduError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.cj_assessment_service.cj_core_logic.callback_state_manager import (
+    _update_batch_completion_counters,
     check_batch_completion_conditions,
     reconstruct_comparison_task,
     update_comparison_result,
@@ -478,6 +479,88 @@ class TestUpdateComparisonResult:
         assert comparison_pair.winner == "error"
         assert comparison_pair.error_code == "RATE_LIMIT"
         assert comparison_pair.completed_at is not None
+
+    @pytest.mark.asyncio
+    async def test_retryable_error_routed_to_failed_pool(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Retryable errors should enter failed pool and only increment failed counters."""
+
+        settings = Settings()
+        settings.ENABLE_FAILED_COMPARISON_RETRY = True
+
+        correlation_id = uuid4()
+        comparison_pair = create_comparison_pair(
+            request_correlation_id=correlation_id,
+            winner=None,
+        )
+
+        session = MockSession(comparison_pair=comparison_pair)
+        repository = MockRepository(session)
+
+        comparison_result = create_llm_comparison_result(
+            correlation_id=correlation_id,
+            is_error=True,
+        )
+
+        mock_add_failed = AsyncMock()
+        monkeypatch.setattr(
+            "services.cj_assessment_service.cj_core_logic.callback_state_manager.add_failed_comparison_to_pool",
+            mock_add_failed,
+        )
+        mock_update_counters = AsyncMock()
+        monkeypatch.setattr(
+            "services.cj_assessment_service.cj_core_logic.callback_state_manager._update_batch_completion_counters",
+            mock_update_counters,
+        )
+
+        pool_manager = AsyncMock()
+        retry_processor = AsyncMock()
+
+        await update_comparison_result(
+            comparison_result=comparison_result,
+            database=repository,
+            correlation_id=correlation_id,
+            settings=settings,
+            pool_manager=pool_manager,
+            retry_processor=retry_processor,
+        )
+
+        mock_add_failed.assert_awaited_once()
+        mock_update_counters.assert_awaited_once()
+        assert mock_update_counters.await_args is not None
+        assert mock_update_counters.await_args.kwargs["is_error"] is True
+
+
+@pytest.mark.asyncio
+async def test_update_batch_completion_counters_error_only_increments_failed() -> None:
+    """Error callbacks should never bump completed counters."""
+
+    batch_state = create_batch_state(
+        total_comparisons=50,
+        completed_comparisons=10,
+        failed_comparisons=2,
+    )
+
+    class _Result:
+        def __init__(self, value: CJBatchState) -> None:
+            self._value = value
+
+        def scalar_one_or_none(self) -> CJBatchState:
+            return self._value
+
+    session = AsyncMock(spec=AsyncSession)
+    session.execute.return_value = _Result(batch_state)
+
+    await _update_batch_completion_counters(
+        session=session,
+        batch_id=batch_state.batch_id,
+        is_error=True,
+        correlation_id=uuid4(),
+    )
+
+    assert batch_state.failed_comparisons == 3
+    assert batch_state.completed_comparisons == 10
 
 
 class TestBatchCompletionConditions:

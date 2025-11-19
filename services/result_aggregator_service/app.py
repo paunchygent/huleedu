@@ -6,7 +6,7 @@ import asyncio
 
 import dotenv
 from dishka import make_async_container
-from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
 from huleedu_service_libs.outbox import EventRelayWorker, OutboxProvider
 from huleedu_service_libs.quart_app import HuleEduApp
 from quart_dishka import QuartDishka
@@ -19,7 +19,7 @@ dotenv.load_dotenv()
 
 from services.result_aggregator_service.api.health_routes import health_bp
 from services.result_aggregator_service.api.query_routes import query_bp
-from services.result_aggregator_service.config import Settings
+from services.result_aggregator_service.config import Settings, settings
 from services.result_aggregator_service.di import (
     CoreInfrastructureProvider,
     DatabaseProvider,
@@ -27,6 +27,9 @@ from services.result_aggregator_service.di import (
 )
 from services.result_aggregator_service.kafka_consumer import ResultAggregatorKafkaConsumer
 from services.result_aggregator_service.startup_setup import setup_metrics_endpoint
+
+# Configure centralized structured logging before creating logger
+configure_service_logging("result_aggregator_service", log_level=settings.LOG_LEVEL)
 
 logger = create_service_logger("result_aggregator.app")
 

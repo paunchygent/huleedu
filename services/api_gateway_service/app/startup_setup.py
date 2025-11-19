@@ -7,13 +7,17 @@ from dishka.integrations.fastapi import FastapiProvider, setup_dishka
 from fastapi import FastAPI
 
 from huleedu_service_libs import init_tracing
-from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
 from huleedu_service_libs.middleware.frameworks.fastapi_metrics_middleware import (
     setup_standard_service_metrics_middleware,
 )
 from huleedu_service_libs.middleware.frameworks.fastapi_middleware import setup_tracing_middleware
 from services.api_gateway_service.app.auth_provider import AuthProvider
 from services.api_gateway_service.app.di import ApiGatewayProvider
+from services.api_gateway_service.config import settings
+
+# Configure centralized structured logging before creating logger
+configure_service_logging("api_gateway_service", log_level=settings.LOG_LEVEL)
 
 logger = create_service_logger("api_gateway_service.startup")
 

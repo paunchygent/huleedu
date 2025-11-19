@@ -18,6 +18,7 @@ from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.models_api import CJAssessmentRequestData, ComparisonTask
+from services.cj_assessment_service.models_db import CJBatchState
 from services.cj_assessment_service.protocols import (
     CJRepositoryProtocol,
     LLMInteractionProtocol,
@@ -29,9 +30,9 @@ from .batch_config import (
 )
 from .batch_submission import (
     BatchSubmissionResult,
+    get_batch_state,
     submit_batch_chunk,
     update_batch_state_in_session,
-    update_submitted_count_in_session,
 )
 
 logger = create_service_logger("cj_assessment_service.batch_processor")
@@ -121,7 +122,7 @@ class BatchProcessor:
             await self._update_batch_state_with_totals(
                 cj_batch_id=cj_batch_id,
                 state=CJBatchStateEnum.WAITING_CALLBACKS,
-                total_comparisons=len(comparison_tasks),
+                iteration_comparisons=len(comparison_tasks),
                 correlation_id=correlation_id,
             )
 
@@ -144,13 +145,6 @@ class BatchProcessor:
                 )
 
                 total_submitted += len(batch_tasks)
-
-                # Update submitted count in database
-                await self._update_submitted_count(
-                    cj_batch_id=cj_batch_id,
-                    submitted_count=total_submitted,
-                    correlation_id=correlation_id,
-                )
 
                 logger.info(
                     f"Submitted batch chunk {i // effective_batch_size + 1} "
@@ -317,35 +311,53 @@ class BatchProcessor:
         self,
         cj_batch_id: int,
         state: CJBatchStateEnum,
-        total_comparisons: int,
+        iteration_comparisons: int,
         correlation_id: UUID,
     ) -> None:
-        """Update batch state and set total comparisons count."""
+        """Update batch state with cumulative totals and iteration counter."""
+
         try:
             async with self.database.session() as session:
-                from sqlalchemy import update
-
-                from services.cj_assessment_service.models_db import CJBatchState
-
-                await session.execute(
-                    update(CJBatchState)
-                    .where(CJBatchState.batch_id == cj_batch_id)
-                    .values(
-                        state=state,
-                        total_comparisons=total_comparisons,
-                        submitted_comparisons=total_comparisons,  # All comparisons submitted
-                    )
+                batch_state = await get_batch_state(
+                    session=session,
+                    cj_batch_id=cj_batch_id,
+                    correlation_id=correlation_id,
+                    for_update=True,
                 )
+
+                if batch_state is None:
+                    raise ValueError(f"Batch state not found for batch_id={cj_batch_id}")
+
+                is_first_submission = (
+                    batch_state.total_budget is None or batch_state.current_iteration == 0
+                )
+
+                if is_first_submission:
+                    batch_state.total_budget = self._resolve_total_budget(
+                        batch_state=batch_state,
+                        iteration_comparisons=iteration_comparisons,
+                    )
+                    batch_state.total_comparisons = iteration_comparisons
+                    batch_state.submitted_comparisons = iteration_comparisons
+                    batch_state.current_iteration = 1
+                else:
+                    batch_state.total_comparisons += iteration_comparisons
+                    batch_state.submitted_comparisons += iteration_comparisons
+                    batch_state.current_iteration += 1
+
+                batch_state.state = state
                 await session.commit()
 
                 logger.info(
-                    f"Updated batch state to {state.value} "
-                    f"with {total_comparisons} total comparisons",
+                    "Updated batch state with cumulative totals",
                     extra={
                         "correlation_id": str(correlation_id),
                         "cj_batch_id": cj_batch_id,
                         "state": state.value,
-                        "total_comparisons": total_comparisons,
+                        "iteration_comparisons": iteration_comparisons,
+                        "total_comparisons": batch_state.total_comparisons,
+                        "total_budget": batch_state.total_budget,
+                        "current_iteration": batch_state.current_iteration,
                     },
                 )
 
@@ -356,7 +368,7 @@ class BatchProcessor:
                     "correlation_id": str(correlation_id),
                     "cj_batch_id": cj_batch_id,
                     "target_state": state.value,
-                    "total_comparisons": total_comparisons,
+                    "iteration_comparisons": iteration_comparisons,
                     "error": str(e),
                 },
                 exc_info=True,
@@ -371,39 +383,28 @@ class BatchProcessor:
                 entity_id=str(cj_batch_id),
             )
 
-    async def _update_submitted_count(
-        self,
-        cj_batch_id: int,
-        submitted_count: int,
-        correlation_id: UUID,
-    ) -> None:
-        """Update submitted comparisons count in database."""
-        try:
-            async with self.database.session() as session:
-                await update_submitted_count_in_session(
-                    session=session,
-                    cj_batch_id=cj_batch_id,
-                    submitted_count=submitted_count,
-                    correlation_id=correlation_id,
-                )
+    @staticmethod
+    def _resolve_total_budget(
+        batch_state: "CJBatchState",
+        iteration_comparisons: int,
+    ) -> int:
+        """Determine the correct total comparison budget for the batch."""
 
-        except Exception as e:
-            logger.error(
-                f"Failed to update submitted count for CJ batch {cj_batch_id}: {e}",
-                extra={
-                    "correlation_id": str(correlation_id),
-                    "cj_batch_id": cj_batch_id,
-                    "submitted_count": submitted_count,
-                    "error": str(e),
-                },
-                exc_info=True,
-            )
+        metadata = batch_state.processing_metadata or {}
+        requested_budget: int | None = None
 
-            raise_processing_error(
-                service="cj_assessment_service",
-                operation="update_submitted_count",
-                message=f"Failed to update submitted count: {str(e)}",
-                correlation_id=correlation_id,
-                database_operation="update_submitted_count",
-                entity_id=str(cj_batch_id),
-            )
+        if isinstance(metadata, dict):
+            budget_block = metadata.get("comparison_budget")
+            if isinstance(budget_block, dict):
+                requested_budget = budget_block.get("max_pairs_requested")
+
+        if requested_budget and isinstance(requested_budget, int) and requested_budget > 0:
+            return requested_budget
+
+        if batch_state.total_budget and batch_state.total_budget > 0:
+            return batch_state.total_budget
+
+        if batch_state.total_comparisons and batch_state.total_comparisons > 0:
+            return batch_state.total_comparisons
+
+        return iteration_comparisons

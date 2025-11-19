@@ -285,6 +285,7 @@ async def submit_comparisons_for_async_processing(
             existing_pairs_threshold=settings.COMPARISONS_PER_STABILITY_CHECK_ITERATION,
             max_pairwise_comparisons=max_pairs_cap,
             correlation_id=correlation_id,
+            randomization_seed=settings.PAIR_GENERATION_SEED,
         )
 
         if not comparison_tasks:
@@ -560,6 +561,7 @@ async def _process_comparison_iteration(
         existing_pairs_threshold=settings.COMPARISONS_PER_STABILITY_CHECK_ITERATION,
         max_pairwise_comparisons=settings.MAX_PAIRWISE_COMPARISONS,
         correlation_id=correlation_id,
+        randomization_seed=settings.PAIR_GENERATION_SEED,
     )
 
     if not comparison_tasks_for_llm:

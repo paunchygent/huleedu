@@ -41,6 +41,7 @@ from scripts.cj_experiments_runners.eng5_np.kafka_flow import (
 )
 from scripts.cj_experiments_runners.eng5_np.logging_support import (
     configure_cli_logging,
+    configure_execute_logging,
     load_artefact_data,
     log_validation_state,
     print_batching_metrics_hints,
@@ -295,7 +296,12 @@ def _build_llm_overrides(
 @app.callback(invoke_without_command=True)
 def main(
     ctx: typer.Context,
-    mode: RunnerMode = typer.Option(RunnerMode.PLAN, case_sensitive=False),
+    mode: RunnerMode = typer.Option(
+        RunnerMode.PLAN,
+        case_sensitive=False,
+        help="Runner mode: plan (preview only), dry_run (stub creation), execute (full run with "
+        "persistent file logging enabled at .claude/research/data/eng5_np_2016/logs/)",
+    ),
     assignment_id: uuid.UUID = typer.Option(
         ...,
         help="Assignment ID (REQUIRED). Must exist in CJ service assessment_instructions table. "
@@ -465,6 +471,20 @@ def main(
         completion_timeout=completion_timeout,
         llm_batching_mode_hint=llm_batching_mode,
     )
+
+    # Reconfigure logging for execute mode to enable file persistence
+    if mode is RunnerMode.EXECUTE:
+        from datetime import datetime
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_file = (
+            f".claude/research/data/eng5_np_2016/logs/eng5-{settings.batch_id}-{timestamp}.log"
+        )
+        configure_execute_logging(settings=settings, verbose=verbose)
+        typer.echo(
+            f"📝 Execute mode: Persistent logging enabled → {log_file}",
+            err=True,
+        )
 
     logger = setup_cli_logger(settings=settings)
 

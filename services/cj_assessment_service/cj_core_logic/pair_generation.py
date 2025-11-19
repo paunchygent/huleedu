@@ -6,6 +6,7 @@ using string-based essay IDs and protocol-based database access.
 
 from __future__ import annotations
 
+from random import Random
 from uuid import UUID
 
 from huleedu_service_libs.logging_utils import create_service_logger
@@ -32,6 +33,7 @@ async def generate_comparison_tasks(
     existing_pairs_threshold: int,
     max_pairwise_comparisons: int | None = None,
     correlation_id: UUID | None = None,
+    randomization_seed: int | None = None,
 ) -> list[ComparisonTask]:
     """Generate comparison tasks for essays, avoiding duplicate comparisons.
 
@@ -89,6 +91,7 @@ async def generate_comparison_tasks(
 
     comparison_tasks = []
     new_pairs_count = 0
+    randomizer = _build_pair_randomizer(randomization_seed)
 
     # Generate all possible pairs
     for i in range(len(essays_for_comparison)):
@@ -111,6 +114,9 @@ async def generate_comparison_tasks(
                     f"stopping pair generation",
                 )
                 break
+
+            if _should_swap_positions(randomizer):
+                essay_a, essay_b = essay_b, essay_a
 
             # Create comparison task with assessment context
             prompt = _build_comparison_prompt(
@@ -138,6 +144,18 @@ async def generate_comparison_tasks(
         },
     )
     return comparison_tasks
+
+
+def _build_pair_randomizer(randomization_seed: int | None) -> Random:
+    """Return a random number generator for pair randomization."""
+
+    return Random(randomization_seed)
+
+
+def _should_swap_positions(randomizer: Random) -> bool:
+    """Return True when essay positions should be swapped."""
+
+    return randomizer.random() < 0.5
 
 
 async def _fetch_existing_comparison_ids(

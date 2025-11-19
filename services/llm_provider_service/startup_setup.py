@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dishka import make_async_container
-from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
 from huleedu_service_libs.middleware.frameworks.quart_middleware import setup_tracing_middleware
 from huleedu_service_libs.observability.tracing import init_tracing
 from quart import Quart
@@ -22,6 +22,9 @@ logger = create_service_logger("llm_provider_service.startup")
 
 async def initialize_services(app: Quart, settings: Settings) -> None:
     """Initialize all services and middleware."""
+    # Configure centralized structured logging before any logging operations
+    configure_service_logging(settings.SERVICE_NAME, log_level=settings.LOG_LEVEL)
+
     logger.info(f"Starting {settings.SERVICE_NAME} initialization...")
 
     # Initialize OpenTelemetry tracing

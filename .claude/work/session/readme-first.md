@@ -57,6 +57,12 @@ All services use automatic code reload in development:
 
 Changes to `.py` files trigger automatic restart (~9-11 seconds). No manual rebuild needed.
 
+### Logging (2025-11-19)
+
+**Infrastructure**: File-based logging + Docker bounded rotation operational. See Rule 043 §3.2, Grafana playbook (Loki access).
+
+**ENG5 Runner**: Execute mode → persistent logs at `.claude/research/data/eng5_np_2016/logs/eng5-{batch_id}-{timestamp}.log`
+
 ## Critical Development Info
 
 ### CJ Assessment & LLM Provider Integration
@@ -183,6 +189,8 @@ pdm run python -m scripts.cj_experiments_runners.eng5_np.cli \
 - Finalizing JSON artefact schema (`Documentation/schemas/eng5_np/assessment_run.schema.json`)
 - Validating ENG5 runner execute mode with full observability
 - Preparing reproducible research bundles for empirical validation
+- Hardening CJ batch throughput before serial_bundle rollout: total_budget tracking + denominator-aware completion logic merged (tests: `test_batch_state_tracking.py`, `test_completion_threshold.py`; commands: `pdm run format-all`, `pdm run lint-fix --unsafe-fixes`, `pdm run typecheck-all`).
+- Eliminating CJ pair-position bias: per-pair randomization + optional `CJ_ASSESSMENT_SERVICE_PAIR_GENERATION_SEED` shipped with `test_pair_generation_randomization.py` guarding deterministic + statistical behavior.
 
 **Reference**: See `TASKS/phase3_cj_confidence/PHASE3_CJ_CONFIDENCE_HUB.md` for complete task breakdown and `TASKS/phase3_cj_confidence/TASK-CJ-CONFIDENCE-PHASE3-GRADE-SCALE-DATA-PIPELINE.md` for implementation details.
 

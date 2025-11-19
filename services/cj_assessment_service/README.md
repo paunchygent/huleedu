@@ -353,6 +353,7 @@ LLM_QUEUE_TOTAL_TIMEOUT_SECONDS=900               # Total timeout (15 minutes)
 CJ_ASSESSMENT_SERVICE_LLM_BATCHING_MODE=per_request
 CJ_ASSESSMENT_SERVICE_ENABLE_LLM_BATCHING_METADATA_HINTS=false
 CJ_ASSESSMENT_SERVICE_ENABLE_ITERATIVE_BATCHING_LOOP=false
+CJ_ASSESSMENT_SERVICE_PAIR_GENERATION_SEED=                  # Optional deterministic randomization seed
 
 # LLM Provider API Keys
 OPENAI_API_KEY=sk-...
@@ -415,6 +416,8 @@ In that state CJ adds `comparison_iteration` to the metadata whenever
 is omitted.
 
 `COMPARISONS_PER_STABILITY_CHECK_ITERATION` defines the number of new pairs generated per stability iteration; `MAX_PAIRWISE_COMPARISONS` is an absolute guardrail on the batch. Both values are applied directly by `pair_generation.generate_comparison_tasks`, so adjust them via environment variables rather than hard-coding limits elsewhere.
+
+Set `CJ_ASSESSMENT_SERVICE_PAIR_GENERATION_SEED=<int>` only when you need reproducible pair ordering for debugging or deterministic tests. When unset (the default), pair generation randomizes essay A/B positions per pair to eliminate anchor bias while keeping the duplicate-detection logic intact.
 
 ## Database Schema
 

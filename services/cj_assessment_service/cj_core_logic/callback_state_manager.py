@@ -109,6 +109,8 @@ async def update_comparison_result(
             )
 
             # Add to failed comparison pool if pool manager is available
+            # Retry policy: transient provider failures enter the retry pool so they
+            # consume only the failed counter until the fairness processor resubmits them.
             if pool_manager and retry_processor and settings.ENABLE_FAILED_COMPARISON_RETRY:
                 await add_failed_comparison_to_pool(
                     pool_manager=pool_manager,
@@ -214,14 +216,12 @@ async def check_batch_completion_conditions(
 
         # Simple heuristic: check if batch has significant completion
         # In practice, this would integrate with proper batch state management
-        if (
-            batch_state.total_comparisons > 0
-            and batch_state.completed_comparisons >= batch_state.total_comparisons * 0.8
-        ):
-            completion_rate = batch_state.completed_comparisons / batch_state.total_comparisons
+        denominator = batch_state.completion_denominator()
+        if denominator > 0 and batch_state.completed_comparisons >= denominator * 0.8:
+            completion_rate = batch_state.completed_comparisons / denominator
             logger.info(
                 f"Batch {batch_id} completion detected: "
-                f"{batch_state.completed_comparisons}/{batch_state.total_comparisons} "
+                f"{batch_state.completed_comparisons}/{denominator} "
                 f"comparisons completed (80%+ threshold reached)",
                 extra={
                     "correlation_id": str(correlation_id),
@@ -494,6 +494,8 @@ async def _update_batch_completion_counters(
 
         # Atomically increment the appropriate counter
         if is_error:
+            # Retry policy: provider/network failures are recorded as failed comparisons
+            # (eligible for retry pool processing) and never counted as completed work.
             batch_state.failed_comparisons += 1
             logger.info(f"Batch {batch_id} failed_comparisons: {batch_state.failed_comparisons}")
         else:

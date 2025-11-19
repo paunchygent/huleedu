@@ -26,6 +26,31 @@ def configure_cli_logging(*, verbose: bool) -> None:
     )
 
 
+def configure_execute_logging(*, settings: RunnerSettings, verbose: bool) -> None:
+    """Configure file + stdout logging for execute mode runs.
+
+    Creates persistent log files in .claude/research/data/eng5_np_2016/logs/
+    with the pattern: eng5-{batch_id}-{timestamp}.log
+
+    Uses service-standard rotation: 100MB per file, 10 backups (1GB total).
+    """
+    from datetime import datetime
+
+    log_dir = Path(".claude/research/data/eng5_np_2016/logs")
+    log_dir.mkdir(parents=True, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_file = log_dir / f"eng5-{settings.batch_id}-{timestamp}.log"
+
+    configure_service_logging(
+        service_name="eng5-np-runner",
+        environment="production",
+        log_level="DEBUG" if verbose else "INFO",
+        log_to_file=True,
+        log_file_path=str(log_file),
+    )
+
+
 def setup_cli_logger(*, settings: RunnerSettings) -> BoundLogger:
     """Bind correlation context and return a structlog logger for the CLI."""
 

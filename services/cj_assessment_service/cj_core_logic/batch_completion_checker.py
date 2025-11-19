@@ -76,17 +76,16 @@ class BatchCompletionChecker:
                     return True
 
                 # Check completion threshold
-                if batch_state.total_comparisons > 0:
-                    completion_rate = (
-                        batch_state.completed_comparisons / batch_state.total_comparisons
-                    )
+                denominator = batch_state.completion_denominator()
+                if denominator > 0:
+                    completion_rate = batch_state.completed_comparisons / denominator
 
                     # Get effective threshold
                     threshold = get_effective_threshold(config_overrides, batch_state)
 
                     logger.info(
                         f"Batch {cj_batch_id} completion check: "
-                        f"{batch_state.completed_comparisons}/{batch_state.total_comparisons} "
+                        f"{batch_state.completed_comparisons}/{denominator} "
                         f"({completion_rate:.2%}) vs threshold {threshold:.2%}",
                         extra={
                             "correlation_id": str(correlation_id),

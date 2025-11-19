@@ -213,6 +213,15 @@ class Settings(SecureServiceSettings, JWTValidationSettings):
     )
     SCORE_STABILITY_THRESHOLD: float = 0.05
 
+    # Pair generation configuration
+    PAIR_GENERATION_SEED: int | None = Field(
+        default=None,
+        description=(
+            "Optional seed for deterministic pair position randomization. "
+            "Leave unset in production to preserve unbiased ordering."
+        ),
+    )
+
     # Failed Comparison Pool Configuration
     FAILED_COMPARISON_RETRY_THRESHOLD: int = Field(
         default=20, description="Minimum failed comparisons needed before retry batch creation"
