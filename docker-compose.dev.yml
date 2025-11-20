@@ -137,6 +137,7 @@ services:
       - LOG_LEVEL=DEBUG
       - HULEEDU_DB_USER=${HULEEDU_DB_USER}
       - HULEEDU_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
+      - BCS_PIPELINE_CONFIG_PATH=services/batch_conductor_service/pipelines.yaml
 
   # LLM Provider Service
   llm_provider_service:
@@ -173,7 +174,7 @@ services:
       - ENV_TYPE=docker
       - ENVIRONMENT=development
       - LOG_LEVEL=DEBUG
-      - API_GATEWAY_JWT_SECRET_KEY=test-secret-key
+      - JWT_SECRET_KEY=test-secret-key
 
   # Result Aggregator Service
   result_aggregator_service:

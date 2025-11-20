@@ -327,9 +327,14 @@ class ExternalClientsProvider(Provider):
         return base_client
 
     @provide(scope=Scope.APP)
-    def provide_entitlements_client(self, settings: Settings) -> EntitlementsServiceProtocol:
+    def provide_entitlements_client(
+        self,
+        http_session: ClientSession,
+        settings: Settings,
+    ) -> EntitlementsServiceProtocol:
         """Provide Entitlements Service HTTP client implementation."""
         return EntitlementsServiceClientImpl(
+            session=http_session,
             base_url=settings.ENTITLEMENTS_BASE_URL,
             timeout_seconds=float(settings.ENTITLEMENTS_HTTP_TIMEOUT_SECONDS),
         )

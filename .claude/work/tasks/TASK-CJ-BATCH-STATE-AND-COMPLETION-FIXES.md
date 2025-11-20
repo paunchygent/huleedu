@@ -285,7 +285,7 @@ Result: `submitted=10, completed=34`
     - Regression test: Verify total pair count unchanged (still n*(n-1)/2)
 
 - **Integration test**
-  - [ ] Add test in `test_cj_batch_integration.py`:
+  - [x] Add test in `test_cj_batch_integration.py`:
     - Submit batch with 12 anchors + 12 students
     - After completion, query `cj_comparison_pairs` and verify:
       - Anchors in essay_a: 50% ± 10% (statistical tolerance)
@@ -295,7 +295,7 @@ Result: `submitted=10, completed=34`
 - **Validation**
   - [x] Run `pdm run pytest-root services/cj_assessment_service/tests/unit/test_pair_generation_randomization.py`
   - [x] Run statistical validation: 100 batches, measure anchor position distribution
-  - [ ] Verify chi-squared test: distribution not significantly different from 50/50
+  - [x] Verify chi-squared test: distribution not significantly different from 50/50
 
 #### Progress (2025-11-19)
 - Implemented per-pair randomization with a dedicated RNG and helper hooks so A/B ordering remains unbiased while duplicate detection still uses normalized IDs.

@@ -250,7 +250,7 @@ class CreditManagerImpl:
                     subject_id=subject_id,
                     metric=metric,
                     amount=0,
-                    consumed_from=source,  # Use actual resolved source
+                    consumed_from="none",  # Free operation - no credits consumed
                     correlation_id=correlation_id,
                     batch_id=batch_id,
                     status="completed",
@@ -260,7 +260,7 @@ class CreditManagerImpl:
                 return CreditConsumptionResult(
                     success=True,
                     new_balance=current_balance,
-                    consumed_from=source,  # Use actual resolved source
+                    consumed_from="none",  # Free operation - no credits consumed
                 )
 
             # Determine credit source using same logic as check_credits
@@ -400,7 +400,7 @@ class CreditManagerImpl:
                     subject_id=fallback_subject,
                     metric=metric,
                     amount=0,
-                    consumed_from=fallback_source,  # Use fallback source
+                    consumed_from="error",  # Error case - no consumption occurred
                     correlation_id=correlation_id,
                     batch_id=batch_id,
                     status="failed",
@@ -414,7 +414,7 @@ class CreditManagerImpl:
             return CreditConsumptionResult(
                 success=False,
                 new_balance=current_balance,
-                consumed_from=fallback_source,  # Use fallback source
+                consumed_from="error",  # Error case - no consumption occurred
             )
 
     async def get_balance(self, user_id: str, org_id: str | None = None) -> CreditBalanceInfo:
