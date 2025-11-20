@@ -157,6 +157,14 @@ class BatchRepositoryProtocol(Protocol):
         pass
 
 
+class ContentClientProtocol(Protocol):
+    """Protocol for Content Service lookups."""
+
+    async def content_exists(self, storage_id: str, correlation_id: UUID) -> bool:
+        """Return True if content exists; False on 404; raise on other failures."""
+        ...
+
+
 class BatchEventPublisherProtocol(Protocol):
     """Protocol for publishing batch-related events."""
 

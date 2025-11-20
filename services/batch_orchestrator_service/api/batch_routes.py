@@ -6,10 +6,12 @@ import uuid
 from typing import Any
 from uuid import uuid4
 
+from common_core.api_models.batch_prompt_amendment import BatchPromptAmendmentRequest
+from common_core.domain_enums import ContentType
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.client_commands import ClientBatchPipelineRequestV1
 from common_core.pipeline_models import PhaseName, PipelineExecutionStatus
-from common_core.status_enums import OperationStatus, ProcessingStatus
+from common_core.status_enums import BatchStatus, OperationStatus, ProcessingStatus
 from dishka import FromDishka
 from huleedu_service_libs.logging_utils import create_service_logger
 from pydantic import ValidationError
@@ -23,6 +25,7 @@ from services.batch_orchestrator_service.protocols import (
     BatchConductorClientProtocol,
     BatchProcessingServiceProtocol,
     BatchRepositoryProtocol,
+    ContentClientProtocol,
     PipelinePhaseCoordinatorProtocol,
 )
 
@@ -31,6 +34,11 @@ batch_bp = Blueprint("batch_routes", __name__, url_prefix="/v1/batches")
 
 CONTENT_SERVICE_URL = settings.CONTENT_SERVICE_URL
 OUTPUT_KAFKA_TOPIC_SPELLCHECK_REQUEST = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED)
+ALLOWED_STATUSES_FOR_PROMPT_AMEND = {
+    BatchStatus.AWAITING_CONTENT_VALIDATION,
+    BatchStatus.AWAITING_PIPELINE_CONFIGURATION,
+    BatchStatus.READY_FOR_PIPELINE_EXECUTION,
+}
 
 
 @batch_bp.route("/register", methods=["POST"])
@@ -148,6 +156,159 @@ async def get_batch_status(
     except Exception as e:
         current_app.logger.error(f"Error getting batch status for {batch_id}: {e}")
         return jsonify({"error": "Failed to get batch status"}), 500
+
+
+@batch_bp.route("/<batch_id>/prompt", methods=["PATCH"])
+@inject
+async def amend_batch_prompt(
+    batch_id: str,
+    batch_repo: FromDishka[BatchRepositoryProtocol],
+    content_client: FromDishka[ContentClientProtocol],
+) -> Response | tuple[Response, int]:
+    """Attach or replace the student prompt reference for an existing batch."""
+    # Correlation ID (optional header -> UUID fallback)
+    correlation_header = request.headers.get("X-Correlation-ID")
+    try:
+        correlation_id = uuid.UUID(correlation_header) if correlation_header else uuid.uuid4()
+    except ValueError:
+        correlation_id = uuid.uuid4()
+
+    user_id = request.headers.get("X-User-ID")
+    if not user_id:
+        return jsonify({"error": "User authentication required"}), 401
+
+    try:
+        raw_body = await request.get_json()
+        if not raw_body:
+            return jsonify({"error": "Request body must be valid JSON"}), 400
+        amendment_request = BatchPromptAmendmentRequest.model_validate(raw_body)
+    except ValidationError as ve:
+        return jsonify({"error": "Validation Error", "details": ve.errors()}), 400
+
+    batch_row = await batch_repo.get_batch_by_id(batch_id)
+    if not batch_row:
+        return jsonify({"error": "Batch not found"}), 404
+
+    batch_context = await batch_repo.get_batch_context(batch_id)
+    if not batch_context:
+        return jsonify({"error": "Batch context not found"}), 404
+
+    context_user_id = getattr(batch_context, "user_id", None)
+    if context_user_id and context_user_id != user_id:
+        logger.warning(
+            "Batch prompt amendment rejected due to ownership mismatch",
+            extra={
+                "operation": "batch_prompt_amended",
+                "batch_id": batch_id,
+                "user_id": user_id,
+                "context_user_id": context_user_id,
+                "correlation_id": str(correlation_id),
+                "reason": "ownership_mismatch",
+            },
+        )
+        return jsonify({"error": "Batch not owned by user"}), 403
+
+    status_value = batch_row.get("status") if isinstance(batch_row, dict) else batch_row.status
+    try:
+        batch_status = BatchStatus(status_value)
+    except Exception:
+        return jsonify({"error": "Invalid batch status"}), 500
+
+    if batch_status not in ALLOWED_STATUSES_FOR_PROMPT_AMEND:
+        logger.warning(
+            "Batch prompt amendment rejected due to batch state",
+            extra={
+                "operation": "batch_prompt_amended",
+                "batch_id": batch_id,
+                "user_id": user_id,
+                "batch_status": status_value,
+                "correlation_id": str(correlation_id),
+                "reason": "invalid_batch_state",
+            },
+        )
+        return jsonify({"error": "Batch not editable for prompt amendment"}), 409
+
+    prompt_ref = amendment_request.student_prompt_ref.references.get(
+        ContentType.STUDENT_PROMPT_TEXT
+    )
+    if not prompt_ref or "storage_id" not in prompt_ref:
+        return jsonify({"error": "Invalid student_prompt_ref"}), 400
+
+    storage_id = prompt_ref["storage_id"]
+
+    try:
+        exists = await content_client.content_exists(storage_id, correlation_id)
+    except Exception:
+        logger.error(
+            "Content Service validation failed during prompt amendment",
+            extra={
+                "operation": "batch_prompt_amended",
+                "batch_id": batch_id,
+                "user_id": user_id,
+                "correlation_id": str(correlation_id),
+                "prompt_storage_id": storage_id,
+                "content_validation_result": "external_error",
+            },
+            exc_info=True,
+        )
+        return jsonify({"error": "Content Service validation failed"}), 502
+
+    if not exists:
+        logger.warning(
+            "Content reference not found during prompt amendment",
+            extra={
+                "operation": "batch_prompt_amended",
+                "batch_id": batch_id,
+                "user_id": user_id,
+                "correlation_id": str(correlation_id),
+                "prompt_storage_id": storage_id,
+                "content_validation_result": "not_found",
+            },
+        )
+        return jsonify({"error": "Invalid student_prompt_ref"}), 404
+
+    previous_prompt_present = bool(getattr(batch_context, "student_prompt_ref", None))
+    batch_context.student_prompt_ref = amendment_request.student_prompt_ref
+
+    stored = await batch_repo.store_batch_context(
+        batch_id, batch_context, correlation_id=str(correlation_id)
+    )
+    if not stored:
+        logger.error(
+            "Failed to store amended batch prompt context",
+            extra={
+                "operation": "batch_prompt_amended",
+                "batch_id": batch_id,
+                "user_id": user_id,
+                "correlation_id": str(correlation_id),
+            },
+        )
+        return jsonify({"error": "Failed to store batch prompt"}), 500
+
+    logger.info(
+        "Batch prompt amended",
+        extra={
+            "operation": "batch_prompt_amended",
+            "batch_id": batch_id,
+            "user_id": user_id,
+            "correlation_id": str(correlation_id),
+            "prompt_storage_id": storage_id,
+            "previous_prompt_present": previous_prompt_present,
+            "batch_status": batch_status.value,
+            "content_validation_result": "exists",
+        },
+    )
+
+    return (
+        jsonify(
+            {
+                "status": "success",
+                "batch_id": batch_id,
+                "student_prompt_ref": amendment_request.student_prompt_ref.model_dump(mode="json"),
+            }
+        ),
+        200,
+    )
 
 
 # Internal API Blueprint for service-to-service communication
@@ -347,8 +508,17 @@ async def preflight_pipeline(
         except ValueError:
             return {"error": f"Invalid pipeline phase: {phase}"}, 400
 
+        # Construct batch_metadata with prompt information for BCS validation
+        prompt_attached = bool(getattr(batch_context, "student_prompt_ref", None))
+        batch_metadata = {
+            "prompt_attached": prompt_attached,
+            "prompt_source": "context" if prompt_attached else "none",
+        }
+
         # Resolve pipeline via BCS
-        bcs_response = await bcs_client.resolve_pipeline(batch_id, requested_phase, correlation_id)
+        bcs_response = await bcs_client.resolve_pipeline(
+            batch_id, requested_phase, correlation_id, batch_metadata
+        )
         resolved_pipeline_strings = bcs_response.get("final_pipeline", [])
         if not resolved_pipeline_strings:
             return {

@@ -93,6 +93,16 @@ async def test_pipeline_request_returns_402_on_preflight_denial():
         ) -> httpx.Response:  # type: ignore[override]
             return httpx.Response(200)
 
+        async def patch(
+            self,
+            url: str,
+            *,
+            json: dict | None = None,
+            headers: dict[str, str] | None = None,
+            timeout: float | httpx.Timeout | None = None,
+        ) -> httpx.Response:  # type: ignore[override]
+            return httpx.Response(200)
+
     deny_client = DenyClient()
     provider = PreflightProvider(deny_client)
     container = make_async_container(provider)

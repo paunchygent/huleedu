@@ -34,6 +34,10 @@ class Settings(SecureServiceSettings):
         default="localhost:9092", description="Kafka bootstrap servers for event publishing"
     )
     CONTENT_SERVICE_URL: str = "http://content_service:8000/v1/content"
+    CONTENT_SERVICE_TIMEOUT_SECONDS: int = Field(
+        default=5,
+        description="Timeout in seconds for Content Service validation requests",
+    )
     PORT: int = 5000  # Default port for batch orchestrator service
     HOST: str = "0.0.0.0"
     WEB_CONCURRENCY: int = 1

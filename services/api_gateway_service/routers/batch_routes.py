@@ -13,11 +13,13 @@ from fastapi import APIRouter, Request, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+from common_core.api_models.batch_prompt_amendment import BatchPromptAmendmentRequest
 from common_core.api_models.batch_registration import BatchRegistrationRequestV1
 from common_core.domain_enums import CourseCode
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.client_commands import ClientBatchPipelineRequestV1, PipelinePromptPayload
 from common_core.events.envelope import EventEnvelope
+from common_core.metadata_models import StorageReferenceMetadata
 from common_core.pipeline_models import PhaseName
 from huleedu_service_libs.error_handling import raise_kafka_publish_error, raise_validation_error
 from huleedu_service_libs.kafka_client import KafkaBus
@@ -75,6 +77,7 @@ class ClientBatchRegistrationRequest(BaseModel):
     expected_essay_count: int = Field(..., gt=0)
     essay_ids: list[str] | None = Field(default=None, min_length=1)
     course_code: CourseCode
+    student_prompt_ref: StorageReferenceMetadata | None = None
     class_id: str | None = None
     enable_cj_assessment: bool = False
     cj_default_llm_model: str | None = None
@@ -107,6 +110,7 @@ async def register_batch(
             expected_essay_count=registration_request.expected_essay_count,
             essay_ids=registration_request.essay_ids,
             course_code=registration_request.course_code,
+            student_prompt_ref=registration_request.student_prompt_ref,
             user_id=user_id,
             org_id=org_id,
             class_id=registration_request.class_id,
@@ -138,6 +142,68 @@ async def register_batch(
             logger.warning(
                 f"BOS registration failed: status={response.status_code}, body={body}, correlation_id='{correlation_id}'"
             )
+        return JSONResponse(status_code=response.status_code, content=body)
+
+
+@router.patch(
+    "/batches/{batch_id}/prompt",
+    status_code=status.HTTP_200_OK,
+    summary="Attach or replace the student prompt reference for a batch",
+)
+@inject
+async def amend_batch_prompt(
+    batch_id: str,
+    amendment_request: BatchPromptAmendmentRequest,
+    request: Request,
+    http_client: FromDishka[HttpClientProtocol],
+    metrics: FromDishka[MetricsProtocol],
+    user_id: FromDishka[str],
+    org_id: FromDishka[str | None],
+    correlation_id: FromDishka[UUID],
+):
+    endpoint = "/batches/{batch_id}/prompt"
+    with metrics.http_request_duration_seconds.labels(method="PATCH", endpoint=endpoint).time():
+        bos_url = f"{settings.BOS_URL}/v1/batches/{batch_id}/prompt"
+        headers = {
+            "X-User-ID": user_id,
+            "X-Correlation-ID": str(correlation_id),
+        }
+        if org_id:
+            headers["X-Org-ID"] = org_id
+
+        response = await http_client.patch(
+            bos_url,
+            json=amendment_request.model_dump(mode="json"),
+            headers=headers,
+        )
+
+        try:
+            body = response.json()
+        except Exception:
+            body = {"detail": "Invalid response from BOS"}
+
+        if response.status_code < 400:
+            logger.info(
+                "Batch prompt amendment proxied",
+                extra={
+                    "operation": "proxy_batch_prompt_amend",
+                    "batch_id": batch_id,
+                    "user_id": user_id,
+                    "correlation_id": str(correlation_id),
+                },
+            )
+        else:
+            logger.warning(
+                "BOS prompt amendment failed",
+                extra={
+                    "operation": "proxy_batch_prompt_amend",
+                    "batch_id": batch_id,
+                    "user_id": user_id,
+                    "correlation_id": str(correlation_id),
+                    "status": response.status_code,
+                },
+            )
+
         return JSONResponse(status_code=response.status_code, content=body)
 
 

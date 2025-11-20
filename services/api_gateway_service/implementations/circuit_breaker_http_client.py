@@ -94,3 +94,20 @@ class ApiGatewayCircuitBreakerHttpClient(HttpClientProtocol):
             headers=headers,
             timeout=timeout,
         )
+
+    async def patch(
+        self,
+        url: str,
+        *,
+        json: dict | None = None,
+        headers: dict[str, str] | None = None,
+        timeout: float | httpx.Timeout | None = None,
+    ) -> httpx.Response:
+        """Send PATCH request with circuit breaker protection."""
+        return await self._circuit_breaker.call(
+            self._delegate.patch,
+            url,
+            json=json,
+            headers=headers,
+            timeout=timeout,
+        )

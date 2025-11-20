@@ -41,6 +41,17 @@ class HttpClientProtocol(Protocol):
         """Send GET request."""
         ...
 
+    async def patch(
+        self,
+        url: str,
+        *,
+        json: dict | None = None,
+        headers: dict[str, str] | None = None,
+        timeout: float | httpx.Timeout | None = None,
+    ) -> httpx.Response:
+        """Send PATCH request."""
+        ...
+
 
 class MetricsProtocol(Protocol):
     """Protocol for metrics collection matching GatewayMetrics exactly."""

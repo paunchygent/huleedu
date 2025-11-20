@@ -66,6 +66,9 @@ from services.batch_orchestrator_service.implementations.cj_assessment_initiator
 from services.batch_orchestrator_service.implementations.client_pipeline_request_handler import (
     ClientPipelineRequestHandler,
 )
+from services.batch_orchestrator_service.implementations.content_client_impl import (
+    ContentClientImpl,
+)
 from services.batch_orchestrator_service.implementations.els_batch_phase_outcome_handler import (
     ELSBatchPhaseOutcomeHandler,
 )
@@ -107,6 +110,7 @@ from services.batch_orchestrator_service.protocols import (
     BatchProcessingServiceProtocol,
     BatchRepositoryProtocol,
     CJAssessmentInitiatorProtocol,
+    ContentClientProtocol,
     EntitlementsServiceProtocol,
     EssayLifecycleClientProtocol,
     NLPInitiatorProtocol,
@@ -178,6 +182,13 @@ class CoreInfrastructureProvider(Provider):
     async def provide_http_session(self) -> ClientSession:
         """Provide HTTP client session."""
         return ClientSession()
+
+    @provide(scope=Scope.APP)
+    def provide_content_client(
+        self, http_session: ClientSession, settings: Settings
+    ) -> ContentClientProtocol:
+        """Provide Content Service client for existence checks."""
+        return ContentClientImpl(http_session, settings)
 
     @provide(scope=Scope.APP)
     def provide_circuit_breaker_registry(self, settings: Settings) -> CircuitBreakerRegistry:

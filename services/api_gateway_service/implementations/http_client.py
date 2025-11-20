@@ -80,3 +80,14 @@ class ApiGatewayHttpClient(HttpClientProtocol):
             headers=headers,
             timeout=timeout,
         )
+
+    async def patch(
+        self,
+        url: str,
+        *,
+        json: dict | None = None,
+        headers: dict[str, str] | None = None,
+        timeout: float | httpx.Timeout | None = None,
+    ) -> httpx.Response:
+        """Send PATCH request."""
+        return await self._client.patch(url=url, json=json, headers=headers, timeout=timeout)
