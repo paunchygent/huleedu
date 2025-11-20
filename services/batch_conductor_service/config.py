@@ -85,6 +85,12 @@ class Settings(SecureServiceSettings):
         default="latest", description="Kafka auto offset reset policy"
     )
 
+    # DLQ configuration
+    DLQ_PUBLISH_TIMEOUT_SECONDS: float = Field(
+        default=5.0,
+        description="Timeout in seconds for DLQ publish operations",
+    )
+
     # Database configuration
     DB_HOST: str = Field(default="localhost", description="PostgreSQL host (Docker or external)")
     DB_PORT: int = Field(default=5441, description="PostgreSQL port (5441 for BCS in development)")

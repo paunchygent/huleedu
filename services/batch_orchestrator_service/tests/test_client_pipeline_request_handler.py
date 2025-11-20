@@ -194,3 +194,146 @@ async def test_handle_client_request_skips_when_pipeline_active() -> None:
 
     bcs_client.resolve_pipeline.assert_not_awaited()
     phase_coordinator.initiate_resolved_pipeline.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_handle_client_request_prompt_from_assignment_id() -> None:
+    assignment_id = "assignment-123"
+
+    request_payload = ClientBatchPipelineRequestV1(
+        batch_id="batch-456",
+        requested_pipeline=PhaseName.CJ_ASSESSMENT.value,
+        user_id="teacher-99",
+        is_retry=False,
+        prompt_payload=PipelinePromptPayload(assignment_id=assignment_id),
+    )
+
+    envelope = EventEnvelope[ClientBatchPipelineRequestV1](
+        event_type=topic_name(ProcessingEvent.CLIENT_BATCH_PIPELINE_REQUEST),
+        source_service="api_gateway_service",
+        correlation_id=uuid4(),
+        data=request_payload.model_dump(mode="json"),
+    )
+    message = _make_kafka_message(envelope)
+
+    registration_context = BatchRegistrationRequestV1(
+        expected_essay_count=1,
+        essay_ids=["essay-1"],
+        course_code=CourseCode.ENG5,
+        student_prompt_ref=None,
+        user_id="teacher-99",
+        org_id=None,
+        class_id=None,
+        enable_cj_assessment=True,
+    )
+
+    bcs_client = AsyncMock()
+    bcs_client.resolve_pipeline.return_value = {"final_pipeline": [PhaseName.CJ_ASSESSMENT.value]}
+
+    batch_repo = AsyncMock()
+    batch_repo.get_batch_context.return_value = registration_context
+    batch_repo.get_batch_by_id.return_value = {
+        "status": BatchStatus.READY_FOR_PIPELINE_EXECUTION.value
+    }
+    batch_repo.get_processing_pipeline_state.side_effect = [None, None]
+    batch_repo.save_processing_pipeline_state = AsyncMock()
+
+    phase_coordinator = AsyncMock()
+    entitlements_client = AsyncMock()
+    credit_guard = AsyncMock()
+    credit_guard.evaluate.return_value = _StubCreditOutcome()
+
+    handler = ClientPipelineRequestHandler(
+        bcs_client=bcs_client,
+        batch_repo=batch_repo,
+        phase_coordinator=phase_coordinator,
+        entitlements_client=entitlements_client,
+        credit_guard=credit_guard,
+    )
+
+    await handler.handle_client_pipeline_request(message)
+
+    resolve_args = bcs_client.resolve_pipeline.await_args.args
+    assert resolve_args[0] == "batch-456"
+    assert resolve_args[1] == PhaseName.CJ_ASSESSMENT
+
+    sent_metadata = resolve_args[3]
+    assert sent_metadata["prompt_attached"] is True
+    assert sent_metadata["prompt_source"] == "canonical"
+    assert sent_metadata["assignment_id"] == assignment_id
+    assert registration_context.student_prompt_ref is None
+
+
+@pytest.mark.asyncio
+async def test_handle_client_request_prompt_from_context() -> None:
+    prompt_ref = StorageReferenceMetadata()
+    prompt_ref.add_reference(ContentType.STUDENT_PROMPT_TEXT, "context-storage-999")
+
+    request_payload = ClientBatchPipelineRequestV1(
+        batch_id="batch-789",
+        requested_pipeline=PhaseName.AI_FEEDBACK.value,
+        user_id="teacher-ctx",
+        is_retry=False,
+        prompt_payload=None,
+    )
+
+    envelope = EventEnvelope[ClientBatchPipelineRequestV1](
+        event_type=topic_name(ProcessingEvent.CLIENT_BATCH_PIPELINE_REQUEST),
+        source_service="api_gateway_service",
+        correlation_id=uuid4(),
+        data=request_payload.model_dump(mode="json"),
+    )
+    message = _make_kafka_message(envelope)
+
+    registration_context = BatchRegistrationRequestV1(
+        expected_essay_count=1,
+        essay_ids=["essay-1"],
+        course_code=CourseCode.ENG5,
+        student_prompt_ref=prompt_ref,
+        user_id="teacher-ctx",
+        org_id=None,
+        class_id=None,
+        enable_cj_assessment=True,
+    )
+
+    bcs_client = AsyncMock()
+    bcs_client.resolve_pipeline.return_value = {"final_pipeline": [PhaseName.AI_FEEDBACK.value]}
+
+    batch_repo = AsyncMock()
+    batch_repo.get_batch_context.return_value = registration_context
+    batch_repo.get_batch_by_id.return_value = {
+        "status": BatchStatus.READY_FOR_PIPELINE_EXECUTION.value
+    }
+    batch_repo.get_processing_pipeline_state.side_effect = [None, None]
+    batch_repo.save_processing_pipeline_state = AsyncMock()
+    batch_repo.store_batch_context = AsyncMock()
+
+    phase_coordinator = AsyncMock()
+    entitlements_client = AsyncMock()
+    credit_guard = AsyncMock()
+    credit_guard.evaluate.return_value = _StubCreditOutcome()
+
+    handler = ClientPipelineRequestHandler(
+        bcs_client=bcs_client,
+        batch_repo=batch_repo,
+        phase_coordinator=phase_coordinator,
+        entitlements_client=entitlements_client,
+        credit_guard=credit_guard,
+    )
+
+    await handler.handle_client_pipeline_request(message)
+
+    resolve_args = bcs_client.resolve_pipeline.await_args.args
+    assert resolve_args[0] == "batch-789"
+    assert resolve_args[1] == PhaseName.AI_FEEDBACK
+
+    sent_metadata = resolve_args[3]
+    assert sent_metadata == {"prompt_attached": True, "prompt_source": "context"}
+    assert registration_context.student_prompt_ref is not None
+    assert (
+        registration_context.student_prompt_ref.references[ContentType.STUDENT_PROMPT_TEXT][
+            "storage_id"
+        ]
+        == "context-storage-999"
+    )
+    batch_repo.store_batch_context.assert_not_awaited()

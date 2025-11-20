@@ -7,9 +7,12 @@ using mocked dependencies to isolate rules logic.
 from __future__ import annotations
 
 from unittest.mock import AsyncMock
+from uuid import uuid4
 
 import pytest
 
+from common_core.error_enums import BatchConductorErrorCode
+from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
 from services.batch_conductor_service.implementations.pipeline_rules_impl import (
     DefaultPipelineRules,
 )
@@ -171,3 +174,25 @@ async def test_prune_completed_steps_empty_pipeline(pipeline_rules, mock_batch_s
 
     # BatchStateRepository should not be called for empty pipeline
     mock_batch_state_repository.is_batch_step_complete.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_validate_pipeline_compatibility_prompt_not_attached(pipeline_rules):
+    """Prompt-dependent pipelines should fail when prompt is not attached.
+
+    Error code must be BCS_PIPELINE_COMPATIBILITY_FAILED with
+    compatibility_issue="prompt_not_attached".
+    """
+
+    correlation_id = uuid4()
+
+    with pytest.raises(HuleEduError) as excinfo:
+        await pipeline_rules.validate_pipeline_compatibility(
+            pipeline_name="ai_feedback",
+            correlation_id=correlation_id,
+            batch_metadata={"prompt_attached": False, "prompt_source": "none"},
+        )
+
+    error_detail = excinfo.value.error_detail
+    assert error_detail.error_code == BatchConductorErrorCode.PIPELINE_COMPATIBILITY_FAILED
+    assert error_detail.details.get("compatibility_issue") == "prompt_not_attached"

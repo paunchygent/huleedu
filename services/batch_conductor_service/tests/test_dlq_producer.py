@@ -123,7 +123,7 @@ class MockConcurrentFailureEventData(BaseModel):
     failure_sequence: int
 
 
-class MockKafkaDlqProducerBehavior:
+class TestKafkaDlqProducerBehavior:
     """Test business behavior of DLQ producer with realistic failure scenarios."""
 
     @pytest.fixture
@@ -655,6 +655,27 @@ class MockKafkaDlqProducerBehavior:
 
         # Verify all calls were made
         assert mock_kafka_bus.producer.send.call_count == 3
+
+    async def test_dlq_publish_timeout_returns_false(
+        self,
+        dlq_producer: KafkaDlqProducerImpl,
+        mock_kafka_bus: MagicMock,
+        sample_event_envelope: EventEnvelope,
+    ) -> None:
+        """Timeouts during DLQ publish should be logged and reported as False without raising."""
+
+        import asyncio
+
+        mock_kafka_bus.producer.send.side_effect = asyncio.TimeoutError
+
+        result = await dlq_producer.publish_to_dlq(
+            base_topic="huleedu.test.topic",
+            failed_event_envelope=sample_event_envelope,
+            dlq_reason="TimeoutScenario",
+        )
+
+        assert result is False
+        mock_kafka_bus.producer.send.assert_called_once()
 
     async def test_large_event_data_handling(
         self, dlq_producer: KafkaDlqProducerImpl, mock_kafka_bus: MagicMock

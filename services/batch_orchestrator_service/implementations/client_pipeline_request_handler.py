@@ -206,6 +206,22 @@ class ClientPipelineRequestHandler:
                             prompt_attached = True
                             prompt_source = "cms"
                             batch_context.student_prompt_ref = prompt_payload.cms_prompt_ref
+                            try:
+                                await self.batch_repo.store_batch_context(
+                                    batch_id=batch_id,
+                                    registration_data=batch_context,
+                                    correlation_id=str(correlation_id),
+                                )
+                            except Exception as e:  # pragma: no cover - defensive logging
+                                logger.warning(
+                                    "Failed to persist updated student_prompt_ref in batch context",
+                                    extra={
+                                        "batch_id": batch_id,
+                                        "requested_pipeline": requested_pipeline,
+                                        "correlation_id": str(correlation_id),
+                                        "error": str(e),
+                                    },
+                                )
                     elif getattr(batch_context, "student_prompt_ref", None):
                         prompt_attached = True
                         prompt_source = "context"
@@ -216,6 +232,18 @@ class ClientPipelineRequestHandler:
                     }
                     if assignment_context:
                         batch_metadata["assignment_id"] = assignment_context
+
+                    logger.info(
+                        "Resolved prompt attachment metadata",
+                        extra={
+                            "batch_id": batch_id,
+                            "requested_pipeline": requested_pipeline,
+                            "correlation_id": str(correlation_id),
+                            "prompt_attached": prompt_attached,
+                            "prompt_source": prompt_source,
+                            "assignment_id": assignment_context,
+                        },
+                    )
 
                     # Convert string pipeline name to PhaseName enum for BCS client
                     try:

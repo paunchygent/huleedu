@@ -25,6 +25,7 @@ from services.batch_conductor_service.startup_setup import (
     create_container,
     initialize_database_schema,
     initialize_metrics,
+    initialize_tracing,
     shutdown_services,
 )
 
@@ -171,6 +172,9 @@ async def startup() -> None:
     try:
         # Initialize database schema first
         await initialize_database_schema(app)
+
+        # Initialize tracing
+        await initialize_tracing(app)
 
         # Metrics rely on the DI container which is already wired
         await initialize_metrics(app, container)

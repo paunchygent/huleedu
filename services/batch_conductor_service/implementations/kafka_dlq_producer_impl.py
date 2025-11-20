@@ -13,6 +13,7 @@ Handles publishing failed messages to DLQ topics following the schema:
 
 from __future__ import annotations
 
+import asyncio
 import json
 from datetime import UTC, datetime
 from typing import Any
@@ -33,8 +34,9 @@ class KafkaDlqProducerImpl(DlqProducerProtocol):
     and potential reprocessing after issues are resolved.
     """
 
-    def __init__(self, kafka_bus: KafkaBus):
+    def __init__(self, kafka_bus: KafkaBus, timeout_seconds: float = 5.0):
         self.kafka_bus = kafka_bus
+        self._timeout_seconds = timeout_seconds
 
     def _extract_message_key(
         self, failed_event_envelope: EventEnvelope[Any] | dict[Any, Any]
@@ -132,10 +134,29 @@ class KafkaDlqProducerImpl(DlqProducerProtocol):
             # Extract message key for Kafka partitioning
             message_key = self._extract_message_key(failed_event_envelope)
 
-            # Publish to DLQ topic
-            await self.kafka_bus.producer.send(
-                topic=dlq_topic, key=message_key, value=json.dumps(dlq_message), headers={}
-            )
+            # Publish to DLQ topic with bounded timeout
+            try:
+                await asyncio.wait_for(
+                    self.kafka_bus.producer.send(
+                        topic=dlq_topic,
+                        key=message_key,
+                        value=json.dumps(dlq_message),
+                        headers={},
+                    ),
+                    timeout=self._timeout_seconds,
+                )
+            except TimeoutError:
+                logger.error(
+                    "DLQ publish timeout",
+                    extra={
+                        "base_topic": base_topic,
+                        "dlq_topic": dlq_topic,
+                        "dlq_reason": dlq_reason,
+                        "original_event_id": event_id,
+                        "timeout_seconds": self._timeout_seconds,
+                    },
+                )
+                return False
 
             logger.error(
                 f"Published message to DLQ: topic={dlq_topic}, reason={dlq_reason}",

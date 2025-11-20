@@ -131,6 +131,7 @@ class EventDrivenServicesProvider(Provider):
 
         return KafkaDlqProducerImpl(
             kafka_bus=kafka_bus,
+            timeout_seconds=settings.DLQ_PUBLISH_TIMEOUT_SECONDS,
         )
 
     @provide(scope=Scope.APP)
