@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from collections.abc import Generator
 from typing import Any
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 from uuid import UUID, uuid4
 
 import pytest
@@ -44,6 +44,7 @@ from services.essay_lifecycle_service.implementations.db_pending_content_ops imp
 from services.essay_lifecycle_service.implementations.essay_repository_postgres_impl import (
     PostgreSQLEssayRepository,
 )
+from services.essay_lifecycle_service.implementations.essay_state_model import EssayState
 from services.essay_lifecycle_service.models_db import Base
 from services.essay_lifecycle_service.protocols import EventPublisher, SlotOperationsProtocol
 
@@ -466,6 +467,53 @@ class TestAtomicBatchCreationIntegration:
         # Batch should still only have 1 essay (the pre-existing one)
         batch_essays = await postgres_repository.list_essays_by_batch(sample_batch_event.entity_id)
         assert len(batch_essays) == 1
+
+    @pytest.mark.asyncio
+    async def test_batch_registration_and_essays_rollback_together_on_failure(
+        self,
+        coordination_handler: DefaultBatchCoordinationHandler,
+        sample_batch_event: BatchEssaysRegistered,
+        postgres_repository: PostgreSQLEssayRepository,
+        batch_tracker_persistence: BatchTrackerPersistence,
+    ) -> None:
+        """Ensure tracker + essay inserts are fully atomic under handler transaction.
+
+        This test simulates a failure during essay creation to verify that
+        neither the batch tracker nor any essay rows are committed.
+        """
+
+        correlation_id = uuid4()
+
+        # Force essay creation to fail after tracker persistence
+        async def failing_create_essay_records_batch(
+            essay_data: list[dict[str, str | None]],
+            session: AsyncSession | None = None,
+            correlation_id: UUID | None = None,
+        ) -> list[EssayState]:
+            raise Exception("Simulated failure during essay batch creation")
+
+        # Act & Assert: handler should wrap the error as HuleEduError
+        with (
+            patch.object(
+                coordination_handler.repository,
+                "create_essay_records_batch",
+                side_effect=failing_create_essay_records_batch,
+            ),
+            pytest.raises(HuleEduError),
+        ):
+            await coordination_handler.handle_batch_essays_registered(
+                sample_batch_event, correlation_id
+            )
+
+        # Assert: no tracker row was committed for this batch
+        tracker = await batch_tracker_persistence.get_tracker_by_batch_id(
+            sample_batch_event.entity_id
+        )
+        assert tracker is None
+
+        # Assert: no essays were committed for this batch
+        batch_essays = await postgres_repository.list_essays_by_batch(sample_batch_event.entity_id)
+        assert batch_essays == []
 
     @pytest.mark.asyncio
     async def test_atomic_batch_creation_empty_essay_list(

@@ -26,7 +26,10 @@ from services.result_aggregator_service.di import (
     ServiceProvider,
 )
 from services.result_aggregator_service.kafka_consumer import ResultAggregatorKafkaConsumer
-from services.result_aggregator_service.startup_setup import setup_metrics_endpoint
+from services.result_aggregator_service.startup_setup import (
+    initialize_tracing,
+    setup_metrics_endpoint,
+)
 
 # Configure centralized structured logging before creating logger
 configure_service_logging("result_aggregator_service", log_level=settings.LOG_LEVEL)
@@ -81,6 +84,9 @@ app = create_app()
 async def startup() -> None:
     """Initialize services on startup."""
     try:
+        # Initialize tracing
+        await initialize_tracing(app)
+
         # Setup Kafka consumer
         async with app.container() as request_container:
             settings = await request_container.get(Settings)

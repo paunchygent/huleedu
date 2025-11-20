@@ -144,6 +144,9 @@ SERVICES = {
     "llm_provider_service": {
         "cmd_dev": ["python", "services/llm_provider_service/app.py"],
     },
+    "nlp_service": {
+        "cmd_dev": ["python", "services/nlp_service/worker_main.py"],
+    },
     "result_aggregator_service": {
         "cmd_dev": ["python", "services/result_aggregator_service/app.py"],
     },

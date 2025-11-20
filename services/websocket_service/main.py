@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from huleedu_service_libs.error_handling.fastapi import (
     register_error_handlers as register_fastapi_error_handlers,
 )
-from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
 
 from services.websocket_service.config import settings
 from services.websocket_service.routers import health_routes, websocket_routes
@@ -19,6 +19,9 @@ from services.websocket_service.startup_setup import (
     start_kafka_consumer,
     stop_kafka_consumer,
 )
+
+# Configure logging at module level (reads LOG_FORMAT env var)
+configure_service_logging("websocket_service", log_level=settings.LOG_LEVEL)
 
 logger = create_service_logger("websocket.main")
 

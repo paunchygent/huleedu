@@ -69,7 +69,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         self._event_callbacks[event_type] = callback
 
     async def register_batch(
-        self, event: Any, correlation_id: UUID
+        self, event: Any, correlation_id: UUID, session: AsyncSession
     ) -> None:  # BatchEssaysRegistered
         """
         Register batch slot expectations using Redis coordinator for distributed coordination.
@@ -124,7 +124,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         )
 
         # Persist to database
-        await self._persistence.persist_batch_expectation(expectation)
+        await self._persistence.persist_batch_expectation(expectation, session=session)
 
         # Database pre-seeds slot inventory via migration
 

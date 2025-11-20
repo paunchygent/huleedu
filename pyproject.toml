@@ -375,6 +375,7 @@ pytest-root = "scripts/pytest-root.sh"
 dev = "scripts/dev.sh"  # Main dev script - type 'pdm run dev help' for all commands
 dev-build = {shell = "scripts/dev.sh build $@"}  # Build for development with cache
 dev-build-clean = {shell = "scripts/dev.sh build-clean $@"}  # Clean build for development
+dev-build-deps-clean = {shell = "scripts/dev.sh build-deps-clean"}  # Build only shared deps image with --no-cache
 dev-start = {shell = "scripts/dev.sh start-nobuild $@"}  # Start development environment (no rebuild, fast)
 dev-build-start = {shell = "scripts/dev.sh start $@"}  # Build with cache then start development environment
 dev-stop = {shell = "scripts/dev.sh stop $@"}  # Stop development containers

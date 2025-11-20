@@ -30,6 +30,7 @@ QuartDishka(app=app, container=_di_container)
 async def startup() -> None:
     """Initialize services and middleware."""
     try:
+        await startup_setup.initialize_tracing(app)
         await startup_setup.initialize_services(app, settings, _di_container)
         setup_content_service_metrics_middleware(app)
         logger.info("Content Service startup completed successfully")

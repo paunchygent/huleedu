@@ -169,50 +169,47 @@ class BatchTrackerPersistence:
             self._logger.error(f"Failed to list active batch ids: {e}")
             return []
 
-    async def persist_batch_expectation(self, expectation: BatchExpectation) -> None:
+    async def persist_batch_expectation(
+        self, expectation: BatchExpectation, session: AsyncSession
+    ) -> None:
         """Persist batch expectation to database (dual-write pattern)."""
         try:
-            async with self._session_factory() as session:
-                metadata_payload: dict[str, object] | None = None
-                if expectation.student_prompt_ref:
-                    metadata_payload = {
-                        "student_prompt_ref": expectation.student_prompt_ref.model_dump(mode="json")
-                    }
+            metadata_payload: dict[str, object] | None = None
+            if expectation.student_prompt_ref:
+                metadata_payload = {
+                    "student_prompt_ref": expectation.student_prompt_ref.model_dump(mode="json")
+                }
 
-                # Create database record
-                tracker_db = BatchEssayTrackerDB(
-                    batch_id=expectation.batch_id,
-                    expected_essay_ids=list(expectation.expected_essay_ids),
-                    available_slots=list(
-                        expectation.expected_essay_ids
-                    ),  # Initialize with all slots available
-                    expected_count=expectation.expected_count,
-                    course_code=expectation.course_code.value,
-                    user_id=expectation.user_id,
-                    org_id=expectation.org_id,
-                    correlation_id=str(expectation.correlation_id),
-                    timeout_seconds=expectation.timeout_seconds,
-                    batch_metadata=metadata_payload,
+            # Create database record
+            tracker_db = BatchEssayTrackerDB(
+                batch_id=expectation.batch_id,
+                expected_essay_ids=list(expectation.expected_essay_ids),
+                available_slots=list(
+                    expectation.expected_essay_ids
+                ),  # Initialize with all slots available
+                expected_count=expectation.expected_count,
+                course_code=expectation.course_code.value,
+                user_id=expectation.user_id,
+                org_id=expectation.org_id,
+                correlation_id=str(expectation.correlation_id),
+                timeout_seconds=expectation.timeout_seconds,
+                batch_metadata=metadata_payload,
+            )
+
+            session.add(tracker_db)
+            await session.flush()
+
+            # Pre-seed inventory rows for each expected essay slot
+            for essay_id in expectation.expected_essay_ids:
+                session.add(
+                    SlotAssignmentDB(
+                        batch_tracker_id=tracker_db.id,
+                        internal_essay_id=essay_id,
+                        status="available",
+                    )
                 )
 
-                session.add(tracker_db)
-                await session.flush()
-
-                # Pre-seed inventory rows for each expected essay slot
-                for essay_id in expectation.expected_essay_ids:
-                    session.add(
-                        SlotAssignmentDB(
-                            batch_tracker_id=tracker_db.id,
-                            internal_essay_id=essay_id,
-                            status="available",
-                        )
-                    )
-
-                await session.commit()
-                # Refresh gauges: a new active batch has been added
-                await self.refresh_batch_metrics()
-
-                self._logger.debug(f"Persisted batch expectation: {expectation.batch_id}")
+            self._logger.debug(f"Persisted batch expectation: {expectation.batch_id}")
 
         except Exception as e:
             self._logger.error(f"Failed to persist batch expectation {expectation.batch_id}: {e}")

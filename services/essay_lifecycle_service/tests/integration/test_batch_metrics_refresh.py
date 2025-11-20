@@ -36,7 +36,7 @@ async def test_refresh_batch_metrics_updates_gauges() -> None:
         engine = create_async_engine(pg_url)
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
-        async_sessionmaker(engine, expire_on_commit=False)
+        session_factory = async_sessionmaker(engine, expire_on_commit=False)
         persistence = BatchTrackerPersistence(engine)
 
         # Create one GUEST active, one GUEST completed, and one REGULAR active
@@ -52,7 +52,9 @@ async def test_refresh_batch_metrics_updates_gauges() -> None:
             student_prompt_ref=make_prompt_ref("prompt-guest-active"),
             timeout_seconds=3600,
         )
-        await persistence.persist_batch_expectation(guest_active)
+        async with session_factory() as session:
+            async with session.begin():
+                await persistence.persist_batch_expectation(guest_active, session=session)
 
         guest_completed = BatchExpectation(
             batch_id=str(uuid4()),
@@ -66,7 +68,9 @@ async def test_refresh_batch_metrics_updates_gauges() -> None:
             student_prompt_ref=make_prompt_ref("prompt-guest-completed"),
             timeout_seconds=3600,
         )
-        await persistence.persist_batch_expectation(guest_completed)
+        async with session_factory() as session:
+            async with session.begin():
+                await persistence.persist_batch_expectation(guest_completed, session=session)
         await persistence.mark_batch_completed(guest_completed.batch_id)
 
         regular_active = BatchExpectation(
@@ -81,7 +85,9 @@ async def test_refresh_batch_metrics_updates_gauges() -> None:
             student_prompt_ref=make_prompt_ref("prompt-regular-active"),
             timeout_seconds=3600,
         )
-        await persistence.persist_batch_expectation(regular_active)
+        async with session_factory() as session:
+            async with session.begin():
+                await persistence.persist_batch_expectation(regular_active, session=session)
 
         # Refresh metrics
         await persistence.refresh_batch_metrics()

@@ -6,6 +6,7 @@ from typing import Any
 
 from dishka.integrations.fastapi import FromDishka, inject
 from fastapi import APIRouter, HTTPException, Response
+from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 from prometheus_client import CollectorRegistry, generate_latest
 
@@ -24,6 +25,8 @@ async def health_check(
     settings: FromDishka[Settings],
 ) -> dict[str, Any]:
     """Basic health check endpoint."""
+    logger = create_service_logger("websocket_service.routers.health")
+    logger.info("Health check requested")
     return {
         "service": settings.SERVICE_NAME,
         "status": "healthy",

@@ -440,7 +440,7 @@ class BatchEssayTracker(Protocol):
     """Protocol for tracking batch readiness and coordination."""
 
     async def register_batch(
-        self, event: Any, correlation_id: UUID
+        self, event: Any, correlation_id: UUID, session: AsyncSession
     ) -> None:  # BatchEssaysRegistered
         """Register batch expectations from BOS."""
         ...

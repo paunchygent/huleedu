@@ -70,7 +70,9 @@ async def test_option_b_assignment_idempotency_and_exhaustion() -> None:
             created_at=datetime.now(UTC),
             timeout_seconds=3600,
         )
-        await persistence.persist_batch_expectation(expectation)
+        async with session_factory() as session:
+            async with session.begin():
+                await persistence.persist_batch_expectation(expectation, session=session)
         # Option B requires essay rows to exist in essay_states for inventory
         repository = PostgreSQLEssayRepository(session_factory)
         essay_data: list[dict[str, str | None]] = [

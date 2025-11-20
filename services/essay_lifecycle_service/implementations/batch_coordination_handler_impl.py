@@ -78,7 +78,9 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
             # PHASE 1: Register and create essays atomically, then commit
             async with self.session_factory() as session:
                 async with session.begin():
-                    await self.batch_tracker.register_batch(event_data, correlation_id)
+                    await self.batch_tracker.register_batch(
+                        event_data, correlation_id, session=session
+                    )
 
                     logger.info(
                         "Creating initial essay records in database for batch",

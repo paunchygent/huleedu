@@ -460,6 +460,11 @@ case "$1" in
     "build-clean")
         build_clean_dev "${@:2}"
         ;;
+    "build-deps-clean")
+        echo_dev "Building shared DEPS image with --no-cache"
+        ensure_deps_image "clean"
+        echo_success "Dependency image built successfully"
+        ;;
     "start")
         start_dev "${@:2}"
         ;;
