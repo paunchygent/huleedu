@@ -16,7 +16,6 @@ from services.class_management_service.config import Settings
 if TYPE_CHECKING:
     from huleedu_service_libs.quart_app import HuleEduApp
 
-logger = create_service_logger("class_management_service.api.health")
 health_bp = Blueprint("health_routes", __name__)
 
 
@@ -24,7 +23,9 @@ health_bp = Blueprint("health_routes", __name__)
 @inject
 async def health_check(settings: FromDishka[Settings]) -> Response | tuple[Response, int]:
     """Standardized health check endpoint."""
+    logger = create_service_logger("class_management_service.api.health")
     try:
+        logger.info("Health check requested")
         # Check database connectivity
         checks = {"service_responsive": True, "dependencies_available": True}
         dependencies = {}
@@ -77,6 +78,7 @@ async def health_check(settings: FromDishka[Settings]) -> Response | tuple[Respo
 @inject
 async def metrics(registry: FromDishka[CollectorRegistry]) -> Response:
     """Prometheus metrics endpoint."""
+    logger = create_service_logger("class_management_service.api.health")
     try:
         metrics_data = generate_latest(registry)
         response = Response(metrics_data, content_type=CONTENT_TYPE_LATEST)

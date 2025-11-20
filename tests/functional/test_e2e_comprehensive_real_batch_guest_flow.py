@@ -83,6 +83,7 @@ async def test_comprehensive_real_batch_pipeline():
             expected_completion_event="cj_assessment.completed",
             validate_phase_pruning=False,
             timeout_seconds=120,  # Increased timeout for 25 essays
+            prompt_payload={"assignment_id": "test_eng5_writing_2025"},
         )
 
         # Validate pipeline completed successfully

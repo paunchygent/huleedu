@@ -21,8 +21,6 @@ from services.spellchecker_service.config import settings
 from services.spellchecker_service.di import SpellCheckerServiceProvider
 from services.spellchecker_service.kafka_consumer import SpellCheckerKafkaConsumer
 
-logger = create_service_logger("spell_checker.worker_main")
-
 # Global state for graceful shutdown
 should_stop = False
 kafka_consumer_instance: SpellCheckerKafkaConsumer | None = None
@@ -34,6 +32,7 @@ relay_worker_task: asyncio.Task | None = None
 def setup_signal_handlers() -> None:
     """Setup signal handlers for graceful shutdown."""
     global should_stop
+    logger = create_service_logger("spell_checker.worker_main")
 
     def signal_handler(signum: int, frame: object) -> None:
         global should_stop
@@ -53,6 +52,7 @@ async def main() -> None:
         service_name=settings.SERVICE_NAME,
         log_level=settings.LOG_LEVEL,
     )
+    logger = create_service_logger("spell_checker.worker_main")
 
     # Setup signal handlers
     setup_signal_handlers()

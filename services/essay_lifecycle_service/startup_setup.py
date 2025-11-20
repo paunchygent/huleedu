@@ -23,14 +23,13 @@ from services.essay_lifecycle_service.implementations.essay_repository_postgres_
 from services.essay_lifecycle_service.metrics import get_http_metrics
 from services.essay_lifecycle_service.models_db import Base
 
-logger = create_service_logger("els.startup")
-
 # Global references for service management (unavoidable for Quart lifecycle)
 # ELS doesn't need background tasks like BOS, but keeping structure consistent
 
 
 async def initialize_services(app: HuleEduApp, settings: Settings) -> None:
     """Initialize DI container, Quart-Dishka integration, and metrics."""
+    logger = create_service_logger("els.startup")
 
     try:
         # Initialize DI container with all provider classes
@@ -83,6 +82,7 @@ async def initialize_services(app: HuleEduApp, settings: Settings) -> None:
 
 async def shutdown_services() -> None:
     """Gracefully shutdown services."""
+    logger = create_service_logger("els.startup")
 
     try:
         # ELS API doesn't have background tasks to shutdown like BOS

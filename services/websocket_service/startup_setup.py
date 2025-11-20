@@ -6,25 +6,15 @@ from typing import Any
 from dishka import make_async_container
 from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI
+from huleedu_service_libs import init_tracing
 from huleedu_service_libs.logging_utils import create_service_logger
-
-try:
-    from opentelemetry import trace
-    from opentelemetry.exporter.jaeger.thrift import JaegerExporter
-    from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-    from opentelemetry.sdk.resources import Resource
-    from opentelemetry.sdk.trace import TracerProvider
-    from opentelemetry.sdk.trace.export import BatchSpanProcessor
-
-    TRACING_AVAILABLE = True
-except ImportError:
-    TRACING_AVAILABLE = False
+from huleedu_service_libs.middleware.frameworks.fastapi_middleware import (
+    setup_tracing_middleware,
+)
 
 from services.websocket_service.config import settings
 from services.websocket_service.di import WebSocketServiceProvider
 from services.websocket_service.protocols import NotificationEventConsumerProtocol
-
-logger = create_service_logger("websocket.startup")
 
 # Global references for service management
 kafka_consumer_instance: NotificationEventConsumerProtocol | None = None
@@ -33,6 +23,7 @@ consumer_task: asyncio.Task | None = None
 
 def create_di_container() -> Any:
     """Create the dependency injection container."""
+    logger = create_service_logger("websocket.startup")
     logger.info("Creating DI container")
     container = make_async_container(WebSocketServiceProvider())
     return container
@@ -40,40 +31,24 @@ def create_di_container() -> Any:
 
 def setup_dependency_injection(app: FastAPI, container: Any) -> None:
     """Setup Dishka dependency injection for FastAPI."""
+    logger = create_service_logger("websocket.startup")
     logger.info("Setting up dependency injection")
     setup_dishka(container, app)
 
 
 def setup_tracing(app: FastAPI) -> None:
-    """Setup distributed tracing with Jaeger."""
+    """Setup distributed tracing with Jaeger using OTLP exporter."""
+    logger = create_service_logger("websocket.startup")
     logger.info("Setting up distributed tracing")
-
-    # Create a TracerProvider with service name
-    resource = Resource.create({"service.name": settings.SERVICE_NAME})
-    tracer_provider = TracerProvider(resource=resource)
-
-    # Configure Jaeger exporter
-    jaeger_exporter = JaegerExporter(
-        agent_host_name=settings.JAEGER_ENDPOINT.split("://")[1].split(":")[0],
-        agent_port=6831,  # Default Jaeger agent port
-    )
-
-    # Add span processor
-    span_processor = BatchSpanProcessor(jaeger_exporter)
-    tracer_provider.add_span_processor(span_processor)
-
-    # Set the global tracer provider
-    trace.set_tracer_provider(tracer_provider)
-
-    # Instrument FastAPI
-    FastAPIInstrumentor.instrument_app(app)
-
+    tracer = init_tracing(settings.SERVICE_NAME)
+    setup_tracing_middleware(app, tracer)
     logger.info("Distributed tracing setup complete")
 
 
 async def start_kafka_consumer(container: Any) -> None:
     """Start the Kafka consumer as a background task."""
     global kafka_consumer_instance, consumer_task
+    logger = create_service_logger("websocket.startup")
 
     try:
         async with container() as request_container:
@@ -91,6 +66,7 @@ async def start_kafka_consumer(container: Any) -> None:
 async def stop_kafka_consumer() -> None:
     """Stop the Kafka consumer and background tasks."""
     global kafka_consumer_instance, consumer_task
+    logger = create_service_logger("websocket.startup")
 
     try:
         if kafka_consumer_instance:

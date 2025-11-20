@@ -10,7 +10,6 @@ from quart_dishka import inject
 
 from services.file_service.config import Settings
 
-logger = create_service_logger("file_service.api.health")
 health_bp = Blueprint("health_routes", __name__)
 
 
@@ -18,7 +17,9 @@ health_bp = Blueprint("health_routes", __name__)
 @inject
 async def health_check(settings: FromDishka[Settings]) -> Response | tuple[Response, int]:
     """Standardized health check endpoint."""
+    logger = create_service_logger("file_service.api.health")
     try:
+        logger.info("Health check requested")
         checks = {"service_responsive": True, "dependencies_available": True}
         dependencies = {}
 
@@ -60,6 +61,7 @@ async def health_check(settings: FromDishka[Settings]) -> Response | tuple[Respo
 @inject
 async def metrics(registry: FromDishka[CollectorRegistry]) -> Response:
     """Prometheus metrics endpoint."""
+    logger = create_service_logger("file_service.api.health")
     try:
         metrics_data = generate_latest(registry)
         response = Response(metrics_data, content_type=CONTENT_TYPE_LATEST)

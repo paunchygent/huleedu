@@ -11,8 +11,6 @@ from quart_dishka import inject
 
 from services.llm_provider_service.config import Settings
 
-logger = create_service_logger("llm_provider_service.health")
-
 health_bp = Blueprint("health", __name__)
 
 
@@ -23,6 +21,8 @@ async def health_check(
     redis_client: FromDishka[RedisClientProtocol],
 ) -> Response | tuple[Response, int]:
     """Health check endpoint."""
+    logger = create_service_logger("llm_provider_service.api.health")
+    logger.info("Health check requested")
     health_status: Dict[str, Any] = {
         "service": settings.SERVICE_NAME,
         "status": "healthy",
@@ -85,6 +85,7 @@ async def health_check(
 @health_bp.route("/metrics", methods=["GET"])
 async def metrics() -> Response:
     """Prometheus metrics endpoint."""
+    logger = create_service_logger("llm_provider_service.api.health")
     try:
         # Generate metrics from the default registry
         metrics_output = generate_latest()

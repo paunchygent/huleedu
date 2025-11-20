@@ -31,8 +31,6 @@ from services.batch_orchestrator_service.implementations.batch_repository_postgr
 from services.batch_orchestrator_service.kafka_consumer import BatchKafkaConsumer
 from services.batch_orchestrator_service.metrics import get_metrics
 
-logger = create_service_logger("bos.startup")
-
 # Global references for service management (unavoidable for Quart lifecycle)
 kafka_consumer_instance: BatchKafkaConsumer | None = None
 consumer_task: asyncio.Task | None = None
@@ -42,6 +40,7 @@ event_relay_worker: EventRelayWorker | None = None
 async def initialize_services(app: HuleEduApp, settings: Settings) -> None:
     """Initialize DI container, Quart-Dishka integration, metrics, and Kafka consumer."""
     global kafka_consumer_instance, consumer_task, event_relay_worker
+    logger = create_service_logger("bos.startup")
 
     try:
         # Initialize DI container with all provider instances
@@ -114,6 +113,7 @@ async def initialize_services(app: HuleEduApp, settings: Settings) -> None:
 async def shutdown_services() -> None:
     """Gracefully shutdown the Kafka consumer, outbox worker, and background tasks."""
     global kafka_consumer_instance, consumer_task, event_relay_worker
+    logger = create_service_logger("bos.startup")
 
     try:
         # Stop EventRelayWorker first

@@ -39,10 +39,6 @@ from services.cj_assessment_service.protocols import (
     LLMInteractionProtocol,
 )
 
-# Configure logging
-configure_service_logging(settings.SERVICE_NAME, log_level=settings.LOG_LEVEL)
-logger = create_service_logger("worker_main")
-
 # Global shutdown flag
 shutdown_event = asyncio.Event()
 
@@ -57,6 +53,7 @@ async def run_consumer(
     tracer: Tracer,
 ) -> None:
     """Run the Kafka consumer task."""
+    logger = create_service_logger("worker_main")
     logger.info("Starting Kafka consumer task")
 
     # Apply idempotency decorator to message processing with v2 configuration
@@ -127,6 +124,7 @@ async def run_consumer(
 
 async def run_monitor(batch_monitor: BatchMonitor) -> None:
     """Run the batch monitoring task."""
+    logger = create_service_logger("worker_main")
     logger.info("Starting batch monitor task")
 
     try:
@@ -166,6 +164,8 @@ async def run_monitor(batch_monitor: BatchMonitor) -> None:
 
 async def main() -> None:
     """Main entry point for CJ Assessment Service worker."""
+    configure_service_logging(settings.SERVICE_NAME, log_level=settings.LOG_LEVEL)
+    logger = create_service_logger("worker_main")
     logger.info("CJ Assessment Service worker starting...")
 
     # Initialize tracing (this sets up the global tracer provider)
@@ -335,6 +335,7 @@ async def main() -> None:
 def signal_handler(signum: int, frame: Any) -> None:
     """Handle shutdown signals."""
     _ = frame  # Unused but required by signal handler signature
+    logger = create_service_logger("worker_main")
     logger.info(f"Received signal {signum}, initiating shutdown...")
     shutdown_event.set()
 
@@ -347,5 +348,6 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except Exception as e:
+        logger = create_service_logger("worker_main")
         logger.error(f"CJ Assessment Service worker failed: {e}", exc_info=True)
         sys.exit(1)

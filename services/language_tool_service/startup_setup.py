@@ -15,11 +15,10 @@ from services.language_tool_service.di import (
     ServiceImplementationsProvider,
 )
 
-logger = create_service_logger("language_tool_service.startup")
-
 
 async def initialize_services(app: Quart, _settings: Settings) -> None:
     """Initialize DI container, Quart-Dishka integration, and metrics."""
+    logger = create_service_logger("language_tool_service.startup")
     try:
         # Initialize DI container with all providers
         container = make_async_container(
@@ -53,6 +52,7 @@ async def initialize_services(app: Quart, _settings: Settings) -> None:
 
 async def shutdown_services(app: Quart | None = None) -> None:
     """Gracefully shutdown all services."""
+    logger = create_service_logger("language_tool_service.startup")
     try:
         # Close any async resources if needed
         logger.info("Language Tool Service shutdown completed")

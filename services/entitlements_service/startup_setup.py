@@ -27,11 +27,10 @@ if TYPE_CHECKING:
 
     from services.entitlements_service.config import Settings
 
-logger = create_service_logger("entitlements_service.startup")
-
 
 async def _start_kafka_consumer_with_monitoring(app: "HuleEduApp") -> None:
     """Start Kafka consumer with automatic restart monitoring and circuit breaker."""
+    logger = create_service_logger("entitlements_service.startup")
 
     async def start_consumer_task() -> None:
         try:
@@ -53,6 +52,7 @@ async def _start_kafka_consumer_with_monitoring(app: "HuleEduApp") -> None:
 
 async def _monitor_kafka_consumer(app: "HuleEduApp") -> None:
     """Monitor Kafka consumer and restart with backoff; guard with circuit breaker."""
+    logger = create_service_logger("entitlements_service.startup")
     restart_count = 0
     max_restart_attempts = 20
     restart_delay = 10.0
@@ -154,6 +154,7 @@ async def initialize_services(
         settings: Service configuration
         container: Dependency injection container
     """
+    logger = create_service_logger("entitlements_service.startup")
     logger.info("Initializing Entitlements Service components...")
 
     try:
@@ -243,6 +244,7 @@ async def initialize_services(
 
 async def shutdown_services() -> None:
     """Shutdown service components gracefully."""
+    logger = create_service_logger("entitlements_service.startup")
     logger.info("Shutting down Entitlements Service components...")
 
     try:

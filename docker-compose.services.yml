@@ -77,7 +77,7 @@ services:
     build:
       context: .
       dockerfile: services/result_aggregator_service/Dockerfile
-    container_name: huleedu_result_aggregator
+    container_name: huleedu_result_aggregator_service
     restart: unless-stopped
     depends_on:
       kafka_topic_setup:
@@ -640,8 +640,12 @@ services:
       - CORS_ORIGINS=["http://localhost:3000"]
       - LOG_LEVEL=INFO
       - ENABLE_METRICS=true
-      - ENABLE_TRACING=false
-      - JAEGER_ENDPOINT=http://jaeger:14268/api/traces
+      - ENABLE_TRACING=true
+      # OpenTelemetry configuration
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - OTEL_SERVICE_NAME=websocket_service
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_METRICS_EXPORTER=none
       # Kafka configuration
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - KAFKA_CONSUMER_GROUP=websocket-service-consumer

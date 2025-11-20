@@ -10,13 +10,12 @@ from huleedu_service_libs.quart_app import HuleEduApp
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.metrics import get_metrics
 
-logger = create_service_logger("cj_assessment_service.startup")
-
 
 async def initialize_services(
     app: HuleEduApp, settings: Settings, container: AsyncContainer
 ) -> None:
     """Initialize database schema using guaranteed infrastructure."""
+    logger = create_service_logger("cj_assessment_service.startup")
     try:
         # Use guaranteed database engine for schema initialization
         async with app.database_engine.begin() as conn:
@@ -43,6 +42,7 @@ async def initialize_services(
 
 async def shutdown_services() -> None:
     """Gracefully shutdown the service."""
+    logger = create_service_logger("cj_assessment_service.startup")
     try:
         logger.info("CJ Assessment Service shutdown completed")
     except Exception as e:

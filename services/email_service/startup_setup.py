@@ -12,13 +12,12 @@ from huleedu_service_libs.quart_app import HuleEduApp
 
 from services.email_service.config import Settings
 
-logger = create_service_logger("email_service.startup_setup")
-
 
 async def initialize_services(
     app: HuleEduApp, settings: Settings, container: AsyncContainer
 ) -> None:
     """Initialize database schema using guaranteed infrastructure."""
+    logger = create_service_logger("email_service.startup_setup")
     try:
         # Use guaranteed database engine for schema initialization
         async with app.database_engine.begin() as conn:
@@ -41,6 +40,7 @@ async def initialize_services(
 
 async def shutdown_services() -> None:
     """Cleanup tasks for graceful shutdown."""
+    logger = create_service_logger("email_service.startup_setup")
     try:
         logger.info("Email Service shutdown tasks completed")
     except Exception as e:

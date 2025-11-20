@@ -178,6 +178,7 @@ services:
 
   # Result Aggregator Service
   result_aggregator_service:
+    container_name: huleedu_result_aggregator_service
     build:
       context: .
       dockerfile: services/result_aggregator_service/Dockerfile.dev

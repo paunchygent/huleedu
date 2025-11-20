@@ -6,17 +6,32 @@ import asyncio
 import signal
 from typing import Any
 
+from huleedu_service_libs import init_tracing
 from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs.middleware.frameworks.quart_middleware import (
+    setup_tracing_middleware,
+)
 from huleedu_service_libs.quart_app import HuleEduApp
 from prometheus_client import start_http_server
 
 from services.result_aggregator_service.config import Settings
 
-logger = create_service_logger("result_aggregator.startup")
+
+async def initialize_tracing(app: HuleEduApp) -> None:
+    """Initialize OpenTelemetry tracing with Jaeger."""
+    logger = create_service_logger("result_aggregator.startup")
+    try:
+        tracer = init_tracing("result_aggregator_service")
+        setup_tracing_middleware(app, tracer)
+        logger.info("Result Aggregator Service tracing initialized successfully")
+    except Exception as e:
+        logger.critical("Failed to initialize tracing: %s", e, exc_info=True)
+        raise
 
 
 def setup_metrics_endpoint(app: HuleEduApp) -> None:
     """Setup Prometheus metrics endpoint on separate port."""
+    logger = create_service_logger("result_aggregator.startup")
 
     @app.before_serving
     async def start_metrics_server() -> None:
@@ -31,6 +46,7 @@ def setup_metrics_endpoint(app: HuleEduApp) -> None:
 
 def setup_signal_handlers(app: HuleEduApp) -> None:
     """Setup graceful shutdown signal handlers."""
+    logger = create_service_logger("result_aggregator.startup")
 
     async def graceful_shutdown() -> None:
         """Perform graceful shutdown."""

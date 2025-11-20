@@ -19,8 +19,6 @@ if TYPE_CHECKING:
 from services.spellchecker_service.config import Settings
 from services.spellchecker_service.metrics import get_metrics
 
-logger = create_service_logger("spellchecker_service.startup_setup")
-
 
 async def initialize_services(
     app: "HuleEduApp", settings: Settings, container: AsyncContainer
@@ -39,6 +37,7 @@ async def initialize_services(
         settings: Application settings
         container: DI container for service dependencies
     """
+    logger = create_service_logger("spellchecker_service.startup_setup")
     logger.info("Initializing Spell Checker Service health API components")
 
     # Initialize tracing
@@ -87,6 +86,7 @@ async def shutdown_services() -> None:
 
     Handles graceful shutdown of any resources that need explicit cleanup.
     """
+    logger = create_service_logger("spellchecker_service.startup_setup")
     logger.info("Shutting down Spell Checker Service health API components")
 
     # TODO: Add cleanup logic here

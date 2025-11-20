@@ -16,7 +16,6 @@ from services.batch_orchestrator_service.config import Settings
 if TYPE_CHECKING:
     from huleedu_service_libs.quart_app import HuleEduApp
 
-logger = create_service_logger("bos.api.health")
 health_bp = Blueprint("health_routes", __name__)
 
 
@@ -24,7 +23,9 @@ health_bp = Blueprint("health_routes", __name__)
 @inject
 async def health_check(settings: FromDishka[Settings]) -> Response | tuple[Response, int]:
     """Standardized health check endpoint."""
+    logger = create_service_logger("batch_orchestrator_service.api.health")
     try:
+        logger.info("Health check requested")
         # Check database connectivity
         checks = {"service_responsive": True, "dependencies_available": True}
         dependencies = {}
@@ -81,6 +82,7 @@ async def health_check(settings: FromDishka[Settings]) -> Response | tuple[Respo
 @health_bp.route("/healthz/database")
 async def database_health_check() -> Response | tuple[Response, int]:
     """Database-specific health check endpoint with detailed metrics."""
+    logger = create_service_logger("batch_orchestrator_service.api.health")
     try:
         # Get database engine (guaranteed to exist with HuleEduApp)
         if TYPE_CHECKING:
@@ -118,6 +120,7 @@ async def database_health_check() -> Response | tuple[Response, int]:
 @health_bp.route("/healthz/database/summary")
 async def database_health_summary() -> Response | tuple[Response, int]:
     """Lightweight database health summary for frequent polling."""
+    logger = create_service_logger("batch_orchestrator_service.api.health")
     try:
         # Get database engine (guaranteed to exist with HuleEduApp)
         if TYPE_CHECKING:
@@ -150,6 +153,7 @@ async def database_health_summary() -> Response | tuple[Response, int]:
 @health_bp.route("/metrics")
 async def metrics() -> Response:
     """Prometheus metrics endpoint."""
+    logger = create_service_logger("batch_orchestrator_service.api.health")
     try:
         metrics_data = generate_latest(REGISTRY)
         response = Response(metrics_data, content_type=CONTENT_TYPE_LATEST)

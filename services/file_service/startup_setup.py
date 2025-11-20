@@ -13,11 +13,10 @@ from quart_dishka import QuartDishka
 from services.file_service.config import Settings
 from services.file_service.di import CoreInfrastructureProvider, ServiceImplementationsProvider
 
-logger = create_service_logger("file_service.startup")
-
 
 async def initialize_services(app: Quart, _settings: Settings) -> None:
     """Initialize DI container, Quart-Dishka integration, and metrics."""
+    logger = create_service_logger("file_service.startup")
     try:
         # Initialize DI container with all providers
         # OutboxProvider automatically provides environment-based settings
@@ -58,6 +57,7 @@ async def initialize_services(app: Quart, _settings: Settings) -> None:
 
 async def shutdown_services(app: Quart | None = None) -> None:
     """Gracefully shutdown all services."""
+    logger = create_service_logger("file_service.startup")
     try:
         # Stop EventRelayWorker if it exists
         if app and hasattr(app, "extensions") and "relay_worker" in app.extensions:

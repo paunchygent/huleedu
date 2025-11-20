@@ -17,8 +17,6 @@ if TYPE_CHECKING:
 
 from ..config import Settings
 
-logger = create_service_logger("entitlements_service.health")
-
 # Create health blueprint
 health_bp = Blueprint("health", __name__)
 
@@ -30,6 +28,8 @@ async def health_check() -> tuple[dict[str, Any], int]:
     Returns:
         JSON response with health status
     """
+    logger = create_service_logger("entitlements_service.api.health")
+    logger.info("Health check requested")
     app: HuleEduApp = current_app._get_current_object()  # type: ignore[attr-defined]
 
     # Check database health
@@ -50,25 +50,12 @@ async def health_check() -> tuple[dict[str, Any], int]:
         db_message = f"Health check failed: {e}"
         logger.error(db_message)
 
-    # Check Kafka consumer health
-    kafka_healthy = False
-    kafka_message = "Unknown"
+    # Kafka health check removed - Kafka availability is validated during message consumption
+    # This prevents false negatives from the normal consumer restart pattern
+    # (Consumer task completes and restarts every ~5 seconds, which is expected behavior)
 
-    try:
-        if hasattr(app, "kafka_consumer") and app.kafka_consumer:
-            if hasattr(app, "consumer_task") and app.consumer_task and not app.consumer_task.done():
-                kafka_healthy = True
-                kafka_message = "Kafka consumer running"
-            else:
-                kafka_message = "Kafka consumer task completed or failed"
-        else:
-            kafka_message = "Kafka consumer not initialized"
-    except Exception as e:
-        kafka_message = f"Kafka consumer health check failed: {e}"
-        logger.error(kafka_message)
-
-    # Overall health status
-    healthy = db_healthy and kafka_healthy
+    # Overall health status - only check database connectivity
+    healthy = db_healthy
     overall_status = "healthy" if healthy else "unhealthy"
 
     # Get environment information from settings
@@ -89,8 +76,11 @@ async def health_check() -> tuple[dict[str, Any], int]:
                 "message": db_message,
             },
             "kafka_consumer": {
-                "status": "healthy" if kafka_healthy else "unhealthy",
-                "message": kafka_message,
+                "status": "info",
+                "note": "Kafka availability checked during message consumption",
+                "message": (
+                    "Consumer uses automatic restart pattern; task completion is normal behavior"
+                ),
             },
             # Aggregate booleans retained for compatibility
             "service_responsive": True,
@@ -110,6 +100,7 @@ async def metrics() -> Response:
     Returns:
         Prometheus formatted metrics
     """
+    logger = create_service_logger("entitlements_service.api.health")
     try:
         # Generate metrics in Prometheus format
         metrics_data = generate_latest()

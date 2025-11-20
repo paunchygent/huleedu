@@ -25,7 +25,6 @@ from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.models_api import ErrorResponse
 from services.cj_assessment_service.protocols import CJRepositoryProtocol
 
-logger = create_service_logger("cj_assessment_service.api.health")
 health_bp = Blueprint("health_routes", __name__)
 
 
@@ -52,7 +51,9 @@ def create_error_response(
 @inject
 async def health_check(settings: FromDishka[Settings]) -> tuple[Response, int]:
     """Standardized health check endpoint for CJ Assessment Service."""
+    logger = create_service_logger("cj_assessment_service.api.health")
     try:
+        logger.info("Health check requested")
         # Check database connectivity
         checks = {"service_responsive": True, "dependencies_available": True}
         dependencies = {}
@@ -101,6 +102,7 @@ async def health_check(settings: FromDishka[Settings]) -> tuple[Response, int]:
 @inject
 async def database_health_check(settings: FromDishka[Settings]) -> Response | tuple[Response, int]:
     """Database-specific health check endpoint with detailed metrics."""
+    logger = create_service_logger("cj_assessment_service.api.health")
     try:
         # Type-safe access to guaranteed infrastructure
         if TYPE_CHECKING:
@@ -136,6 +138,7 @@ async def database_health_summary(
     settings: FromDishka[Settings],
 ) -> Response | tuple[Response, int]:
     """Lightweight database health summary for frequent polling."""
+    logger = create_service_logger("cj_assessment_service.api.health")
     try:
         # Type-safe access to guaranteed infrastructure
         if TYPE_CHECKING:
@@ -171,6 +174,7 @@ async def metrics(registry: FromDishka[CollectorRegistry]) -> Response:
     Returns:
         Prometheus-formatted metrics data
     """
+    logger = create_service_logger("cj_assessment_service.api.health")
     try:
         from prometheus_client import generate_latest
 
@@ -197,6 +201,7 @@ async def liveness_probe(settings: FromDishka[Settings]) -> tuple[Response, int]
     This endpoint is intentionally lightweight and only checks
     basic service responsiveness, not dependencies.
     """
+    logger = create_service_logger("cj_assessment_service.api.health")
     try:
         # Basic check - if we can handle requests, we're alive
         response = {
@@ -226,6 +231,7 @@ async def readiness_probe(
     - Active batch monitoring
     - Critical dependencies
     """
+    logger = create_service_logger("cj_assessment_service.api.health")
     try:
         checks = {
             "database": False,

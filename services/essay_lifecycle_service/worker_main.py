@@ -46,8 +46,6 @@ from services.essay_lifecycle_service.protocols import (
     ServiceResultHandler,
 )
 
-logger = create_service_logger("worker_main")
-
 # Global state for graceful shutdown
 should_stop = False
 
@@ -55,6 +53,7 @@ should_stop = False
 def setup_signal_handlers() -> None:
     """Setup signal handlers for graceful shutdown."""
     global should_stop
+    logger = create_service_logger("worker_main")
 
     def signal_handler(signum: int, frame: object) -> None:
         global should_stop
@@ -67,6 +66,7 @@ def setup_signal_handlers() -> None:
 
 async def create_kafka_consumer() -> AIOKafkaConsumer:
     """Create and configure Kafka consumer."""
+    logger = create_service_logger("worker_main")
     # Define topics using topic_name() function for consistency
     topics = [
         topic_name(
@@ -122,6 +122,7 @@ async def run_consumer_loop(
 ) -> None:
     """Main message processing loop with idempotency support."""
     global should_stop
+    logger = create_service_logger("worker_main")
 
     # Define the base message handler with confirmation callback
     async def _process_message_wrapper(
@@ -270,6 +271,7 @@ async def main() -> None:
         service_name=settings.SERVICE_NAME,
         log_level=settings.LOG_LEVEL,
     )
+    logger = create_service_logger("worker_main")
 
     # Setup signal handlers
     setup_signal_handlers()

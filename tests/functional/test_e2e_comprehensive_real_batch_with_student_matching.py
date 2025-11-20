@@ -119,6 +119,7 @@ async def test_comprehensive_real_batch_with_student_matching() -> None:
             expected_completion_event="batch.cj_assessment.completed",  # CJ completion event
             validate_phase_pruning=False,  # First run, no pruning
             timeout_seconds=120,
+            prompt_payload={"assignment_id": "test_eng5_writing_2025"},
         )
 
         # Step 5: Validate pipeline execution

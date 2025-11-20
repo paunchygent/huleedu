@@ -17,8 +17,6 @@ from services.result_aggregator_service.config import Settings
 if TYPE_CHECKING:
     from huleedu_service_libs.quart_app import HuleEduApp
 
-logger = create_service_logger("result_aggregator.api.health")
-
 health_bp = Blueprint("health", __name__)
 
 
@@ -29,7 +27,9 @@ async def health_check(
     redis_client: FromDishka[RedisClientProtocol],
 ) -> Response | tuple[Response, int]:
     """Health check endpoint with dependency checks."""
+    logger = create_service_logger("result_aggregator_service.api.health")
     try:
+        logger.info("Health check requested")
         # Check dependencies
         dependencies = {}
         checks = {"service_responsive": True, "dependencies_available": True}
@@ -107,6 +107,7 @@ async def _check_redis_health(redis_client: RedisClientProtocol) -> dict:
 @inject
 async def metrics(registry: FromDishka[CollectorRegistry]) -> Response:
     """Prometheus metrics endpoint."""
+    logger = create_service_logger("result_aggregator_service.api.health")
     try:
         from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 

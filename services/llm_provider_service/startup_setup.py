@@ -17,13 +17,12 @@ from services.llm_provider_service.implementations.connection_pool_manager_impl 
 from services.llm_provider_service.implementations.queue_processor_impl import QueueProcessorImpl
 from services.llm_provider_service.metrics import get_metrics
 
-logger = create_service_logger("llm_provider_service.startup")
-
 
 async def initialize_services(app: Quart, settings: Settings) -> None:
     """Initialize all services and middleware."""
     # Configure centralized structured logging before any logging operations
     configure_service_logging(settings.SERVICE_NAME, log_level=settings.LOG_LEVEL)
+    logger = create_service_logger("llm_provider_service.startup")
 
     logger.info(f"Starting {settings.SERVICE_NAME} initialization...")
 
@@ -56,6 +55,7 @@ async def initialize_services(app: Quart, settings: Settings) -> None:
 
 async def shutdown_services(app: Quart) -> None:
     """Gracefully shutdown all services."""
+    logger = create_service_logger("llm_provider_service.startup")
     logger.info("Starting graceful shutdown...")
 
     # Stop queue processor

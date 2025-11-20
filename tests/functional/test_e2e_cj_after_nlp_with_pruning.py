@@ -129,6 +129,7 @@ async def test_e2e_cj_assessment_after_nlp_with_spellcheck_pruning() -> None:
             expected_completion_event="cj_assessment.completed",
             validate_phase_pruning=False,  # Don't validate manual pruning
             timeout_seconds=120,
+            prompt_payload={"assignment_id": "test_eng5_writing_2025"},
         )
 
         # Validate CJ Assessment pipeline results

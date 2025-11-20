@@ -10,16 +10,17 @@ from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry, generate_l
 from quart import Blueprint, Response, jsonify
 from quart_dishka import inject
 
-logger = create_service_logger("content.api.health")
 health_bp = Blueprint("health_routes", __name__)
 
 
 @health_bp.route("/healthz")
 async def health_check() -> Response | tuple[Response, int]:
     """Standardized health check endpoint."""
+    logger = create_service_logger("content_service.api.health")
     correlation_id = uuid.uuid4()
 
     try:
+        logger.info("Health check requested")
         # Basic service responsiveness check
         # Database connectivity is verified through actual operations
         health_response = {
@@ -59,6 +60,7 @@ async def health_check() -> Response | tuple[Response, int]:
 @inject
 async def metrics(registry: FromDishka[CollectorRegistry]) -> Response:
     """Prometheus metrics endpoint."""
+    logger = create_service_logger("content_service.api.health")
     correlation_id = uuid.uuid4()
 
     try:

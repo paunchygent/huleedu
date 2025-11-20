@@ -78,6 +78,7 @@ class TestE2EIdentityThreading:
                     expected_completion_event="cj_assessment.completed",
                     validate_phase_pruning=False,
                     timeout_seconds=45,
+                    prompt_payload={"assignment_id": "test_eng5_writing_2025"},
                 )
 
                 assert result.all_steps_completed
@@ -161,6 +162,7 @@ class TestE2EIdentityThreading:
                 expected_completion_event="cj_assessment.completed",
                 validate_phase_pruning=False,
                 timeout_seconds=45,
+                prompt_payload={"assignment_id": "test_eng5_writing_2025"},
             )
 
             assert result.all_steps_completed
@@ -202,6 +204,7 @@ class TestE2EIdentityThreading:
                 expected_completion_event="cj_assessment.completed",
                 validate_phase_pruning=False,
                 timeout_seconds=45,
+                prompt_payload={"assignment_id": "test_eng5_writing_2025"},
             )
 
             assert result.all_steps_completed
@@ -249,6 +252,7 @@ class TestE2EIdentityThreading:
                 expected_completion_event="cj_assessment.completed",
                 validate_phase_pruning=False,
                 timeout_seconds=45,
+                prompt_payload={"assignment_id": "test_eng5_writing_2025"},
             )
 
             assert result.all_steps_completed
@@ -295,6 +299,7 @@ class TestE2EIdentityThreading:
                 expected_completion_event="cj_assessment.completed",
                 validate_phase_pruning=False,
                 timeout_seconds=45,
+                prompt_payload={"assignment_id": "test_eng5_writing_2025"},
             )
 
             assert result.all_steps_completed

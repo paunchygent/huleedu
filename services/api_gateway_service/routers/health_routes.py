@@ -10,14 +10,15 @@ from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry, generate_l
 
 from huleedu_service_libs.logging_utils import create_service_logger
 
-logger = create_service_logger("api_gateway_service.routers.health")
 router = APIRouter(tags=["Health"])
 
 
 @router.get("/healthz")
 async def health_check() -> dict[str, str | dict]:
     """Health check endpoint following Rule 072 format."""
+    logger = create_service_logger("api_gateway_service.routers.health")
     try:
+        logger.info("Health check requested")
         checks = {"service_responsive": True, "dependencies_available": True}
         dependencies = {
             "redis": {"status": "healthy", "note": "Rate limiting and session storage"},
@@ -53,6 +54,7 @@ async def health_check() -> dict[str, str | dict]:
 @inject
 async def metrics(registry: FromDishka[CollectorRegistry]):
     """Prometheus metrics endpoint."""
+    logger = create_service_logger("api_gateway_service.routers.health")
     try:
         metrics_data = generate_latest(registry)
         return PlainTextResponse(content=metrics_data, media_type=CONTENT_TYPE_LATEST)

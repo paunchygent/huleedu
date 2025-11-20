@@ -217,6 +217,7 @@ class PipelineTestHarness:
         validate_phase_pruning: bool = False,
         expected_pruned_phases: Optional[list[str]] = None,
         timeout_seconds: int = 120,
+        prompt_payload: Optional[dict[str, Any]] = None,
     ) -> PipelineExecutionResult:
         """
         Execute a pipeline and monitor its progress.
@@ -228,6 +229,7 @@ class PipelineTestHarness:
             validate_phase_pruning: Whether to validate phase pruning
             expected_pruned_phases: List of phases expected to be pruned
             timeout_seconds: Timeout for pipeline execution
+            prompt_payload: Optional prompt metadata for prompt-dependent pipelines
 
         Returns:
             PipelineExecutionResult with execution details
@@ -249,14 +251,18 @@ class PipelineTestHarness:
 
         # Send pipeline execution request
         # Pipeline names match PhaseName enum values directly - no mapping needed
+        request_payload: dict[str, Any] = {
+            "batch_id": self.batch_id,
+            "requested_pipeline": pipeline_name,
+        }
+        if prompt_payload:
+            request_payload["prompt_payload"] = prompt_payload
+
         response = await self.service_manager.make_request(
             method="POST",
             service="api_gateway_service",
             path=f"/v1/batches/{self.batch_id}/pipelines",
-            json={
-                "batch_id": self.batch_id,
-                "requested_pipeline": pipeline_name,
-            },
+            json=request_payload,
             user=self.teacher_user,
             correlation_id=request_correlation_id,
         )

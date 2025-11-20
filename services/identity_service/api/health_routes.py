@@ -20,14 +20,15 @@ if TYPE_CHECKING:
     from huleedu_service_libs import HuleEduApp
 
 bp = Blueprint("health", __name__)
-logger = create_service_logger("identity_service.health_routes")
 
 
 @bp.route("/healthz")
 @inject
 async def health_check(settings: FromDishka[Settings]) -> Response | tuple[Response, int]:
     """Standardized health check endpoint."""
+    logger = create_service_logger("identity_service.api.health")
     try:
+        logger.info("Health check requested")
         # Check database connectivity
         checks = {"service_responsive": True, "dependencies_available": True}
         dependencies = {}
@@ -79,6 +80,7 @@ async def health_check(settings: FromDishka[Settings]) -> Response | tuple[Respo
 @inject
 async def metrics(registry: FromDishka[CollectorRegistry]) -> Response:
     """Prometheus metrics endpoint."""
+    logger = create_service_logger("identity_service.api.health")
     try:
         metrics_data = generate_latest(registry)
         return Response(metrics_data, content_type=CONTENT_TYPE_LATEST)

@@ -129,6 +129,7 @@ async def test_e2e_sequential_pipelines_with_phase_pruning() -> None:
             expected_steps=["cj_assessment"],  # Spellcheck should be pruned!
             expected_completion_event="batch.cj_assessment.completed",
             validate_phase_pruning=True,  # Validate pruning occurred
+            prompt_payload={"assignment_id": "test_eng5_writing_2025"},
         )
 
         # Validate CJ Assessment pipeline results

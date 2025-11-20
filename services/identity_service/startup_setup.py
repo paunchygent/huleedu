@@ -5,7 +5,6 @@ import asyncio
 from dishka import make_async_container
 from huleedu_service_libs import init_tracing
 from huleedu_service_libs.logging_utils import (
-    configure_service_logging,
     create_service_logger,
 )
 from huleedu_service_libs.middleware.frameworks.quart_middleware import (
@@ -24,11 +23,9 @@ from services.identity_service.di import (
 from services.identity_service.kafka_consumer import IdentityKafkaConsumer
 from services.identity_service.models_db import Base
 
-logger = create_service_logger("identity_service.startup")
-
 
 async def initialize_services(app: Quart, settings: Settings) -> None:
-    configure_service_logging(settings.SERVICE_NAME, log_level=settings.LOG_LEVEL)
+    logger = create_service_logger("identity_service.startup")
     logger.info("Identity Service initializing")
 
     # DI container and quart integration
@@ -72,6 +69,7 @@ async def initialize_services(app: Quart, settings: Settings) -> None:
 
 
 async def shutdown_services(app: Quart | None = None) -> None:
+    logger = create_service_logger("identity_service.startup")
     if app and hasattr(app, "extensions"):
         # Stop IdentityKafkaConsumer
         if "identity_kafka_consumer" in app.extensions:

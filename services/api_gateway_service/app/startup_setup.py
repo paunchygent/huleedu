@@ -19,11 +19,10 @@ from services.api_gateway_service.config import settings
 # Configure centralized structured logging before creating logger
 configure_service_logging("api_gateway_service", log_level=settings.LOG_LEVEL)
 
-logger = create_service_logger("api_gateway_service.startup")
-
 
 def create_di_container():
     """Create and configure the DI container."""
+    logger = create_service_logger("api_gateway_service.startup")
     try:
         logger.info("Creating DI container...")
         container = make_async_container(
@@ -40,6 +39,7 @@ def create_di_container():
 
 def setup_dependency_injection(app: FastAPI, container):
     """Setup Dishka integration with FastAPI."""
+    logger = create_service_logger("api_gateway_service.startup")
     try:
         logger.info("Setting up dependency injection...")
         setup_dishka(container, app)
@@ -51,6 +51,7 @@ def setup_dependency_injection(app: FastAPI, container):
 
 def setup_tracing_and_middleware(app: FastAPI):
     """Setup distributed tracing and tracing middleware for the API Gateway."""
+    logger = create_service_logger("api_gateway_service.startup")
     try:
         logger.info("Initializing distributed tracing...")
         tracer = init_tracing("api_gateway_service")
@@ -80,6 +81,7 @@ def setup_standard_metrics_middleware(app: FastAPI, registry=None):
         app: FastAPI application instance
         registry: Optional Prometheus registry for test isolation
     """
+    logger = create_service_logger("api_gateway_service.startup")
     try:
         logger.info("Setting up standard HTTP metrics middleware...")
         setup_standard_service_metrics_middleware(app, "api_gateway", registry=registry)
@@ -91,4 +93,5 @@ def setup_standard_metrics_middleware(app: FastAPI, registry=None):
 
 async def shutdown_services() -> None:
     """Gracefully shutdown all services."""
+    logger = create_service_logger("api_gateway_service.startup")
     logger.info("API Gateway Service shutdown completed")

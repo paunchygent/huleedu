@@ -15,7 +15,6 @@ from services.language_tool_service.protocols import (
     LanguageToolWrapperProtocol,
 )
 
-logger = create_service_logger("language_tool_service.api.health")
 health_bp = Blueprint("health_routes", __name__)
 
 
@@ -28,7 +27,9 @@ async def health_check(
     language_tool_manager: FromDishka[LanguageToolManagerProtocol],
 ) -> Response | tuple[Response, int]:
     """Standardized health check endpoint with dependency status."""
+    logger = create_service_logger("language_tool_service.api.health")
     try:
+        logger.info("Health check requested")
         checks = {"service_responsive": True, "dependencies_available": True}
         dependencies = {}
 
@@ -130,6 +131,7 @@ async def health_check(
 @inject
 async def metrics(registry: FromDishka[CollectorRegistry]) -> Response:
     """Prometheus metrics endpoint."""
+    logger = create_service_logger("language_tool_service.api.health")
     try:
         metrics_data = generate_latest(registry)
         response = Response(metrics_data, content_type=CONTENT_TYPE_LATEST)

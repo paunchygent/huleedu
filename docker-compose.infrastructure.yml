@@ -160,9 +160,10 @@ services:
       - ALLOW_ANONYMOUS_LOGIN=yes
 
   kafka:
-    image: bitnami/kafka:3.7 
+    image: bitnami/kafka:3.7
     container_name: huleedu_kafka
     restart: unless-stopped
+    init: true  # Enable init system to properly reap zombie processes
     depends_on:
       - zookeeper
     networks:
@@ -182,6 +183,15 @@ services:
       - KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR=1
       - KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
       - KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR=1
+      - KAFKA_HEAP_OPTS=-Xmx1G -Xms512M  # JVM heap: max 1GB, initial 512MB
+    deploy:
+      resources:
+        limits:
+          memory: 2G      # Maximum memory allocation
+          cpus: '2.0'     # Maximum CPU allocation
+        reservations:
+          memory: 1G      # Guaranteed memory
+          cpus: '1.0'     # Guaranteed CPU
     healthcheck:
       test: ["CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list"]
       interval: 15s

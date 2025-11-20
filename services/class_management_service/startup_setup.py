@@ -6,11 +6,10 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from services.class_management_service.models_db import Base
 
-logger = create_service_logger("cms.startup")
-
 
 async def initialize_database_schema(app: HuleEduApp) -> AsyncEngine:
     """Initialize the database schema using the app's existing engine."""
+    logger = create_service_logger("cms.startup")
     try:
         logger.info("Initializing database schema...")
 
@@ -29,6 +28,7 @@ async def initialize_database_schema(app: HuleEduApp) -> AsyncEngine:
 
 async def shutdown_services() -> None:
     """Gracefully shutdown all services."""
+    logger = create_service_logger("cms.startup")
     try:
         # Shutdown Redis and other async resources
         from services.class_management_service.di import shutdown_container_resources

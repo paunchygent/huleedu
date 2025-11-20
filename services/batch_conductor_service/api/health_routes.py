@@ -14,7 +14,6 @@ from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 from services.batch_conductor_service.config import Settings
 from services.batch_conductor_service.protocols import BatchStateRepositoryProtocol
 
-logger = create_service_logger("bcs.api.health")
 health_bp = Blueprint("health_routes", __name__)
 
 
@@ -26,6 +25,8 @@ async def health_check(
     settings: FromDishka[Settings],
 ) -> Response | tuple[Response, int]:
     """Health check endpoint compliant with Rule 072 format."""
+    logger = create_service_logger("batch_conductor_service.api.health")
+    logger.info("Health check requested")
     # Initialize checks and dependencies
     checks: dict[str, bool] = {
         "service_responsive": True,
@@ -103,6 +104,7 @@ async def health_check(
 @health_bp.route("/metrics")
 async def metrics() -> Response:
     """Prometheus metrics endpoint."""
+    logger = create_service_logger("batch_conductor_service.api.health")
     try:
         metrics_data = generate_latest(REGISTRY)
         response = Response(metrics_data, content_type=CONTENT_TYPE_LATEST)

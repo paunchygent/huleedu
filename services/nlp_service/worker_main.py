@@ -22,8 +22,6 @@ from services.nlp_service.di import NlpServiceInfrastructureProvider
 from services.nlp_service.di_nlp_analysis import NlpAnalysisProvider
 from services.nlp_service.kafka_consumer import NlpKafkaConsumer
 
-logger = create_service_logger("nlp_service.worker_main")
-
 # Global state for graceful shutdown
 should_stop = False
 kafka_consumer_instance: NlpKafkaConsumer | None = None
@@ -33,6 +31,7 @@ consumer_task: asyncio.Task | None = None
 def setup_signal_handlers() -> None:
     """Setup signal handlers for graceful shutdown."""
     global should_stop
+    logger = create_service_logger("nlp_service.worker_main")
 
     def signal_handler(signum: int, frame: object) -> None:
         global should_stop
@@ -52,6 +51,7 @@ async def main() -> None:
         service_name=settings.SERVICE_NAME,
         log_level=settings.LOG_LEVEL,
     )
+    logger = create_service_logger("nlp_service.worker_main")
 
     # Setup signal handlers
     setup_signal_handlers()
