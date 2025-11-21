@@ -159,6 +159,21 @@ class HuleEduApp(Quart):
     the event relay background process.
     """
 
+    batch_monitor: Optional[Any] = None
+    """Batch monitoring instance for background batch status tracking.
+
+    OPTIONAL: Used by services that implement batch monitoring.
+    Manages background processing for stuck batch detection and recovery.
+    """
+
+    monitor_task: Optional[asyncio.Task[None]] = None
+    """Asyncio task for background batch monitor processing.
+
+    OPTIONAL: Used by services with batch monitors.
+    Enables graceful shutdown and task lifecycle management for
+    the batch monitoring background process.
+    """
+
     def __init__(self, import_name: str, *args, **kwargs) -> None:
         """Initialize HuleEduApp with type-safe infrastructure attributes.
 
@@ -187,3 +202,5 @@ class HuleEduApp(Quart):
         self._consumer_shutdown_requested = False
         self.relay_worker = None
         self.relay_task = None
+        self.batch_monitor = None
+        self.monitor_task = None

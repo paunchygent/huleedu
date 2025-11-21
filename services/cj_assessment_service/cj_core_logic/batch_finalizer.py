@@ -89,6 +89,15 @@ class BatchFinalizer:
                 )
                 return
 
+            # Idempotency guard: if terminal, skip
+            status_str = str(batch_upload.status)
+            if status_str.startswith("COMPLETE") or status_str.startswith("ERROR"):
+                logger.info(
+                    "Batch already terminal, skipping finalization",
+                    extra={**log_extra, "batch_id": batch_id, "status": status_str},
+                )
+                return
+
             # Transition the CJ state machine into SCORING once finalization starts
             await update_batch_state_in_session(
                 session=session,
