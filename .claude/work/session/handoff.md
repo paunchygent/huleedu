@@ -7,7 +7,7 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 - **README_FIRST.md** - Architectural overview, decisions, service status
 - **Service READMEs** - Service-specific patterns, error handling, testing
 - **.claude/rules/** - Implementation standards and requirements
-- **Documentation/OPERATIONS/** - Operational runbooks
+- **Documentation/OPERATIONS/** - Operational runbooks (see docs/operations/cj-assessment-foundation.md for CJ/LLM defaults & metrics)
 - **TASKS/** - Detailed task documentation
 
 ---
@@ -16,29 +16,48 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 
 ### Uncommitted Changes Ready for Commit
 
-**Status**: Significant refactoring complete, quality gates passing, ready for review and commit
+**Status**: Stability-first completion + critical JSON serialization bug fix complete, all tests passing
 
-**Modified Files** (~36 files, +1570/-583 lines):
-- CJ Completion Logic: Stability-first completion, callback-driven scoring
-- Anthropic Provider: Retry-After support, 529 handling, metadata propagation
+**Modified Files** (~38 files, +1620/-620 lines):
+- CJ Completion Logic: Stability-first completion, callback-driven scoring, JSON serialization fix
+- Anthropic Provider: Retry-After support, 529 handling, metadata propagation, prompt caching
 - ELS Slot Assignment: Lock-aware retries for Option B allocator under contention
-- Functional Test Updates: E2E CJ pipeline harness with stability completion
+- Integration Tests: Real database workflow validation passing
 - Batch Monitor: Embedded in `app.py`, heartbeat + sweep operational
 
 **Key Changes**:
-1. **Callback-Driven Completion**: Scoring runs as soon as `callbacks_received == submitted_comparisons`
-2. **Stability-First Finalization**: Triggers on BT stability or capped denominator (min(total_budget, nC2))
-3. **Small Batch Fix**: Completion denominator uses nC2 cap (4 essays → 6 pairs)
-4. **Anthropic Hardening**: Respects Retry-After, treats 529/overloaded as retryable, surfaces stop_reason
-5. **Metadata Enrichment**: Sends correlation_id + prompt_sha256, optional prompt caching with TTL
+1. **Callback-Driven Workflow**: Scoring runs immediately when `callbacks_received == submitted_comparisons`; finalize when stability passes or callbacks hit capped denominator (min(total_budget, nC2))
+2. **Small Batch Completion Fix**: Cap denominator using nC2 via `CJBatchState._max_possible_comparisons` (n=4 → 6 pairs finish right after callbacks)
+3. **JSON Serialization Bug Fix**: Replace `float("inf")` with `None` in `workflow_continuation.py:180` - PostgreSQL JSON columns reject `Infinity` token, was causing batch finalization to fail silently on first iteration
+4. **Callback Counter Updates**: `last_activity_at` updated on each callback; BatchMonitor progress/sweep now include failed callbacks
+5. **Anthropic Hardening**: Retry-After on 429 (bounded sleep), 529/overloaded treated retryable, stop_reason=max_tokens raises structured error, correlation_id + prompt_sha256 metadata, optional system-block prompt caching (ENABLE_PROMPT_CACHING, PROMPT_CACHE_TTL_SECONDS)
+
+**Workflow Continuation Enhancements**:
+- Waits until all submitted callbacks arrive (`pending_callbacks == 0`)
+- Recomputes BT scores, persists `bt_scores`/`last_score_change` (now JSON-safe)
+- Finalizes if stability threshold or denominator reached; otherwise enqueues more if budget remains
 
 **Quality Gates**:
 - ✅ Typecheck: All passing
 - ✅ Format: All passing
 - ✅ Lint: All passing (except pre-existing F821 in health_routes.py files)
-- ✅ Tests: Updated and passing
+- ✅ Tests: All passing including `test_real_database_integration.py`
 
-**Next Action**: Review uncommitted changes, create commit with proper message, run full test suite validation
+**Test Coverage**:
+```bash
+# Validated passing:
+pdm run pytest-root services/cj_assessment_service/tests/unit/test_workflow_continuation.py
+pdm run pytest-root services/cj_assessment_service/tests/unit/test_completion_threshold.py
+pdm run pytest-root services/cj_assessment_service/tests/integration/test_real_database_integration.py
+pdm run pytest-root services/llm_provider_service/tests/integration/test_anthropic_error_diagnostics.py
+```
+
+**Documentation Updated**:
+- CJ README: Completion path, callback-driven finalization
+- LPS README: Anthropic ops, prompt caching, retry behavior
+- Task doc: `.claude/work/tasks/TASK-CJ-LLM-SERIAL-BUNDLE-VALIDATION-FIXES.md` (PR1 done, PR3 in_progress)
+
+**Next Action**: Create commit, run broader CJ integration/ENG5 validation, tune `PROMPT_CACHE_TTL_SECONDS` as needed
 
 ---
 
@@ -46,7 +65,7 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 
 ### 1. ELS Transaction Boundary Violations (High Priority)
 
-**Task Doc**: `.claude/work/tasks/TASK-FIX-ELS-TRANSACTION-BOUNDARY-VIOLATIONS.md`
+**Task Doc**: `TASKS/infrastructure/fix-els-transaction-boundary-violations.md` (migrated 2025-11-21)
 **Status**: Investigation complete ✅, Task approved ✅, Ready for implementation
 
 **Summary**: Systematic scan revealed 17 handler files creating multiple independent transaction blocks instead of single Unit of Work pattern. Violates architectural standard for Handler-Level Unit of Work with Transactional Outbox.
@@ -69,7 +88,7 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 
 ### 2. LPS Rate Limiting Implementation (Awaiting Approval)
 
-**Task Doc**: `.claude/work/tasks/TASK-LPS-RATE-LIMITING-IMPLEMENTATION-2025-11-21.md`
+**Task Doc**: `TASKS/infrastructure/lps-rate-limiting-implementation.md` (migrated 2025-11-21)
 **Status**: Investigation complete ✅, 5 PRs defined, Awaiting implementation approval
 
 **Summary**: No rate limiting enforcement exists. Queue processor sends requests as fast as it dequeues them. Can exceed Anthropic tier 1 limits (50 req/min, 40K tokens/min) under high load.
@@ -103,16 +122,17 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 
 ## ✅ RECENTLY COMPLETED (Reference Only)
 
-- **2025-11-21 CJ Completion Idempotency** - Guard + unique constraint migration applied, 6/6 tests passing. See `TASK-CJ-COMPLETION-EVENT-IDEMPOTENCY-2025-11-21.md`
+- **2025-11-21 Task Migration Complete** - 36 files migrated from `.claude/work/tasks/` to `TASKS/` with proper frontmatter and domain organization. See `MIGRATION_SUMMARY_2025-11-21.md`
+- **2025-11-21 CJ Completion Idempotency** - Guard + unique constraint migration applied, 6/6 tests passing. See `TASKS/assessment/cj-completion-event-idempotency.md`
 - **2025-11-21 Database Enum Audit** - 9 services checked, 2 fixed (ELS, BOS), prevention implemented (`pdm run validate-enum-drift`). See `.claude/research/database-enum-audit-2025-11-21.md`
 - **2025-11-21 CJ BatchMonitor Embed** - Monitor operational in app.py, stalled batch recovered, infra healthy
 - **2025-11-21 PDM Skill Created** - Migration skill in `.claude/skills/pdm/` with Context7 integration
 - **2025-11-21 ELS Slot Assignment Fix** - Lock-aware retries for Option B allocator, contention test passing
 - **2025-11-20 Prompt Propagation Fix** - BOS → BCS batch_metadata propagation, committed
-- **2025-11-19 Logging Infrastructure** - File persistence + Docker rotation (5 PRs). See `TASK-LOGGING-FILE-PERSISTENCE-AND-DOCKER-CONFIG.md`
+- **2025-11-19 Logging Infrastructure** - File persistence + Docker rotation (5 PRs). See `TASKS/infrastructure/logging-file-persistence-docker-rotation.md`
 - **2025-11-19 Loki Cardinality Fix** - 7.5M → 25 streams (300,000x improvement), JSON parsing operational
 - **2025-11-19 CJ Batch State Fixes** - Total budget tracking, completion denominator, position randomization (7 PRs)
-- **2025-11-18 LLM Batch Strategy** - Serial bundle infrastructure complete (Phases 1-3). See `TASK-LLM-BATCH-STRATEGY-IMPLEMENTATION-CHECKLIST.md`
+- **2025-11-18 LLM Batch Strategy** - Serial bundle infrastructure complete (Phases 1-3). See `TASKS/integrations/llm-batch-strategy-checklist.md`
 - **2025-11-17 HTTP API Contracts Migration** - CJ ↔ LPS cross-service imports eliminated (8 commits)
 
 ---
