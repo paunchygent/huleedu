@@ -10,7 +10,7 @@ This document is **normative**. Project documentation MUST comply.
 
 ## 2. Scope
 
-- Applies to Markdown documentation files under `documentation/` and any future `docs/` alias.
+- Applies to Markdown documentation files under `docs/`.
 - Covers:
   - Top-level documentation taxonomy.
   - Allowed subdirectories and their purpose.
@@ -19,9 +19,9 @@ This document is **normative**. Project documentation MUST comply.
 
 ## 3. Top-Level Documentation Taxonomy
 
-The canonical documentation root is `documentation/` (a future `docs/` directory MAY be introduced as an alias but MUST mirror this structure).
+The canonical documentation root is `docs/`.
 
-Allowed top-level subdirectories under `documentation/`:
+Allowed top-level subdirectories under `docs/`:
 
 - `overview/`
 - `architecture/`
@@ -64,12 +64,12 @@ No additional top-level documentation directories MAY be created without updatin
 - New documentation file basenames (filename without extension) MUST be `kebab-case` (lowercase words separated by `-`) and contain no spaces.
   - Example: `processing-flow-overview.md`.
 - Existing `SCREAMING_SNAKE_CASE` filenames (for example, `API_PRODUCTIZATION_PLAN.md`) are permitted for backward compatibility but SHOULD be migrated to `kebab-case` when the file is touched for other changes.
-- Directory names under `documentation/` and its subdirectories MUST be `kebab-case` or `lower_snake_case`.
+- Directory names under `docs/` and its subdirectories MUST be `kebab-case` or `lower_snake_case`.
 - No spaces are allowed in any documentation file or directory names.
 
 ## 5. Runbook Frontmatter (operations/)
 
-Runbooks under `documentation/operations/` SHOULD include machine-readable frontmatter:
+Runbooks under `docs/operations/` SHOULD include machine-readable frontmatter:
 
 ```yaml
 ---
@@ -84,7 +84,7 @@ Tools MAY rely on this metadata to surface relevant runbooks.
 
 ## 6. Decision Records (decisions/)
 
-- ADR-style records MUST live under `documentation/decisions/`.
+- ADR-style records MUST live under `docs/decisions/`.
 - Recommended filename pattern:
   - `NNNN-short-descriptor.md` (e.g. `0001-http-contracts-in-common-core.md`).
 - Decision records SHOULD include frontmatter:
@@ -101,7 +101,7 @@ last_updated: YYYY-MM-DD
 
 ## 7. Service Documentation (services/)
 
-- `documentation/services/` MUST contain one Markdown file per major service or a small set of service grouping files.
+- `docs/services/` MUST contain one Markdown file per major service or a small set of service grouping files.
 - Each file SHOULD:
   - Summarize the service's responsibility and key endpoints.
   - Link to the service's in-repo `services/<service>/README.md`.
@@ -110,7 +110,7 @@ last_updated: YYYY-MM-DD
 
 - `TASKS/` contains work items and planning documents and is governed by `TASKS/_REORGANIZATION_PROPOSAL.md`.
 - `.claude/` and `.windsurf/rules/` contain AI- and tool-specific instructions and MUST NOT be treated as canonical human documentation.
-- Where relevant, `documentation/` SHOULD link to normative rules in `.windsurf/rules/` rather than duplicating content.
+- Where relevant, `docs/` SHOULD link to normative rules in `.windsurf/rules/` rather than duplicating content.
 
 ## 9. Enforcement
 

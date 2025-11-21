@@ -1,6 +1,8 @@
 ---
-trigger: model_decision
-description: This document serves as the team's shared brain for observability. It contains dashboard guides, key queries, and alert runbooks to empower effective debugging and monitoring.
+type: runbook
+service: global
+severity: high
+last_reviewed: 2025-11-21
 ---
 
 # HuleEdu Grafana Playbook

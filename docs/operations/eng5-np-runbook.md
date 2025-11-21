@@ -1,3 +1,10 @@
+---
+type: runbook
+service: global
+severity: medium
+last_reviewed: 2025-11-21
+---
+
 # ENG5 NP Runner – Execute Mode Runbook
 
 ## Purpose

@@ -14,7 +14,7 @@ This rule is **normative** for all documentation in the repository.
 
 Normative references:
 
-- `documentation/DOCS_STRUCTURE_SPEC.md` – Project documentation layout, taxonomy, and naming.
+- `docs/DOCS_STRUCTURE_SPEC.md` – Project documentation layout, taxonomy, and naming.
 - `TASKS/_REORGANIZATION_PROPOSAL.md` – TASKS structure, task frontmatter, and enforcement.
 - `.claude/rules/000-rule-index.md` – Rule index and rule management.
 
@@ -26,13 +26,13 @@ Types of documentation and their canonical locations:
 
 - **Architectural Documentation**
   - High-level overviews, service boundaries, processing flows, DDD boundaries.
-  - Location: `documentation/architecture/`, `documentation/decisions/`, and `documentation/overview/`.
+  - Location: `docs/architecture/`, `docs/decisions/`, and `docs/overview/`.
 - **Service Documentation**
   - Per-service responsibilities, endpoints, events, local setup.
-  - Location: `documentation/services/` and `services/<service>/README.md`.
+  - Location: `docs/services/` and `services/<service>/README.md`.
 - **Contract Documentation**
   - HTTP APIs, events, schemas, and Pydantic models.
-  - Location: code in `libs/common_core/` and generated or curated reference in `documentation/reference/`.
+  - Location: code in `libs/common_core/` and generated or curated reference in `docs/reference/`.
 - **Code-Level Documentation**
   - Docstrings, inline comments, and type hints in source files.
   - Location: alongside the code in `services/`, `libs/`, and `scripts/`.
@@ -45,21 +45,21 @@ Types of documentation and their canonical locations:
 
 Any new documentation MUST be placed in the appropriate location above.
 
-## 3. Project Documentation Layout (`documentation/`)
+## 3. Project Documentation Layout (docs/)
 
-- All project-level documentation (other than service/library READMEs, rules, and TASKS documents) MUST live under `documentation/`.
-- `documentation/` MUST follow the taxonomy defined in `documentation/DOCS_STRUCTURE_SPEC.md`:
+- All project-level documentation (other than service/library READMEs, rules, and TASKS documents) MUST live under docs/.
+- docs/ MUST follow the taxonomy defined in `docs/DOCS_STRUCTURE_SPEC.md`:
   - Allowed top-level directories: `overview/`, `architecture/`, `services/`, `operations/`, `how-to/`, `reference/`, `decisions/`, `product/`, `research/`.
-  - No additional top-level directories MAY be created without updating `DOCS_STRUCTURE_SPEC.md` and this rule.
+  - No additional top-level directories MAY be created without updating `docs/DOCS_STRUCTURE_SPEC.md` and this rule.
 - Naming:
   - Files MUST use `.md` extension and MUST NOT contain spaces.
   - New documentation file basenames MUST be `kebab-case` (lowercase words separated by `-`).
   - Existing `SCREAMING_SNAKE_CASE` filenames are permitted for backward compatibility but SHOULD be migrated to `kebab-case` ASAP and always when touched for other changes.
   - Directory names MUST be `kebab-case` or `lower_snake_case`.
 - Runbooks:
-  - Runbooks under `documentation/operations/` SHOULD include the frontmatter described in `DOCS_STRUCTURE_SPEC.md`.
+  - Runbooks under `docs/operations/` SHOULD include the frontmatter described in `docs/DOCS_STRUCTURE_SPEC.md`.
 - Decision records:
-  - ADRs MUST live under `documentation/decisions/` and SHOULD follow the filename and frontmatter patterns in `DOCS_STRUCTURE_SPEC.md`.
+  - ADRs MUST live under `docs/decisions/` and SHOULD follow the filename and frontmatter patterns in `docs/DOCS_STRUCTURE_SPEC.md`.
 
 ## 4. Service READMEs
 
@@ -172,7 +172,7 @@ Library `README.md` files MUST include:
 
 ## 10. Documentation as Part of Work and Review
 
-- Updating relevant documentation (service READMEs, library READMEs, `documentation/` pages, TASKS, and rules where needed) is a REQUIRED part of any task that changes behavior, contracts, or architecture.
+- Updating relevant documentation (service READMEs, library READMEs, docs/ pages, TASKS, and rules where needed) is a REQUIRED part of any task that changes behavior, contracts, or architecture.
 - Task descriptions MUST explicitly include required documentation updates in their implementation plan and success criteria.
 - Code reviews MUST include verification that documentation has been updated or an explicit justification that no update is required.
 
@@ -182,6 +182,6 @@ Library `README.md` files MUST include:
   - Changes go through the same review process.
   - Large reorganizations MUST be captured as dedicated tasks under `TASKS/`.
 - Periodic maintenance tasks SHOULD:
-  - Reconcile `documentation/` with actual behavior and service READMEs.
+  - Reconcile docs/ with actual behavior and service READMEs.
   - Remove or clearly mark obsolete documents.
   - Ensure that rule files, docs specs, and TASKS specs remain consistent.
