@@ -44,53 +44,36 @@ cross-service task context.
 
 ### 5. Task Management and Documentation Structure
 
-**Task Creation and Management:**
+**Task Creation:**
 
-All tasks MUST be created in `TASKS/<domain>/` with proper frontmatter:
+All tasks MUST be created in `TASKS/<domain>/` with proper frontmatter. `.claude/work/tasks/` is DEPRECATED.
 
 ```bash
-# Create a new task
-python scripts/task_mgmt/new_task.py --domain assessment --title "Fix CJ Batch State"
+# Create task
+python scripts/task_mgmt/new_task.py --domain assessment --title "Task Title"
 
-# Validate all tasks
+# Validate
 python scripts/task_mgmt/validate_front_matter.py --verbose
-
-# Regenerate task index
-python scripts/task_mgmt/index_tasks.py
-
-# Archive completed task
-python scripts/task_mgmt/archive_task.py --id task-name
-```
-
-**IMPORTANT:**
-- `.claude/work/tasks/` is DEPRECATED - all tasks go in `TASKS/`
-- Required frontmatter fields: id, title, status, priority, domain, owner_team, created, last_updated
-- See `TASKS/_REORGANIZATION_PROPOSAL.md` for full specification
-
-**Documentation Structure:**
-
-All project documentation follows canonical structure in `docs/`:
-
-```markdown
-docs/
-├── overview/           # System introductions
-├── architecture/       # Cross-service architecture
-├── services/           # Per-service summaries
-├── operations/         # Runbooks (require frontmatter)
-├── how-to/             # Task-oriented guides
-├── reference/          # API/schema/config reference
-├── decisions/          # ADRs (require frontmatter)
-├── product/            # PRDs
-└── research/           # Design spikes
-```
-
-```bash
-# Validate documentation structure
 python scripts/docs_mgmt/validate_docs_structure.py --verbose
-
-# Validate .claude/ structure
 python scripts/claude_mgmt/validate_claude_structure.py --verbose
+
+# Manage
+python scripts/task_mgmt/index_tasks.py              # Regenerate index
+python scripts/task_mgmt/archive_task.py --id <id>   # Archive completed
 ```
+
+**File Naming:**
+- Tasks: lowercase `kebab-case`, filename must match frontmatter `id` field
+- Docs: lowercase `kebab-case` for new files (legacy `SCREAMING_SNAKE_CASE` tolerated)
+- No spaces in any filenames
+
+**Locations:**
+- Tasks: `TASKS/<domain>/<task-id>.md`
+- Session: `.claude/work/session/handoff.md` and `.claude/work/session/readme-first.md`
+- Runbooks: `docs/operations/<name>.md` (requires frontmatter)
+- ADRs: `docs/decisions/NNNN-<name>.md` (requires frontmatter)
+- How-tos: `docs/how-to/<name>.md`
+- Code reviews: `.claude/archive/code-reviews/<YYYY-MM-DD>-<name>.md`
 
 **Specifications:**
 - Tasks: `TASKS/_REORGANIZATION_PROPOSAL.md`
