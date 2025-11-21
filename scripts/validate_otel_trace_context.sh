@@ -62,9 +62,9 @@ validate_service_trace_context() {
     # Get total log lines
     local total_lines=$(docker logs "${container_name}" 2>&1 | wc -l | tr -d ' ')
 
-    # Extract logs with trace context (filter JSON lines first)
-    local logs_with_trace=$(docker logs "${container_name}" --tail 500 2>&1 | \
-        grep -a '^{' | \
+    # Extract logs with trace context (filter JSON lines first, then take last 500)
+    local logs_with_trace=$(docker logs "${container_name}" 2>&1 | \
+        grep -a '^{' | tail -500 | \
         jq -r 'select(.trace_id) | {timestamp, event, trace_id, span_id, correlation_id}' 2>/dev/null || echo "")
 
     if [[ -z "${logs_with_trace}" ]]; then
@@ -75,9 +75,9 @@ validate_service_trace_context() {
         return 0
     fi
 
-    # Count logs with trace context (filter JSON lines first)
-    local trace_count=$(docker logs "${container_name}" --tail 500 2>&1 | \
-        grep -a '^{' | \
+    # Count logs with trace context (filter JSON lines first, then take last 500)
+    local trace_count=$(docker logs "${container_name}" 2>&1 | \
+        grep -a '^{' | tail -500 | \
         jq -r 'select(.trace_id)' 2>/dev/null | wc -l | tr -d ' ')
 
     # Calculate percentage (of last 500 lines checked)
@@ -91,12 +91,12 @@ validate_service_trace_context() {
     fi
 
     # Validate format (trace_id: 32-char hex, span_id: 16-char hex)
-    local sample_trace_id=$(docker logs "${container_name}" --tail 200 2>&1 | \
-        grep -a '^{' | \
+    local sample_trace_id=$(docker logs "${container_name}" 2>&1 | \
+        grep -a '^{' | tail -200 | \
         jq -r '.trace_id // empty' 2>/dev/null | grep -v '^$' | head -1)
 
-    local sample_span_id=$(docker logs "${container_name}" --tail 200 2>&1 | \
-        grep -a '^{' | \
+    local sample_span_id=$(docker logs "${container_name}" 2>&1 | \
+        grep -a '^{' | tail -200 | \
         jq -r '.span_id // empty' 2>/dev/null | grep -v '^$' | head -1)
 
     local has_span_id="NO"

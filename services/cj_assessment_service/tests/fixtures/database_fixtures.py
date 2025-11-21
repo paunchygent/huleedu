@@ -119,6 +119,7 @@ def test_settings() -> Generator[Settings, None, None]:
     settings.DB_HOST = "sqlite"
     settings.DB_PORT = 0
     settings.DB_NAME = "cj_assessment_test"
+    settings.PAIR_GENERATION_SEED = 42
 
     import os
 

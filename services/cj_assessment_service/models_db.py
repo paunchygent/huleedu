@@ -306,11 +306,37 @@ class CJBatchState(Base):
 
     def completion_denominator(self) -> int:
         """Return the denominator to use for completion math."""
+        max_possible_pairs = self._max_possible_comparisons()
 
         if self.total_budget and self.total_budget > 0:
+            if max_possible_pairs:
+                return min(self.total_budget, max_possible_pairs)
             return self.total_budget
+
         if self.total_comparisons and self.total_comparisons > 0:
+            if max_possible_pairs:
+                return min(self.total_comparisons, max_possible_pairs)
             return self.total_comparisons
+
+        return max_possible_pairs
+
+    def _max_possible_comparisons(self) -> int:
+        """Compute the n-choose-2 upper bound for this batch.
+
+        Uses the expected essay count from the batch upload when available to
+        ensure small batches (e.g., 4 essays => 6 pairs) do not inherit large
+        global budgets (e.g., 350) for completion gating.
+        """
+
+        try:
+            essay_count = None
+            if self.batch_upload and self.batch_upload.expected_essay_count:
+                essay_count = self.batch_upload.expected_essay_count
+            if isinstance(essay_count, int) and essay_count > 1:
+                return (essay_count * (essay_count - 1)) // 2
+        except Exception:  # pragma: no cover - defensive guard
+            return 0
+
         return 0
 
     def __repr__(self) -> str:  # pragma: no cover - string helper

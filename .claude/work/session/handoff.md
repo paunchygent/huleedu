@@ -12,483 +12,182 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 
 ---
 
-## 🔄 PR 5 Prompt Amendment progress (2025-11-20)
-- Added shared contract `BatchPromptAmendmentRequest` (common_core) and wired BOS PATCH `/v1/batches/<batch_id>/prompt` with ownership + status guard and Content Service validation via new `ContentClientImpl`.
-- Added API Gateway proxy PATCH `/v1/batches/{batch_id}/prompt`; HttpClientProtocol now supports PATCH.
-- Tests: `pdm run pytest-root services/api_gateway_service/tests/test_batch_prompt_amendment_proxy.py services/batch_orchestrator_service/tests/test_content_client_impl.py` ✅
-- Formatting: `pdm run format-all` ✅
-- Lint: `pdm run lint-fix --unsafe-fixes` ❌ (pre-existing F821 logger undefined in multiple *health_routes.py* files; unchanged in this task).
+## 🎯 ACTIVE WORK (2025-11-21)
+
+### Uncommitted Changes Ready for Commit
+
+**Status**: Significant refactoring complete, quality gates passing, ready for review and commit
+
+**Modified Files** (~36 files, +1570/-583 lines):
+- CJ Completion Logic: Stability-first completion, callback-driven scoring
+- Anthropic Provider: Retry-After support, 529 handling, metadata propagation
+- ELS Slot Assignment: Lock-aware retries for Option B allocator under contention
+- Functional Test Updates: E2E CJ pipeline harness with stability completion
+- Batch Monitor: Embedded in `app.py`, heartbeat + sweep operational
+
+**Key Changes**:
+1. **Callback-Driven Completion**: Scoring runs as soon as `callbacks_received == submitted_comparisons`
+2. **Stability-First Finalization**: Triggers on BT stability or capped denominator (min(total_budget, nC2))
+3. **Small Batch Fix**: Completion denominator uses nC2 cap (4 essays → 6 pairs)
+4. **Anthropic Hardening**: Respects Retry-After, treats 529/overloaded as retryable, surfaces stop_reason
+5. **Metadata Enrichment**: Sends correlation_id + prompt_sha256, optional prompt caching with TTL
+
+**Quality Gates**:
+- ✅ Typecheck: All passing
+- ✅ Format: All passing
+- ✅ Lint: All passing (except pre-existing F821 in health_routes.py files)
+- ✅ Tests: Updated and passing
+
+**Next Action**: Review uncommitted changes, create commit with proper message, run full test suite validation
 
 ---
 
-## ✅ OTEL Trace Context Logger Timing Fix - VALIDATED (2025-11-20)
+## 📋 READY FOR IMPLEMENTATION (Next Session)
 
-**Status**: Logger timing fix deployed and working. Health endpoint logging incomplete.
+### 1. ELS Transaction Boundary Violations (High Priority)
 
-### What Was Accomplished
+**Task Doc**: `.claude/work/tasks/TASK-FIX-ELS-TRANSACTION-BOUNDARY-VIOLATIONS.md`
+**Status**: Investigation complete ✅, Task approved ✅, Ready for implementation
 
-**1. Fixed Logger Timing in 20 Files** ✅
-- **Issue**: Module-level loggers created BEFORE `configure_service_logging()` prevented OTEL trace context from appearing in logs
-- **Fix**: Moved `logger = create_service_logger(...)` from module-level to inside functions AFTER `configure_service_logging()`
-- **Files Modified**:
-  - 15 `startup_setup.py` files (all services)
-  - 4 `worker_main.py` files (essay_lifecycle, spellchecker, cj_assessment, nlp)
-  - 1 `api_gateway_service/app/startup_setup.py`
-  - 1 `api_gateway_service/routers/health_routes.py` (added logging)
-- **Deployment**: Hot reload confirmed working (code changes deployed to running containers)
+**Summary**: Systematic scan revealed 17 handler files creating multiple independent transaction blocks instead of single Unit of Work pattern. Violates architectural standard for Handler-Level Unit of Work with Transactional Outbox.
 
-**2. Updated Validation Script** ✅
-- Expanded from 4 services to 18 services
-- Fixed container naming issues (result_aggregator, essay_lifecycle_api/worker)
-- Script now validates: `scripts/validate_otel_trace_context.sh`
+**Priority Files**:
+- `batch_coordination_handler_impl.py` (7 transaction blocks - highest impact)
+- Result handlers (4 files, 6 blocks)
+- Command handlers (3 files, 3 blocks)
 
-**3. Validation Results** (2025-11-20 20:28)
+**Implementation Phases**:
+1. Phase 1: Refactor batch_coordination_handler_impl.py
+2. Phase 2: Refactor result and command handlers
+3. Phase 3: Validate session propagation in collaborators
+4. Phase 4: Integration tests and atomicity verification
 
-| Service | Status | % With Context | Notes |
-|---------|--------|----------------|-------|
-| batch_conductor_service | ✅ PASS | 268% | Logs DB queries during health checks |
-| api_gateway_service | ✅ PASS | 49% | Fixed - now logs "Health check requested" |
-| spellchecker_service | ✅ PASS | 10% | Logs connection pool activity |
-| result_aggregator | ⚠️ WARN | 5% | Partial trace context |
-| **14 other services** | ⚠️ WARN | 0% | Health endpoints don't log (see below) |
-
-**Trace Format Validation**: ✅ All passing services have correct 32-char hex trace_id and 16-char hex span_id
-**Jaeger Integration**: ✅ Traces successfully exported to Jaeger
-
-### Why 14 Services Show 0%
-
-**Root Cause**: Health endpoints don't generate application logs during normal operation
-- Services only log during errors or specific operations (not health checks)
-- Startup logs have no trace_id (no active span during startup)
-- Without logged operations during HTTP requests, no traced logs exist to validate
-
-**This is NOT a failure of the logger timing fix** - it's proven working by the 3 services that DO log.
-
-**Examples**:
-- content_service: Has JSON startup logs, but health endpoint is silent
-- batch_orchestrator_service: Logs during batch registration (verified with old logs showing trace_id), but not during health checks
-- identity_service, file_service, etc.: Health endpoints don't log
-
-### NEXT STEPS (For Next Session)
-
-**Option 1: Add Health Endpoint Logging** (Recommended)
-- Add `logger.info("Health check requested")` to all 14 services' health endpoints
-- Pattern: Same as api_gateway_service/routers/health_routes.py
-- This will enable validation via health checks
-
-**Option 2: Trigger Business Operations**
-- Run actual workflows (batch submissions, content uploads, etc.)
-- Validate trace context in business logic logs
-- More comprehensive but requires test data
-
-**Files to Modify** (if Option 1):
-```bash
-services/batch_orchestrator_service/api/health_routes.py
-services/content_service/api/health_routes.py
-services/identity_service/api/health_routes.py
-services/file_service/api/health_routes.py
-services/class_management_service/api/health_routes.py
-services/email_service/api/health_routes.py
-services/llm_provider_service/api/health_routes.py
-services/entitlements_service/api/health_routes.py
-services/websocket_service/routers/health_routes.py
-services/language_tool_service/api/health_routes.py
-services/result_aggregator_service/api/health_routes.py
-services/essay_lifecycle_service/api/health_routes.py
-services/nlp_service/api/health_routes.py
-services/cj_assessment_service/api/health_routes.py
-```
-
-### Documentation Created
-- `.claude/rules/071.5-llm-debugging-with-observability.md` (LLM reference)
-- `docs/how-to/debugging-with-observability.md` (developer tutorials)
-- `.claude/skills/loki-logql/debugging-patterns.md` (LogQL patterns)
+**Architectural Reference**: `.claude/rules/042.1-transactional-outbox-pattern.md` (Lines 64-82, 137-143)
+**Pattern Example**: `services/class_management_service/implementations/batch_author_matches_handler.py:126-192`
 
 ---
 
-## 🎯 Next Session Entry Point (2025-11-20 Evening)
+### 2. LPS Rate Limiting Implementation (Awaiting Approval)
 
-### Task: E2E Identity Threading Test Timeout Investigation
+**Task Doc**: `.claude/work/tasks/TASK-LPS-RATE-LIMITING-IMPLEMENTATION-2025-11-21.md`
+**Status**: Investigation complete ✅, 5 PRs defined, Awaiting implementation approval
 
-**Status**: Prompt propagation fixes complete ✅, test timeout requires investigation
+**Summary**: No rate limiting enforcement exists. Queue processor sends requests as fast as it dequeues them. Can exceed Anthropic tier 1 limits (50 req/min, 40K tokens/min) under high load.
 
-**Current State (2025-11-20 17:46)**:
-- ✅ **Fixed**: Entitlements service health check (removed Kafka consumer check causing false negatives)
-- ✅ **Fixed**: PR 1 prompt propagation bug (BOS `preflight_pipeline` now passes `batch_metadata` to BCS)
-- ✅ **Verified**: Pipeline request accepted (BCS validation passes with `prompt_attached=True`)
-- ❌ **Issue**: Test times out after 45s waiting for pipeline completion
+**Implementation Plan**: 5 PRs (2-3 weeks, 1 developer)
 
-**Test Details**:
-- **Test**: `test_e2e_identity_threading.py::TestE2EIdentityThreading::test_complete_identity_threading_workflow`
-- **Batch ID**: `e00522e5-5b3e-473f-af69-f2f6e14e579a`
-- **Pipeline Correlation**: `49eb5e95-3f18-4147-9eab-3e3cfbc68267`
-- **Last Success**: Pipeline request accepted at 17:45:34
-- **Timeout**: 45s pytest-timeout killed test at 17:46:05
+- **PR1 (P0)**: Token Bucket Rate Limiter - Dual-bucket algorithm (requests/min + tokens/min)
+- **PR2 (P1)**: Rate Limit Header Reading - Parse `x-ratelimit-*` headers, dynamic adjustment
+- **PR3 (P2)**: Configurable CJ Semaphore - Override hardcoded default=3
+- **PR4 (P1)**: Inter-Request Delay - Add `inter_request_delay_ms` config (default: 100ms)
+- **PR5 (P2)**: Startup Validation - Fail-fast if settings exceed tier limits
 
-**Next Steps**:
-1. Trace correlation `49eb5e95-3f18-4147-9eab-3e3cfbc68267` through service logs
-2. Identify where pipeline processing stopped (BCS→ELS→CJ→RAS chain)
-3. Check for errors/warnings in service logs around 17:45-17:46 timeframe
-4. Verify Kafka consumers are actively processing events
-5. Determine if timeout or actual processing failure
-
-**Files Modified This Session**:
-- `services/entitlements_service/api/health_routes.py` (health check fix)
-- `services/batch_orchestrator_service/api/batch_routes.py` (batch_metadata propagation)
-- `services/batch_conductor_service/tests/test_dlq_producer.py` (class naming fix)
-
-**Required Reading for Next Session**:
-- `.claude/rules/046-docker-container-debugging.md` (log analysis patterns)
-- Handoff prompt in chat above (detailed investigation guide with all correlation IDs)
+**Acceptance Criteria**: No 429 errors under normal load, configurable limits, graceful degradation, full test coverage
 
 ---
 
-## 🎯 Previous Entry Point (2025-11-20+)
+### 3. Prompt Amendment API (Uncommitted - Lint Blocking)
 
-### Task: Loki Logging Infrastructure - OTEL Alignment (Optional Enhancement)
-
-**Primary Document**: `.claude/work/tasks/TASK-LOKI-LOGGING-OTEL-ALIGNMENT-AND-CARDINALITY-FIX.md`
-
-**Status**: PR 1 (P0) ✅ | PR 2 (P1) ✅ | PR 3 (P2) ✅ COMPLETE
-
-**Completion Summary (2025-11-19)**:
-- ✅ **PR 1**: Loki cardinality fix (7.5M → 25 streams, 300,000x improvement)
-- ✅ **PR 2**: OTEL service context (`service.name`, `deployment.environment`)
-- ✅ **PR 3**: OTEL trace context (`trace_id`, `span_id` when span active)
-- ✅ Files Modified: 3 (logging_utils.py, test_logging_utils.py, test_anthropic_error_diagnostics.py)
-- ✅ Tests: 12 unit tests passing (6 for PR 2, 6 for PR 3)
-- ✅ All quality checks: typecheck, lint, format ✅
-
-**What Remains**:
-- **Commit**: Ready to commit all 3 PRs
-- **PR 4 (P2 OPTIONAL)**: logcli CLI documentation
-
----
-
-### ✅ Phase 4: Validation & Cleanup (COMPLETE)
+**Status**: Implementation complete, tests passing, lint errors blocking commit
 
 **Completed**:
-- ✅ Phase 1-3: HTTP API contracts migration, integration tests, import updates (all committed)
-- ✅ 8 logical commits created for cross-service refactoring work
-- ✅ Deleted violating test file: `services/cj_assessment_service/tests/integration/test_llm_metadata_roundtrip_integration.py`
-- ✅ Fixed 4 type errors with runtime isinstance() validation (no cast() used)
-- ✅ Fixed 11 lint errors (E501 line-too-long issues)
+- ✅ Shared contract `BatchPromptAmendmentRequest` (common_core)
+- ✅ BOS PATCH `/v1/batches/<batch_id>/prompt` with ownership + status guard
+- ✅ API Gateway proxy PATCH `/v1/batches/{batch_id}/prompt`
+- ✅ Tests passing
+- ✅ Format passing
 
-**Validation Results**:
-
-1. **Grep Validation**: ✅ Zero cross-service imports between CJ ↔ LPS
-2. **Integration Tests**: ✅ All passing
-   - `test_cj_lps_metadata_roundtrip.py` - passing
-   - `test_cj_lps_manifest_contract.py` - 6/6 passed
-3. **Full Test Suites**: ✅ 991 tests passed (exceeds 801+ target)
-   - CJ Assessment Service: 568 passed, 3 skipped
-   - LLM Provider Service: 423 passed, 1 skipped
-4. **Typecheck**: ✅ Success: no issues found in 1263 source files
-5. **Lint**: ✅ All checks passed!
-
-**Success Criteria**: ALL MET ✅
-- [✅] Zero grep violations for cross-service imports
-- [✅] Metadata roundtrip test passes
-- [✅] Manifest contract test passes (6/6)
-- [✅] All existing tests pass (991 > 801+)
-- [✅] Zero new type/lint errors
-
-### 🚧 Task: CJ Batch State & Completion Fixes (2025-11-19)
-
-- Rebased PR1/PR2 requirements onto current main: added `total_budget` + `completion_denominator()` on `CJBatchState`, normalized `current_iteration` default to 0, and shipped Alembic migration `20251119_1200_add_total_budget_and_iteration_defaults.py` (auto-populates legacy rows).
-- Batch submission now accumulates totals instead of overwriting: `_update_batch_state_with_totals()` locks the row, resolves requested budget from `comparison_budget` metadata, and increments `current_iteration`. Removed the redundant per-chunk submitted counter writes to prevent double counting.
-- Completion logic now references the immutable budget and only counts valid winners: `workflow_continuation.check_workflow_continuation()` filters `winner IN ('essay_a','essay_b')`, heuristics + `BatchCompletionChecker` divide by `batch_state.completion_denominator()`, and stuck-batch monitoring logs budget-aware progress.
-- Diagnostics script surfaces `total_budget`/`comparison_budget` so ENG5 can audit live batches quickly.
-- Tests/type-safety: `pdm run pytest-root services/cj_assessment_service/tests/unit/test_batch_state_tracking.py`, `pdm run pytest-root services/cj_assessment_service/tests/unit/test_completion_threshold.py`, `pdm run typecheck-all`, `pdm run format-all`, `pdm run lint-fix --unsafe-fixes` (all green).
-- 2025-11-19: `_update_batch_state_with_totals()` now reuses `get_batch_state(..., for_update=True)` to avoid the Postgres `FOR UPDATE` + outer join error, plus regression coverage `TestBatchProcessor.test_update_batch_state_with_totals_uses_locked_fetch` and green runs for `pdm run pytest-root services/cj_assessment_service/tests/unit/test_batch_processor.py`, `pdm run format-all`, `pdm run lint-fix --unsafe-fixes`, `pdm run typecheck-all`.
-
-- **Validation Complete (2025-11-19)**:
-  - **PR 1 (Batch State)**: Multi-round integration test `test_batch_state_multi_round_integration.py` passed. Verified accumulation of `total_comparisons` and `submitted_comparisons` across 10 iterations.
-  - **PR 2 (Completion Logic)**: `test_completion_threshold.py` passed. Fixed regression in `BatchMonitor` tests (mocked `completion_denominator`).
-  - **PR 3 (Randomization)**: Added `test_anchor_position_chi_squared` to `test_pair_generation_randomization.py`. Statistical test (N=200) confirms p > 0.05 (unbiased distribution).
-  - **Regressions**: Full CJ service regression suite passed.
-
-**Next focus**: PR 5 (Investigate Anthropic API Failure Rate) - P0 Critical. Then PR 4 (Threshold Unification) and PR 6/7.
-
-### 🚧 Task: CJ Pair Randomization (2025-11-19)
-
-- Implemented per-pair A/B shuffling via `_should_swap_positions()` and a deterministic RNG; `comparison_processing` now injects `settings.PAIR_GENERATION_RANDOMIZATION_SEED` so ENG5 can reproduce ordering when needed.
-- Added `CJ_ASSESSMENT_SERVICE_PAIR_GENERATION_SEED` setting + README entry; leaving it unset keeps unbiased randomness, setting an int seeds Python's RNG per generation call.
-- New suite `services/cj_assessment_service/tests/unit/test_pair_generation_randomization.py` verifies deterministic seeds, forced swaps, anchor balance across 200 deterministic seeds, and maintains the expected nC2 task count. Command: `pdm run pytest-root services/cj_assessment_service/tests/unit/test_pair_generation_randomization.py`.
-- Outstanding per task doc: chi-squared validation + integration test to sample live DB pairs once serial_bundle validation resumes.
+**Remaining**: Fix pre-existing F821 lint errors (`logger` undefined in multiple `*health_routes.py` files)
 
 ---
 
-## LLM Batch Strategy Implementation Status (2025-11-18)
+## ✅ RECENTLY COMPLETED (Reference Only)
 
-### Overview
-**Progress**: ~95% complete - ALL IMPLEMENTATION DONE, VALIDATION PENDING
-**Primary Document**: `.claude/work/tasks/TASK-LLM-BATCH-STRATEGY-IMPLEMENTATION-CHECKLIST.md`
+- **2025-11-21 CJ Completion Idempotency** - Guard + unique constraint migration applied, 6/6 tests passing. See `TASK-CJ-COMPLETION-EVENT-IDEMPOTENCY-2025-11-21.md`
+- **2025-11-21 Database Enum Audit** - 9 services checked, 2 fixed (ELS, BOS), prevention implemented (`pdm run validate-enum-drift`). See `.claude/research/database-enum-audit-2025-11-21.md`
+- **2025-11-21 CJ BatchMonitor Embed** - Monitor operational in app.py, stalled batch recovered, infra healthy
+- **2025-11-21 PDM Skill Created** - Migration skill in `.claude/skills/pdm/` with Context7 integration
+- **2025-11-21 ELS Slot Assignment Fix** - Lock-aware retries for Option B allocator, contention test passing
+- **2025-11-20 Prompt Propagation Fix** - BOS → BCS batch_metadata propagation, committed
+- **2025-11-19 Logging Infrastructure** - File persistence + Docker rotation (5 PRs). See `TASK-LOGGING-FILE-PERSISTENCE-AND-DOCKER-CONFIG.md`
+- **2025-11-19 Loki Cardinality Fix** - 7.5M → 25 streams (300,000x improvement), JSON parsing operational
+- **2025-11-19 CJ Batch State Fixes** - Total budget tracking, completion denominator, position randomization (7 PRs)
+- **2025-11-18 LLM Batch Strategy** - Serial bundle infrastructure complete (Phases 1-3). See `TASK-LLM-BATCH-STRATEGY-IMPLEMENTATION-CHECKLIST.md`
+- **2025-11-17 HTTP API Contracts Migration** - CJ ↔ LPS cross-service imports eliminated (8 commits)
 
-### ✅ ALL IMPLEMENTATION COMPLETE
+---
 
-**Phase 1 (CJ Configuration)** - ✅ 100% COMPLETE:
-- ✅ `LLMBatchingMode` enum in common_core
-- ✅ `Settings.LLM_BATCHING_MODE` with PER_REQUEST default
-- ✅ `BatchConfigOverrides.llm_batching_mode_override`
-- ✅ `resolve_effective_llm_batching_mode()` with provider guardrails
-- ✅ Metadata propagation: `cj_batch_id`, `cj_source`, `cj_request_type`, `cj_llm_batching_mode`
-- ✅ Full test coverage for config resolution and metadata
+## 🎯 CJ E2E Test Latency Finding (2025-11-21)
 
-**Phase 2 (LPS Serial Bundling)** - ✅ 100% COMPLETE:
-- ✅ `ComparisonProcessorProtocol.process_comparison_batch` implemented
-- ✅ `QueueProcessingMode` and `BatchApiMode` enums
-- ✅ `_process_request_serial_bundle` with fairness and compatibility checks
-- ✅ Provider-side metadata enrichment (`resolved_provider`, `resolved_model`, `queue_processing_mode`)
-- ✅ Result mapping back to individual callbacks
-- ✅ Comprehensive unit test coverage
+**Context**: Not a bug, architectural observation from test run
 
-**Phase 3 (Metrics & Observability)** - ✅ 100% COMPLETE:
-- ✅ Queue expiry metrics: `llm_provider_queue_expiry_total`, `llm_provider_queue_expiry_age_seconds`
-- ✅ Serial bundle metrics: `llm_provider_serial_bundle_calls_total`, `llm_provider_serial_bundle_items_per_call`
-- ✅ CJ batching metrics: `cj_llm_requests_total`, `cj_llm_batches_started_total`
-- ✅ Batch state diagnostics: `inspect_batch_state.py` shows batching mode
-- ✅ ENG5 runner diagnostics: cost summaries + Prometheus query hints
-- ✅ Documentation: LPS/CJ READMEs + `docs/operations/eng5-np-runbook.md`
+**Observation**: Functional test `test_complete_cj_assessment_processing_pipeline` took ~3m56s despite 4 essays and 6 comparisons.
 
-### ⏳ ONLY VALIDATION REMAINING
+**Root Cause**: Completion gate uses percent-of-budget (95% of `total_budget=350`). For n=4 (nC2=6), completion_rate=6/350 (~1.7%) never satisfies gate. Batch stayed in WAITING_CALLBACKS until BatchMonitor sweep (5m interval) forced completion.
 
-All code, tests, metrics, diagnostics, and documentation are complete. The single remaining item is:
+**Note**: Callbacks arrived within ~12s, scoring ran immediately once monitor triggered. No LLM/network slowness.
 
-### Key Findings
+**Resolution**: Stability-first completion now implemented (addresses this issue). Completion denominator capped to nC2.
 
-**Naming Clarifications**:
-- `cj_batch_id` (integer) = Internal CJ database FK
-- `bos_batch_id` (UUID string) = External BOS batch identifier
-- Both are separate; metadata currently uses `bos_batch_id` correctly
-- Checklist requires adding `cj_batch_id` as `str(internal_id)` to metadata
+---
 
-**Architecture Update**:
-- LPS now defines its own `QueueProcessingMode` + `BatchApiMode` enums and keeps CJ's `LLMBatchingMode` as an external hint only.
-- Serial bundle mode actually drains multiple compatible requests (provider + override + CJ hint) per queue-loop iteration; incompatible dequeues are held in-memory for the next iteration.
-- `SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL` (default 8) actively bounds bundle size and rejects invalid env inputs.
+## 📚 INVESTIGATION RUNBOOKS (Appendix)
 
-**Critical Focus Areas**:
-- CJ batching metrics (per-batch and per-request) to complement LPS serial-bundle metrics.
-- Rollout documentation and ENG5-focused diagnostics to make serial_bundle safe to enable in production.
+### Database Enum Drift Detection
 
-### Next Steps: ENG5 Validation Run
+**Context**: Two critical enum mismatches discovered 2025-11-21 (ELS `essay_status_enum`, BOS `batch_status_enum`) blocking 100% of pipeline flows.
 
-**Single remaining task**: Execute one ENG5 batch with `serial_bundle` mode enabled
+**Status**: ✅ Audit complete, prevention implemented, no additional mismatches found
 
-**Environment setup**:
+**Prevention Implemented**:
+- CI/local check: `pdm run validate-enum-drift` (uses dev DBs)
+- Startup validation: ELS and BOS fail-fast on enum mismatch (non-prod environments)
+- Rule update: `.claude/rules/085-database-migration-standards.md` mandates enum drift guard
+
+**Root Cause**: Bulk addition of expanded enums landed 2025-07-17 with no migrations. Divergence persisted until 2025-11-21 fixes.
+
+**Services Audited**: 9 services with databases - no new mismatches found
+- ✅ CJ, RAS, Email, Entitlements: enums match DB
+- ✅ Spellchecker, File, NLP, Class Management: no status enums or non-status only
+
+**Research Doc**: `.claude/research/database-enum-audit-2025-11-21.md`
+
+---
+
+### CJ Completion Event Debugging
+
+**Validation Script**: `scripts/validate_duplicate_completion_events.sh`
+
+**Purpose**: Detect duplicate `cj_assessment.completed` events in outbox
+
+**Usage**:
 ```bash
-export CJ_ASSESSMENT_SERVICE_LLM_BATCHING_MODE=serial_bundle
-export LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE=serial_bundle
-export LLM_PROVIDER_SERVICE_BATCH_API_MODE=disabled
+./scripts/validate_duplicate_completion_events.sh
 ```
 
-**Validation checklist**:
-1. CJ metrics increment correctly (`cj_llm_requests_total`, `cj_llm_batches_started_total`)
-2. LPS serial-bundle metrics increment (`llm_provider_serial_bundle_calls_total`, `llm_provider_serial_bundle_items_per_call`)
-3. No regressions in callbacks or batch completion
-4. Serial bundling achieves expected efficiency gains (fewer external HTTP calls)
-5. `inspect_batch_state.py` shows correct batching mode
-6. ENG5 runner displays cost summary and metrics hints
+**What it checks**:
+- Duplicate outbox entries for same `aggregate_id`
+- Multiple completion events within short time windows (<5 min)
+- Summary statistics: `total_events / unique_batches` ratio
 
-**Documentation**: All procedures documented in `docs/operations/eng5-np-runbook.md`
+**Research**: `.claude/research/cj-completion-event-validation-results-2025-11-21.md`
 
 ---
 
----
+## 📝 NOTES FOR NEXT SESSION
 
-## Current Session (2025-11-18) - Validation Execution
-
-### ✅ Schema Path Fix (COMPLETE)
-**Issue**: Documentation migration `Documentation/` → `docs/` broke schema loading
-**Files Modified**:
-- `scripts/cj_experiments_runners/eng5_np/paths.py` line 37
-- `scripts/tests/test_eng5_np_runner.py` line 538
-- `scripts/tests/test_eng5_np_execute_integration.py` line 73
-
-**Result**: ✅ Schema loads from `docs/reference/schemas/eng5_np/assessment_run.schema.json`
-
-### ✅ Baseline Test (COMPLETE)
-**Mode**: per_request
-**Results**:
-- Comparisons: 4/4
-- Cost: $0.13 (12,548 prompt + 445 completion tokens)
-- Model: claude-haiku-4-5-20251001
-- Status: Full BT analysis, grade projections, no partial data
-
-### ✅ Serial Bundle Configuration (COMPLETE)
-**Issue**: `CJ_ASSESSMENT_SERVICE_LLM_BATCHING_MODE` not passed to container
-**Fix**: Added env var to `docker-compose.dev.yml` line 234
-**Result**: ✅ Both services configured correctly
-
-### ⏳ Serial Bundle Test (RUNNING)
-**Started**: 2025-11-18 23:18 UTC
-**Batch ID**: serial-bundle-20251119-0018
-**Parameters**: 100 comparisons, 900s timeout, serial_bundle mode
-**Background Task**: 84ebf6
-**Expected Completion**: ~23:33-23:48 UTC (15-30 minutes)
+1. **Uncommitted work is significant**: ~1570 additions across 36 files. Review carefully before committing.
+2. **CJ completion logic substantially refactored**: Stability-first approach, major changes to workflow_continuation.py
+3. **All quality gates passing**: typecheck ✅, format ✅, lint ✅ (except pre-existing F821s)
+4. **Docker containers healthy**: No deployment issues, CJ service running 2 hours with embedded monitor
+5. **ELS transaction boundary violations are next logical priority**: Architectural compliance, high impact on data consistency
 
 ---
 
----
+## 🔍 Archived Work
 
-## Current Session (2025-11-19) - Serial Bundle Validation Failure Investigation
+**Location**: `.claude/archive/handoff-history/`
 
-### ✅ Critical Bug Discovery (COMPLETE)
-
-**Investigation**: Serial bundle validation runs (batches 33, 34) revealed **7 critical bugs** in CJ Assessment Service that were masked by per_request mode's lower throughput.
-
-**Key Finding**: Issues are NOT caused by serial_bundle itself, but by pre-existing bugs in CJ batch state logic that become catastrophic under higher load.
-
-### Evidence from Batch 33 (100 comparisons, serial_bundle mode)
-
-**Database Reality**:
-- 66 errors (`winner='error'`), 11 essay_a wins, 23 essay_b wins = 100 total pairs
-- Batch state shows: `submitted=10, completed=34` (wrong - should be 100 submitted)
-- Completion logs show: 110%, 120%, 160% completion rates (impossible)
-
-**Root Causes Identified**:
-
-1. **Runaway completion loop** - Uses `completed_callbacks / submitted_this_iteration` instead of `valid_comparisons / total_budget`
-2. **Metrics mismatch** - `total_comparisons` overwritten each iteration instead of accumulated
-3. **Errors count as complete** - SQL filter `winner IS NOT NULL` includes `winner='error'`
-4. **Position bias** - No randomization; anchors dominate essay_a position (86% vs expected 50%)
-5. **66% API failure rate** - Genuine Anthropic provider errors (cause requires investigation)
-6. **Stray callback race** - Database commit before queue submission allows fast responses to fail lookup
-7. **Stuck queue items** - No automatic expiry for indefinitely "processing" requests
-
-### ✅ Deliverables (COMPLETE)
-
-**Investigation Documents**:
-- `.claude/research/validation/llm-batching-mode-investigation-2025-11-19.md` - Data-driven findings
-- `.claude/research/validation/llm-batching-mode-code-analysis-2025-11-19.md` - Code path analysis with file/line numbers
-
-**Task Document**:
-- `.claude/work/tasks/TASK-CJ-BATCH-STATE-AND-COMPLETION-FIXES.md` - 7 focused PRs with detailed checklists
-
-### PR Summary
-
-**Phase 1 (P0 - Blocks Serial Bundle)**:
-- PR 1: Fix batch state tracking (accumulate across iterations)
-- PR 2: Exclude error callbacks from completion count
-- PR 5: Investigate Anthropic API failure rate (diagnostic)
-
-**Phase 2 (P1 - Quality)**:
-- PR 3: Add position randomization to pair generation
-- PR 4: Unify completion threshold configuration
-
-**Phase 3 (P2 - Reliability)**:
-- PR 6: Fix stray callback race condition
-- PR 7: Queue hygiene (auto-expire stuck requests)
-
----
-
-## Remaining Work (Next Session)
-
-**Immediate**:
-1. Implement Phase 1 PRs (P0 critical fixes)
-2. Validate fixes against batch 33 scenario
-3. Re-run serial_bundle validation with fixes applied
-
-**Follow-up**:
-4. Implement Phase 2 PRs (quality improvements)
-5. Implement Phase 3 PRs (reliability enhancements)
-6. Complete original serial_bundle validation checklist
-
----
-
-### ✅ Logging Infrastructure Complete (2025-11-19)
-
-**Status**: All 5 PRs complete. See `.claude/work/tasks/TASK-LOGGING-FILE-PERSISTENCE-AND-DOCKER-CONFIG.md` for details.
-
-**Summary**: File-based logging + Docker bounded rotation + ENG5 persistence + validation tests + docs (Rule 043, Grafana playbook).
-
----
-
-## Notes for Next Session
-
-1. **All bugs pre-exist serial_bundle**: They exist in per_request mode too, just harder to trigger with lower throughput
-2. **Serial bundle implementation is correct**: All LPS/CJ metrics, metadata, and queue processing logic validated in unit tests
-3. **Position bias violates CJ methodology**: Must fix before any production CJ batches (regardless of batching mode)
-4. **Database queries available**: Investigation documents contain all SQL to verify fixes against real data
-
----
-
-## ✅ Current Session (2025-11-19) - Loki Cardinality Reduction Validation COMPLETE
-
-### Objective
-
-Validate that removing `correlation_id` and `logger_name` from Loki labels reduced cardinality without breaking JSON log parsing.
-
-### Configuration Changes
-
-1. ✅ Added `LOG_FORMAT=json` to all 18 services in `docker-compose.services.yml`
-2. ✅ Updated `libs/huleedu_service_libs/src/huleedu_service_libs/logging_utils.py`:
-   - Added LOG_FORMAT env var check (line 72-73)
-   - Logic: `use_json = log_format == "json" or (not log_format and environment == "production")`
-3. ✅ Separated `dev-recreate` (services only) from `dev-db-recreate` (databases)
-
-### Promtail Pipeline Fix
-
-**Root Cause Identified**: The `output` stage was causing pipeline failures for non-JSON lines, resulting in "context canceled" errors.
-
-**Solution Implemented** (using Context7 official docs):
-Updated `observability/promtail/promtail-config.yml` with correct pipeline:
-```yaml
-pipeline_stages:
-  - json:           # Extracts fields, preserves original line
-      expressions:
-        timestamp: timestamp
-        level: level
-        event: event
-        correlation_id: correlation_id
-        event_id: event_id
-        event_type: event_type
-        source_service: source_service
-        logger_name: logger_name
-  - timestamp:      # Parse timestamp from JSON
-      source: timestamp
-      format: RFC3339
-  - labels:         # Promote only low-cardinality fields
-      level:
-      service:
-```
-
-**Key Insight**: Removed `output` stage to preserve original log lines. JSON fields are extracted and queryable with `{service="..."} | json | field="value"`.
-
-### Validation Results
-
-1. ✅ **No Pipeline Errors**: Zero "could not transfer logs" errors
-2. ✅ **JSON Logs Visible**: Full JSON structure preserved in Loki
-3. ✅ **Fields Extractable**: Query with `| json` accesses all fields
-4. ✅ **Filtering Works**: `{service="content_service"} | json | event="Content Service startup completed successfully"` returns results
-5. ✅ **Cardinality Maintained**: 25 streams total (only `service` and `level` labels)
-6. ✅ **High-Cardinality Fields**: `correlation_id` and `logger_name` remain in JSON body only
-
-### Query Patterns
-
-**Basic log retrieval**:
-```logql
-{service="content_service"}
-```
-
-**JSON field filtering**:
-```logql
-{service="content_service"} | json | correlation_id="<uuid>"
-{service="content_service"} | json | event="Content Service startup completed successfully"
-{service="content_service"} | json | logger_name="content.app"
-```
-
-**Cross-service correlation**:
-```logql
-{service=~".*"} | json | correlation_id="<uuid>"
-```
-
-### Success Criteria: ALL MET ✅
-
-- [✅] Cardinality reduced to 25 streams
-- [✅] JSON log parsing functional
-- [✅] Correlation ID filtering works via `| json | correlation_id="..."`
-- [✅] No Promtail pipeline errors
-- [✅] Labels `correlation_id` and `logger_name` removed from index
-- [✅] High-cardinality fields queryable in JSON body
+For reference, previous versions and completed work from 2025-11-18 to 2025-11-21 are preserved in:
+- `handoff-2025-11-21-pre-cleanup.md` (full backup before this cleanup)
+- `2025-11-18-to-2025-11-21-completed-work.md` (archived completed sections)

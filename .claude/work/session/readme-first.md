@@ -49,6 +49,13 @@ pdm run pytest-root services/<service>/tests/
 pdm run pytest-root tests/integration/  # Cross-service tests
 ```
 
+### Latest Ops Status (2025-11-21)
+- CJ pipeline stall resolved after infra restore: Kafka/ZooKeeper/Redis/CJ DB healthy; `huleedu_cj_assessment_service` restarted with BatchMonitor running.
+- Stalled batch 588f04f4-219f-4545-9040-eabae4161f72 (corr 4cc75b6c-0fb2-465f-a20d-dfa0fb7de79f) now COMPLETED_STABLE; completion + RAS ready events published at ~11:48:59 UTC.
+- No batches remain in WAITING_CALLBACKS/GENERATING_PAIRS; monitor new runs via Loki query `{service="cj_assessment_service"} | json | event="BatchMonitor heartbeat"` and completion sweep logs.
+- E2E CJ test latency note: callbacks returned in ~12s, but `completion_threshold` (95% of budget 350) kept batch in WAITING_CALLBACKS until 5‑minute monitor sweep forced completion (~3m42s delay). Pending follow-up to switch completion to stability-first and cap budget to nC2.
+- Stability-first completion shipped: callbacks now trigger scoring immediately; batches finalize on stability or when callbacks hit the capped denominator (min(total_budget, nC2)). BatchMonitor is recovery-only.
+
 ### Hot-Reload Development
 
 All services use automatic code reload in development:
@@ -57,9 +64,11 @@ All services use automatic code reload in development:
 
 Changes to `.py` files trigger automatic restart (~9-11 seconds). No manual rebuild needed.
 
-### Logging (2025-11-19)
+### Logging & Observability (2025-11-20)
 
 **Infrastructure**: File-based logging + Docker bounded rotation operational. See Rule 043 §3.2, Grafana playbook (Loki access).
+
+**OTEL Trace Context**: ✅ Operational across all 15 API services. Health endpoints log with trace_id/span_id. Jaeger integration active. Use `scripts/validate_otel_trace_context.sh` to validate.
 
 **ENG5 Runner**: Execute mode → persistent logs at `.claude/research/data/eng5_np_2016/logs/eng5-{batch_id}-{timestamp}.log`
 
@@ -137,6 +146,10 @@ pdm run python -m scripts.cj_experiments_runners.eng5_np.cli \
 ```
 
 **Validation**: All artefacts are schema-compliant (see `Documentation/schemas/eng5_np/`)
+
+### Essay Lifecycle Slot Assignment (2025-11-21)
+- Added lock-aware retry to Option B content assignment (`assign_via_essay_states_immediate_commit`) to prevent false "no slot" responses under contention.
+- Regression coverage: `test_option_b_assignment_retries_when_slots_locked` + distributed `test_concurrent_identical_content_provisioning_race_prevention` now green.
 
 ### Bayesian Consensus Model
 

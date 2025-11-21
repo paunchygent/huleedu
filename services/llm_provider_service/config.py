@@ -124,6 +124,8 @@ class Settings(SecureServiceSettings):
     LLM_MAX_CONCURRENT_REQUESTS: int = 3
     LLM_DEFAULT_TEMPERATURE: float = 0.7
     LLM_DEFAULT_MAX_TOKENS: int = 4096
+    ENABLE_PROMPT_CACHING: bool = True
+    PROMPT_CACHE_TTL_SECONDS: int = 3600
 
     # Model Manifest Configuration
     USE_MANIFEST_MODEL_SELECTION: bool = Field(

@@ -222,6 +222,7 @@ class ServiceTestManager:
         cj_default_llm_model: str | None = None,
         cj_default_temperature: float | None = None,
         student_prompt_ref: StorageReferenceMetadata | None = None,
+        attach_prompt: bool = True,
     ) -> tuple[str, str]:
         """
         Create a test batch via API Gateway (AGW).
@@ -262,7 +263,7 @@ class ServiceTestManager:
         timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         prompt_label = f"Test batch prompt via AGW at {timestamp} (corr: {correlation_id[:8]})"
         prompt_ref = student_prompt_ref
-        if prompt_ref is None:
+        if prompt_ref is None and attach_prompt:
             prompt_text = (
                 f"{prompt_label}. This prompt was auto-generated for functional testing flows."
             )
@@ -273,8 +274,9 @@ class ServiceTestManager:
             "expected_essay_count": expected_essay_count,
             "course_code": course_code_enum.value,
             "enable_cj_assessment": enable_cj_assessment,
-            "student_prompt_ref": serialize_prompt_ref(prompt_ref),
         }
+        if prompt_ref is not None:
+            payload["student_prompt_ref"] = serialize_prompt_ref(prompt_ref)
 
         if class_id is not None:
             payload["class_id"] = class_id
@@ -324,6 +326,7 @@ class ServiceTestManager:
         enable_cj_assessment: bool = False,
         class_id: str | None = None,
         student_prompt_ref: StorageReferenceMetadata | None = None,
+        attach_prompt: bool = True,
     ) -> tuple[str, str]:
         """
         Create a test batch via API Gateway.
@@ -350,6 +353,7 @@ class ServiceTestManager:
             enable_cj_assessment=enable_cj_assessment,
             class_id=class_id,
             student_prompt_ref=student_prompt_ref,
+            attach_prompt=attach_prompt,
         )
 
     async def upload_files(

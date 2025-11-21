@@ -335,9 +335,16 @@ class TestAsyncWorkflowContinuation:
                 correlation_id=uuid4(),
             )
 
-            # The existing logic continues every 5 completions
-            if i == 4:  # 5th completion (index 4)
-                assert should_continue, f"Should continue at completion {i + 1}"
+            # New logic: continuation triggers only when all submitted callbacks have arrived
+            if i < total_comparisons - 1:
+                # For partial completion we should NOT continue yet
+                assert not should_continue, f"Should not continue at completion {i + 1}"
+            else:
+                # On the final callback (all comparisons completed), continuation should trigger
+                assert should_continue, (
+                    f"Should continue only after all {total_comparisons} callbacks, "
+                    f"got continuation at {i + 1}"
+                )
 
             # Simulate state change if workflow continues
             if should_continue:

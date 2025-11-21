@@ -419,6 +419,12 @@ is omitted.
 
 Set `CJ_ASSESSMENT_SERVICE_PAIR_GENERATION_SEED=<int>` only when you need reproducible pair ordering for debugging or deterministic tests. When unset (the default), pair generation randomizes essay A/B positions per pair to eliminate anchor bias while keeping the duplicate-detection logic intact.
 
+### Completion & scoring triggers (stability-first)
+- Scoring now runs as soon as `completed_comparisons + failed_comparisons == submitted_comparisons`; no more waiting for the 5‑minute monitor sweep.
+- A batch finalizes when either BT scores are stable (`SCORE_STABILITY_THRESHOLD`, gated by `MIN_COMPARISONS_FOR_STABILITY_CHECK`) or total callbacks hit the comparison cap.
+- The completion denominator is `min(total_budget, nC2)` so small batches (e.g., 4 essays → 6 pairs) complete immediately after their callbacks instead of being judged against large global budgets.
+- BatchMonitor remains recovery-only; healthy batches should finish via callback-driven scoring.
+
 ## Database Schema
 
 ### Core Tables

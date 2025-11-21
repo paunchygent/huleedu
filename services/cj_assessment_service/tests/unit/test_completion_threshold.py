@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 import pytest
 from common_core.status_enums import CJBatchStateEnum
 
-from services.cj_assessment_service.cj_core_logic import workflow_continuation as wc
 from services.cj_assessment_service.cj_core_logic.batch_completion_checker import (
     BatchCompletionChecker,
 )
-from services.cj_assessment_service.models_db import CJBatchState
+from services.cj_assessment_service.enums_db import CJBatchStatusEnum
+from services.cj_assessment_service.models_db import CJBatchState, CJBatchUpload
 from services.cj_assessment_service.protocols import CJRepositoryProtocol
 
 
@@ -80,59 +80,17 @@ async def test_completion_checker_respects_lower_threshold(mock_database: AsyncM
     assert result is True
 
 
-@pytest.mark.asyncio
-async def test_workflow_continuation_counts_only_valid_winners(mock_database: AsyncMock) -> None:
-    """Continuation logic should rely on valid winners and ignore error callbacks."""
-
-    session = mock_database.session.return_value.__aenter__.return_value
-    completed_result = Mock()
-    completed_result.scalar_one.return_value = 34
-    session.execute = AsyncMock(return_value=completed_result)
-
+def test_completion_denominator_uses_small_batch_nc2_cap() -> None:
     batch_state = _build_batch_state()
+    batch_state.total_budget = 350
+    batch_state.total_comparisons = 6
+    batch_state.batch_upload = CJBatchUpload(
+        bos_batch_id="bos-test",
+        event_correlation_id="00000000-0000-0000-0000-000000000000",
+        language="en",
+        course_code="eng5",
+        expected_essay_count=4,
+        status=CJBatchStatusEnum.PENDING,
+    )
 
-    with patch(
-        "services.cj_assessment_service.cj_core_logic.workflow_continuation.get_batch_state",
-        new_callable=AsyncMock,
-    ) as mock_get_state:
-        mock_get_state.return_value = batch_state
-
-        should_continue = await wc.check_workflow_continuation(
-            batch_id=batch_state.batch_id,
-            database=mock_database,
-            correlation_id=uuid4(),
-        )
-
-    assert should_continue is False
-
-    captured_stmt = session.execute.await_args[0][0]
-    compiled = str(captured_stmt.compile(compile_kwargs={"literal_binds": False}))
-    assert "winner" in compiled and "IN" in compiled
-
-
-@pytest.mark.asyncio
-async def test_workflow_continuation_honors_completion_threshold_override(
-    mock_database: AsyncMock,
-) -> None:
-    """Threshold overrides should allow continuation when valid completion percentage is met."""
-
-    session = mock_database.session.return_value.__aenter__.return_value
-    completed_result = Mock()
-    completed_result.scalar_one.return_value = 34
-    session.execute = AsyncMock(return_value=completed_result)
-
-    batch_state = _build_batch_state(threshold=30)
-
-    with patch(
-        "services.cj_assessment_service.cj_core_logic.workflow_continuation.get_batch_state",
-        new_callable=AsyncMock,
-    ) as mock_get_state:
-        mock_get_state.return_value = batch_state
-
-        should_continue = await wc.check_workflow_continuation(
-            batch_id=batch_state.batch_id,
-            database=mock_database,
-            correlation_id=uuid4(),
-        )
-
-    assert should_continue is True
+    assert batch_state.completion_denominator() == 6

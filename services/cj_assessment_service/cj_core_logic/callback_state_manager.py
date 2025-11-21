@@ -510,6 +510,8 @@ async def _update_batch_completion_counters(
                 f"Batch {batch_id} completed_comparisons: {batch_state.completed_comparisons}"
             )
 
+        batch_state.last_activity_at = datetime.now(UTC)
+
         # Check for partial scoring trigger (80% completion threshold)
         if (
             batch_state.total_comparisons > 0

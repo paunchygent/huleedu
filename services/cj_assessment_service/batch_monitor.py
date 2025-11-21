@@ -25,6 +25,7 @@ from sqlalchemy import and_, select
 from sqlalchemy.orm import selectinload
 
 from services.cj_assessment_service.cj_core_logic import scoring_ranking
+from services.cj_assessment_service.cj_core_logic.batch_finalizer import BatchFinalizer
 from services.cj_assessment_service.cj_core_logic.dual_event_publisher import (
     DualEventPublishingData,
     publish_dual_assessment_events,
@@ -147,9 +148,68 @@ class BatchMonitor:
                         ]
                         await asyncio.gather(*tasks, return_exceptions=True)
                     else:
-                        # No stuck batches found, reset gauge to 0
+                        # No stuck batches found, reset gauge to 0 and emit heartbeat
+                        logger.info(
+                            "BatchMonitor heartbeat: no stuck batches detected",
+                            extra={
+                                "stuck_threshold": stuck_threshold.isoformat(),
+                                "monitored_states": [s.value for s in monitored_states],
+                            },
+                        )
                         if self._stuck_batches_gauge:
                             self._stuck_batches_gauge.set(0)
+
+                    # Fast-path completion sweeper: finalize batches with all callbacks received
+                    ready_stmt = (
+                        select(CJBatchState)
+                        .options(selectinload(CJBatchState.batch_upload))
+                        .where(
+                            CJBatchState.state == CJBatchStateEnum.WAITING_CALLBACKS,
+                            CJBatchState.total_comparisons > 0,
+                            (CJBatchState.completed_comparisons + CJBatchState.failed_comparisons)
+                            >= CJBatchState.total_comparisons,
+                        )
+                    )
+                    ready_result = await session.execute(ready_stmt)
+                    ready_batches = ready_result.scalars().all()
+
+                    for ready_state in ready_batches:
+                        try:
+                            correlation_id = UUID(ready_state.batch_upload.event_correlation_id)
+                            log_extra = {
+                                "batch_id": ready_state.batch_id,
+                                "correlation_id": str(correlation_id),
+                                "completed": ready_state.completed_comparisons,
+                                "total": ready_state.total_comparisons,
+                                "state": ready_state.state.value,
+                                "reason": "monitor_completion_sweep",
+                            }
+                            logger.info(
+                                "Finalizing batch with all callbacks received",
+                                extra=log_extra,
+                            )
+                            finalizer = BatchFinalizer(
+                                database=self._repository,
+                                event_publisher=self._event_publisher,
+                                content_client=self._content_client,
+                                settings=self._settings,
+                            )
+                            await finalizer.finalize_scoring(
+                                batch_id=ready_state.batch_id,
+                                correlation_id=correlation_id,
+                                session=session,
+                                log_extra=log_extra,
+                            )
+                        except Exception as e:  # pragma: no cover
+                            logger.error(
+                                "Failed to finalize batch in completion sweep",
+                                extra={
+                                    "batch_id": ready_state.batch_id,
+                                    "error": str(e),
+                                    "error_type": type(e).__name__,
+                                },
+                                exc_info=True,
+                            )
 
             except Exception as e:
                 logger.error(
@@ -185,9 +245,8 @@ class BatchMonitor:
         try:
             # Calculate progress percentage
             denominator = batch_state.completion_denominator()
-            progress_pct = (
-                (batch_state.completed_comparisons / denominator) * 100 if denominator else 0
-            )
+            callbacks_recorded = batch_state.completed_comparisons + batch_state.failed_comparisons
+            progress_pct = (callbacks_recorded / denominator) * 100 if denominator else 0
 
             batch_id = batch_state.batch_id
             current_state = batch_state.state

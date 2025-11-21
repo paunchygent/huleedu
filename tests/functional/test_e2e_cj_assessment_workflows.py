@@ -19,6 +19,7 @@ from huleedu_service_libs.logging_utils import create_service_logger
 from tests.functional.pipeline_test_harness import PipelineTestHarness
 from tests.utils.auth_manager import AuthTestManager
 from tests.utils.kafka_test_manager import KafkaTestManager
+from tests.utils.prompt_reference import make_prompt_ref_payload
 from tests.utils.service_test_manager import ServiceTestManager
 
 logger = create_service_logger("test.e2e_cj_assessment")
@@ -197,6 +198,63 @@ class TestE2ECJAssessmentWorkflows:
                 if essay_result["cj_assessment_status"] == "completed":
                     assert "cj_rank" in essay_result
                     assert "cj_score" in essay_result
+
+        finally:
+            await harness.cleanup()
+
+    @pytest.mark.e2e
+    @pytest.mark.docker
+    @pytest.mark.asyncio
+    @pytest.mark.timeout(300)
+    async def test_amended_prompt_cj_pipeline_succeeds_without_prompt_payload(self):
+        """End-to-end: amend prompt via PATCH then run CJ pipeline without prompt_payload."""
+
+        auth_manager = AuthTestManager()
+        service_manager = ServiceTestManager(auth_manager=auth_manager)
+        kafka_mgr = KafkaTestManager()
+        harness = PipelineTestHarness(service_manager, kafka_mgr, auth_manager)
+
+        essay_files = [
+            Path("test_uploads/real_test_batch/MHHXGMXL 50 (SA24D ENG 5 WRITING 2025).txt"),
+            Path("test_uploads/real_test_batch/MHHXGMXE 50 (SA24D ENG 5 WRITING 2025).txt"),
+        ]
+
+        try:
+            # 1. Setup guest batch WITHOUT an initial prompt (attach later)
+            batch_id, corr = await harness.setup_guest_batch(essay_files, attach_prompt=False)
+
+            # 2. Upload a new prompt to Content Service
+            prompt_text = f"Amended test prompt for batch {batch_id}"
+            prompt_storage_id = await service_manager.upload_content_directly(prompt_text)
+
+            # 3. Amend the batch with the new prompt via AGW PATCH endpoint
+            amendment_payload = {"student_prompt_ref": make_prompt_ref_payload(prompt_storage_id)}
+
+            amend_response = await service_manager.make_request(
+                method="PATCH",
+                service="api_gateway_service",
+                path=f"/v1/batches/{batch_id}/prompt",
+                json=amendment_payload,
+                user=harness.teacher_user,
+                correlation_id=corr,
+            )
+
+            assert amend_response.get("status") == "success"
+            assert amend_response.get("batch_id") == batch_id
+
+            # 4. Execute CJ pipeline WITHOUT prompt_payload
+            result = await harness.execute_pipeline(
+                pipeline_name="cj_assessment",
+                expected_steps=["spellcheck", "cj_assessment"],
+                expected_completion_event="cj_assessment.completed",
+                validate_phase_pruning=False,
+                timeout_seconds=240,
+                # No prompt_payload here; BOS should use batch_context student_prompt_ref
+            )
+
+            assert result.all_steps_completed, "CJ pipeline did not complete after prompt amendment"
+            assert "cj_assessment" in result.executed_steps
+            assert result.error_events == []
 
         finally:
             await harness.cleanup()

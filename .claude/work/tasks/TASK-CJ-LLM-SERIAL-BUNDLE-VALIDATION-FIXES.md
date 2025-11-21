@@ -2,7 +2,7 @@
 id: "cj-llm-serial-bundle-validation-fixes"
 title: "CJ LLM Serial Bundle Validation Fixes"
 type: "task"
-status: "todo"
+status: "in_progress"
 priority: "high"
 domain: "assessment"
 service: "cj_assessment_service"
@@ -10,7 +10,7 @@ owner_team: "agents"
 owner: ""
 program: ""
 created: "2025-11-19"
-last_updated: "2025-11-19"
+last_updated: "2025-11-21"
 related: [
   ".claude/work/tasks/TASK-LLM-BATCH-STRATEGY-IMPLEMENTATION-CHECKLIST.md",
   ".claude/work/tasks/TASK-LLM-SERIAL-BUNDLE-METRICS-AND-DIAGNOSTICS-FIX.md"
@@ -41,11 +41,16 @@ labels: []
 - **PR 3 – Anthropic Error Diagnostics for Serial-Bundle ENG5 Runs**  
 - **PR 4 – Queue Hygiene & Orphan Callback Handling**
 
-**Success Criteria:**  
-- Serial-bundle runs never report >100% completion and match DB counts.  
-- A/B positions are balanced for anchors and students across runs.  
-- Anthropic failures are classified with structured `ErrorDetail` + Prometheus metrics by `error_type`.  
+**Success Criteria:**
+- Serial-bundle runs never report >100% completion and match DB counts.
+- A/B positions are balanced for anchors and students across runs.
+- Anthropic failures are classified with structured `ErrorDetail` + Prometheus metrics by `error_type`.
 - Stuck queue items and orphan callbacks are surfaced via metrics/logs and cleaned up deterministically.
+
+**Progress 2025-11-21:**
+- PR1: stability-first completion shipped (callback-driven scoring, nC₂ denominator cap, monitor recovery-only). Unit tests added; targeted pytest command below.
+- PR3: Anthropic client hardened (429 Retry-After, 529/overloaded retryable, stop_reason=max_tokens, prompt caching hook + metadata). Integration test still to extend for 529/stop_reason cases.
+- Docs updated: CJ README (completion path) and LPS README (Anthropic ops/caching). Tests run: `pdm run pytest-root services/cj_assessment_service/tests/unit/test_workflow_continuation.py services/cj_assessment_service/tests/unit/test_completion_threshold.py services/llm_provider_service/tests/integration/test_anthropic_error_diagnostics.py`.
 
 ---
 
@@ -54,7 +59,7 @@ labels: []
 **Goal:** Make batch completion, partial scoring, and metrics use coherent
 counters so completion percentages never exceed 100% and match DB reality.
 
-**Status:** todo
+**Status:** in_progress (stability-first completion landed 2025-11-21)
 
 **Files:**
 - `services/cj_assessment_service/models_db.py` (`CJBatchState`)
@@ -63,24 +68,15 @@ counters so completion percentages never exceed 100% and match DB reality.
 - `cj_core_logic/workflow_continuation.py`
 - `cj_core_logic/batch_processor.py`
 
-**Checklist:**
-- **[ ]** Define clear semantics for `total_comparisons`, `submitted_comparisons`,
+**Checklist (updated 2025-11-21):**
+- **[x]** Define clear semantics for `total_comparisons`, `submitted_comparisons`,
   `completed_comparisons`, `failed_comparisons` (global budget vs runtime counts).
-- **[ ]** Ensure `total_comparisons` is a **global budget** set once per batch,
-  not overwritten per iteration.
-- **[ ]** Change completion rate calculations to use:
-  - Numerator: count of valid comparisons from `cj_comparison_pairs`
-    (`winner IS NOT NULL AND winner != 'error'`).
-  - Denominator: global budget from `CJBatchState.total_comparisons`.
-- **[ ]** Align `check_batch_completion_conditions` (80% heuristic) and
-  `BatchCompletionChecker.check_batch_completion` (threshold / overrides) to use
-  the same numerator/denominator and structured logging.
-- **[ ]** Update partial scoring trigger in `_update_batch_completion_counters`
-  to use the same completion definition and fire exactly once.
-- **[ ]** Add regression tests covering: low-valid/high-error, budget exhausted
-  but incomplete, and 100% completion.
-- **[ ]** Validate via unit + CJ integration tests and run
-  `pdm run typecheck-all`, `pdm run lint-fix --unsafe-fixes`.
+- **[x]** Keep `total_comparisons`/`total_budget` immutable per batch; accumulate `submitted_comparisons` per iteration.
+- **[x]** Completion gate now uses callbacks_received (completed+failed) with denominator `min(total_budget or total_comparisons, nC2)`; small batches finalize immediately (n=4 → 6 pairs).
+- **[x]** Stability-first: when callbacks_received == submitted_comparisons, recompute BT and finalize on stability (`SCORE_STABILITY_THRESHOLD`) or when callbacks hit denominator/budget cap; BatchMonitor stays recovery-only.
+- **[±]** Partial scoring trigger still uses legacy 80% heuristic; leave for follow-up if needed (no regression today).
+- **[x]** Tests added/updated: workflow continuation, completion denominator small-batch cap.
+- **[x]** Validation: `pdm run pytest-root services/cj_assessment_service/tests/unit/test_workflow_continuation.py services/cj_assessment_service/tests/unit/test_completion_threshold.py` + lint/format.
 
 ---
 
@@ -115,28 +111,24 @@ balanced A/B positions while preserving reproducibility.
 
 ## PR 3 – Anthropic Error Diagnostics for Serial-Bundle ENG5 Runs
 
-**Goal:** Classify Anthropic errors (rate limit, timeout, etc.) and surface them
-via structured `ErrorDetail` and Prometheus metrics so ENG5 runs can distinguish
-provider behaviour from CJ bugs.
+**Goal:** Classify Anthropic errors (rate limit, overload, max_tokens truncation) and surface
+them via structured `ErrorDetail` and Prometheus metrics so ENG5 runs can distinguish provider behaviour from CJ bugs.
 
-**Status:** todo
+**Status:** in_progress (retry/overload/stop_reason + prompt caching shipped 2025-11-21)
 
 **Files:**
-- `services/llm_provider_service/implementations/comparison_processor_impl.py`
-- Anthropic client / error-mapping module
+- `services/llm_provider_service/implementations/anthropic_provider_impl.py`
+- `services/llm_provider_service/config.py`
 - `services/llm_provider_service/exceptions.py`
 - `services/llm_provider_service/metrics.py`
 
-**Checklist:**
-- **[ ]** Enrich `ErrorDetail.details` for Anthropic failures with at least:
-  `provider`, `http_status`, `error_type`, `provider_error_code`, `retryable`.
-- **[ ]** Ensure enriched details propagate into
-  `LLMComparisonResultV1.error_detail` and are visible in CJ logs.
-- **[ ]** Add `llm_provider_errors_total{provider,model,error_type}` metric and
-  increment it for all external service errors (per_request + serial_bundle).
-- **[ ]** Add unit tests for representative Anthropic failures and verify
-  `ErrorDetail` and metrics labels.
-- **[ ]** Document PromQL examples for ENG5 in LPS/CJ READMEs or runbook.
+**Checklist (current):**
+- **[x]** Treat 529/`overloaded_error` as transient + retryable; metrics label `overloaded`.
+- **[x]** Respect `Retry-After` on 429 (bounded sleep) and propagate retryable details.
+- **[x]** Detect `stop_reason=max_tokens` and raise structured EXTERNAL_SERVICE_ERROR.
+- **[x]** Include `correlation_id` + `prompt_sha256` in Anthropic request metadata; prompt caching hook on system block with configurable TTL.
+- **[ ]** Extend `test_anthropic_error_diagnostics.py` to cover 529 / stop_reason flows (currently 429/500/connection).
+- **[ ]** Add PromQL snippets to LPS README or ENG5 runbook for error_type visibility.
 
 ---
 

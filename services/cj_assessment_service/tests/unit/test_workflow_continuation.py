@@ -14,7 +14,12 @@ import pytest
 
 from services.cj_assessment_service.cj_core_logic import workflow_continuation as wc
 from services.cj_assessment_service.config import Settings
-from services.cj_assessment_service.models_db import AssessmentInstruction, CJBatchState
+from services.cj_assessment_service.enums_db import CJBatchStatusEnum
+from services.cj_assessment_service.models_db import (
+    AssessmentInstruction,
+    CJBatchState,
+    CJBatchUpload,
+)
 from services.cj_assessment_service.protocols import CJRepositoryProtocol
 from services.cj_assessment_service.tests.unit.instruction_store import AssessmentInstructionStore
 
@@ -162,16 +167,27 @@ class _Repo(CJRepositoryProtocol):
         return 1  # Return a mock anchor ID
 
 
+def _make_upload(expected_count: int) -> CJBatchUpload:
+    return CJBatchUpload(
+        bos_batch_id="bos-test",
+        event_correlation_id="00000000-0000-0000-0000-000000000000",
+        language="en",
+        course_code="eng5",
+        expected_essay_count=expected_count,
+        status=CJBatchStatusEnum.PENDING,
+    )
+
+
 @pytest.mark.asyncio
-async def test_check_continuation_periodic_every_5(monkeypatch: Any) -> None:
-    # Arrange: 10 completed out of 100 => periodic rule applies (every 5)
+async def test_check_continuation_true_when_all_callbacks_arrived(monkeypatch: Any) -> None:
     session = _FakeSession(completed_count=10)
     repo = _Repo(session)
 
     batch_state = CJBatchState()
     batch_state.batch_id = 1
-    batch_state.total_comparisons = 100
-    batch_state.completion_threshold_pct = 95
+    batch_state.submitted_comparisons = 5
+    batch_state.completed_comparisons = 3
+    batch_state.failed_comparisons = 2
 
     async def _fake_get_batch_state(
         _s: Any, _bid: int, _cid: Any, _for_update: bool = False
@@ -180,52 +196,23 @@ async def test_check_continuation_periodic_every_5(monkeypatch: Any) -> None:
 
     monkeypatch.setattr(wc, "get_batch_state", _fake_get_batch_state)
 
-    # Act
     should_continue = await wc.check_workflow_continuation(
         batch_id=1, database=repo, correlation_id=uuid4()
     )
 
-    # Assert
     assert should_continue is True
 
 
 @pytest.mark.asyncio
-async def test_check_continuation_threshold(monkeypatch: Any) -> None:
-    # Arrange: 18/20 => 90% completed, threshold set to 80 => continuation by threshold
-    session = _FakeSession(completed_count=18)
-    repo = _Repo(session)
-
-    batch_state = CJBatchState()
-    batch_state.batch_id = 2
-    batch_state.total_comparisons = 20
-    batch_state.completion_threshold_pct = 80
-
-    async def _fake_get_batch_state(
-        _s: Any, _bid: int, _cid: Any, _for_update: bool = False
-    ) -> Any:
-        return batch_state
-
-    monkeypatch.setattr(wc, "get_batch_state", _fake_get_batch_state)
-
-    # Act
-    should_continue = await wc.check_workflow_continuation(
-        batch_id=2, database=repo, correlation_id=uuid4()
-    )
-
-    # Assert
-    assert should_continue is True
-
-
-@pytest.mark.asyncio
-async def test_check_continuation_false(monkeypatch: Any) -> None:
-    # Arrange: 3/20 => 15%, below periodic rule and below threshold
+async def test_check_continuation_false_when_pending(monkeypatch: Any) -> None:
     session = _FakeSession(completed_count=3)
     repo = _Repo(session)
 
     batch_state = CJBatchState()
-    batch_state.batch_id = 3
-    batch_state.total_comparisons = 20
-    batch_state.completion_threshold_pct = 95
+    batch_state.batch_id = 2
+    batch_state.submitted_comparisons = 6
+    batch_state.completed_comparisons = 4
+    batch_state.failed_comparisons = 1
 
     async def _fake_get_batch_state(
         _s: Any, _bid: int, _cid: Any, _for_update: bool = False
@@ -234,12 +221,35 @@ async def test_check_continuation_false(monkeypatch: Any) -> None:
 
     monkeypatch.setattr(wc, "get_batch_state", _fake_get_batch_state)
 
-    # Act
+    should_continue = await wc.check_workflow_continuation(
+        batch_id=2, database=repo, correlation_id=uuid4()
+    )
+
+    assert should_continue is False
+
+
+@pytest.mark.asyncio
+async def test_check_continuation_false_when_nothing_submitted(monkeypatch: Any) -> None:
+    session = _FakeSession(completed_count=0)
+    repo = _Repo(session)
+
+    batch_state = CJBatchState()
+    batch_state.batch_id = 3
+    batch_state.submitted_comparisons = 0
+    batch_state.completed_comparisons = 0
+    batch_state.failed_comparisons = 0
+
+    async def _fake_get_batch_state(
+        _s: Any, _bid: int, _cid: Any, _for_update: bool = False
+    ) -> Any:
+        return batch_state
+
+    monkeypatch.setattr(wc, "get_batch_state", _fake_get_batch_state)
+
     should_continue = await wc.check_workflow_continuation(
         batch_id=3, database=repo, correlation_id=uuid4()
     )
 
-    # Assert
     assert should_continue is False
 
 
@@ -277,119 +287,52 @@ def test_resolve_comparison_budget(
 
 
 @pytest.mark.asyncio
-async def test_trigger_continuation_enqueues_additional_pairs(monkeypatch: Any) -> None:
+async def test_trigger_continuation_finalizes_when_callbacks_hit_cap(monkeypatch: Any) -> None:
     settings = Mock(spec=Settings)
-    settings.MAX_PAIRWISE_COMPARISONS = 500
-    repo = _Repo(_FakeSession(completed_count=15))
+    settings.MAX_PAIRWISE_COMPARISONS = 350
+    settings.MIN_COMPARISONS_FOR_STABILITY_CHECK = 5
+    settings.SCORE_STABILITY_THRESHOLD = 0.05
+
+    repo = _Repo(_FakeSession(completed_count=0))
     event_publisher = AsyncMock()
     content_client = AsyncMock()
     llm_interaction = AsyncMock()
 
-    async def fake_completion_conditions(*_args: Any, **_kwargs: Any) -> bool:
-        return False
+    batch_state = CJBatchState()
+    batch_state.batch_id = 9
+    batch_state.submitted_comparisons = 6
+    batch_state.completed_comparisons = 6
+    batch_state.failed_comparisons = 0
+    batch_state.total_comparisons = 6
+    batch_state.total_budget = 350
+    batch_state.current_iteration = 1
+    batch_state.processing_metadata = {}
 
-    monkeypatch.setattr(wc, "check_batch_completion_conditions", fake_completion_conditions)
-
-    batch_state = Mock()
-    batch_state.total_comparisons = 40
-    batch_state.completion_threshold_pct = 95
-    batch_state.processing_metadata = {
-        "comparison_budget": {"max_pairs_requested": 100, "source": "runner_override"},
-        "config_overrides": {"batch_size": 25},
-        "llm_overrides": {"model_override": "claude"},
-        "original_request": {
-            "assignment_id": "assignment-123",
-            "language": "en",
-            "course_code": "ENG5",
-            "max_comparisons_override": 175,
-        },
-    }
+    # Provide essay count for nC2 = 6
+    batch_state.batch_upload = _make_upload(expected_count=4)
 
     async def fake_get_batch_state(*_args: Any, **_kwargs: Any) -> Any:
         return batch_state
 
     monkeypatch.setattr(wc, "get_batch_state", fake_get_batch_state)
 
-    class _Checker:
-        def __init__(self, *_args: Any, **_kwargs: Any) -> None:
-            pass
+    essays = [
+        Mock(els_essay_id=str(i), assessment_input_text=f"essay-{i}", current_bt_score=0.0)
+        for i in range(4)
+    ]
+    repo.get_essays_for_cj_batch = AsyncMock(return_value=essays)
 
-        async def check_batch_completion(self, *_args: Any, **_kwargs: Any) -> bool:
-            return False
-
-    monkeypatch.setattr(wc, "BatchCompletionChecker", _Checker)
-
-    finalizer_called = AsyncMock()
-
-    class _Finalizer:
-        def __init__(self, *_args: Any, **_kwargs: Any) -> None:
-            pass
-
-        async def finalize_scoring(self, *_args: Any, **_kwargs: Any) -> None:
-            await finalizer_called()
-
-    monkeypatch.setattr(wc, "BatchFinalizer", _Finalizer)
-
-    request_additional = AsyncMock(return_value=True)
     monkeypatch.setattr(
-        wc.comparison_processing,
-        "request_additional_comparisons_for_batch",
-        request_additional,
+        wc.scoring_ranking,
+        "record_comparisons_and_update_scores",
+        AsyncMock(return_value={"a": 0.1, "b": 0.2}),
     )
-
-    await wc.trigger_existing_workflow_continuation(
-        batch_id=7,
-        database=repo,
-        event_publisher=event_publisher,
-        settings=settings,
-        content_client=content_client,
-        correlation_id=uuid4(),
-        llm_interaction=llm_interaction,
+    monkeypatch.setattr(
+        wc.scoring_ranking,
+        "check_score_stability",
+        Mock(return_value=0.01),
     )
-
-    request_additional.assert_awaited_once()
-    assert request_additional.await_args is not None
-    _, kwargs = request_additional.await_args
-    assert kwargs["config_overrides_payload"] == {"batch_size": 25}
-    assert kwargs["llm_overrides_payload"] == {"model_override": "claude"}
-    assert kwargs["original_request_payload"] == batch_state.processing_metadata["original_request"]
-    finalizer_called.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_trigger_continuation_finalizes_when_budget_exhausted(monkeypatch: Any) -> None:
-    settings = Mock(spec=Settings)
-    settings.MAX_PAIRWISE_COMPARISONS = 200
-    repo = _Repo(_FakeSession(completed_count=50))
-    event_publisher = AsyncMock()
-    content_client = AsyncMock()
-    llm_interaction = AsyncMock()
-
-    async def fake_completion_conditions(*_args: Any, **_kwargs: Any) -> bool:
-        return False
-
-    monkeypatch.setattr(wc, "check_batch_completion_conditions", fake_completion_conditions)
-
-    batch_state = Mock()
-    batch_state.total_comparisons = 200
-    batch_state.completion_threshold_pct = 95
-    batch_state.processing_metadata = {
-        "comparison_budget": {"max_pairs_requested": 200, "source": "service_default"},
-    }
-
-    async def fake_get_batch_state(*_args: Any, **_kwargs: Any) -> Any:
-        return batch_state
-
-    monkeypatch.setattr(wc, "get_batch_state", fake_get_batch_state)
-
-    class _Checker:
-        def __init__(self, *_args: Any, **_kwargs: Any) -> None:
-            pass
-
-        async def check_batch_completion(self, *_args: Any, **_kwargs: Any) -> bool:
-            return False
-
-    monkeypatch.setattr(wc, "BatchCompletionChecker", _Checker)
+    monkeypatch.setattr(wc, "merge_batch_processing_metadata", AsyncMock())
 
     finalize_called = AsyncMock()
 
@@ -402,13 +345,6 @@ async def test_trigger_continuation_finalizes_when_budget_exhausted(monkeypatch:
 
     monkeypatch.setattr(wc, "BatchFinalizer", _Finalizer)
 
-    request_additional = AsyncMock(return_value=False)
-    monkeypatch.setattr(
-        wc.comparison_processing,
-        "request_additional_comparisons_for_batch",
-        request_additional,
-    )
-
     await wc.trigger_existing_workflow_continuation(
         batch_id=9,
         database=repo,
@@ -419,5 +355,87 @@ async def test_trigger_continuation_finalizes_when_budget_exhausted(monkeypatch:
         llm_interaction=llm_interaction,
     )
 
-    request_additional.assert_not_awaited()
     finalize_called.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_trigger_continuation_requests_more_when_not_finalized(monkeypatch: Any) -> None:
+    settings = Mock(spec=Settings)
+    settings.MAX_PAIRWISE_COMPARISONS = 10
+    settings.MIN_COMPARISONS_FOR_STABILITY_CHECK = 5
+    settings.SCORE_STABILITY_THRESHOLD = 0.05
+
+    repo = _Repo(_FakeSession(completed_count=0))
+    event_publisher = AsyncMock()
+    content_client = AsyncMock()
+    llm_interaction = AsyncMock()
+
+    batch_state = CJBatchState()
+    batch_state.batch_id = 10
+    batch_state.submitted_comparisons = 4
+    batch_state.completed_comparisons = 4
+    batch_state.failed_comparisons = 0
+    batch_state.total_comparisons = 4
+    batch_state.total_budget = 10
+    batch_state.current_iteration = 1
+    batch_state.processing_metadata = {
+        "comparison_budget": {"max_pairs_requested": 10, "source": "service_default"},
+        "config_overrides": {"batch_size": 25},
+        "llm_overrides": {"model_override": "claude"},
+        "original_request": {"assignment_id": "assignment-123"},
+    }
+    batch_state.batch_upload = _make_upload(expected_count=5)
+
+    async def fake_get_batch_state(*_args: Any, **_kwargs: Any) -> Any:
+        return batch_state
+
+    monkeypatch.setattr(wc, "get_batch_state", fake_get_batch_state)
+
+    essays = [
+        Mock(els_essay_id=str(i), assessment_input_text=f"essay-{i}", current_bt_score=0.0)
+        for i in range(5)
+    ]
+    repo.get_essays_for_cj_batch = AsyncMock(return_value=essays)
+
+    monkeypatch.setattr(
+        wc.scoring_ranking,
+        "record_comparisons_and_update_scores",
+        AsyncMock(return_value={"a": 0.1, "b": 0.3}),
+    )
+    monkeypatch.setattr(
+        wc.scoring_ranking,
+        "check_score_stability",
+        Mock(return_value=0.2),
+    )
+    monkeypatch.setattr(wc, "merge_batch_processing_metadata", AsyncMock())
+
+    request_additional = AsyncMock(return_value=True)
+    monkeypatch.setattr(
+        wc.comparison_processing,
+        "request_additional_comparisons_for_batch",
+        request_additional,
+    )
+
+    finalize_called = AsyncMock()
+
+    class _Finalizer:
+        def __init__(self, *_args: Any, **_kwargs: Any) -> None:
+            pass
+
+        async def finalize_scoring(self, *_args: Any, **_kwargs: Any) -> None:
+            await finalize_called()
+
+    monkeypatch.setattr(wc, "BatchFinalizer", _Finalizer)
+
+    await wc.trigger_existing_workflow_continuation(
+        batch_id=10,
+        database=repo,
+        event_publisher=event_publisher,
+        settings=settings,
+        content_client=content_client,
+        correlation_id=uuid4(),
+        llm_interaction=llm_interaction,
+    )
+
+    request_additional.assert_awaited_once()
+    finalize_called.assert_not_awaited()

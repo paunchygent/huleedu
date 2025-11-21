@@ -54,6 +54,31 @@ echo_dev() {
     echo -e "${CYAN}[DEV]${NC} $1"
 }
 
+# Expand service list with required dependencies (e.g., DB containers)
+expand_with_dependencies() {
+    local inputs=("$@")
+    local expanded=()
+    for svc in "${inputs[@]}"; do
+        expanded+=("$svc")
+        case "$svc" in
+            batch_orchestrator_service) expanded+=("batch_orchestrator_db" "kafka" "zookeeper") ;;
+            batch_conductor_service)    expanded+=("batch_conductor_db" "kafka" "zookeeper") ;;
+            essay_lifecycle_service)    expanded+=("essay_lifecycle_db" "kafka" "zookeeper") ;;
+            cj_assessment_service)      expanded+=("cj_assessment_db" "kafka" "zookeeper") ;;
+            class_management_service)   expanded+=("class_management_db") ;;
+            file_service)               expanded+=("file_service_db") ;;
+            content_service)            expanded+=("content_service_db") ;;
+            spellchecker_service)       expanded+=("spellchecker_db") ;;
+            result_aggregator_service)  expanded+=("result_aggregator_db") ;;
+            nlp_service)                expanded+=("nlp_db") ;;
+            identity_service)           expanded+=("identity_db") ;;
+            email_service)              expanded+=("email_db") ;;
+            entitlements_service)       expanded+=("entitlements_db") ;;
+        esac
+    done
+    echo "${expanded[@]}"
+}
+
 compute_deps_hash() {
     python "$REPO_ROOT/scripts/compute_deps_hash.py"
 }
@@ -133,6 +158,7 @@ start_dev() {
     local display="all services"
     if [ ${#services[@]} -gt 0 ]; then
         display="${services[*]}"
+        services=($(expand_with_dependencies "${services[@]}"))
     fi
     echo_dev "Starting DEVELOPMENT environment: ${display}"
     echo_info "Hot-reload enabled via volume mounts"
@@ -166,6 +192,7 @@ start_dev_nobuild() {
     local display="all services"
     if [ ${#services[@]} -gt 0 ]; then
         display="${services[*]}"
+        services=($(expand_with_dependencies "${services[@]}"))
     fi
     echo_dev "Starting DEVELOPMENT environment (no rebuild): ${display}"
     echo_info "Hot-reload enabled via volume mounts"
@@ -210,6 +237,7 @@ restart_dev() {
     local display="all containers"
     if [ ${#services[@]} -gt 0 ]; then
         display="${services[*]}"
+        services=($(expand_with_dependencies "${services[@]}"))
     fi
     echo_dev "Restarting DEVELOPMENT containers: ${display}"
 
@@ -235,7 +263,7 @@ recreate_dev() {
     echo_info "Use this when docker-compose.yml environment variables changed"
     echo_info "Databases will NOT be reset - use 'pdm run dev-db-recreate' to reset databases"
 
-    # Database services to exclude from recreation
+    # Database/stateful services to exclude from recreation
     local db_services=(
         "batch_orchestrator_db"
         "essay_lifecycle_db"
@@ -251,42 +279,55 @@ recreate_dev() {
         "identity_db"
         "email_db"
         "entitlements_db"
-        "zookeeper"
-        "kafka"
     )
 
     if [ ${#services[@]} -gt 0 ]; then
-        # User specified services - recreate only those
-        docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d --force-recreate --no-build "${services[@]}"
-    else
-        # Get all service names and exclude databases
-        local all_services=$(docker-compose -f docker-compose.yml -f docker-compose.dev.yml config --services)
-        local services_to_recreate=()
-
-        for service in $all_services; do
+        # User specified services - recreate only those, excluding DBs even if passed
+        local filtered=()
+        for svc in "${services[@]}"; do
             local is_db=false
-            for db_service in "${db_services[@]}"; do
-                if [ "$service" = "$db_service" ]; then
+            for db in "${db_services[@]}"; do
+                if [ "$svc" = "$db" ]; then
                     is_db=true
                     break
                 fi
             done
-
             if [ "$is_db" = false ]; then
-                services_to_recreate+=("$service")
+                filtered+=("$svc")
+            fi
+        done
+        if [ ${#filtered[@]} -eq 0 ]; then
+            echo_warn "No non-database services to recreate"
+            return
+        fi
+        docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d --force-recreate --no-build "${filtered[@]}"
+    else
+        # Recreate all non-database services
+        local all_services
+        all_services=$(docker-compose -f docker-compose.yml -f docker-compose.dev.yml config --services)
+        local recreate_list=()
+        for svc in $all_services; do
+            local is_db=false
+            for db in "${db_services[@]}"; do
+                if [ "$svc" = "$db" ]; then
+                    is_db=true
+                    break
+                fi
+            done
+            if [ "$is_db" = false ]; then
+                recreate_list+=("$svc")
             fi
         done
 
-        if [ ${#services_to_recreate[@]} -gt 0 ]; then
-            docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d --force-recreate --no-build "${services_to_recreate[@]}"
+        if [ ${#recreate_list[@]} -gt 0 ]; then
+            docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d --force-recreate --no-build "${recreate_list[@]}"
         else
-            echo_warn "No service containers found to recreate"
+            echo_warn "No non-database services discovered via docker-compose config"
         fi
     fi
 
-    echo_dev "Development service containers recreated"
-    echo_info "Containers will use updated environment variables"
-    echo_info "Database data preserved"
+    echo_dev "Development service containers recreated (databases untouched)"
+    echo_info "Use 'pdm run dev-db-recreate' if you need to reset databases explicitly"
 }
 
 # Force recreate database containers (resets data)

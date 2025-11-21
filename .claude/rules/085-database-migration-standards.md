@@ -40,6 +40,12 @@ cd services/<service>
   local script) that provisions an ephemeral PostgreSQL instance (TestContainers or
   docker-compose) and runs `../../.venv/bin/alembic upgrade head`. This regression test
   guards against enum/type duplication and other DDL conflicts before migrations merge.
+- **Enum drift guard:** if you add or modify any `Enum` class (including
+  `common_core.status_enums`), you MUST:
+  - create the matching Alembic migration in every affected service, **and**
+  - extend the CI/pre-commit check that compares Python enum members against the
+    database enum definitions emitted by the latest migrations; the pipeline MUST fail
+    when Python contains values not present in the DB type.
 - **Enum creation policy:** prefer SQLAlchemy-managed enums over ad-hoc `CREATE TYPE`
   statements. Use `postgresql.ENUM(..., name="<enum_name>")` and let Alembic emit the
   DDL, or set `create_type=False` when the enum already exists. Manual

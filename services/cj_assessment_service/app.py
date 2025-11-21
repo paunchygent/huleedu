@@ -34,9 +34,15 @@ from services.cj_assessment_service.api.admin import (
     student_prompts_bp,
 )
 from services.cj_assessment_service.api.health_routes import health_bp
+from services.cj_assessment_service.batch_monitor import BatchMonitor
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.di import CJAssessmentServiceProvider
 from services.cj_assessment_service.kafka_consumer import CJAssessmentKafkaConsumer
+from services.cj_assessment_service.protocols import (
+    CJEventPublisherProtocol,
+    CJRepositoryProtocol,
+    ContentClientProtocol,
+)
 from services.cj_assessment_service.startup_setup import initialize_services, shutdown_services
 
 logger = create_service_logger("cj_assessment_service.app")
@@ -92,6 +98,8 @@ def create_app(settings: Settings | None = None) -> HuleEduApp:
     app.consumer_task = None
     app.kafka_consumer = None
     app.relay_worker = None
+    app.batch_monitor = None
+    app.monitor_task = None
 
     # Setup dependency injection
     QuartDishka(app=app, container=app.container)
@@ -123,6 +131,9 @@ def create_app(settings: Settings | None = None) -> HuleEduApp:
             async with app.container() as request_container:
                 app.kafka_consumer = await request_container.get(CJAssessmentKafkaConsumer)
                 app.relay_worker = await request_container.get(EventRelayWorker)
+                repository = await request_container.get(CJRepositoryProtocol)
+                event_publisher = await request_container.get(CJEventPublisherProtocol)
+                content_client = await request_container.get(ContentClientProtocol)
 
             # Start EventRelayWorker for outbox pattern
             assert app.relay_worker is not None, "EventRelayWorker must be initialized"
@@ -132,6 +143,16 @@ def create_app(settings: Settings | None = None) -> HuleEduApp:
             # Start consumer as background task
             assert app.kafka_consumer is not None, "Kafka consumer must be initialized"
             app.consumer_task = asyncio.create_task(app.kafka_consumer.start_consumer())
+
+            # Start BatchMonitor in-process (non-testing) to ensure completion progression
+            app.batch_monitor = BatchMonitor(
+                repository=repository,
+                event_publisher=event_publisher,
+                content_client=content_client,
+                settings=settings,
+            )
+            app.monitor_task = asyncio.create_task(app.batch_monitor.check_stuck_batches())
+            logger.info("BatchMonitor task started")
 
             logger.info("CJ Assessment Service started successfully")
             logger.info("Health endpoint: /healthz")
@@ -151,6 +172,16 @@ def create_app(settings: Settings | None = None) -> HuleEduApp:
                 logger.info("Stopping EventRelayWorker...")
                 await app.relay_worker.stop()
                 logger.info("EventRelayWorker stopped")
+
+            # Stop BatchMonitor
+            if app.batch_monitor:
+                await app.batch_monitor.stop()
+            if app.monitor_task and not app.monitor_task.done():
+                app.monitor_task.cancel()
+                try:
+                    await app.monitor_task
+                except asyncio.CancelledError:
+                    logger.info("BatchMonitor task cancelled successfully")
 
             # Stop Kafka consumer
             if app.kafka_consumer:

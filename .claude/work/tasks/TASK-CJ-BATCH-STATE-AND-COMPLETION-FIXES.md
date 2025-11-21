@@ -120,6 +120,11 @@ Result: `submitted=10, completed=34`
     - Completion threshold: verify percentage uses `total_budget` as denominator
     - Defensive bounds: verify counters never exceed `total_budget`
   - [ ] Add integration test: simulate 100-comparison batch with 10 per iteration, verify final state
+  - [ ] New: stability-first completion gate:
+      - When all callbacks for the current iteration arrive, run scoring immediately.
+      - Finalize if stability threshold passes OR submitted callbacks have reached budget_cap.
+      - For small batches set `completion_denominator = min(total_budget, nC2)` so n=4 (6 pairs) can complete without waiting for monitor.
+      - Monitor remains recovery-only (no normal-path dependency).
 
 - **Validation**
   - [x] Run `pdm run pytest-root services/cj_assessment_service/tests/unit/test_batch_state_tracking.py`
@@ -137,10 +142,11 @@ Result: `submitted=10, completed=34`
 - Batch processor now locks `CJBatchState`, seeds `total_budget` from `comparison_budget` metadata, and accumulates totals per iteration; redundant submitted-count update removed.
 - Diagnostics (`inspect_batch_state.py`) surfaces `total_budget`/`comparison_budget` for ENG5 triage; batch monitor + completion logs now reference immutable budgets.
 - New regression suites: `test_batch_state_tracking.py` (iteration accumulation) + `test_completion_threshold.py` (valid-only completion checks).
+- 2025-11-21: Observed 4-essay batch (6 pairs) stay WAITING_CALLBACKS until 5m monitor sweep because percent-of-budget gate used budget=350; confirms need for stability-first + capped denominator in normal flow.
 
 **Acceptance Criteria**:
 - Batch state metrics accurately reflect cumulative totals across all iterations
-- Completion percentage calculation uses total budget as denominator
+- Completion uses stability-first gate with capped denominator (`min(budget, nC2)`); normal flow never waits for monitor
 - Logs show sensible percentages (0-100%, never >100%)
 - No existing batch data is corrupted by migration
 

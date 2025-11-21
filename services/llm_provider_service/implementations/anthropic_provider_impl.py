@@ -1,5 +1,6 @@
 """Anthropic LLM provider implementation."""
 
+import asyncio
 import hashlib
 import json
 from typing import Any
@@ -45,7 +46,9 @@ class AnthropicProviderImpl(LLMProviderProtocol):
         self.settings = settings
         self.retry_manager = retry_manager
         self.api_key = settings.ANTHROPIC_API_KEY.get_secret_value()
-        self.api_base = "https://api.anthropic.com/v1"
+        self.api_base = settings.ANTHROPIC_BASE_URL or "https://api.anthropic.com/v1"
+        self.enable_prompt_caching = getattr(settings, "ENABLE_PROMPT_CACHING", False)
+        self.prompt_cache_ttl = getattr(settings, "PROMPT_CACHE_TTL_SECONDS", 3600)
 
         # Log default model configuration from manifest
         try:
@@ -168,6 +171,9 @@ class AnthropicProviderImpl(LLMProviderProtocol):
             if http_status == 429:
                 error_type = "rate_limit"
                 retryable = True
+            elif http_status == 529:
+                error_type = "overloaded"
+                retryable = True
             elif http_status == 401:
                 error_type = "authentication"
             elif http_status >= 500:
@@ -195,6 +201,10 @@ class AnthropicProviderImpl(LLMProviderProtocol):
                 provider_error_code = code
             provider_error_type = err_type
             provider_error_message = msg
+
+        if provider_error_type == "overloaded_error":
+            error_type = "overloaded"
+            retryable = True
 
         details.update(
             {
@@ -327,15 +337,39 @@ class AnthropicProviderImpl(LLMProviderProtocol):
             }
         ]
 
+        system_blocks: Any
+        if self.enable_prompt_caching:
+            system_blocks = [
+                {
+                    "type": "text",
+                    "text": system_prompt,
+                    "cache_control": {
+                        "type": "ephemeral",
+                        "ttl": int(self.prompt_cache_ttl),
+                    },
+                }
+            ]
+        else:
+            system_blocks = system_prompt
+
+        user_message_content = [{"type": "text", "text": user_prompt}]
+
         payload = {
             "model": model,
-            "system": system_prompt,
-            "messages": [{"role": "user", "content": user_prompt}],
+            "system": system_blocks,
+            "messages": [{"role": "user", "content": user_message_content}],
             "max_tokens": max_tokens,
             "temperature": temperature,
             "tools": tools,
             "tool_choice": {"type": "tool", "name": "comparison_result"},
+            "metadata": {
+                "correlation_id": str(correlation_id),
+                "provider": "anthropic",
+            },
         }
+
+        if prompt_sha256:
+            payload["metadata"]["prompt_sha256"] = prompt_sha256
 
         response_text = await self._perform_http_request_with_metrics(
             endpoint=endpoint,
@@ -372,6 +406,21 @@ class AnthropicProviderImpl(LLMProviderProtocol):
                 else 0,
             },
         )
+
+        stop_reason = response_data.get("stop_reason")
+        if stop_reason == "max_tokens":
+            raise_external_service_error(
+                service="llm_provider_service",
+                operation="anthropic_api_request",
+                external_service="anthropic_api",
+                message="Anthropic truncated response due to max_tokens limit",
+                correlation_id=correlation_id,
+                details={
+                    "provider": "anthropic",
+                    "stop_reason": stop_reason,
+                    "max_tokens": max_tokens,
+                },
+            )
 
         # Extract tool use from Anthropic response
         tool_result = None
@@ -509,8 +558,18 @@ class AnthropicProviderImpl(LLMProviderProtocol):
                 # - connection_error, unexpected (non-HTTP failures)
                 # - invalid_response (HTTP 200 with malformed body, recorded separately)
                 error_type = "unknown"
+                retry_after_header = response.headers.get("retry-after")
                 if response.status == 429:
                     error_type = "rate_limit"
+                    try:
+                        retry_after_seconds = int(float(retry_after_header or "0"))
+                        bounded_retry_after = min(retry_after_seconds, 5)
+                        if bounded_retry_after > 0:
+                            await asyncio.sleep(bounded_retry_after)
+                    except Exception:
+                        pass
+                elif response.status == 529:
+                    error_type = "overloaded"
                 elif response.status == 401:
                     error_type = "authentication"
                 elif response.status >= 500:

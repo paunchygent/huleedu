@@ -79,6 +79,7 @@ class PipelineExecutionResult:
         default_factory=lambda: {"balance_changed": False, "usage_recorded": False}
     )  # Track Entitlements events for credit consumption
     request_correlation_id: str = ""  # Correlation ID used for the pipeline request
+    error_events: list[dict[str, Any]] = field(default_factory=list)
 
 
 class PipelineTestHarness:
@@ -180,6 +181,7 @@ class PipelineTestHarness:
         self,
         essay_files: list[Path],
         user: Optional[Any] = None,
+        attach_prompt: bool = True,
     ) -> tuple[str, str]:
         """
         Setup a GUEST batch (no student matching) for pipeline testing.
@@ -200,6 +202,7 @@ class PipelineTestHarness:
             consumer=self.consumer,
             user=user,
             provision_credits=True,
+            attach_prompt=attach_prompt,
         )
 
         self.batch_id = batch_id
@@ -298,6 +301,7 @@ class PipelineTestHarness:
             execution_time_seconds=time.time() - start_time,
             entitlements_events=tracker.entitlements_events,  # Include Entitlements tracking
             request_correlation_id=request_correlation_id,  # Store the pipeline request ID
+            error_events=tracker.error_events,
         )
 
         # Update harness state

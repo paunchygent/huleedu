@@ -364,6 +364,7 @@ typecheck-service-libs = {shell = "cd libs && mypy -p huleedu_service_libs --sho
 typecheck-path = { shell = "mypy --config-file pyproject.toml --follow-imports=silent \"$@\"" }
 validate-config = "python scripts/validate_service_config.py"  # Validate service configurations against docker-compose
 validate-config-strict = "python scripts/validate_service_config.py --strict"  # Validate with warnings as errors
+validate-enum-drift = "python scripts/validate_enum_drift.py"  # Ensure Python enums exist in DB enums
 test-all = "pytest"
 test-parallel = "pytest -n auto"
 test-sequential = "pytest -n 0"

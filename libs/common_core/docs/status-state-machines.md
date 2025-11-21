@@ -36,7 +36,7 @@ UPLOADED = "uploaded"
 TEXT_EXTRACTED = "text_extracted"
 
 # Content Ingestion
-CONTENT_INGESTING = "content_ingester"
+CONTENT_INGESTING = "content_ingesting"
 CONTENT_INGESTION_FAILED = "content_ingestion_failed"
 
 # ELS Pipeline

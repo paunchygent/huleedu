@@ -30,6 +30,7 @@ class PipelineExecutionTracker:
     entitlements_events: Dict[str, bool] = field(
         default_factory=lambda: {"balance_changed": False, "usage_recorded": False}
     )  # Track Entitlements events
+    error_events: List[Dict[str, Any]] = field(default_factory=list)
 
 
 class KafkaMonitorHelper:
@@ -65,7 +66,19 @@ class KafkaMonitorHelper:
             "huleedu.entitlements.usage.recorded.v1",
         ]
 
-        all_topics = list(pipeline_topics.values()) + phase2_topics + entitlements_topics
+        # BOS/BCS compatibility / gating failure topics (so harness can surface gating errors)
+        compatibility_topics = [
+            "huleedu.batch.pipeline.compatibility_failed.v1",
+            # Future failure topics can be added here, for example:
+            # "huleedu.batch.pipeline.execution_failed.v1",
+        ]
+
+        all_topics = (
+            list(pipeline_topics.values())
+            + phase2_topics
+            + entitlements_topics
+            + compatibility_topics
+        )
 
         # Create consumer context
         consumer_context = kafka_manager.consumer("pipeline_test_harness", all_topics)
@@ -216,6 +229,33 @@ class KafkaMonitorHelper:
                                     f"⏭️ Phase {phase_name} pruned (reusing existing results)"
                                 )
 
+                            # Capture compatibility or dependency resolution failures for assertions
+                            if (
+                                "compatibility_failed" in event_type
+                                or "dependency_resolution_failed" in event_type
+                            ):
+                                tracker.error_events.append(envelope_data)
+
+                                failure_reason = (
+                                    event_data.get("reason")
+                                    or event_data.get("failure_reason")
+                                    or event_data.get("error_message")
+                                )
+
+                                logger.error(
+                                    "🚫 Pipeline gating failure observed",
+                                    extra={
+                                        "event_type": event_type,
+                                        "reason": failure_reason,
+                                        "phase": event_data.get("phase_name"),
+                                        "correlation_id": event_correlation_id,
+                                    },
+                                )
+
+                                # Short-circuit: a compatibility or dependency failure means
+                                # the pipeline will not execute; let the test inspect error_events
+                                return None
+
                             # Check for specific completion events - indicate pipeline completion
                             # but should NOT add phases to executed list
                             if expected_completion_event in event_type:
@@ -288,4 +328,27 @@ class KafkaMonitorHelper:
         logger.error(f"Pipeline did not complete within {timeout_seconds} seconds")
         logger.error(f"Initiated phases: {tracker.initiated_phases}")
         logger.error(f"Completed phases: {tracker.completed_phases}")
+
+        if tracker.error_events:
+            first_error = tracker.error_events[0]
+            first_data = first_error.get("data", {}) or {}
+
+            logger.error(
+                "Captured pipeline error events before timeout",
+                extra={
+                    "first_event_type": first_error.get("event_type"),
+                    "first_error_reason": (
+                        first_data.get("reason")
+                        or first_data.get("failure_reason")
+                        or first_data.get("error_message")
+                    ),
+                    "error_event_count": len(tracker.error_events),
+                },
+            )
+        else:
+            logger.error(
+                "No compatibility or dependency error events observed before timeout "
+                f"(correlation_id={request_correlation_id})",
+            )
+
         return None

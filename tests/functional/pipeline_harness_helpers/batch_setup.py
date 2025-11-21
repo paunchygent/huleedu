@@ -156,6 +156,7 @@ class BatchSetupHelper:
         consumer: Any,
         user: Optional["AuthTestUser"] = None,
         provision_credits: bool = True,
+        attach_prompt: bool = True,
     ) -> Tuple[str, str, "AuthTestUser"]:
         """
         Setup a GUEST batch (no student matching) for pipeline testing.
@@ -191,6 +192,7 @@ class BatchSetupHelper:
             user=user,
             correlation_id=correlation_id,
             enable_cj_assessment=True,
+            attach_prompt=attach_prompt,
             # NO class_id - this triggers GUEST flow!
         )
 

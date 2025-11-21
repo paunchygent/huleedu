@@ -69,6 +69,7 @@ class TestBatchMonitor:
         mock_batch_state.state = CJBatchStateEnum.WAITING_CALLBACKS
         mock_batch_state.total_comparisons = 100
         mock_batch_state.completed_comparisons = 85
+        mock_batch_state.failed_comparisons = 0
         mock_batch_state.last_activity_at = datetime.now(UTC) - timedelta(hours=5)
         mock_batch_state.correlation_id = UUID("00000000-0000-0000-0000-000000000123")
         mock_batch_state.processing_metadata = None
@@ -99,6 +100,7 @@ class TestBatchMonitor:
         mock_batch_state.state = CJBatchStateEnum.GENERATING_PAIRS
         mock_batch_state.total_comparisons = 100
         mock_batch_state.completed_comparisons = 50
+        mock_batch_state.failed_comparisons = 0
         mock_batch_state.last_activity_at = datetime.now(UTC) - timedelta(hours=5)
         mock_batch_state.correlation_id = UUID("00000000-0000-0000-0000-000000000456")
         mock_batch_state.processing_metadata = None
