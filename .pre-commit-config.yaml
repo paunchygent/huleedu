@@ -30,6 +30,15 @@ repos:
         pass_filenames: false
         stages: [pre-commit]
 
+    -   id: validate-claude-structure
+        name: Validate .claude/ structure and rule frontmatter
+        entry: python scripts/claude_mgmt/validate_claude_structure.py
+        language: python
+        files: ^\.claude/rules/.*\.md$
+        exclude: ^\.claude/rules/README\.md$
+        pass_filenames: false
+        stages: [pre-commit]
+
     -   id: markdownlint
         name: Lint markdown files
         entry: markdownlint --fix --config .markdownlint.json

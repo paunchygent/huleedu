@@ -1,0 +1,249 @@
+# Claude Directory Structure Specification
+
+This document is **normative**. All content in `.claude/` MUST comply.
+
+## 1. Purpose
+
+- Define a canonical, machine-enforceable structure for Claude-specific project configuration and work artifacts.
+- Provide clear separation between normative rules, enforcement mechanisms, and ephemeral work artifacts.
+- Enable validation and quality control across Claude Code configurations.
+
+## 2. Scope
+
+- Applies to all files and directories under `.claude/`
+- Covers:
+  - Claude Code rule files (`.claude/rules/`)
+  - Hook configurations (`.claude/hooks/`)
+  - Session work artifacts (`.claude/work/`)
+  - Archive policies (`.claude/archive/`)
+- Does **not** cover `TASKS/` (governed by `TASKS/_REORGANIZATION_PROPOSAL.md`) or `docs/` (governed by `docs/DOCS_STRUCTURE_SPEC.md`)
+
+## 3. Top-Level Directory Taxonomy
+
+The canonical `.claude/` root has the following structure:
+
+```
+.claude/
+├── rules/              # Normative coding standards and patterns
+├── hooks/              # Pre-tool-use hooks for enforcement
+├── work/               # Ephemeral session artifacts
+│   ├── session/       # Session handoffs and state
+│   └── tasks/         # DEPRECATED - migrate to TASKS/
+├── archive/            # Historical session work
+└── CLAUDE_STRUCTURE_SPEC.md  # This file
+```
+
+### 3.1 Directory Semantics
+
+- `.claude/rules/`
+  - Normative coding standards, architectural patterns, and development guidelines
+  - Each rule file defines enforceable standards for the codebase
+  - Must include frontmatter with metadata
+
+- `.claude/hooks/`
+  - Shell scripts that execute before tool use (Write, Bash, etc.)
+  - Enforce structure and prevent violations
+  - Each hook must be documented in `hooks/README.md`
+
+- `.claude/work/session/`
+  - Current session state and handoff documents
+  - `handoff.md` - Cross-service task context
+  - `readme-first.md` - Critical session information
+  - Files here are session-specific and should be updated frequently
+
+- `.claude/work/tasks/` **[DEPRECATED]**
+  - Historical location for task tracking
+  - All active tasks MUST be migrated to `TASKS/` with proper frontmatter
+  - This directory will be removed once migration is complete
+
+- `.claude/archive/`
+  - Historical session work organized by date
+  - Structure: `archive/YYYY/MM/DD/session-name/`
+  - Used for completed sessions and historical reference
+
+## 4. Rule File Standards (.claude/rules/)
+
+### 4.1 File Naming
+
+- Rule files MUST use pattern: `NNN-descriptive-name.md`
+- Where `NNN` is a three-digit number (000-999)
+- Examples: `000-rule-index.md`, `010-foundational-principles.md`
+
+### 4.2 Rule File Frontmatter
+
+All rule files MUST include YAML frontmatter:
+
+```yaml
+---
+id: NNN-descriptive-name        # Must match filename
+title: Human-Readable Title
+category: foundation | architecture | implementation | testing | documentation | operations
+priority: critical | high | medium | low
+applies_to: all | backend | frontend | infrastructure | specific-service-name
+created: YYYY-MM-DD
+last_updated: YYYY-MM-DD
+supersedes: []                  # Optional: list of rule IDs this replaces
+related: []                     # Optional: list of related rule IDs
+---
+```
+
+### 4.3 Rule Categories
+
+- `foundation` - Core principles, DDD, clean code standards
+- `architecture` - Service boundaries, event contracts, API design
+- `implementation` - Code patterns, DI, async patterns, error handling
+- `testing` - Test creation, methodology, coverage standards
+- `documentation` - Documentation structure, ADRs, runbooks
+- `operations` - Deployment, monitoring, database migrations
+
+### 4.4 Enforcement
+
+- Rule files define **what** standards must be followed
+- Hook files in `.claude/hooks/` define **how** standards are enforced
+- All rules must be indexed in `000-rule-index.md`
+
+## 5. Hook Configuration (.claude/hooks/)
+
+### 5.1 Hook File Naming
+
+- Hook files MUST use pattern: `descriptive-name.sh`
+- Must be executable (`chmod +x`)
+- Examples: `enforce-docs-structure.sh`, `validate-tasks-frontmatter.sh`
+
+### 5.2 Hook Documentation
+
+Each hook MUST be documented in `.claude/hooks/README.md` with:
+
+```markdown
+### hook-name.sh
+
+**Trigger**: PreToolUse:Write | PreToolUse:Bash | etc.
+**Purpose**: Brief description of what this hook enforces
+**Blocking**: Yes | No (whether it blocks the operation)
+**Example violation**: What kind of action would be blocked
+```
+
+### 5.3 Hook Standards
+
+- Hooks MUST exit with code 0 to allow operation
+- Hooks MUST exit with non-zero to block operation
+- Hooks MUST output clear error messages when blocking
+- Hooks SHOULD be fast (< 100ms for simple checks)
+
+## 6. Session Work (.claude/work/)
+
+### 6.1 Session Directory
+
+`.claude/work/session/` contains:
+
+- `handoff.md` - Cross-service task context and critical information
+- `readme-first.md` - Session initialization checklist
+- Other session-specific notes
+
+These files SHOULD be updated after each major task phase.
+
+### 6.2 Task Migration from .claude/work/tasks/
+
+**All files in `.claude/work/tasks/` MUST be migrated to `TASKS/`**
+
+Migration steps:
+1. Review file and determine appropriate domain
+2. Add proper YAML frontmatter (see `TASKS/_REORGANIZATION_PROPOSAL.md`)
+3. Rename to kebab-case matching `id` field
+4. Move to `TASKS/<domain>/`
+5. Archive completed tasks to `TASKS/archive/`
+6. Delete original file from `.claude/work/tasks/`
+
+**No new files should be created in `.claude/work/tasks/`**
+
+### 6.3 Archive Policy
+
+Completed sessions SHOULD be archived to `.claude/archive/YYYY/MM/DD/session-name/`
+
+Archive structure:
+```
+.claude/archive/
+└── 2025/
+    └── 11/
+        └── 21/
+            └── documentation-alignment/
+                ├── investigation-report.md
+                ├── implementation-notes.md
+                └── final-validation.txt
+```
+
+## 7. Relationship to TASKS/ and docs/
+
+### 7.1 Work Item Tracking
+
+- **Current tasks**: Use `TASKS/<domain>/` with proper frontmatter
+- **Session notes**: Use `.claude/work/session/` for handoffs
+- **Historical work**: Archive to `.claude/archive/`
+- **Do NOT use**: `.claude/work/tasks/` (deprecated)
+
+### 7.2 Documentation
+
+- **Normative standards**: `.claude/rules/` defines coding standards
+- **Human documentation**: `docs/` contains user-facing documentation
+- **Cross-linking**: Rules MAY link to `docs/` for detailed explanations
+- **No duplication**: Don't copy content between `.claude/rules/` and `docs/`
+
+## 8. Validation and Enforcement
+
+### 8.1 Validation Script
+
+A validation script MUST exist at `scripts/claude_mgmt/validate_claude_structure.py` that:
+
+- Validates all rule files have proper frontmatter
+- Checks rule file naming conventions (NNN-descriptive-name.md)
+- Verifies hook files are documented in `hooks/README.md`
+- Warns about deprecated `.claude/work/tasks/` usage
+- Validates directory structure compliance
+
+### 8.2 Pre-commit Integration
+
+The validation script SHOULD be integrated into pre-commit hooks to:
+
+- Block commits with invalid rule file frontmatter
+- Warn about new files in deprecated locations
+- Ensure rule index is up to date
+
+### 8.3 CI Integration
+
+CI SHOULD validate:
+- All rule files comply with frontmatter schema
+- Hook files are executable and documented
+- No new files created in `.claude/work/tasks/`
+
+## 9. Migration Checklist
+
+For migrating to this specification:
+
+- [ ] All rule files have proper frontmatter
+- [ ] All hooks documented in `hooks/README.md`
+- [ ] All tasks migrated from `.claude/work/tasks/` to `TASKS/`
+- [ ] Validation script created and integrated
+- [ ] Pre-commit hooks configured
+- [ ] CI validation configured
+- [ ] Old `.claude/work/tasks/` directory removed
+
+## 10. Changes to This Specification
+
+- Any changes to the `.claude/` structure or rules in this file MUST be performed via code review
+- Tools and AI agents MUST treat this file as the source of truth for `.claude/` layout
+- Version control: Update `last_updated` in frontmatter when making normative changes
+
+## 11. Exceptions
+
+### 11.1 Allowed Root-Level Files
+
+The following files are allowed at `.claude/` root:
+- `CLAUDE_STRUCTURE_SPEC.md` (this file)
+- `README.md` (overview of Claude configuration)
+
+### 11.2 Backward Compatibility
+
+During transition period:
+- `.claude/work/tasks/` is DEPRECATED but tolerated until migration complete
+- Existing rule files without frontmatter receive warnings but don't block
+- Once migration complete, these exceptions will be removed

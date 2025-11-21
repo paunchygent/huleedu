@@ -3,33 +3,37 @@
 # Prevents unauthorized creation of new directories in .claude/
 
 # Allowed directory structure in .claude/
-# Top-level directories
+# Top-level directories (per .claude/CLAUDE_STRUCTURE_SPEC.md)
 ALLOWED_TOP_LEVEL=(
-  "config"
-  "agents"
-  "skills"
-  "commands"
-  "hooks"
-  "rules"
-  "work"
-  "archive"
-  "research"
+  "config"           # Legacy - tool configuration
+  "agents"           # Legacy - agent definitions
+  "skills"           # Legacy - skill definitions
+  "commands"         # Legacy - command definitions
+  "hooks"            # Pre-tool-use enforcement hooks
+  "rules"            # Normative coding standards
+  "work"             # Session artifacts
+  "archive"          # Historical work
+  "research"         # Legacy - research artifacts
+  "repomix_packages" # Generated repomix outputs
 )
 
 # Second-level directories under work/
 ALLOWED_WORK_SUBDIRS=(
-  "tasks"
-  "session"
-  "audits"
+  "tasks"            # DEPRECATED - migrate to TASKS/ root directory
+  "session"          # Session handoffs and state
+  "audits"           # Code audit results
 )
 
 # Second-level directories under archive/
+# Per spec: archive/YYYY/MM/DD/session-name/ or archive/sessions/YYYY-MM/
 ALLOWED_ARCHIVE_SUBDIRS=(
-  "code-reviews"
-  "session-results"
-  "prompts"
-  "repomix"
-  "task-archive"
+  "code-reviews"     # Historical code reviews
+  "session-results"  # Session completion artifacts
+  "sessions"         # Session-specific archives (YYYY-MM subdirs)
+  "prompts"          # Historical prompts
+  "repomix"          # Archived repomix outputs
+  "task-archive"     # Legacy task archives
+  # Also allow YYYY year directories (e.g., "2025")
 )
 
 # Second-level directories under research/
@@ -120,6 +124,25 @@ To modify the .claude/work/ structure, you must:
 Operation blocked.
 EOF
               exit 2
+            fi
+
+            # Warn if creating file in deprecated .claude/work/tasks/
+            if [[ "$SECOND_DIR" == "tasks" ]]; then
+              cat >&2 << EOF
+⚠️  DEPRECATED DIRECTORY WARNING
+
+You are creating a file in .claude/work/tasks/ which is DEPRECATED.
+  File: $FILE_PATH
+
+Per .claude/CLAUDE_STRUCTURE_SPEC.md:
+  - .claude/work/tasks/ is deprecated for task tracking
+  - All tasks should be created in TASKS/ root directory with proper frontmatter
+  - Use: python scripts/task_mgmt/new_task.py to create tasks
+
+This operation is ALLOWED but discouraged.
+Consider creating the task in TASKS/ instead.
+
+EOF
             fi
             ;;
           "archive")

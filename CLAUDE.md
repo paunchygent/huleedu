@@ -21,7 +21,7 @@ When operating in the Claude Code cloud sandbox (web, not access to local machin
 2. **Select Mode**: Use `.claude/rules/110-ai-agent-interaction-modes.md` to choose mode (Planning, Coding, Debugging)
 3. **Rule Reference**: Consult `.claude/rules/000-rule-index.md` for relevant rules
 cross-service task context.
-4. **Update**: After each task phase, Always stop to update `.claude/work/session/handoff.md` and `.claude/work/session/readme-first.md` with any new information + ask user any clarifying questions to retain alignment with user's intent.
+4. **Update**: After each task phase, Always stop to update 1. **active task documents** 2.`.claude/work/session/handoff.md` and `.claude/work/session/readme-first.md` with any new information + ask user any clarifying questions to retain alignment with user's intent.
 ```
 
 ### 3. Error Resolution Protocol
@@ -41,6 +41,61 @@ cross-service task context.
 - Never lint style issues manually before having run format-all and lint-fix --unsafe-fixes
 - Always run typecheck-all from root after creating a test or implementing new code
 ```
+
+### 5. Task Management and Documentation Structure
+
+**Task Creation and Management:**
+
+All tasks MUST be created in `TASKS/<domain>/` with proper frontmatter:
+
+```bash
+# Create a new task
+python scripts/task_mgmt/new_task.py --domain assessment --title "Fix CJ Batch State"
+
+# Validate all tasks
+python scripts/task_mgmt/validate_front_matter.py --verbose
+
+# Regenerate task index
+python scripts/task_mgmt/index_tasks.py
+
+# Archive completed task
+python scripts/task_mgmt/archive_task.py --id task-name
+```
+
+**IMPORTANT:**
+- `.claude/work/tasks/` is DEPRECATED - all tasks go in `TASKS/`
+- Required frontmatter fields: id, title, status, priority, domain, owner_team, created, last_updated
+- See `TASKS/_REORGANIZATION_PROPOSAL.md` for full specification
+
+**Documentation Structure:**
+
+All project documentation follows canonical structure in `docs/`:
+
+```markdown
+docs/
+├── overview/           # System introductions
+├── architecture/       # Cross-service architecture
+├── services/           # Per-service summaries
+├── operations/         # Runbooks (require frontmatter)
+├── how-to/             # Task-oriented guides
+├── reference/          # API/schema/config reference
+├── decisions/          # ADRs (require frontmatter)
+├── product/            # PRDs
+└── research/           # Design spikes
+```
+
+```bash
+# Validate documentation structure
+python scripts/docs_mgmt/validate_docs_structure.py --verbose
+
+# Validate .claude/ structure
+python scripts/claude_mgmt/validate_claude_structure.py --verbose
+```
+
+**Specifications:**
+- Tasks: `TASKS/_REORGANIZATION_PROPOSAL.md`
+- Documentation: `docs/DOCS_STRUCTURE_SPEC.md`
+- Claude Config: `.claude/CLAUDE_STRUCTURE_SPEC.md`
 
 ---
 
@@ -199,15 +254,7 @@ pdm run dev-stop [service]           # Stop running containers
 pdm run dev-logs [service]           # Follow container logs
 pdm run dev-check                    # Check what needs rebuilding
 
-# Production (optimized)
-pdm run prod-build [service]         # Build for production with cache
-pdm run prod-build-clean [service]   # Build for production without cache
-pdm run prod-start [service]         # Start production containers
-pdm run prod-stop [service]          # Stop production containers
-pdm run prod-restart [service]       # Restart production containers
-pdm run prod-logs [service]          # Follow production logs
-pdm run prod-health                  # Check production service health
-pdm run prod-deploy [service]        # Full production deployment workflow
+
 ```
 
 ### Database Access (Common Issue)
@@ -253,7 +300,7 @@ pdm run prod-migrate               # Run production migrations
 ### Metrics
 
 ```markdown
-- Use Prometheus for service metrics
+- Use Prometheus, for service metrics
 - Instrument key operations with timing and counters
 - Follow naming conventions: `service_operation_total`, `service_operation_duration_seconds`
 ```
