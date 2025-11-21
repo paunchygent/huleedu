@@ -180,6 +180,10 @@ Based on the CLAUDE.md context provided:
 
 ## Output Format
 
+**IMPORTANT**: Save all investigation reports to `.claude/work/reports/<investigation-name>.md`
+
+Use naming pattern: `.claude/work/reports/<YYYY-MM-DD>-<topic>.md`
+
 Structure your findings as follows:
 
 ### Investigation Summary

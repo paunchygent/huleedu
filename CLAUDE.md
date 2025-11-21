@@ -34,51 +34,33 @@ cross-service task context.
 
 ### 4. Documentation & Testing
 
-```markdown
-- Update relevant task documents per `.claude/rules/090-documentation-standards.md`
-- Never create files in root - follow folder patterns
+**Task Tracking:**
+- Create: `python scripts/task_mgmt/new_task.py --domain <domain> --title "Title"` → `TASKS/<domain>/<id>.md`
+- Update: Active tasks in `TASKS/`, session context in `.claude/work/session/handoff.md`
+- ⚠️ `.claude/work/tasks/` is DEPRECATED
+
+**Documentation:**
+- Runbooks: `docs/operations/` (requires frontmatter)
+- ADRs: `docs/decisions/` (requires frontmatter)
+- How-tos: `docs/how-to/`
+- Reports: `.claude/work/reports/` (research-diagnostic agent)
+
+**Naming:**
+- All files: lowercase `kebab-case` (filename must match frontmatter `id` for tasks)
+- No spaces in filenames
+
+**Testing:**
 - All code changes require tests (run and verified)
-- Never lint style issues manually before having run format-all and lint-fix --unsafe-fixes
-- Always run typecheck-all from root after creating a test or implementing new code
-```
+- Never lint manually before `format-all` and `lint-fix --unsafe-fixes`
+- Always `typecheck-all` from root after implementation
 
-### 5. Task Management and Documentation Structure
-
-**Task Creation:**
-
-All tasks MUST be created in `TASKS/<domain>/` with proper frontmatter. `.claude/work/tasks/` is DEPRECATED.
-
+**Validate:**
 ```bash
-# Create task
-python scripts/task_mgmt/new_task.py --domain assessment --title "Task Title"
-
-# Validate
 python scripts/task_mgmt/validate_front_matter.py --verbose
 python scripts/docs_mgmt/validate_docs_structure.py --verbose
-python scripts/claude_mgmt/validate_claude_structure.py --verbose
-
-# Manage
-python scripts/task_mgmt/index_tasks.py              # Regenerate index
-python scripts/task_mgmt/archive_task.py --id <id>   # Archive completed
 ```
 
-**File Naming:**
-- Tasks: lowercase `kebab-case`, filename must match frontmatter `id` field
-- Docs: lowercase `kebab-case` for new files (legacy `SCREAMING_SNAKE_CASE` tolerated)
-- No spaces in any filenames
-
-**Locations:**
-- Tasks: `TASKS/<domain>/<task-id>.md`
-- Session: `.claude/work/session/handoff.md` and `.claude/work/session/readme-first.md`
-- Runbooks: `docs/operations/<name>.md` (requires frontmatter)
-- ADRs: `docs/decisions/NNNN-<name>.md` (requires frontmatter)
-- How-tos: `docs/how-to/<name>.md`
-- Code reviews: `.claude/archive/code-reviews/<YYYY-MM-DD>-<name>.md`
-
-**Specifications:**
-- Tasks: `TASKS/_REORGANIZATION_PROPOSAL.md`
-- Documentation: `docs/DOCS_STRUCTURE_SPEC.md`
-- Claude Config: `.claude/CLAUDE_STRUCTURE_SPEC.md`
+**Specs:** `TASKS/_REORGANIZATION_PROPOSAL.md`, `docs/DOCS_STRUCTURE_SPEC.md`, `.claude/CLAUDE_STRUCTURE_SPEC.md`
 
 ---
 

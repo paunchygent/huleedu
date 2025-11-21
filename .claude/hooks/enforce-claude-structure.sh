@@ -21,7 +21,7 @@ ALLOWED_TOP_LEVEL=(
 ALLOWED_WORK_SUBDIRS=(
   "tasks"            # DEPRECATED - migrate to TASKS/ root directory
   "session"          # Session handoffs and state
-  "audits"           # Code audit results
+  "reports"          # Research-diagnostic agent reports
 )
 
 # Second-level directories under archive/
