@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import asyncio
 
+from common_core.status_enums import BatchStatus
 from dishka import make_async_container
 from huleedu_service_libs import init_tracing
 from huleedu_service_libs.database import DatabaseMetrics
+from huleedu_service_libs.database.enum_validation import EnumDriftError, assert_enum_contains
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.middleware.frameworks.quart_middleware import setup_tracing_middleware
 from huleedu_service_libs.outbox import EventRelayWorker, OutboxProvider
@@ -70,6 +72,20 @@ async def initialize_services(app: HuleEduApp, settings: Settings) -> None:
         # Initialize guaranteed database engine infrastructure
         app.database_engine = db_repository.db_infrastructure.engine
         logger.info("Database engine initialized for guaranteed access")
+
+        # Fail-fast enum validation in non-production environments
+        if settings.ENVIRONMENT != "production":
+            try:
+                await assert_enum_contains(
+                    app.database_engine,
+                    "batch_status_enum",
+                    (status.value for status in BatchStatus),
+                    service_name="batch_orchestrator_service",
+                )
+                logger.info("Enum validation passed for batch_status_enum")
+            except EnumDriftError:
+                logger.critical("Enum validation failed for batch_status_enum", exc_info=True)
+                raise
 
         # Get database metrics from DI container
         async with container() as request_container:

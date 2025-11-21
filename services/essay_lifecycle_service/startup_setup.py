@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from common_core.status_enums import EssayStatus
 from dishka import make_async_container
 from huleedu_service_libs.database import DatabaseMetrics
+from huleedu_service_libs.database.enum_validation import EnumDriftError, assert_enum_contains
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.outbox import OutboxProvider
 from huleedu_service_libs.quart_app import HuleEduApp
@@ -70,6 +72,20 @@ async def initialize_services(app: HuleEduApp, settings: Settings) -> None:
             PostgreSQLEssayRepository(session_factory)
             app.database_engine = engine
             logger.info("Database schema initialized and engine stored for health checks")
+
+            # Fail-fast enum validation in non-production environments
+            if settings.ENVIRONMENT != "production":
+                try:
+                    await assert_enum_contains(
+                        engine,
+                        "essay_status_enum",
+                        (status.value for status in EssayStatus),
+                        service_name="essay_lifecycle_service",
+                    )
+                    logger.info("Enum validation passed for essay_status_enum")
+                except EnumDriftError:
+                    logger.critical("Enum validation failed for essay_status_enum", exc_info=True)
+                    raise
 
         logger.info(
             "Essay Lifecycle Service DI container, quart-dishka integration, "

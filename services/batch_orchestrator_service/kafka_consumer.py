@@ -117,8 +117,15 @@ class BatchKafkaConsumer:
             # Start message processing loop
             await self._process_messages()
 
-        except Exception as e:
-            logger.error(f"Error starting BOS Kafka consumer: {e}")
+        except Exception:
+            logger.error(
+                "Error starting BOS Kafka consumer",
+                exc_info=True,
+                extra={
+                    "group_id": self.consumer_group,
+                    "bootstrap_servers": self.kafka_bootstrap_servers,
+                },
+            )
             raise
         finally:
             await self.stop_consumer()
@@ -166,6 +173,15 @@ class BatchKafkaConsumer:
                     logger.info("Shutdown requested, stopping BOS message processing")
                     break
 
+                logger.debug(
+                    "BOS Kafka message received",
+                    extra={
+                        "topic": msg.topic,
+                        "partition": msg.partition,
+                        "offset": msg.offset,
+                    },
+                )
+
                 try:
                     result = await handle_message_idempotently(msg)
 
@@ -211,9 +227,10 @@ class BatchKafkaConsumer:
                             "partition": msg.partition,
                             "offset": msg.offset,
                         },
+                        exc_info=True,
                     )
-        except Exception as e:
-            logger.error(f"Error in BOS message processing loop: {e}")
+        except Exception:
+            logger.error("Error in BOS message processing loop", exc_info=True)
             raise
 
     async def _handle_message(self, msg: Any) -> None:
