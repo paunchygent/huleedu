@@ -177,7 +177,7 @@ async def trigger_existing_workflow_continuation(
 
         previous_scores = _extract_previous_scores(metadata)
 
-        max_score_change = float("inf")
+        max_score_change = None  # Use None instead of float("inf") for JSON compatibility
         stability_passed = False
 
         try:
@@ -230,6 +230,7 @@ async def trigger_existing_workflow_continuation(
                 "max_score_change": max_score_change,
                 "pairs_remaining": pairs_remaining,
                 "budget_exhausted": budget_exhausted,
+                "should_finalize": should_finalize,
             },
         )
 

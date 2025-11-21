@@ -180,13 +180,16 @@ class TestRealDatabaseIntegration:
             assert cj_batch is not None, f"CJ batch not found for BOS batch ID: {batch_id}"
             actual_cj_batch_id = cj_batch.id
 
-            # Initialize batch state with total_budget for completion logic
+            # Verify batch processor initialized values correctly
             # 5 essays = nC2 = 10 comparison pairs
             batch_state = await session.get(CJBatchState, actual_cj_batch_id)
-            if batch_state:
-                batch_state.total_budget = 10
-                batch_state.completion_threshold_pct = 80
-                await session.commit()
+            assert batch_state is not None, "Batch state should exist after processing"
+            assert batch_state.submitted_comparisons == 10, (
+                f"Expected submitted_comparisons=10, got {batch_state.submitted_comparisons}"
+            )
+            assert batch_state.total_budget > 0, (
+                f"Expected total_budget > 0, got {batch_state.total_budget}"
+            )
 
         # Phase 2: Simulate LLM callbacks to complete the workflow
         # This bridges the async gap in testing by processing the mock results as callbacks
@@ -249,7 +252,53 @@ class TestRealDatabaseIntegration:
 
             cj_batch = await session.get(CJBatchUpload, actual_cj_batch_id)
             assert cj_batch is not None
-            assert cj_batch.status == BatchStatus.COMPLETED_SUCCESSFULLY
+
+            # Get final state for diagnostic assertion
+            final_batch_state = await session.get(CJBatchState, actual_cj_batch_id)
+            pending_callbacks = (
+                final_batch_state.submitted_comparisons
+                - (final_batch_state.completed_comparisons + final_batch_state.failed_comparisons)
+                if final_batch_state
+                else "N/A"
+            )
+
+            state_val = final_batch_state.state.value if final_batch_state else "NOT FOUND"
+            submitted_val = final_batch_state.submitted_comparisons if final_batch_state else "N/A"
+            completed_val = final_batch_state.completed_comparisons if final_batch_state else "N/A"
+            failed_val = final_batch_state.failed_comparisons if final_batch_state else "N/A"
+            total_budget_val = final_batch_state.total_budget if final_batch_state else "N/A"
+            denom_val = final_batch_state.completion_denominator() if final_batch_state else "N/A"
+
+            diagnostic_info = (
+                f"\n{'=' * 80}\n"
+                f"BATCH FINALIZATION FAILURE DIAGNOSTICS\n"
+                f"{'=' * 80}\n"
+                f"Expected Status: {BatchStatus.COMPLETED_SUCCESSFULLY.value}\n"
+                f"Actual Status: {cj_batch.status.value}\n"
+                f"Batch State: {state_val}\n"
+                f"Submitted Comparisons: {submitted_val}\n"
+                f"Completed Comparisons: {completed_val}\n"
+                f"Failed Comparisons: {failed_val}\n"
+                f"Pending Callbacks: {pending_callbacks}\n"
+                f"Total Budget: {total_budget_val}\n"
+                f"Denominator: {denom_val}\n"
+                f"{'=' * 80}\n"
+            )
+
+            # Verify batch reached a successful terminal state
+            # CJ batches can complete in multiple ways: stability, max comparisons, etc.
+            from services.cj_assessment_service.enums_db import CJBatchStatusEnum
+
+            successful_completion_statuses = {
+                CJBatchStatusEnum.COMPLETE_STABLE,
+                CJBatchStatusEnum.COMPLETE_MAX_COMPARISONS,
+            }
+            assert cj_batch.status in successful_completion_statuses, (
+                f"{diagnostic_info}\n"
+                f"Expected one of {[s.value for s in successful_completion_statuses]}, "
+                f"got {cj_batch.status.value}"
+            )
+
             batch_state = await session.get(CJBatchState, actual_cj_batch_id)
             assert batch_state is not None
             assert batch_state.state == CJBatchStateEnum.COMPLETED
