@@ -14,6 +14,20 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 
 ## 🎯 ACTIVE WORK (2025-11-22)
 
+### Infrastructure & Tooling Improvements (2025-11-22)
+
+**Completed**:
+- ✅ Task filtering system: `pdm run tasks`, `tasks-now`, `tasks-next` (`scripts/task_mgmt/filter_tasks.py`)
+- ✅ PDM migration: PEP 735 dependency groups (removed legacy `[tool.pdm.dev-dependencies]`)
+- ✅ AGENTS.md sync hook: Auto-sync to CLAUDE.md, CODEX.md, GEMINI.md on commit
+- ✅ Task creation enforcement: Added to AGENTS.md (use `pdm run new-task`)
+- ✅ Linting consolidation: Ruff per-file-ignores (11 entries → 8, wildcards, section headers)
+
+**Next**:
+- MyPy configuration investigation (separate task - global exclude vs override conflict)
+
+---
+
 ### New Work: CJ Prompt Cache Template Builder (Phase 1 Complete)
 
 **Status**: Phase 1 implementation complete, all tests passing, ready for integration
