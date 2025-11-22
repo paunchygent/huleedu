@@ -126,6 +126,14 @@ class Settings(SecureServiceSettings):
     LLM_DEFAULT_MAX_TOKENS: int = 4096
     ENABLE_PROMPT_CACHING: bool = True
     PROMPT_CACHE_TTL_SECONDS: int = 3600
+    USE_EXTENDED_TTL_FOR_SERVICE_CONSTANTS: bool = Field(
+        default=False,
+        description=(
+            "When true, legacy prompts and provider-level constants (system prompt, tool schema)"
+            " use the extended 1h prompt cache TTL. When false (default), service constants use a"
+            " 5m TTL unless prompt blocks explicitly request 1h."
+        ),
+    )
 
     # Model Manifest Configuration
     USE_MANIFEST_MODEL_SELECTION: bool = Field(

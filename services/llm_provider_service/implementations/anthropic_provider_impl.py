@@ -50,6 +50,9 @@ class AnthropicProviderImpl(LLMProviderProtocol):
         self.api_base = settings.ANTHROPIC_BASE_URL or "https://api.anthropic.com/v1"
         self.enable_prompt_caching = getattr(settings, "ENABLE_PROMPT_CACHING", False)
         self.prompt_cache_ttl = getattr(settings, "PROMPT_CACHE_TTL_SECONDS", 3600)
+        self.use_extended_ttl_for_service_constants = getattr(
+            settings, "USE_EXTENDED_TTL_FOR_SERVICE_CONSTANTS", False
+        )
 
         # Log default model configuration from manifest
         try:
@@ -326,7 +329,10 @@ class AnthropicProviderImpl(LLMProviderProtocol):
                     return "1h"
             return "5m"
 
-        return "1h" if self.prompt_cache_ttl >= 3600 else "5m"
+        if self.use_extended_ttl_for_service_constants and self.prompt_cache_ttl >= 3600:
+            return "1h"
+
+        return "5m"
 
     def _validate_prompt_block_order(
         self, prompt_blocks: list[dict[str, Any]], correlation_id: UUID

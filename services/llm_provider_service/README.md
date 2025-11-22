@@ -328,6 +328,9 @@ CLI/Service → validate_llm_overrides() → ELS_CJAssessmentRequestV1(llm_confi
   - `prompt_sha256` is appended on success (from provider metadata) or recomputed on error.
   - Future batching hints (e.g., `cj_llm_batching_mode`, `comparison_iteration`) are passed
     straight through because `CJLLMComparisonMetadata` marks them as additive.
+  - Prompt cache usage from provider metadata (`cache_read_input_tokens`,
+    `cache_creation_input_tokens`, `usage`) is appended when present without overwriting
+    caller-supplied keys.
 - Tests in `tests/unit/test_callback_publishing.py` lock this behaviour by asserting
   that `essay_a_id`, `essay_b_id`, and `bos_batch_id` survive success/error callbacks.
 
@@ -340,7 +343,7 @@ the existing contract.
 - 429 responses now respect `Retry-After` and bubble a retryable error; 529/`overloaded_error` and 5xx codes are treated as transient server errors for the retry manager.
 - `stop_reason=max_tokens` triggers a structured external-service error so callers can raise limits instead of silently using truncated tool payloads.
 - Requests include `metadata.correlation_id` and `prompt_sha256` for Anthropic-side traceability.
-- Prompt caching: the system prompt and tool schema are sent as `cache_control.type=ephemeral` blocks; TTL defaults to `PROMPT_CACHE_TTL_SECONDS` (configurable, default 3600s) and can be disabled with `ENABLE_PROMPT_CACHING=false`.
+- Prompt caching: the system prompt and tool schema are sent as `cache_control.type=ephemeral` blocks; TTL defaults to 5m (extended to `PROMPT_CACHE_TTL_SECONDS`, default 3600s, when `USE_EXTENDED_TTL_FOR_SERVICE_CONSTANTS=true`) and can be disabled with `ENABLE_PROMPT_CACHING=false`.
 
 ## Updating LLM Models
 

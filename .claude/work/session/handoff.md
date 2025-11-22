@@ -102,6 +102,8 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 - API/queue/orchestrator/comparison processor propagate `prompt_blocks`; callback metadata retains prompt hashes; prompt cache usage metrics are surfaced in provider response metadata.
 - Added unit coverage for cache_control payload + TTL ordering (`test_anthropic_prompt_blocks.py`) and prompt_blocks acceptance on request models.
 - Added cache-sandbox CLI (6-essay, two-pass, 5m TTL) using Anthropic provider to report cache read/write tokens.
+- Added `USE_EXTENDED_TTL_FOR_SERVICE_CONSTANTS` flag (default false) so legacy/system/tool TTLs stay 5m unless explicitly extended; Anthropic TTL selection updated to honor the flag.
+- New integration suite `services/llm_provider_service/tests/integration/test_anthropic_prompt_cache_blocks.py` (8 tests) covering block preference, legacy fallback, system/tool cache_control, TTL ordering pass/fail, callback cache usage propagation, and cache-bypass metrics.
 
 ---
 

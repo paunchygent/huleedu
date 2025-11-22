@@ -923,6 +923,11 @@ class QueueProcessorImpl:
             prompt_hash = result.metadata.get("prompt_sha256") if result.metadata else None
             if prompt_hash:
                 request_meta.setdefault("prompt_sha256", prompt_hash)
+            provider_metadata = result.metadata or {}
+            for key, value in provider_metadata.items():
+                if key == "prompt_sha256":
+                    continue
+                request_meta.setdefault(key, value)
 
             # Create success callback event
             callback_event = LLMComparisonResultV1(

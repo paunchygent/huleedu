@@ -102,6 +102,7 @@ Changes to `.py` files trigger automatic restart (~9-11 seconds). No manual rebu
 - `cj_llm_batching_mode` - Batching hint (when `CJ_ASSESSMENT_SERVICE_ENABLE_LLM_BATCHING_METADATA_HINTS=true`)
 - `comparison_iteration` - Stability loop iteration (when iterative batching enabled)
 - `cj_batch_id`, `cj_source`, `cj_request_type` - emitted by CJ for every request so retries and ENG5 tooling can correlate callbacks with CJ batches and upstream workflows without scraping logs.
+- Prompt cache usage (when available): `cache_read_input_tokens`, `cache_creation_input_tokens`, and raw `usage` dict are appended by LPS without overwriting caller metadata.
 
 **Validation**: See `tests/integration/test_cj_lps_metadata_roundtrip.py`
 

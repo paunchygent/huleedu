@@ -165,13 +165,15 @@ def _make_api_request():
 ### Phase 2: LPS Multi-Block Cache (2 days)
 - [x] Extend `LLMComparisonRequest` with `prompt_blocks` field
 - [x] Modify `anthropic_provider_impl.py` to prefer `prompt_blocks`, add cache_control (system/user/tools), enforce TTL ordering, and fallback to legacy `user_prompt` if blocks are absent
-- [ ] Add `USE_EXTENDED_TTL_FOR_SERVICE_CONSTANTS` config
-- [ ] Write 8 integration tests for block caching
+- [x] Add `USE_EXTENDED_TTL_FOR_SERVICE_CONSTANTS` config
+- [x] Write 8 integration tests for block caching
 
 **Progress 2025-11-22**
 - `prompt_blocks` threaded through API → orchestrator → queue → comparison processor → provider; callback metadata keeps prompt hash.
 - Anthropic provider builds block arrays with cache_control, TTL ordering validation (1h before 5m), and cache metrics in response metadata.
 - New unit coverage: `test_anthropic_prompt_blocks.py`, `test_api_routes_simple.py`; cache sandbox fixture + CLI (`llm-admin cache-sandbox`) added for two-pass token read/write measurement.
+- Config flag `USE_EXTENDED_TTL_FOR_SERVICE_CONSTANTS` defaults Anthropic legacy/service-constant TTLs to 5m (opt-in 1h); callback metadata now includes provider cache usage.
+- New integration suite `test_anthropic_prompt_cache_blocks.py` covers block preference, legacy fallback, system/tool cache_control, TTL ordering pass/fail, callback cache metrics, and bypass behaviour.
 
 ### Phase 3: Observability (1 day)
 - [ ] Add block-level Prometheus metrics
