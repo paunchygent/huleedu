@@ -104,6 +104,7 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 - Added cache-sandbox CLI (6-essay, two-pass, 5m TTL) using Anthropic provider to report cache read/write tokens.
 - Added `USE_EXTENDED_TTL_FOR_SERVICE_CONSTANTS` flag (default false) so legacy/system/tool TTLs stay 5m unless explicitly extended; Anthropic TTL selection updated to honor the flag.
 - New integration suite `services/llm_provider_service/tests/integration/test_anthropic_prompt_cache_blocks.py` (8 tests) covering block preference, legacy fallback, system/tool cache_control, TTL ordering pass/fail, callback cache usage propagation, and cache-bypass metrics.
+- Warm-up acceptance criteria captured: seed exactly one request per prompt hash (cacheable static blocks + tool schema; essays stay non-cacheable), avoid concurrent first-writes (ordered/jittered), require post-seed miss rate per hash ≤20% converging to near-0, enforce TTL alignment with `USE_EXTENDED_TTL_FOR_SERVICE_CONSTANTS`, and include `prompt_sha256` + provider cache usage in callbacks without overwriting caller metadata. Metrics to watch: `llm_provider_prompt_cache_events_total` hit/miss/bypass and `llm_provider_prompt_cache_tokens_total`.
 
 ---
 

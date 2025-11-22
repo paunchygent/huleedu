@@ -207,6 +207,10 @@ def _make_api_request():
 - [ ] System blocks structured as array (not string) **(pending LPS Phase 2)**
 - [x] Legacy `user_prompt` fallback works (rendered from blocks, not separate template)
 - [x] Requests <1024 tokens process without errors (graceful degradation)
+- [ ] Warm-up pattern enforced: one seed request per prompt hash (cacheable static blocks + tool schema; essays stay non-cacheable) before dispatching the cohort, with post-seed miss rate per hash ≤20% and converging to near-0 on subsequent requests.
+- [ ] TTL alignment: system/tool TTLs respect `USE_EXTENDED_TTL_FOR_SERVICE_CONSTANTS` (default 5m) and retain 1h-before-5m ordering.
+- [ ] Warm-up scheduling avoids concurrent first-writes (ordered dequeue or light jitter) to prevent thundering-herd misses.
+- [ ] Callback metadata includes `prompt_sha256` and provider cache usage (`usage`, `cache_read_input_tokens`, `cache_creation_input_tokens`) without overwriting caller metadata (essay IDs, batch IDs, etc.).
 
 ### Performance Requirements
 

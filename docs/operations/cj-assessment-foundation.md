@@ -45,6 +45,14 @@ Purpose: single reference for defaults, reasoning, metrics, and open work across
 2) Cache TTL sweep: compare 600s vs 3600s vs 14400s on repeated prompts; record hit rate and token savings.
 3) Model/prompt anchor tests: mix official + teacher anchors; measure grade projection consistency and cost.
 
+## Prompt cache warm-up – acceptance criteria
+- Seed once per unique prompt hash (static cacheable blocks + tool schema) before dispatching the rest of that hash cohort; essays remain non-cacheable.
+- After the seed completes, cache miss rate per hash should drop to ≤20% and converge to near-0 within the next request (PromQL hit rate over 5m window).
+- TTL ordering must hold (1h blocks before 5m blocks); system/tool blocks keep `cache_control` aligned with `USE_EXTENDED_TTL_FOR_SERVICE_CONSTANTS` (default 5m).
+- No essay caching or A/B slot tricks; cacheable scope is system/rubric/instructions/tool schema only.
+- Warm-up scheduling avoids concurrent first-writes (light jitter or ordered dequeue) to prevent thundering-herd misses.
+- Callback metadata must include `prompt_sha256` and provider cache usage (`usage`, `cache_read_input_tokens`, `cache_creation_input_tokens`) without overwriting caller metadata (essay IDs, batch IDs, etc.).
+
 ## Open work (align with .claude/work/tasks)
 - PR2: Pair position fairness (balanced A/B for anchors/students).
 - PR3: Extend Anthropic tests to 529 + stop_reason; add PromQL snippets for error_type and cache hit rate.
