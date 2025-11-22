@@ -3,7 +3,7 @@ id: cj-prompt-cache-template-builder
 title: CJ Prompt Cache Template Builder
 type: task
 status: in_progress
-priority: medium
+priority: high
 domain: assessment
 owner_team: agents
 created: '2025-11-22'

@@ -412,6 +412,11 @@ kafka-setup = "python scripts/kafka_topic_bootstrap.py"  # Initialize Kafka topi
 docker-clean = "docker system prune -af"  # Clean Docker resources (use with caution)
 codex = "scripts/codex-exec"  # Start codex with full system access and high reasoning
 
+# Task Management
+tasks = {shell = "python scripts/task_mgmt/filter_tasks.py $@"}  # Filter and query tasks by frontmatter
+tasks-now = "python scripts/task_mgmt/filter_tasks.py --priority high --status in_progress"  # High priority tasks in progress
+tasks-next = "python scripts/task_mgmt/filter_tasks.py --priority high --priority medium --status research --sort priority"  # Research tasks ready to start (high priority first)
+
 # Observability Stack Management
 obs-up = "docker compose up -d prometheus grafana loki jaeger promtail alertmanager"
 obs-down = "docker compose stop prometheus grafana loki jaeger promtail alertmanager"

@@ -62,6 +62,19 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 
 ---
 
+### CJ Stability & Validation Fixes (In Progress)
+
+**Status**: Multiple high-priority fixes in progress across CJ service
+
+**Active Tasks**:
+- **Cj Assessment Code Hardening** (`TASKS/assessment/cj-assessment-code-hardening.md`)
+- **Cj Llm Serial Bundle Validation Fixes** (`TASKS/assessment/cj-llm-serial-bundle-validation-fixes.md`)
+- **Cj Batch State And Completion Fixes** (`TASKS/assessment/cj-batch-state-and-completion-fixes.md`)
+
+See individual task documents for details.
+
+---
+
 ### Uncommitted Changes Ready for Commit (2025-11-21)
 
 **Status**: Stability-first completion + critical JSON serialization bug fix complete, all tests passing
