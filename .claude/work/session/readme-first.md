@@ -56,9 +56,10 @@ pdm run pytest-root tests/integration/  # Cross-service tests
 - E2E CJ test latency note: callbacks returned in ~12s, but `completion_threshold` (95% of budget 350) kept batch in WAITING_CALLBACKS until 5‑minute monitor sweep forced completion (~3m42s delay). Pending follow-up to switch completion to stability-first and cap budget to nC2.
 - Stability-first completion shipped: callbacks now trigger scoring immediately; batches finalize on stability or when callbacks hit the capped denominator (min(total_budget, nC2)). BatchMonitor is recovery-only.
 - Anthropic regression coverage extended to 529 overload + stop_reason=max_tokens; prompt cache metrics (`llm_provider_prompt_cache_events_total`, `llm_provider_prompt_cache_tokens_total`) now available with hit/miss and tokens-saved visibility.
-- Grafana wiring: new dashboard `LLM Provider Prompt Cache` (uid `huleedu-llm-prompt-cache`) plus alert `LLMPromptCacheLowHitRate` (Anthropic) firing when hit rate <20% with traffic; links in PromQL doc/runbook.
+- Grafana wiring: `LLM Provider Prompt Cache` dashboard now shows scope-aware hit rates (assignment vs ad-hoc), block mix, and static vs dynamic token size; alert `LLMPromptCacheLowHitRate` now keys off assignment scope <40%, and new `LLMPromptTTLOutOfOrder` warns on TTL ordering violations.
 - Phase 1.3 prompt cache integration plan drafted (see `.claude/work/session/handoff.md`); next action is wiring `PromptTemplateBuilder` through pair generation and dual-sending prompt blocks to LPS.
 - Default `MAX_PAIRWISE_COMPARISONS` reduced to 150 for cost safety; per-request overrides still honored; tests updated.
+- CJ prompt block serialization guard tightened: non-production now raises (production falls back to legacy prompt), closing prior unit test failure in `test_llm_interaction_impl_unit.py`.
 
 ### Hot-Reload Development
 

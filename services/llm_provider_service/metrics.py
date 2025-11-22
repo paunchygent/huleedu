@@ -210,6 +210,31 @@ def _create_metrics() -> dict[str, Any]:
                 ["provider", "model", "direction"],
                 registry=REGISTRY,
             ),
+            "llm_provider_prompt_blocks_total": Counter(
+                "llm_provider_prompt_blocks_total",
+                "Prompt blocks observed by provider, model, target, cacheability, and ttl.",
+                ["provider", "model", "target", "cacheable", "ttl"],
+                registry=REGISTRY,
+            ),
+            "llm_provider_prompt_tokens_histogram": Histogram(
+                "llm_provider_prompt_tokens_histogram",
+                "Approximate token counts per prompt section (cacheable vs dynamic).",
+                ["provider", "model", "section"],
+                buckets=(16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192),
+                registry=REGISTRY,
+            ),
+            "llm_provider_cache_scope_total": Counter(
+                "llm_provider_cache_scope_total",
+                "Prompt cache outcomes by scope (assignment/ad-hoc) and result.",
+                ["provider", "model", "scope", "result"],
+                registry=REGISTRY,
+            ),
+            "llm_provider_prompt_ttl_violations_total": Counter(
+                "llm_provider_prompt_ttl_violations_total",
+                "TTL ordering validation failures detected while building provider payloads.",
+                ["provider", "model", "stage"],
+                registry=REGISTRY,
+            ),
         }
         return metrics
     except ValueError as e:
@@ -262,6 +287,14 @@ def get_llm_metrics() -> dict[str, Any]:
         ),
         "llm_provider_prompt_cache_tokens_total": all_metrics.get(
             "llm_provider_prompt_cache_tokens_total"
+        ),
+        "llm_provider_prompt_blocks_total": all_metrics.get("llm_provider_prompt_blocks_total"),
+        "llm_provider_prompt_tokens_histogram": all_metrics.get(
+            "llm_provider_prompt_tokens_histogram"
+        ),
+        "llm_provider_cache_scope_total": all_metrics.get("llm_provider_cache_scope_total"),
+        "llm_provider_prompt_ttl_violations_total": all_metrics.get(
+            "llm_provider_prompt_ttl_violations_total"
         ),
     }
 
@@ -325,6 +358,10 @@ def _get_existing_metrics() -> dict[str, Any]:
         "llm_serial_bundle_items_per_call": "llm_provider_serial_bundle_items_per_call",
         "llm_provider_prompt_cache_events_total": "llm_provider_prompt_cache_events_total",
         "llm_provider_prompt_cache_tokens_total": "llm_provider_prompt_cache_tokens_total",
+        "llm_provider_prompt_blocks_total": "llm_provider_prompt_blocks_total",
+        "llm_provider_prompt_tokens_histogram": "llm_provider_prompt_tokens_histogram",
+        "llm_provider_cache_scope_total": "llm_provider_cache_scope_total",
+        "llm_provider_prompt_ttl_violations_total": "llm_provider_prompt_ttl_violations_total",
     }
 
     existing: dict[str, Any] = {}

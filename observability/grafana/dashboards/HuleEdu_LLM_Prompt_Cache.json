@@ -243,6 +243,179 @@
       ],
       "title": "Tokens Written to Cache (creation)",
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.2
+              },
+              {
+                "color": "yellow",
+                "value": 0.4
+              },
+              {
+                "color": "green",
+                "value": 0.8
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "id": 5,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "clamp_min(sum(rate(llm_provider_cache_scope_total{scope=\"assignment\", result=\"hit\"}[$__rate_interval])), 0)\n  /\nclamp_min(sum(rate(llm_provider_cache_scope_total{scope=\"assignment\"}[$__rate_interval])), 0.0001)",
+          "legendFormat": "assignment",
+          "refId": "A"
+        },
+        {
+          "expr": "clamp_min(sum(rate(llm_provider_cache_scope_total{scope=\"adhoc\", result=\"hit\"}[$__rate_interval])), 0)\n  /\nclamp_min(sum(rate(llm_provider_cache_scope_total{scope=\"adhoc\"}[$__rate_interval])), 0.0001)",
+          "legendFormat": "ad-hoc",
+          "refId": "B"
+        }
+      ],
+      "title": "Hit Rate by Scope",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(llm_provider_prompt_blocks_total[$__rate_interval])) by (target, cacheable)",
+          "legendFormat": "{{target}} • cacheable={{cacheable}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Prompt Blocks by Target/Cacheability",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 24
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(llm_provider_prompt_tokens_histogram_sum[$__rate_interval])) by (section)\n/\nclamp_min(sum(rate(llm_provider_prompt_tokens_histogram_count[$__rate_interval])) by (section), 0.0001)",
+          "legendFormat": "{{section}} avg_tokens",
+          "refId": "A"
+        }
+      ],
+      "title": "Average Prompt Tokens by Section",
+      "type": "timeseries"
     }
   ],
   "refresh": "",
@@ -297,6 +470,6 @@
   "timezone": "",
   "title": "LLM Provider Prompt Cache",
   "uid": "huleedu-llm-prompt-cache",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }

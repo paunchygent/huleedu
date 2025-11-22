@@ -16,7 +16,7 @@ from unittest.mock import Mock
 from uuid import UUID, uuid4
 
 import pytest
-from common_core import LLMBatchingMode, LLMProviderType
+from common_core import Environment, LLMBatchingMode, LLMProviderType
 
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.implementations.llm_interaction_impl import LLMInteractionImpl
@@ -100,12 +100,12 @@ class TestLLMInteractionImplProtocolCompliance:
     @pytest.fixture
     def test_settings(self) -> Settings:
         """Create test settings."""
-        settings = Mock(spec=Settings)
+        settings = Settings()
         settings.DEFAULT_LLM_PROVIDER = LLMProviderType.OPENAI
         settings.DEFAULT_LLM_MODEL = "gpt-4"
-        settings.max_concurrent_llm_requests = 3
         settings.ENABLE_LLM_BATCHING_METADATA_HINTS = False
         settings.LLM_BATCHING_MODE = LLMBatchingMode.PER_REQUEST
+        settings.ENVIRONMENT = Environment.DEVELOPMENT
         return settings
 
     @pytest.fixture
@@ -212,6 +212,53 @@ class TestLLMInteractionImplProtocolCompliance:
             "essay_a_id": sample_comparison_task.essay_a.id,
             "essay_b_id": sample_comparison_task.essay_b.id,
         }
+
+    @pytest.mark.asyncio
+    async def test_prompt_block_serialization_failure_raises_in_non_prod(
+        self,
+        providers_dict_success: dict[LLMProviderType, LLMProviderProtocol],
+        test_settings: Settings,
+        sample_comparison_task: ComparisonTask,
+    ) -> None:
+        """Non-production environments should surface prompt block serialization errors."""
+
+        failing_blocks = Mock()
+        failing_blocks.to_api_dict_list.side_effect = ValueError("cannot serialize")
+        sample_comparison_task.prompt_blocks = failing_blocks  # type: ignore[assignment]
+
+        llm_impl = LLMInteractionImpl(providers=providers_dict_success, settings=test_settings)
+
+        with pytest.raises(ValueError):
+            await llm_impl.perform_comparisons(
+                tasks=[sample_comparison_task],
+                correlation_id=uuid4(),
+            )
+
+    @pytest.mark.asyncio
+    async def test_prompt_block_serialization_failure_falls_back_in_production(
+        self,
+        providers_dict_success: dict[LLMProviderType, LLMProviderProtocol],
+        test_settings: Settings,
+        sample_comparison_task: ComparisonTask,
+        successful_provider: MockLLMProvider,
+    ) -> None:
+        """Production environment should log and continue without prompt blocks."""
+
+        test_settings.ENVIRONMENT = Environment.PRODUCTION
+        failing_blocks = Mock()
+        failing_blocks.to_api_dict_list.side_effect = ValueError("cannot serialize")
+        sample_comparison_task.prompt_blocks = failing_blocks  # type: ignore[assignment]
+
+        llm_impl = LLMInteractionImpl(providers=providers_dict_success, settings=test_settings)
+
+        results = await llm_impl.perform_comparisons(
+            tasks=[sample_comparison_task],
+            correlation_id=uuid4(),
+        )
+
+        assert results == []
+        assert successful_provider.last_call_params["prompt_blocks"] is None
+        assert successful_provider.call_count == 1
 
     @pytest.mark.asyncio
     async def test_metadata_includes_bos_batch_id_when_available(

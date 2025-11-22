@@ -28,7 +28,7 @@ from services.llm_provider_service.internal_models import (
     LLMOrchestratorResponse,
     LLMQueuedResult,
 )
-from services.llm_provider_service.metrics import get_queue_metrics
+from services.llm_provider_service.metrics import get_llm_metrics, get_queue_metrics
 from services.llm_provider_service.prompt_utils import compute_prompt_sha256
 from services.llm_provider_service.protocols import (
     ComparisonProcessorProtocol,
@@ -79,6 +79,7 @@ class QueueProcessorImpl:
         self._last_cleanup_time = time.time()
         self._cleanup_interval = 300  # 5 minutes
         self.queue_metrics = get_queue_metrics()
+        self.llm_metrics = get_llm_metrics()
         self._last_queue_metrics_log = 0.0
         self._pending_request: Optional[QueuedRequest] = None
 
@@ -193,6 +194,11 @@ class QueueProcessorImpl:
                 request,
                 provider=provider,
                 model=model_hint,
+            )
+            self._record_prompt_block_metrics(
+                request=request,
+                provider=provider,
+                model=model_hint or "default",
             )
 
             # Restore trace context for queue processing to maintain unbroken spans
@@ -328,6 +334,11 @@ class QueueProcessorImpl:
             provider=primary_provider,
             model=primary_overrides.get("model_override"),
         )
+        self._record_prompt_block_metrics(
+            request=first_request,
+            provider=primary_provider,
+            model=primary_overrides.get("model_override") or "default",
+        )
 
         processing_started[str(first_request.queue_id)] = time.perf_counter()
         await self._mark_request_processing(first_request)
@@ -376,6 +387,11 @@ class QueueProcessorImpl:
                 next_request,
                 provider=candidate_provider,
                 model=candidate_overrides.get("model_override"),
+            )
+            self._record_prompt_block_metrics(
+                request=next_request,
+                provider=candidate_provider,
+                model=candidate_overrides.get("model_override") or "default",
             )
 
             processing_started[str(next_request.queue_id)] = time.perf_counter()
@@ -736,6 +752,149 @@ class QueueProcessorImpl:
                 result=result,
             ).inc()
 
+    def _record_prompt_block_metrics(
+        self,
+        *,
+        request: QueuedRequest,
+        provider: LLMProviderType,
+        model: str,
+    ) -> None:
+        """Record block-level and token-distribution metrics for observability."""
+        if not self.llm_metrics:
+            return
+
+        block_counter = self.llm_metrics.get("llm_provider_prompt_blocks_total")
+        token_hist = self.llm_metrics.get("llm_provider_prompt_tokens_histogram")
+
+        blocks = request.request_data.prompt_blocks or []
+        provider_label = provider.value
+        model_label = model or "default"
+
+        # Track legacy payloads explicitly
+        if not blocks and block_counter is not None:
+            block_counter.labels(
+                provider=provider_label,
+                model=model_label,
+                target="legacy_user_prompt",
+                cacheable="false",
+                ttl="none",
+            ).inc()
+
+        static_tokens = 0
+        dynamic_tokens = 0
+
+        for block in blocks:
+            target = str(block.get("target") or "user_content")
+            cacheable = "true" if block.get("cacheable") else "false"
+            ttl_label = self._normalize_ttl_label(block.get("ttl"))
+            if block_counter is not None:
+                block_counter.labels(
+                    provider=provider_label,
+                    model=model_label,
+                    target=target,
+                    cacheable=cacheable,
+                    ttl=ttl_label,
+                ).inc()
+
+            content_text = str(block.get("content") or "")
+            if block.get("cacheable"):
+                static_tokens += self._estimate_tokens(content_text)
+            else:
+                dynamic_tokens += self._estimate_tokens(content_text)
+
+        if token_hist is not None:
+            if blocks:
+                token_hist.labels(
+                    provider=provider_label, model=model_label, section="static"
+                ).observe(static_tokens)
+                token_hist.labels(
+                    provider=provider_label, model=model_label, section="dynamic"
+                ).observe(dynamic_tokens)
+            else:
+                token_hist.labels(
+                    provider=provider_label, model=model_label, section="legacy"
+                ).observe(self._estimate_tokens(request.request_data.user_prompt))
+
+    def _record_cache_scope_metrics(
+        self,
+        *,
+        request: QueuedRequest,
+        result: LLMOrchestratorResponse,
+    ) -> None:
+        """Record cache outcomes by scope (assignment vs ad-hoc)."""
+        if not self.llm_metrics:
+            return
+
+        scope_counter = self.llm_metrics.get("llm_provider_cache_scope_total")
+        if scope_counter is None:
+            return
+
+        metadata = request.request_data.metadata or {}
+        scope = self._detect_scope(metadata)
+        provider_label = result.provider.value
+        model_label = result.model or "unknown"
+
+        usage: Dict[str, Any] = {}
+        if isinstance(result.metadata, dict):
+            usage = result.metadata.get("usage") or {}
+            # Support flattened cache usage fields if present
+            if "cache_read_input_tokens" in result.metadata:
+                usage.setdefault(
+                    "cache_read_input_tokens", result.metadata.get("cache_read_input_tokens")
+                )
+            if "cache_creation_input_tokens" in result.metadata:
+                usage.setdefault(
+                    "cache_creation_input_tokens",
+                    result.metadata.get("cache_creation_input_tokens"),
+                )
+
+        cache_read_tokens = int(usage.get("cache_read_input_tokens") or 0)
+        cache_write_tokens = int(usage.get("cache_creation_input_tokens") or 0)
+
+        if cache_read_tokens > 0:
+            outcome = "hit"
+        elif cache_write_tokens > 0:
+            outcome = "miss"
+        else:
+            outcome = "bypass"
+
+        scope_counter.labels(
+            provider=provider_label, model=model_label, scope=scope, result=outcome
+        ).inc()
+
+    @staticmethod
+    def _detect_scope(metadata: Dict[str, Any]) -> str:
+        """Infer request scope for cache observability."""
+        if not metadata:
+            return "unknown"
+
+        if metadata.get("assignment_id") or metadata.get("assignmentId"):
+            return "assignment"
+
+        if metadata.get("bos_batch_id") or metadata.get("cj_batch_id"):
+            return "assignment"
+
+        return "adhoc"
+
+    @staticmethod
+    def _normalize_ttl_label(ttl: Any) -> str:
+        """Normalize TTL labels to Prometheus-friendly values."""
+        if ttl is None:
+            return "none"
+        ttl_str = str(ttl).lower().strip()
+        if ttl_str in {"1h", "60m", "3600", "3600s"}:
+            return "1h"
+        if ttl_str in {"5m", "300", "300s"}:
+            return "5m"
+        return "none"
+
+    @staticmethod
+    def _estimate_tokens(text: str) -> int:
+        """Lightweight token estimator (word count heuristic)."""
+        if not text:
+            return 0
+        return max(len(text.split()), 0)
+
     async def _handle_request_success(
         self, request: QueuedRequest, result: LLMOrchestratorResponse
     ) -> None:
@@ -773,6 +932,8 @@ class QueueProcessorImpl:
                 ),
             },
         )
+
+        self._record_cache_scope_metrics(request=request, result=result)
 
         # Publish callback event for successful completion
         await self._publish_callback_event(request, result)

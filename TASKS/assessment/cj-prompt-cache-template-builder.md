@@ -174,11 +174,13 @@ def _make_api_request():
 - New unit coverage: `test_anthropic_prompt_blocks.py`, `test_api_routes_simple.py`; cache sandbox fixture + CLI (`llm-admin cache-sandbox`) added for two-pass token read/write measurement.
 - Config flag `USE_EXTENDED_TTL_FOR_SERVICE_CONSTANTS` defaults Anthropic legacy/service-constant TTLs to 5m (opt-in 1h); callback metadata now includes provider cache usage.
 - New integration suite `test_anthropic_prompt_cache_blocks.py` covers block preference, legacy fallback, system/tool cache_control, TTL ordering pass/fail, callback cache metrics, and bypass behaviour.
+- Observability delivered: block-level Prometheus metrics, scope-aware dashboard panels, hit-rate alert tuned to assignment scope (<40%), and TTL-violation alert added.
+- CJ dev/test now raises prompt block serialization errors (production falls back to legacy prompt) to surface template bugs; `test_llm_interaction_impl_unit.py` fully green.
 
 ### Phase 3: Observability (1 day)
-- [ ] Add block-level Prometheus metrics
-- [ ] Extend Grafana dashboard with 3 new panels
-- [ ] Update Prometheus alerts (tune thresholds, add TTL ordering violation)
+- [x] Add block-level Prometheus metrics
+- [x] Extend Grafana dashboard with 3 new panels
+- [x] Update Prometheus alerts (tune thresholds, add TTL ordering violation)
 
 ### Phase 4: Testing & Validation (1.5 days)
 - [ ] Write performance benchmarks:
@@ -204,13 +206,13 @@ def _make_api_request():
 - [x] Static blocks generate consistent hashes for same assignment
 - [x] TTL values limited to "5m" or "1h" (no invalid values sent)
 - [x] 1h TTL blocks precede 5m TTL blocks in all requests
-- [ ] System blocks structured as array (not string) **(pending LPS Phase 2)**
+- [x] System blocks structured as array (not string)
 - [x] Legacy `user_prompt` fallback works (rendered from blocks, not separate template)
 - [x] Requests <1024 tokens process without errors (graceful degradation)
 - [ ] Warm-up pattern enforced: one seed request per prompt hash (cacheable static blocks + tool schema; essays stay non-cacheable) before dispatching the cohort, with post-seed miss rate per hash ≤20% and converging to near-0 on subsequent requests.
-- [ ] TTL alignment: system/tool TTLs respect `USE_EXTENDED_TTL_FOR_SERVICE_CONSTANTS` (default 5m) and retain 1h-before-5m ordering.
+- [x] TTL alignment: system/tool TTLs respect `USE_EXTENDED_TTL_FOR_SERVICE_CONSTANTS` (default 5m) and retain 1h-before-5m ordering.
 - [ ] Warm-up scheduling avoids concurrent first-writes (ordered dequeue or light jitter) to prevent thundering-herd misses.
-- [ ] Callback metadata includes `prompt_sha256` and provider cache usage (`usage`, `cache_read_input_tokens`, `cache_creation_input_tokens`) without overwriting caller metadata (essay IDs, batch IDs, etc.).
+- [x] Callback metadata includes `prompt_sha256` and provider cache usage (`usage`, `cache_read_input_tokens`, `cache_creation_input_tokens`) without overwriting caller metadata (essay IDs, batch IDs, etc.).
 
 ### Performance Requirements
 
@@ -221,17 +223,17 @@ def _make_api_request():
 
 ### Observability Requirements
 
-- [ ] Grafana dashboard shows hit rate by scope (assignment/ad-hoc)
-- [ ] Block-level metrics track cacheable vs non-cacheable
-- [ ] Prometheus alert fires on low hit rate (<40% for assignments)
-- [ ] TTL ordering violations tracked (should be zero)
+- [x] Grafana dashboard shows hit rate by scope (assignment/ad-hoc)
+- [x] Block-level metrics track cacheable vs non-cacheable
+- [x] Prometheus alert fires on low hit rate (<40% for assignments)
+- [x] TTL ordering violations tracked (should be zero)
 
 ### Code Quality Requirements
 
-- [ ] All unit tests passing (20 new tests: 12 CJ + 8 LPS)
+- [x] All unit tests passing (20 new tests: 12 CJ + 8 LPS)
 - [ ] All integration tests passing
-- [ ] `pdm run typecheck-all` passing
-- [ ] `pdm run format-all && pdm run lint-fix --unsafe-fixes` passing
+- [x] `pdm run typecheck-all` passing
+- [x] `pdm run format-all && pdm run lint-fix --unsafe-fixes` passing
 
 ---
 

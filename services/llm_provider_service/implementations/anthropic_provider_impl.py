@@ -335,7 +335,7 @@ class AnthropicProviderImpl(LLMProviderProtocol):
         return "5m"
 
     def _validate_prompt_block_order(
-        self, prompt_blocks: list[dict[str, Any]], correlation_id: UUID
+        self, prompt_blocks: list[dict[str, Any]], correlation_id: UUID, model: str
     ) -> None:
         """Ensure prompt blocks respect Anthropic TTL ordering (1h before 5m)."""
 
@@ -348,6 +348,7 @@ class AnthropicProviderImpl(LLMProviderProtocol):
             if ttl_value == "5m":
                 seen_five_min = True
             elif ttl_value == "1h" and seen_five_min:
+                self._record_ttl_violation(model=model, stage="incoming_blocks")
                 raise_validation_error(
                     service="llm_provider_service",
                     operation="anthropic_build_payload",
@@ -357,8 +358,20 @@ class AnthropicProviderImpl(LLMProviderProtocol):
                     details={"provider": "anthropic", "block_index": idx},
                 )
 
+    def _record_ttl_violation(self, *, model: str, stage: str) -> None:
+        """Increment TTL violation counter when available."""
+
+        if not self.metrics:
+            return
+
+        ttl_metric = self.metrics.get("llm_provider_prompt_ttl_violations_total")
+        if ttl_metric is None:
+            return
+
+        ttl_metric.labels(provider="anthropic", model=model or "unknown", stage=stage).inc()
+
     def _validate_cache_ttl_ordering(
-        self, blocks: list[dict[str, Any]], correlation_id: UUID
+        self, blocks: list[dict[str, Any]], correlation_id: UUID, *, model: str, stage: str
     ) -> None:
         """Validate cache_control TTL ordering within a constructed message list."""
 
@@ -371,6 +384,7 @@ class AnthropicProviderImpl(LLMProviderProtocol):
             if ttl_value == "5m":
                 seen_five_min = True
             elif ttl_value == "1h" and seen_five_min:
+                self._record_ttl_violation(model=model, stage=stage)
                 raise_validation_error(
                     service="llm_provider_service",
                     operation="anthropic_build_payload",
@@ -388,6 +402,7 @@ class AnthropicProviderImpl(LLMProviderProtocol):
         prompt_blocks: list[dict[str, Any]] | None,
         cache_ttl: str,
         correlation_id: UUID,
+        model: str,
     ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Construct system/user content blocks honoring cache settings and ordering."""
 
@@ -400,7 +415,7 @@ class AnthropicProviderImpl(LLMProviderProtocol):
         system_content.append(system_block)
 
         if prompt_blocks:
-            self._validate_prompt_block_order(prompt_blocks, correlation_id)
+            self._validate_prompt_block_order(prompt_blocks, correlation_id, model)
 
             for block in prompt_blocks:
                 block_target = str(block.get("target") or "user_content")
@@ -422,8 +437,12 @@ class AnthropicProviderImpl(LLMProviderProtocol):
         if not user_content:
             user_content.append({"type": "text", "text": user_prompt})
 
-        self._validate_cache_ttl_ordering(system_content, correlation_id)
-        self._validate_cache_ttl_ordering(user_content, correlation_id)
+        self._validate_cache_ttl_ordering(
+            system_content, correlation_id, model=model, stage="system_blocks"
+        )
+        self._validate_cache_ttl_ordering(
+            user_content, correlation_id, model=model, stage="user_blocks"
+        )
 
         return system_content, user_content
 
@@ -531,6 +550,7 @@ class AnthropicProviderImpl(LLMProviderProtocol):
             prompt_blocks=prompt_blocks,
             cache_ttl=cache_ttl,
             correlation_id=correlation_id,
+            model=model,
         )
 
         metadata: dict[str, Any] = {

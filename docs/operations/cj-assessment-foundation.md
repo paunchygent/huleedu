@@ -35,8 +35,8 @@ Purpose: single reference for defaults, reasoning, metrics, and open work across
 - Stability: stability_iterations_per_batch; max_score_change at finalization.
 - Budget usage: callbacks_received vs completion_denominator; pairs_remaining when finalized.
 - Prompt caching: cache_hits, cache_misses, avg_prompt_tokens_saved.
-  - Metrics: `llm_provider_prompt_cache_events_total{result}`, `llm_provider_prompt_cache_tokens_total{direction}`.
-  - PromQL: hit rate `sum(rate(llm_provider_prompt_cache_events_total{result="hit"}[5m])) / sum(rate(llm_provider_prompt_cache_events_total{result=~"hit|miss|bypass"}[5m]))`; tokens saved per second `sum(rate(llm_provider_prompt_cache_tokens_total{direction="read"}[5m]))`.
+  - Metrics: `llm_provider_prompt_cache_events_total{result}`, `llm_provider_prompt_cache_tokens_total{direction}`, `llm_provider_cache_scope_total{scope,result}`, `llm_provider_prompt_blocks_total{target,cacheable,ttl}`, `llm_provider_prompt_tokens_histogram_bucket{section}`, `llm_provider_prompt_ttl_violations_total{stage}`.
+  - PromQL: hit rate (assignment scope) `sum(rate(llm_provider_cache_scope_total{scope="assignment",result="hit"}[5m])) / sum(rate(llm_provider_cache_scope_total{scope="assignment"}[5m]))`; tokens saved per second `sum(rate(llm_provider_prompt_cache_tokens_total{direction="read"}[5m]))`; block mix `sum(rate(llm_provider_prompt_blocks_total[5m])) by (target, cacheable)`; static vs dynamic size `sum(rate(llm_provider_prompt_tokens_histogram_sum[5m])) by (section) / sum(rate(llm_provider_prompt_tokens_histogram_count[5m])) by (section)`; TTL violations `increase(llm_provider_prompt_ttl_violations_total[1h])` (should be zero).
 - Provider errors: llm_provider_errors_total{provider,model,error_type}; rate_limit/overloaded alerts; stop_reason occurrences.
 - Queue health: processing_timeout_count, orphan_callback_count (pending for PR4).
 

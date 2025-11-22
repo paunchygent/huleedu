@@ -255,6 +255,9 @@ async def test_ttl_ordering_violation_raises_validation_error() -> None:
     settings = Settings(ANTHROPIC_API_KEY="test-key", ENABLE_PROMPT_CACHING=True)
     provider, _ = _build_provider(settings)
 
+    ttl_metric = provider.metrics["llm_provider_prompt_ttl_violations_total"]
+    ttl_metric.labels = Mock(return_value=Mock(inc=Mock()))
+
     provider._perform_http_request_with_metrics = AsyncMock(  # type: ignore[assignment]
         return_value=json.dumps(_fake_tool_response())
     )
@@ -277,6 +280,9 @@ async def test_ttl_ordering_violation_raises_validation_error() -> None:
         )
 
     assert "1h TTL block must precede 5m TTL blocks" in str(exc_info.value)
+    ttl_metric.labels.assert_called_once_with(
+        provider="anthropic", model=settings.ANTHROPIC_DEFAULT_MODEL, stage="incoming_blocks"
+    )
 
 
 @pytest.mark.asyncio

@@ -96,12 +96,14 @@ class TestQueueProcessorErrorHandling:
         settings: Settings,
     ) -> QueueProcessorImpl:
         """Create queue processor with mocked dependencies."""
+        settings.QUEUE_PROCESSING_MODE = QueueProcessingMode.PER_REQUEST
         return QueueProcessorImpl(
             comparison_processor=mock_comparison_processor,
             queue_manager=mock_queue_manager,
             event_publisher=mock_event_publisher,
             trace_context_manager=mock_trace_context_manager,
             settings=settings,
+            queue_processing_mode=QueueProcessingMode.PER_REQUEST,
         )
 
     @pytest.mark.asyncio
@@ -1058,3 +1060,115 @@ class TestQueueProcessorMetadataEnrichment:
         assert metadata["resolved_provider"] == LLMProviderType.OPENAI.value
         assert metadata["queue_processing_mode"] == queue_processor.queue_processing_mode.value
         assert "resolved_model" not in metadata
+
+    def test_prompt_block_metrics_record_cacheable_and_dynamic_tokens(self) -> None:
+        queue_processor = self._create_queue_processor(mode=QueueProcessingMode.PER_REQUEST)
+
+        block_counter = Mock()
+        token_hist = Mock()
+        block_counter.labels.return_value = Mock(inc=Mock())
+        token_hist.labels.return_value = Mock(observe=Mock())
+        queue_processor.llm_metrics = {
+            "llm_provider_prompt_blocks_total": block_counter,
+            "llm_provider_prompt_tokens_histogram": token_hist,
+        }
+
+        prompt_blocks = [
+            {"target": "system", "content": "system guidance", "cacheable": True, "ttl": "1h"},
+            {"target": "user_content", "content": "cached block", "cacheable": True, "ttl": "5m"},
+            {"target": "user_content", "content": "dynamic essays", "cacheable": False},
+        ]
+        request_data = LLMComparisonRequest(
+            user_prompt="legacy prompt",
+            prompt_blocks=prompt_blocks,
+            callback_topic="topic",
+            correlation_id=uuid.uuid4(),
+        )
+        queued_request = QueuedRequest(
+            queue_id=uuid.uuid4(),
+            request_data=request_data,
+            status=QueueStatus.QUEUED,
+            queued_at=datetime.now(timezone.utc),
+            size_bytes=len(request_data.model_dump_json()),
+            callback_topic="topic",
+        )
+
+        queue_processor._record_prompt_block_metrics(
+            request=queued_request,
+            provider=LLMProviderType.ANTHROPIC,
+            model="claude-test",
+        )
+
+        block_counter.labels.assert_any_call(
+            provider="anthropic",
+            model="claude-test",
+            target="system",
+            cacheable="true",
+            ttl="1h",
+        )
+        block_counter.labels.assert_any_call(
+            provider="anthropic",
+            model="claude-test",
+            target="user_content",
+            cacheable="true",
+            ttl="5m",
+        )
+        block_counter.labels.assert_any_call(
+            provider="anthropic",
+            model="claude-test",
+            target="user_content",
+            cacheable="false",
+            ttl="none",
+        )
+        token_hist.labels.assert_any_call(
+            provider="anthropic", model="claude-test", section="static"
+        )
+        token_hist.labels.assert_any_call(
+            provider="anthropic", model="claude-test", section="dynamic"
+        )
+
+    def test_cache_scope_metrics_use_assignment_scope_and_outcome(self) -> None:
+        queue_processor = self._create_queue_processor(mode=QueueProcessingMode.PER_REQUEST)
+
+        scope_counter = Mock()
+        scope_counter.labels.return_value = Mock(inc=Mock())
+        queue_processor.llm_metrics = {"llm_provider_cache_scope_total": scope_counter}
+
+        request_data = LLMComparisonRequest(
+            user_prompt="prompt",
+            callback_topic="topic",
+            correlation_id=uuid.uuid4(),
+            metadata={"bos_batch_id": "batch-123"},
+        )
+        queued_request = QueuedRequest(
+            queue_id=uuid.uuid4(),
+            request_data=request_data,
+            status=QueueStatus.COMPLETED,
+            queued_at=datetime.now(timezone.utc),
+            size_bytes=len(request_data.model_dump_json()),
+            callback_topic="topic",
+        )
+
+        result = LLMOrchestratorResponse(
+            winner=EssayComparisonWinner.ESSAY_A,
+            justification="A",
+            confidence=0.5,
+            provider=LLMProviderType.ANTHROPIC,
+            model="claude-test",
+            response_time_ms=25,
+            token_usage={"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+            cost_estimate=0.01,
+            correlation_id=request_data.correlation_id or uuid.uuid4(),
+            trace_id=None,
+            metadata={"usage": {"cache_read_input_tokens": 64, "cache_creation_input_tokens": 0}},
+        )
+
+        queue_processor._record_cache_scope_metrics(request=queued_request, result=result)
+
+        scope_counter.labels.assert_called_once_with(
+            provider="anthropic",
+            model="claude-test",
+            scope="assignment",
+            result="hit",
+        )
+        scope_counter.labels.return_value.inc.assert_called_once_with()

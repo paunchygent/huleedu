@@ -12,7 +12,7 @@ import asyncio
 from typing import Any, cast
 from uuid import UUID
 
-from common_core import LLMProviderType
+from common_core import Environment, LLMProviderType
 from common_core.error_enums import ErrorCode
 from common_core.models.error_models import ErrorDetail as CanonicalErrorDetail
 from huleedu_service_libs.error_handling.error_detail_factory import (
@@ -135,6 +135,32 @@ class LLMInteractionImpl(LLMInteractionProtocol):
         max_concurrent_requests = getattr(self.settings, "max_concurrent_llm_requests", 3)
         semaphore = asyncio.Semaphore(max_concurrent_requests)
 
+        def _serialize_prompt_blocks(
+            task: ComparisonTask,
+            task_correlation_id: UUID,
+        ) -> list[dict[str, Any]] | None:
+            """Serialize prompt blocks with environment-aware fallback."""
+            if task.prompt_blocks is None:
+                return None
+
+            try:
+                return task.prompt_blocks.to_api_dict_list()
+            except (TypeError, ValueError) as serialization_error:
+                logger.warning(
+                    "Failed to serialize prompt_blocks; falling back to legacy prompt"
+                    if self.settings.ENVIRONMENT is Environment.PRODUCTION
+                    else "Failed to serialize prompt_blocks; raising in non-production",
+                    exc_info=True,
+                    extra={
+                        "essay_a": task.essay_a.id,
+                        "essay_b": task.essay_b.id,
+                        "correlation_id": str(task_correlation_id),
+                    },
+                )
+                if self.settings.ENVIRONMENT is Environment.PRODUCTION:
+                    return None
+                raise serialization_error
+
         async def process_task(task: ComparisonTask) -> ComparisonResult | None:
             """Process a single comparison task with direct LLM call."""
             async with semaphore:
@@ -162,23 +188,20 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                     )
 
                 # Make direct LLM API request - no caching
-                try:
-                    metadata_adapter = CJLLMComparisonMetadata.from_comparison_task(
-                        task,
-                        bos_batch_id=bos_batch_id,
-                    )
-                    if metadata_context:
-                        metadata_adapter = metadata_adapter.with_additional_context(
-                            **metadata_context
-                        )
-                    request_metadata = metadata_adapter.to_request_metadata()
-                    prompt_blocks_payload = None
-                    if task.prompt_blocks is not None:
-                        try:
-                            prompt_blocks_payload = task.prompt_blocks.to_api_dict_list()
-                        except Exception:  # pragma: no cover - defensive
-                            logger.debug("Failed to serialize prompt_blocks", exc_info=True)
+                metadata_adapter = CJLLMComparisonMetadata.from_comparison_task(
+                    task,
+                    bos_batch_id=bos_batch_id,
+                )
+                if metadata_context:
+                    metadata_adapter = metadata_adapter.with_additional_context(**metadata_context)
+                request_metadata = metadata_adapter.to_request_metadata()
 
+                prompt_blocks_payload = _serialize_prompt_blocks(
+                    task=task,
+                    task_correlation_id=task_correlation_id,
+                )
+
+                try:
                     response_data = await provider.generate_comparison(
                         user_prompt=task.prompt,
                         correlation_id=task_correlation_id,  # Use unique correlation ID
@@ -259,6 +282,11 @@ class LLMInteractionImpl(LLMInteractionProtocol):
             async_count = 0
             for i, result in enumerate(results):
                 if isinstance(result, Exception):
+                    if self.settings.ENVIRONMENT is not Environment.PRODUCTION and isinstance(
+                        result, (TypeError, ValueError)
+                    ):
+                        raise result
+
                     # Note: exc_info omitted here as exceptions should have been logged with full
                     # traceback in the inner except block of process_task(). Logging here with
                     # exc_info=result can trigger Rich's introspection of Mock objects in test
@@ -308,6 +336,11 @@ class LLMInteractionImpl(LLMInteractionProtocol):
             return final_results
 
         except Exception as e:
+            if self.settings.ENVIRONMENT is not Environment.PRODUCTION and isinstance(
+                e, (TypeError, ValueError)
+            ):
+                raise
+
             logger.error(
                 f"Critical error during comparison processing: {e}",
                 exc_info=True,
