@@ -33,7 +33,8 @@ cross-service task context.
 ### 4. Documentation & Testing
 
 **Task Tracking:**
-- Create: `python scripts/task_mgmt/new_task.py --domain <domain> --title "Title"` → `TASKS/<domain>/<id>.md`
+- **ALWAYS** use `pdm run new-task` to create tasks (never create manually)
+- Create: `pdm run new-task --domain <domain> --title "Title"` → `TASKS/<domain>/<id>.md`
 - Update: Active tasks in `TASKS/`, session context in `.claude/work/session/handoff.md`
 - ⚠️ `.claude/work/tasks/` is DEPRECATED
 
