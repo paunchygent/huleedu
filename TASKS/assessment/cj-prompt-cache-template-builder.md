@@ -159,17 +159,19 @@ def _make_api_request():
 ### Phase 1: Template Builder Foundation (COMPLETED 2025-11-22)
 - [x] Create `models_prompt.py` with `PromptBlock`, `CacheableBlockTarget`, `AnthropicCacheTTL`
 - [x] Create `cj_core_logic/prompt_templates.py` with `PromptTemplateBuilder`
-- [ ] Integrate with `pair_generation.py` (replace `_build_comparison_prompt()`) - NEXT SESSION
+- [x] Integrate with `pair_generation.py` (replace `_build_comparison_prompt()`) - DONE (blocks now canonical; string rendered from blocks)
 - [x] Write Rule 075 compliant unit tests (40 tests, 16 parametrized, all passing)
 
 ### Phase 2: LPS Multi-Block Cache (2 days)
-- [ ] Extend `LLMComparisonRequest` with `prompt_blocks` field
-- [ ] Modify `anthropic_provider_impl.py`:
-  - [ ] `_build_system_blocks()` - wrap system prompt in array
-  - [ ] `_build_tools_with_cache()` - add cache_control to tool schema
-  - [ ] `_build_user_content_from_blocks()` - selective caching + TTL ordering
+- [x] Extend `LLMComparisonRequest` with `prompt_blocks` field
+- [x] Modify `anthropic_provider_impl.py` to prefer `prompt_blocks`, add cache_control (system/user/tools), enforce TTL ordering, and fallback to legacy `user_prompt` if blocks are absent
 - [ ] Add `USE_EXTENDED_TTL_FOR_SERVICE_CONSTANTS` config
 - [ ] Write 8 integration tests for block caching
+
+**Progress 2025-11-22**
+- `prompt_blocks` threaded through API → orchestrator → queue → comparison processor → provider; callback metadata keeps prompt hash.
+- Anthropic provider builds block arrays with cache_control, TTL ordering validation (1h before 5m), and cache metrics in response metadata.
+- New unit coverage: `test_anthropic_prompt_blocks.py`, `test_api_routes_simple.py`; cache sandbox fixture + CLI (`llm-admin cache-sandbox`) added for two-pass token read/write measurement.
 
 ### Phase 3: Observability (1 day)
 - [ ] Add block-level Prometheus metrics
@@ -197,12 +199,12 @@ def _make_api_request():
 
 ### Functional Requirements
 
-- [ ] Static blocks generate consistent hashes for same assignment
-- [ ] TTL values limited to "5m" or "1h" (no invalid values sent)
-- [ ] 1h TTL blocks precede 5m TTL blocks in all requests
-- [ ] System blocks structured as array (not string)
-- [ ] Legacy `user_prompt` fallback works (backward compat)
-- [ ] Requests <1024 tokens process without errors (graceful degradation)
+- [x] Static blocks generate consistent hashes for same assignment
+- [x] TTL values limited to "5m" or "1h" (no invalid values sent)
+- [x] 1h TTL blocks precede 5m TTL blocks in all requests
+- [ ] System blocks structured as array (not string) **(pending LPS Phase 2)**
+- [x] Legacy `user_prompt` fallback works (rendered from blocks, not separate template)
+- [x] Requests <1024 tokens process without errors (graceful degradation)
 
 ### Performance Requirements
 

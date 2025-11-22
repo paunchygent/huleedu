@@ -64,6 +64,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
         provider: LLMProviderType,
         user_prompt: str,
         correlation_id: UUID,
+        prompt_blocks: list[dict[str, Any]] | None = None,
         request_metadata: Dict[str, Any] | None = None,
         callback_topic: str | None = None,
         **overrides: Any,
@@ -117,6 +118,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
         return await self._queue_request(
             provider=provider,
             user_prompt=user_prompt,
+            prompt_blocks=prompt_blocks,
             correlation_id=correlation_id,
             request_metadata=request_metadata,
             overrides=overrides,
@@ -128,6 +130,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
         provider: LLMProviderType,
         user_prompt: str,
         correlation_id: UUID,
+        prompt_blocks: list[dict[str, Any]] | None = None,
         **overrides: Any,
     ) -> LLMOrchestratorResponse:
         """Process a queued request directly (internal use only).
@@ -167,6 +170,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
         return await self._make_direct_llm_request(
             provider=provider,
             user_prompt=user_prompt,
+            prompt_blocks=prompt_blocks,
             correlation_id=correlation_id,
             overrides=overrides,
             start_time=start_time,
@@ -176,6 +180,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
         self,
         provider: LLMProviderType,
         user_prompt: str,
+        prompt_blocks: list[dict[str, Any]] | None,
         correlation_id: UUID,
         request_metadata: Dict[str, Any] | None,
         overrides: Dict[str, Any],
@@ -201,6 +206,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
         # Create queued request
         request_data = LLMComparisonRequest(
             user_prompt=user_prompt,
+            prompt_blocks=prompt_blocks,
             callback_topic=callback_topic,
             correlation_id=correlation_id,
             metadata=request_metadata or {},
@@ -273,6 +279,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
         self,
         provider: LLMProviderType,
         user_prompt: str,
+        prompt_blocks: list[dict[str, Any]] | None,
         correlation_id: UUID,
         overrides: dict[str, Any],
         start_time: float,
@@ -290,6 +297,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
                 # Call the provider with tracing context
                 result = await provider_impl.generate_comparison(
                     user_prompt=user_prompt,
+                    prompt_blocks=prompt_blocks,
                     correlation_id=correlation_id,
                     system_prompt_override=overrides.get("system_prompt_override"),
                     model_override=overrides.get("model_override"),
@@ -342,6 +350,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
                 cost_estimate=cost_estimate_value,
                 correlation_id=correlation_id,
                 trace_id=self.trace_context_manager.get_current_trace_id(),
+                metadata=result.metadata,
             )
 
         except HuleEduError:

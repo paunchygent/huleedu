@@ -216,6 +216,7 @@ class QueueProcessorImpl:
                     result = await self.comparison_processor.process_comparison(
                         provider=provider,
                         user_prompt=req_data.user_prompt,
+                        prompt_blocks=req_data.prompt_blocks,
                         correlation_id=req_data.correlation_id or request.queue_id,
                         **overrides,
                     )
@@ -223,6 +224,7 @@ class QueueProcessorImpl:
                     batch_item = BatchComparisonItem(
                         provider=provider,
                         user_prompt=req_data.user_prompt,
+                        prompt_blocks=req_data.prompt_blocks,
                         correlation_id=req_data.correlation_id or request.queue_id,
                         overrides=overrides or None,
                     )
@@ -570,6 +572,7 @@ class QueueProcessorImpl:
         return BatchComparisonItem(
             provider=provider,
             user_prompt=request.request_data.user_prompt,
+            prompt_blocks=request.request_data.prompt_blocks,
             correlation_id=request.request_data.correlation_id or request.queue_id,
             overrides=overrides or None,
         )
@@ -1011,6 +1014,7 @@ class QueueProcessorImpl:
                     request_meta["prompt_sha256"] = compute_prompt_sha256(
                         provider=provider_hint,
                         user_prompt=request.request_data.user_prompt,
+                        prompt_blocks=request.request_data.prompt_blocks,
                     )
                 except Exception as exc:  # pragma: no cover - defensive guard
                     logger.warning(

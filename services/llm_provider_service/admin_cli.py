@@ -18,6 +18,7 @@ Usage:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import uuid
 from typing import Any
@@ -28,6 +29,13 @@ from rich.console import Console
 from rich.table import Table
 
 from services.llm_provider_service.config import Settings
+from services.llm_provider_service.fixtures.cache_sandbox import (
+    SANDBOX_PAIRS,
+    build_prompt_blocks_for_pair,
+)
+from services.llm_provider_service.implementations.anthropic_provider_impl import (
+    AnthropicProviderImpl,
+)
 from services.llm_provider_service.implementations.openai_provider_impl import (
     OpenAIProviderImpl,
 )
@@ -278,10 +286,79 @@ def call_cmd(
         console.print("[red]Currently only OpenAI provider is supported for 'call' command[/red]")
         raise typer.Exit(code=1)
 
-    # Run async call
-    import asyncio
-
     asyncio.run(_call_openai(model, essay_a, essay_b, temperature, max_tokens, json_output))
+
+
+@app.command("cache-sandbox")
+def cache_sandbox(
+    provider: str = typer.Option(
+        "anthropic", "--provider", "-p", help="LLM provider (anthropic only)"
+    ),
+    model: str = typer.Option(None, "--model", "-m", help="Model ID to use (defaults to settings)"),
+    passes: int = typer.Option(2, "--passes", help="Number of passes to run"),
+    ttl_seconds: int = typer.Option(
+        300, "--ttl-seconds", help="TTL for cacheable blocks (default 5m)"
+    ),
+) -> None:
+    """Run a two-pass Anthropic prompt cache sandbox using six bundled essays."""
+
+    if provider.lower() != "anthropic":
+        console.print("[red]cache-sandbox currently supports provider=anthropic only[/red]")
+        raise typer.Exit(code=1)
+
+    async def _run_cache_sandbox() -> None:
+        settings = Settings(
+            ENABLE_PROMPT_CACHING=True,
+            PROMPT_CACHE_TTL_SECONDS=ttl_seconds,
+        )
+
+        if not settings.ANTHROPIC_API_KEY.get_secret_value():
+            console.print("[red]ANTHROPIC_API_KEY environment variable not set[/red]")
+            raise typer.Exit(code=1)
+
+        async with aiohttp.ClientSession() as session:
+            retry_manager = RetryManagerImpl(settings)
+            provider_impl = AnthropicProviderImpl(
+                session=session, settings=settings, retry_manager=retry_manager
+            )
+
+            total_read = 0
+            total_write = 0
+
+            for pass_idx in range(1, passes + 1):
+                pass_read = 0
+                pass_write = 0
+
+                for idx_a, idx_b in SANDBOX_PAIRS:
+                    prompt_blocks = build_prompt_blocks_for_pair(idx_a, idx_b)
+                    user_prompt = "\n\n".join(block["content"] for block in prompt_blocks)
+
+                    response = await provider_impl.generate_comparison(
+                        user_prompt=user_prompt,
+                        prompt_blocks=prompt_blocks,
+                        correlation_id=uuid.uuid4(),
+                        model_override=model,
+                    )
+
+                    metadata = response.metadata or {}
+                    pass_read += int(metadata.get("cache_read_input_tokens") or 0)
+                    pass_write += int(metadata.get("cache_creation_input_tokens") or 0)
+
+                total_read += pass_read
+                total_write += pass_write
+
+                console.print(
+                    f"Pass {pass_idx}: cache_read_tokens={pass_read}, "
+                    f"cache_write_tokens={pass_write}"
+                )
+
+            console.print(
+                f"[bold]Totals[/bold] cache_read_tokens={total_read}, "
+                f"cache_write_tokens={total_write}"
+            )
+
+    console.print("[dim]Running cache sandbox (may incur Anthropic costs)[/dim]")
+    asyncio.run(_run_cache_sandbox())
 
 
 async def _call_openai(

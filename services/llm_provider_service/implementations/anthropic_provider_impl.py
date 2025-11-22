@@ -1,7 +1,6 @@
 """Anthropic LLM provider implementation."""
 
 import asyncio
-import hashlib
 import json
 from typing import Any
 from uuid import UUID
@@ -16,10 +15,12 @@ from services.llm_provider_service.exceptions import (
     raise_configuration_error,
     raise_external_service_error,
     raise_parsing_error,
+    raise_validation_error,
 )
 from services.llm_provider_service.internal_models import LLMProviderResponse
 from services.llm_provider_service.metrics import get_llm_metrics
 from services.llm_provider_service.model_manifest import ProviderName
+from services.llm_provider_service.prompt_utils import compute_prompt_sha256, render_prompt_blocks
 from services.llm_provider_service.protocols import LLMProviderProtocol, LLMRetryManagerProtocol
 from services.llm_provider_service.response_validator import validate_and_normalize_response
 
@@ -77,6 +78,7 @@ class AnthropicProviderImpl(LLMProviderProtocol):
         self,
         user_prompt: str,
         correlation_id: UUID,
+        prompt_blocks: list[dict[str, Any]] | None = None,
         system_prompt_override: str | None = None,
         model_override: str | None = None,
         temperature_override: float | None = None,
@@ -109,8 +111,17 @@ class AnthropicProviderImpl(LLMProviderProtocol):
             )
 
         # Use the complete prompt with essays already embedded
-        full_prompt = user_prompt
-        prompt_sha256 = hashlib.sha256(full_prompt.encode("utf-8")).hexdigest()
+        prompt_text = render_prompt_blocks(prompt_blocks) if prompt_blocks else user_prompt
+        if prompt_blocks and prompt_text != user_prompt:
+            logger.debug(
+                "Prompt text reconstructed from blocks differs from user_prompt; "
+                "using block-rendered text for hashing"
+            )
+        prompt_sha256 = compute_prompt_sha256(
+            provider=LLMProviderType.ANTHROPIC,
+            user_prompt=prompt_text,
+            prompt_blocks=prompt_blocks,
+        )
 
         # Use system prompt from override or default comparison prompt
         system_prompt = system_prompt_override or (
@@ -124,8 +135,9 @@ class AnthropicProviderImpl(LLMProviderProtocol):
                 operation=self._make_api_request,
                 operation_name="anthropic_api_request",
                 system_prompt=system_prompt,
-                user_prompt=full_prompt,
+                user_prompt=prompt_text,
                 correlation_id=correlation_id,
+                prompt_blocks=prompt_blocks,
                 model_override=model_override,
                 temperature_override=temperature_override,
                 max_tokens_override=max_tokens_override,
@@ -276,11 +288,145 @@ class AnthropicProviderImpl(LLMProviderProtocol):
                     cache_write_tokens
                 )
 
+    def _normalize_ttl_value(self, ttl_hint: Any, correlation_id: UUID) -> str:
+        """Normalize TTL to Anthropic-supported string values ('5m' or '1h')."""
+
+        if ttl_hint is None:
+            return "5m"
+
+        if isinstance(ttl_hint, (int, float)):
+            return "1h" if ttl_hint >= 3600 else "5m"
+
+        ttl_str = str(ttl_hint).lower().strip()
+        if ttl_str in {"5m", "300", "300s"}:
+            return "5m"
+        if ttl_str in {"1h", "60m", "3600", "3600s"}:
+            return "1h"
+
+        raise_validation_error(
+            service="llm_provider_service",
+            operation="anthropic_build_payload",
+            field="ttl",
+            message=f"Invalid cache TTL value: {ttl_hint}",
+            correlation_id=correlation_id,
+            details={"provider": "anthropic", "ttl_value": str(ttl_hint)},
+        )
+
+    def _select_cache_ttl(
+        self, prompt_blocks: list[dict[str, Any]] | None, correlation_id: UUID
+    ) -> str:
+        """Select cache TTL based on prompt blocks or service defaults."""
+
+        if prompt_blocks:
+            for block in prompt_blocks:
+                if (
+                    block.get("cacheable")
+                    and self._normalize_ttl_value(block.get("ttl"), correlation_id) == "1h"
+                ):
+                    return "1h"
+            return "5m"
+
+        return "1h" if self.prompt_cache_ttl >= 3600 else "5m"
+
+    def _validate_prompt_block_order(
+        self, prompt_blocks: list[dict[str, Any]], correlation_id: UUID
+    ) -> None:
+        """Ensure prompt blocks respect Anthropic TTL ordering (1h before 5m)."""
+
+        seen_five_min = False
+        for idx, block in enumerate(prompt_blocks):
+            if not block.get("cacheable"):
+                continue
+
+            ttl_value = self._normalize_ttl_value(block.get("ttl"), correlation_id)
+            if ttl_value == "5m":
+                seen_five_min = True
+            elif ttl_value == "1h" and seen_five_min:
+                raise_validation_error(
+                    service="llm_provider_service",
+                    operation="anthropic_build_payload",
+                    field="prompt_blocks",
+                    message="1h TTL block must precede 5m TTL blocks",
+                    correlation_id=correlation_id,
+                    details={"provider": "anthropic", "block_index": idx},
+                )
+
+    def _validate_cache_ttl_ordering(
+        self, blocks: list[dict[str, Any]], correlation_id: UUID
+    ) -> None:
+        """Validate cache_control TTL ordering within a constructed message list."""
+
+        seen_five_min = False
+        for idx, block in enumerate(blocks):
+            cache_control = block.get("cache_control")
+            if not cache_control:
+                continue
+            ttl_value = self._normalize_ttl_value(cache_control.get("ttl"), correlation_id)
+            if ttl_value == "5m":
+                seen_five_min = True
+            elif ttl_value == "1h" and seen_five_min:
+                raise_validation_error(
+                    service="llm_provider_service",
+                    operation="anthropic_build_payload",
+                    field="prompt_blocks",
+                    message="Constructed payload violates TTL ordering (1h after 5m)",
+                    correlation_id=correlation_id,
+                    details={"provider": "anthropic", "block_index": idx},
+                )
+
+    def _build_message_content(
+        self,
+        *,
+        system_prompt: str,
+        user_prompt: str,
+        prompt_blocks: list[dict[str, Any]] | None,
+        cache_ttl: str,
+        correlation_id: UUID,
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        """Construct system/user content blocks honoring cache settings and ordering."""
+
+        system_content: list[dict[str, Any]] = []
+        user_content: list[dict[str, Any]] = []
+
+        system_block: dict[str, Any] = {"type": "text", "text": system_prompt}
+        if self.enable_prompt_caching:
+            system_block["cache_control"] = {"type": "ephemeral", "ttl": cache_ttl}
+        system_content.append(system_block)
+
+        if prompt_blocks:
+            self._validate_prompt_block_order(prompt_blocks, correlation_id)
+
+            for block in prompt_blocks:
+                block_target = str(block.get("target") or "user_content")
+                ttl_value = self._normalize_ttl_value(block.get("ttl"), correlation_id)
+                payload_block: dict[str, Any] = {
+                    "type": "text",
+                    "text": block.get("content", ""),
+                }
+                if block.get("cacheable") and self.enable_prompt_caching:
+                    payload_block["cache_control"] = {"type": "ephemeral", "ttl": ttl_value}
+
+                if block_target == "system":
+                    system_content.append(payload_block)
+                else:
+                    user_content.append(payload_block)
+        else:
+            user_content.append({"type": "text", "text": user_prompt})
+
+        if not user_content:
+            user_content.append({"type": "text", "text": user_prompt})
+
+        self._validate_cache_ttl_ordering(system_content, correlation_id)
+        self._validate_cache_ttl_ordering(user_content, correlation_id)
+
+        return system_content, user_content
+
     async def _make_api_request(
         self,
         system_prompt: str,
         user_prompt: str,
         correlation_id: UUID,
+        prompt_blocks: list[dict[str, Any]] | None = None,
         model_override: str | None = None,
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,
@@ -369,22 +515,25 @@ class AnthropicProviderImpl(LLMProviderProtocol):
             }
         ]
 
-        system_blocks: Any
+        cache_ttl = self._select_cache_ttl(prompt_blocks, correlation_id)
         if self.enable_prompt_caching:
-            system_blocks = [
-                {
-                    "type": "text",
-                    "text": system_prompt,
-                    "cache_control": {
-                        "type": "ephemeral",
-                        "ttl": int(self.prompt_cache_ttl),
-                    },
-                }
-            ]
-        else:
-            system_blocks = system_prompt
+            tools[0]["cache_control"] = {"type": "ephemeral", "ttl": cache_ttl}
 
-        user_message_content = [{"type": "text", "text": user_prompt}]
+        system_blocks, user_message_content = self._build_message_content(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            prompt_blocks=prompt_blocks,
+            cache_ttl=cache_ttl,
+            correlation_id=correlation_id,
+        )
+
+        metadata: dict[str, Any] = {
+            "correlation_id": str(correlation_id),
+            "provider": "anthropic",
+        }
+
+        if prompt_sha256:
+            metadata["prompt_sha256"] = prompt_sha256
 
         payload = {
             "model": model,
@@ -394,14 +543,8 @@ class AnthropicProviderImpl(LLMProviderProtocol):
             "temperature": temperature,
             "tools": tools,
             "tool_choice": {"type": "tool", "name": "comparison_result"},
-            "metadata": {
-                "correlation_id": str(correlation_id),
-                "provider": "anthropic",
-            },
+            "metadata": metadata,
         }
-
-        if prompt_sha256:
-            payload["metadata"]["prompt_sha256"] = prompt_sha256
 
         response_text = await self._perform_http_request_with_metrics(
             endpoint=endpoint,
@@ -491,9 +634,19 @@ class AnthropicProviderImpl(LLMProviderProtocol):
                 confidence_normalized = (validated_response.confidence - 1.0) / 4.0
 
                 # Create response model
-                metadata: dict[str, Any] = {}
+                response_metadata: dict[str, Any] = {}
                 if prompt_sha256:
-                    metadata["prompt_sha256"] = prompt_sha256
+                    response_metadata["prompt_sha256"] = prompt_sha256
+                if usage:
+                    response_metadata["usage"] = usage
+                    if usage.get("cache_read_input_tokens") is not None:
+                        response_metadata["cache_read_input_tokens"] = usage.get(
+                            "cache_read_input_tokens"
+                        )
+                    if usage.get("cache_creation_input_tokens") is not None:
+                        response_metadata["cache_creation_input_tokens"] = usage.get(
+                            "cache_creation_input_tokens"
+                        )
 
                 response_model = LLMProviderResponse(
                     winner=winner,
@@ -505,7 +658,7 @@ class AnthropicProviderImpl(LLMProviderProtocol):
                     completion_tokens=completion_tokens,
                     total_tokens=total_tokens,
                     raw_response=response_data,
-                    metadata=metadata,
+                    metadata=response_metadata,
                 )
 
                 return response_model

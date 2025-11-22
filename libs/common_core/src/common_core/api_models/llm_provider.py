@@ -47,11 +47,17 @@ class LLMConfigOverridesHTTP(BaseModel):
 class LLMComparisonRequest(BaseModel):
     """Request model for LLM essay comparison.
 
-    Note: Essays should be embedded directly in the user_prompt field.
-    This ensures efficient token usage and clear separation of concerns.
+    Preferred path is to send `prompt_blocks` (cache-friendly, ordered with TTL rules)
+    while retaining the legacy `user_prompt` string for backward compatibility.
     """
 
     user_prompt: str = Field(..., description="The complete comparison prompt including essays")
+    prompt_blocks: list[dict[str, Any]] | None = Field(
+        default=None,
+        description=(
+            "Optional structured prompt blocks (cache-friendly); user_prompt remains for fallback"
+        ),
+    )
 
     # REQUIRED callback topic for async processing
     callback_topic: str = Field(

@@ -70,6 +70,25 @@ Essay B content""",
     assert request.correlation_id is None
 
 
+def test_comparison_request_with_prompt_blocks() -> None:
+    """Prompt blocks are accepted and preserved on the request model."""
+
+    prompt_blocks = [
+        {"target": "user_content", "content": "static", "cacheable": True, "ttl": "5m"},
+        {"target": "user_content", "content": "Essay A", "cacheable": False},
+        {"target": "user_content", "content": "Essay B", "cacheable": False},
+    ]
+
+    request = LLMComparisonRequest(
+        user_prompt="fallback prompt",
+        prompt_blocks=prompt_blocks,
+        callback_topic="test.callback.topic",
+    )
+
+    assert request.prompt_blocks is not None
+    assert request.prompt_blocks[0]["ttl"] == "5m"
+
+
 @pytest.mark.asyncio
 async def test_comparison_request_with_overrides() -> None:
     """Test LLMComparisonRequest with config overrides."""

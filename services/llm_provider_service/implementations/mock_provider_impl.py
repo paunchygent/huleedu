@@ -36,6 +36,7 @@ class MockProviderImpl(LLMProviderProtocol):
         self,
         user_prompt: str,
         correlation_id: UUID,
+        prompt_blocks: list[dict[str, Any]] | None = None,
         system_prompt_override: str | None = None,
         model_override: str | None = None,
         temperature_override: float | None = None,

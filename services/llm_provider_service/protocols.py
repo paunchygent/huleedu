@@ -22,6 +22,7 @@ class LLMProviderProtocol(Protocol):
         self,
         user_prompt: str,
         correlation_id: UUID,
+        prompt_blocks: list[dict[str, Any]] | None = None,
         system_prompt_override: str | None = None,
         model_override: str | None = None,
         temperature_override: float | None = None,
@@ -54,6 +55,7 @@ class LLMOrchestratorProtocol(Protocol):
         provider: LLMProviderType,
         user_prompt: str,
         correlation_id: UUID,
+        prompt_blocks: list[Dict[str, Any]] | None = None,
         request_metadata: Dict[str, Any] | None = None,
         **overrides: Any,
     ) -> LLMQueuedResult:
@@ -79,6 +81,7 @@ class LLMOrchestratorProtocol(Protocol):
         provider: LLMProviderType,
         user_prompt: str,
         correlation_id: UUID,
+        prompt_blocks: list[Dict[str, Any]] | None = None,
         **overrides: Any,
     ) -> LLMOrchestratorResponse:
         """Process a queued request directly (internal use only).
@@ -376,6 +379,7 @@ class ComparisonProcessorProtocol(Protocol):
         provider: LLMProviderType,
         user_prompt: str,
         correlation_id: UUID,
+        prompt_blocks: list[dict[str, Any]] | None = None,
         **overrides: Any,
     ) -> "LLMOrchestratorResponse":
         """Process LLM comparison without infrastructure concerns.

@@ -187,6 +187,7 @@ class ErrorTriggeringMockProvider:
         self,
         user_prompt: str,
         correlation_id: uuid.UUID,
+        prompt_blocks: list[dict[str, Any]] | None = None,
         system_prompt_override: Optional[str] = None,
         model_override: Optional[str] = None,
         temperature_override: Optional[float] = None,

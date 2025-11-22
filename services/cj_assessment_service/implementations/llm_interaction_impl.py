@@ -172,9 +172,17 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                             **metadata_context
                         )
                     request_metadata = metadata_adapter.to_request_metadata()
+                    prompt_blocks_payload = None
+                    if task.prompt_blocks is not None:
+                        try:
+                            prompt_blocks_payload = task.prompt_blocks.to_api_dict_list()
+                        except Exception:  # pragma: no cover - defensive
+                            logger.debug("Failed to serialize prompt_blocks", exc_info=True)
+
                     response_data = await provider.generate_comparison(
                         user_prompt=task.prompt,
                         correlation_id=task_correlation_id,  # Use unique correlation ID
+                        prompt_blocks=prompt_blocks_payload,
                         system_prompt_override=system_prompt_override,
                         model_override=model_override,
                         temperature_override=temperature_override,

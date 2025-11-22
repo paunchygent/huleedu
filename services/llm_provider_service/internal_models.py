@@ -92,6 +92,10 @@ class BatchComparisonItem(BaseModel):
 
     provider: LLMProviderType = Field(description="Provider requested for each comparison")
     user_prompt: str = Field(description="Fully rendered comparison prompt")
+    prompt_blocks: list[dict[str, Any]] | None = Field(
+        default=None,
+        description="Structured prompt blocks (preferred for caching-capable providers)",
+    )
     correlation_id: UUID = Field(description="Per-comparison correlation identifier")
     overrides: Optional[Dict[str, Any]] = Field(
         default=None,

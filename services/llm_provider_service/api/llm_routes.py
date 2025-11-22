@@ -108,6 +108,7 @@ async def generate_comparison(
                 result = await orchestrator.perform_comparison(
                     provider=provider_override,
                     user_prompt=comparison_request.user_prompt,
+                    prompt_blocks=comparison_request.prompt_blocks,
                     correlation_id=correlation_id,
                     model_override=model_override,
                     temperature_override=temperature_override,

@@ -22,9 +22,17 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 - ✅ AGENTS.md sync hook: Auto-sync to CLAUDE.md, CODEX.md, GEMINI.md on commit
 - ✅ Task creation enforcement: Added to AGENTS.md (use `pdm run new-task`)
 - ✅ Linting consolidation: Ruff per-file-ignores (11 entries → 8, wildcards, section headers)
+- ✅ **MyPy Configuration Consolidation** (2025-11-22) - See `TASKS/infrastructure/MYPY_CONFIGURATION_INVESTIGATION_AND_CONSOLIDATION.md`
+  - Investigated apparent conflict between global `exclude` and `[[tool.mypy.overrides]]` (no actual conflict found)
+  - Removed ineffective overrides (`common_core.*`, `libs.*`) from pyproject.toml for clarity
+  - Fixed `libs/mypy.ini`: Added missing `mypy_path` configuration (was broken, now working)
+  - Fixed PDM scripts `new-task` and `tasks`: Changed from shell to cmd array (handles quoted args)
+  - Documentation: Added Rule 086 section 6 explaining exclude/override interaction
+  - **Result**: All typecheck scripts now functional (typecheck-all, typecheck-libs, typecheck-common-core, typecheck-service-libs)
+  - **Files changed**: pyproject.toml, libs/mypy.ini, .claude/rules/086-mypy-configuration-standards.md
 
 **Next**:
-- MyPy configuration investigation (separate task - global exclude vs override conflict)
+- Consider adding type checking to CI/CD workflows (typecheck-all + typecheck-libs)
 
 ---
 
@@ -74,6 +82,27 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 - Phase 1.3: Integrate `PromptTemplateBuilder` with `pair_generation.py`
 - Phase 2: Extend LPS for multi-block cache support
 
+**Phase 1.3 Plan (2025-11-22)**:
+- Wire `generate_comparison_tasks` to `PromptTemplateBuilder.assemble_full_prompt`, attaching `prompt_blocks` while keeping the legacy monolithic prompt for backward compatibility.
+- Extend `ComparisonTask` / LLM interaction path to carry `prompt_blocks` through `BatchProcessor → LLMInteractionImpl → LLMProviderServiceClient` (dual-send: `prompt_blocks` + `user_prompt`).
+- Add CJ config toggle for extended TTL usage (default 5m) and enforce TTL ordering validation before dispatch.
+- Update unit coverage (pair_generation + client) to assert block structure, TTL ordering, and legacy prompt parity; prep fixture for Phase 2 LPS block handling tests.
+- Measure cache hit rate/cost deltas using existing LPS metrics (`llm_provider_prompt_cache_events_total`, `llm_provider_prompt_cache_tokens_total`) after integration.
+- Lowered default CJ global cap `MAX_PAIRWISE_COMPARISONS` to 150 (was 350); tests that assert defaults updated; explicit overrides in tests still in place.
+
+**Phase 1.3 progress (2025-11-22)**:
+- Replaced legacy `_build_comparison_prompt` with `PromptTemplateBuilder` in `pair_generation`; `ComparisonTask` now carries `prompt_blocks` plus a prompt string rendered from those blocks.
+- Added render helper in `prompt_templates` to produce the monolithic string strictly from blocks (legacy template fully removed).
+- Threaded `prompt_blocks` through `LLMInteractionImpl` → `LLMProviderServiceClient`; HTTP payload now includes `prompt_blocks` (dual-send for now).
+- Updated unit + integration coverage for block payloads (`test_llm_provider_service_client`, `test_llm_payload_construction_integration`); string/block parity asserted.
+- Default comparison cap set to 150; related test expectations updated.
+
+**Phase 2 (LPS block handling) progress (2025-11-22)**:
+- Anthropic provider now prefers `prompt_blocks`, builds system/user block arrays with `cache_control` + TTL validation (1h before 5m), and only falls back to legacy `user_prompt` when blocks are absent.
+- API/queue/orchestrator/comparison processor propagate `prompt_blocks`; callback metadata retains prompt hashes; prompt cache usage metrics are surfaced in provider response metadata.
+- Added unit coverage for cache_control payload + TTL ordering (`test_anthropic_prompt_blocks.py`) and prompt_blocks acceptance on request models.
+- Added cache-sandbox CLI (6-essay, two-pass, 5m TTL) using Anthropic provider to report cache read/write tokens.
+
 ---
 
 ### CJ Stability & Validation Fixes (In Progress)
@@ -86,55 +115,6 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 - **Cj Batch State And Completion Fixes** (`TASKS/assessment/cj-batch-state-and-completion-fixes.md`)
 
 See individual task documents for details.
-
----
-
-### Uncommitted Changes Ready for Commit (2025-11-21)
-
-**Status**: Stability-first completion + critical JSON serialization bug fix complete, all tests passing
-
-**Modified Files** (~38 files, +1620/-620 lines):
-- CJ Completion Logic: Stability-first completion, callback-driven scoring, JSON serialization fix
-- Anthropic Provider: Retry-After support, 529 handling, metadata propagation, prompt caching
-- ELS Slot Assignment: Lock-aware retries for Option B allocator under contention
-- Integration Tests: Real database workflow validation passing
-- Batch Monitor: Embedded in `app.py`, heartbeat + sweep operational
-
-**Key Changes**:
-1. **Callback-Driven Workflow**: Scoring runs immediately when `callbacks_received == submitted_comparisons`; finalize when stability passes or callbacks hit capped denominator (min(total_budget, nC2))
-2. **Small Batch Completion Fix**: Cap denominator using nC2 via `CJBatchState._max_possible_comparisons` (n=4 → 6 pairs finish right after callbacks)
-3. **JSON Serialization Bug Fix**: Replace `float("inf")` with `None` in `workflow_continuation.py:180` - PostgreSQL JSON columns reject `Infinity` token, was causing batch finalization to fail silently on first iteration
-4. **Callback Counter Updates**: `last_activity_at` updated on each callback; BatchMonitor progress/sweep now include failed callbacks
-5. **Anthropic Hardening**: Retry-After on 429 (bounded sleep), 529/overloaded treated retryable, stop_reason=max_tokens raises structured error, correlation_id + prompt_sha256 metadata, optional system-block prompt caching (ENABLE_PROMPT_CACHING, PROMPT_CACHE_TTL_SECONDS)
-6. **New Coverage & Metrics (2025-11-22)**: Added Anthropic error-path tests for 529 overload and stop_reason=max_tokens; added prompt cache hit/miss + token read/write counters (`llm_provider_prompt_cache_events_total`, `llm_provider_prompt_cache_tokens_total`) with PromQL in docs; regression test ensures `workflow_continuation` persists JSON-serializable metadata when no prior scores.
-7. **Observability Wiring**: New Grafana dashboard `HuleEdu_LLM_Prompt_Cache.json` (uid `huleedu-llm-prompt-cache`) + Prometheus alert `LLMPromptCacheLowHitRate` (Anthropic) watching hit-rate <20% with traffic; dashboard/readme updated.
-
-**Workflow Continuation Enhancements**:
-- Waits until all submitted callbacks arrive (`pending_callbacks == 0`)
-- Recomputes BT scores, persists `bt_scores`/`last_score_change` (now JSON-safe)
-- Finalizes if stability threshold or denominator reached; otherwise enqueues more if budget remains
-
-**Quality Gates**:
-- ✅ Typecheck: All passing
-- ✅ Format: All passing
-- ✅ Lint: All passing (except pre-existing F821 in health_routes.py files)
-- ✅ Tests: All passing including `test_real_database_integration.py`, `test_anthropic_error_diagnostics.py`, `test_workflow_continuation.py`
-
-**Test Coverage**:
-```bash
-# Validated passing:
-pdm run pytest-root services/cj_assessment_service/tests/unit/test_workflow_continuation.py
-pdm run pytest-root services/cj_assessment_service/tests/unit/test_completion_threshold.py
-pdm run pytest-root services/cj_assessment_service/tests/integration/test_real_database_integration.py
-pdm run pytest-root services/llm_provider_service/tests/integration/test_anthropic_error_diagnostics.py
-```
-
-**Documentation Updated**:
-- CJ README: Completion path, callback-driven finalization
-- LPS README: Anthropic ops, prompt caching, retry behavior
-- Task doc: `.claude/work/tasks/TASK-CJ-LLM-SERIAL-BUNDLE-VALIDATION-FIXES.md` (PR1 done, PR3 in_progress)
-
-**Next Action**: Create commit, run broader CJ integration/ENG5 validation, tune `PROMPT_CACHE_TTL_SECONDS` as needed
 
 ---
 

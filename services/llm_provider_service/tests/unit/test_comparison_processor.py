@@ -333,6 +333,7 @@ Essay A content
 **Essay B (ID: test_b):**
 Essay B content""",
             correlation_id=correlation_id,
+            prompt_blocks=None,
             **overrides,
         )
 
@@ -346,6 +347,7 @@ Essay A content
 **Essay B (ID: test_b):**
 Essay B content""",
             correlation_id=correlation_id,
+            prompt_blocks=None,
             system_prompt_override="Custom system prompt for testing",
             model_override="gpt-4-custom",
             temperature_override=0.3,

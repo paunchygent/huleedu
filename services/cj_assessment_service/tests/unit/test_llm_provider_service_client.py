@@ -127,6 +127,15 @@ Essay B content.
 
 Please respond with a JSON object."""
         metadata = {"essay_a_id": "123", "essay_b_id": "456"}
+        prompt_blocks = [
+            {
+                "target": "user_content",
+                "content": "**Student Assignment:** Sample",
+                "cacheable": True,
+                "ttl": "5m",
+                "content_hash": "abc",
+            }
+        ]
 
         # Call generate_comparison
         correlation_id = uuid4()
@@ -136,6 +145,7 @@ Please respond with a JSON object."""
             temperature_override=0.1,
             correlation_id=correlation_id,
             request_metadata=metadata,
+            prompt_blocks=prompt_blocks,
         )
 
         # Async-only architecture: result should always be None
@@ -150,6 +160,7 @@ Please respond with a JSON object."""
         # Verify request body
         request_body = call_args[1]["json"]
         assert request_body["user_prompt"] == prompt
+        assert request_body["prompt_blocks"][0]["content_hash"] == "abc"
         # Verify no separate essay fields exist
         assert "essay_a" not in request_body
         assert "essay_b" not in request_body

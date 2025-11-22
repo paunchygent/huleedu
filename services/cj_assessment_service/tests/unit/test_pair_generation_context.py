@@ -10,10 +10,8 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.cj_assessment_service.cj_core_logic import pair_generation
-from services.cj_assessment_service.cj_core_logic.pair_generation import (
-    _build_comparison_prompt,
-    _fetch_assessment_context,
-)
+from services.cj_assessment_service.cj_core_logic.pair_generation import _fetch_assessment_context
+from services.cj_assessment_service.cj_core_logic.prompt_templates import PromptTemplateBuilder
 from services.cj_assessment_service.models_api import EssayForComparison
 
 
@@ -86,13 +84,16 @@ def test_build_comparison_prompt_orders_sections_correctly() -> None:
     essay_a = EssayForComparison(id="essay-a", text_content="Text A", current_bt_score=0.0)
     essay_b = EssayForComparison(id="essay-b", text_content="Text B", current_bt_score=0.0)
 
-    prompt = _build_comparison_prompt(
-        essay_a=essay_a,
-        essay_b=essay_b,
-        assessment_instructions="Assess clarity and structure.",
-        student_prompt_text="Write about your summer.",
-        judge_rubric_text="Prioritize originality and coherence.",
+    prompt_blocks = PromptTemplateBuilder.assemble_full_prompt(
+        {
+            "assessment_instructions": "Assess clarity and structure.",
+            "student_prompt_text": "Write about your summer.",
+            "judge_rubric_text": "Prioritize originality and coherence.",
+        },
+        essay_a,
+        essay_b,
     )
+    prompt = PromptTemplateBuilder.render_prompt_text(prompt_blocks)
 
     assert "**Student Assignment:**" in prompt
     assert "**Assessment Criteria:**" in prompt

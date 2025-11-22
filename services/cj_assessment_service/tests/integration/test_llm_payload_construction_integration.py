@@ -79,6 +79,8 @@ class TestLLMPayloadConstructionIntegration:
         assert essays[0].text_content in user_prompt
         assert f"**Essay B (ID: {essays[1].id}):**" in user_prompt
         assert essays[1].text_content in user_prompt
+        assert "prompt_blocks" in http_request
+        assert len(http_request["prompt_blocks"]) == 3  # essay A, essay B, instructions
 
     async def test_user_prompt_with_full_assessment_context(
         self,
@@ -123,6 +125,9 @@ class TestLLMPayloadConstructionIntegration:
         assert instructions in user_prompt
         assert "**Judge Instructions:**" in user_prompt
         assert rubric in user_prompt
+        assert "prompt_blocks" in http_request
+        assert http_request["prompt_blocks"][0]["cacheable"] is True
+        assert http_request["prompt_blocks"][0]["ttl"] == "5m"
 
     async def test_user_prompt_with_partial_context(
         self,
@@ -158,6 +163,7 @@ class TestLLMPayloadConstructionIntegration:
         assert "**Judge Instructions:**" in user_prompt
         assert "**Student Assignment:**" not in user_prompt
         assert "**Assessment Criteria:**" not in user_prompt
+        assert len(http_request["prompt_blocks"]) == 4  # rubric block + essays + instructions
 
     async def test_user_prompt_without_assessment_context(
         self,
@@ -191,6 +197,41 @@ class TestLLMPayloadConstructionIntegration:
         assert "**Assessment Criteria:**" not in user_prompt
         assert "**Judge Instructions:**" not in user_prompt
         assert "determine which essay better fulfills the requirements" in user_prompt
+        assert len(http_request["prompt_blocks"]) == 3
+
+    async def test_user_prompt_matches_blocks_joined_text(
+        self,
+        postgres_repository: CJRepositoryProtocol,
+        real_llm_interaction: tuple[LLMInteractionProtocol, aioresponses],
+        capture_requests_from_mocker: CapturedRequestExtractor,
+        test_settings: Settings,
+    ) -> None:
+        """Ensure the rendered string matches concatenated prompt blocks."""
+
+        log_label = "block-parity"
+        cj_batch_id, bos_batch_id = await _create_batch_with_context(
+            postgres_repository,
+            label=log_label,
+            teacher_instructions="Assess clarity",
+            judge_rubric="Rubric text",
+            student_prompt="Student assignment text",
+        )
+        essays = _build_mock_essays("block-parity")
+
+        http_request = await _submit_and_capture_request(
+            postgres_repository=postgres_repository,
+            llm_interaction=real_llm_interaction,
+            capture_requests_from_mocker=capture_requests_from_mocker,
+            test_settings=test_settings,
+            essays=essays,
+            cj_batch_id=cj_batch_id,
+            bos_batch_id=bos_batch_id,
+            log_label=log_label,
+        )
+
+        blocks = http_request["prompt_blocks"]
+        rendered = "\n\n".join(block["content"] for block in blocks)
+        assert http_request["user_prompt"] == rendered
 
     async def test_complete_http_payload_structure(
         self,

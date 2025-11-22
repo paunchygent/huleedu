@@ -31,15 +31,20 @@ def format_comparison_prompt(
     return formatted
 
 
+def render_prompt_blocks(prompt_blocks: list[dict[str, str]]) -> str:
+    """Render prompt blocks into a monolithic text string."""
+
+    return "\n\n".join(block.get("content", "") for block in prompt_blocks)
+
+
 def compute_prompt_sha256(
     *,
     provider: LLMProviderType,
     user_prompt: str,
+    prompt_blocks: list[dict[str, str]] | None = None,
 ) -> str:
     """Hash the fully formatted prompt for deterministic tracking."""
 
-    full_prompt = format_comparison_prompt(
-        provider=provider,
-        user_prompt=user_prompt,
-    )
+    prompt_text = render_prompt_blocks(prompt_blocks) if prompt_blocks else user_prompt
+    full_prompt = format_comparison_prompt(provider=provider, user_prompt=prompt_text)
     return sha256(full_prompt.encode("utf-8")).hexdigest()

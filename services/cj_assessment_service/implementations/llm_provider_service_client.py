@@ -105,6 +105,7 @@ class LLMProviderServiceClient(LLMProviderProtocol):
         self,
         user_prompt: str,
         correlation_id: UUID,
+        prompt_blocks: list[dict[str, Any]] | None = None,
         system_prompt_override: str | None = None,
         model_override: str | None = None,
         temperature_override: float | None = None,
@@ -139,12 +140,14 @@ class LLMProviderServiceClient(LLMProviderProtocol):
             max_tokens_override=max_tokens_override,
         )
 
-        request_body = {
+        request_body: dict[str, Any] = {
             "user_prompt": user_prompt,
             "metadata": request_metadata or {},
             "correlation_id": str(correlation_id),
             "callback_topic": self.settings.LLM_PROVIDER_CALLBACK_TOPIC,  # Required field
         }
+        if prompt_blocks:
+            request_body["prompt_blocks"] = prompt_blocks
         if overrides_payload:
             request_body["llm_config_overrides"] = overrides_payload
 

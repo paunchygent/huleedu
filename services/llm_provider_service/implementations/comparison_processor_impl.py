@@ -44,6 +44,7 @@ class ComparisonProcessorImpl(ComparisonProcessorProtocol):
         provider: LLMProviderType,
         user_prompt: str,
         correlation_id: UUID,
+        prompt_blocks: list[dict[str, Any]] | None = None,
         **overrides: Any,
     ) -> LLMOrchestratorResponse:
         """Process LLM comparison without infrastructure concerns.
@@ -59,6 +60,7 @@ class ComparisonProcessorImpl(ComparisonProcessorProtocol):
             # Call the provider with parameters
             result = await provider_impl.generate_comparison(
                 user_prompt=user_prompt,
+                prompt_blocks=prompt_blocks,
                 correlation_id=correlation_id,
                 system_prompt_override=overrides.get("system_prompt_override"),
                 model_override=overrides.get("model_override"),
@@ -157,6 +159,7 @@ class ComparisonProcessorImpl(ComparisonProcessorProtocol):
             result = await self.process_comparison(
                 provider=item.provider,
                 user_prompt=item.user_prompt,
+                prompt_blocks=item.prompt_blocks,
                 correlation_id=item.correlation_id,
                 **overrides,
             )

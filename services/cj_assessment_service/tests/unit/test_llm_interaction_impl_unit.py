@@ -47,6 +47,7 @@ class MockLLMProvider:
         self,
         user_prompt: str,
         correlation_id: UUID,
+        prompt_blocks: list[dict[str, Any]] | None = None,
         system_prompt_override: str | None = None,
         model_override: str | None = None,
         temperature_override: float | None = None,
@@ -59,6 +60,7 @@ class MockLLMProvider:
         self.last_call_params = {
             "user_prompt": user_prompt,
             "correlation_id": correlation_id,
+            "prompt_blocks": prompt_blocks,
             "system_prompt_override": system_prompt_override,
             "model_override": model_override,
             "temperature_override": temperature_override,

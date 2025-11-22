@@ -13,6 +13,7 @@ from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from services.cj_assessment_service.cj_core_logic.prompt_templates import PromptTemplateBuilder
 from services.cj_assessment_service.models_api import ComparisonTask, EssayForComparison
 from services.cj_assessment_service.models_db import ComparisonPair as CJ_ComparisonPair
 
@@ -118,15 +119,19 @@ async def generate_comparison_tasks(
             if _should_swap_positions(randomizer):
                 essay_a, essay_b = essay_b, essay_a
 
-            # Create comparison task with assessment context
-            prompt = _build_comparison_prompt(
-                essay_a,
-                essay_b,
-                assessment_instructions=assessment_context.get("assessment_instructions"),
-                student_prompt_text=assessment_context.get("student_prompt_text"),
-                judge_rubric_text=assessment_context.get("judge_rubric_text"),
+            prompt_blocks = PromptTemplateBuilder.assemble_full_prompt(
+                assessment_context=assessment_context,
+                essay_a=essay_a,
+                essay_b=essay_b,
             )
-            task = ComparisonTask(essay_a=essay_a, essay_b=essay_b, prompt=prompt)
+            prompt_text = PromptTemplateBuilder.render_prompt_text(prompt_blocks)
+
+            task = ComparisonTask(
+                essay_a=essay_a,
+                essay_b=essay_b,
+                prompt=prompt_text,
+                prompt_blocks=prompt_blocks,
+            )
 
             comparison_tasks.append(task)
             new_pairs_count += 1
@@ -306,50 +311,3 @@ def _detect_legacy_prompt(student_prompt_text: str | None) -> str | None:
             return pattern
 
     return None
-
-
-def _build_comparison_prompt(
-    essay_a: EssayForComparison,
-    essay_b: EssayForComparison,
-    assessment_instructions: str | None = None,
-    student_prompt_text: str | None = None,
-    judge_rubric_text: str | None = None,
-) -> str:
-    """Build the comparison prompt for two essays with assessment context.
-
-    Args:
-        essay_a: First essay for comparison
-        essay_b: Second essay for comparison
-        assessment_instructions: Assessment criteria supplied by teacher/admin
-        student_prompt_text: Original student prompt showing what was asked
-        judge_rubric_text: Detailed judge rubric to guide evaluation
-
-    Returns:
-        Formatted prompt string for LLM comparison with full context
-    """
-    prompt_parts = []
-
-    # Add student prompt context if available
-    if student_prompt_text:
-        prompt_parts.append(f"**Student Assignment:**\n{student_prompt_text}")
-
-    # Add assessment instructions/rubric if available
-    if assessment_instructions:
-        prompt_parts.append(f"**Assessment Criteria:**\n{assessment_instructions}")
-
-    if judge_rubric_text:
-        prompt_parts.append(f"**Judge Instructions:**\n{judge_rubric_text}")
-
-    # Add essays for comparison
-    prompt_parts.append(f"**Essay A (ID: {essay_a.id}):**\n{essay_a.text_content}")
-    prompt_parts.append(f"**Essay B (ID: {essay_b.id}):**\n{essay_b.text_content}")
-
-    # Add response instructions
-    prompt_parts.append(
-        "Using the Student Assignment, Assessment Criteria, and Judge Instructions above, "
-        "determine which essay better fulfills the requirements. Respond with JSON indicating "
-        "the `winner` ('Essay A' or 'Essay B'), a brief `justification`, and a `confidence` "
-        "rating from 1-5 (5 = very confident). Provide a decisive judgment."
-    )
-
-    return "\n\n".join(prompt_parts)
