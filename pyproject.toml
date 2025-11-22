@@ -74,6 +74,26 @@ dev = [
     "redis>=6.2.0",
     "aioresponses>=0.7.8",
     "radon>=6.0.1",
+    # Editable local packages (libs and services)
+    "-e file:///${PROJECT_ROOT}/libs/common_core",
+    "-e file:///${PROJECT_ROOT}/libs/huleedu_service_libs",
+    "-e file:///${PROJECT_ROOT}/libs/huleedu_nlp_shared",
+    "-e file:///${PROJECT_ROOT}/services/content_service",
+    "-e file:///${PROJECT_ROOT}/services/spellchecker_service",
+    "-e file:///${PROJECT_ROOT}/services/batch_orchestrator_service",
+    "-e file:///${PROJECT_ROOT}/services/essay_lifecycle_service",
+    "-e file:///${PROJECT_ROOT}/services/file_service",
+    "-e file:///${PROJECT_ROOT}/services/cj_assessment_service",
+    "-e file:///${PROJECT_ROOT}/services/class_management_service",
+    "-e file:///${PROJECT_ROOT}/services/api_gateway_service",
+    "-e file:///${PROJECT_ROOT}/services/result_aggregator_service",
+    "-e file:///${PROJECT_ROOT}/services/llm_provider_service",
+    "-e file:///${PROJECT_ROOT}/services/websocket_service",
+    "-e file:///${PROJECT_ROOT}/services/nlp_service",
+    "-e file:///${PROJECT_ROOT}/services/identity_service",
+    "-e file:///${PROJECT_ROOT}/services/email_service",
+    "-e file:///${PROJECT_ROOT}/services/entitlements_service",
+    "-e file:///${PROJECT_ROOT}/services/language_tool_service",
 ]
 
 [tool.ruff]
@@ -430,28 +450,6 @@ cj-admin = "python -m services.cj_assessment_service.cli_admin"
 llm-check-models = "python -m services.llm_provider_service.cli_check_models"
 llm-admin = "python -m services.llm_provider_service.admin_cli"
 
-[tool.pdm.dev-dependencies]
-dev = [
-    "-e file:///${PROJECT_ROOT}/libs/common_core",
-    "-e file:///${PROJECT_ROOT}/libs/huleedu_service_libs",
-    "-e file:///${PROJECT_ROOT}/libs/huleedu_nlp_shared",
-    "-e file:///${PROJECT_ROOT}/services/content_service",
-    "-e file:///${PROJECT_ROOT}/services/spellchecker_service",
-    "-e file:///${PROJECT_ROOT}/services/batch_orchestrator_service",
-    "-e file:///${PROJECT_ROOT}/services/essay_lifecycle_service",
-    "-e file:///${PROJECT_ROOT}/services/file_service",
-    "-e file:///${PROJECT_ROOT}/services/cj_assessment_service",
-    "-e file:///${PROJECT_ROOT}/services/class_management_service",
-    "-e file:///${PROJECT_ROOT}/services/api_gateway_service",
-    "-e file:///${PROJECT_ROOT}/services/result_aggregator_service",
-    "-e file:///${PROJECT_ROOT}/services/llm_provider_service",
-    "-e file:///${PROJECT_ROOT}/services/websocket_service",
-    "-e file:///${PROJECT_ROOT}/services/nlp_service",
-    "-e file:///${PROJECT_ROOT}/services/identity_service",
-    "-e file:///${PROJECT_ROOT}/services/email_service",
-    "-e file:///${PROJECT_ROOT}/services/entitlements_service",
-    "-e file:///${PROJECT_ROOT}/services/language_tool_service",
-]
 [build-system]
 requires = ["pdm-backend"]
 build-backend = "pdm.backend"
