@@ -8,7 +8,9 @@
 - FIRST ACTION Read `.claude/rules/000-rule-index.md` first. The index contains onboard instructions for all services and project rules and standards. If the prompt contains a task description, use it to read and review all rule files related to the task at hand.
 - SECOND ACTION Use the user's task description to read and review all rule files related to the task at hand.
 - THIRD ACTION Read `.claude/work/session/handoff.md` and `.claude/work/session/readme-first.md` for **critical** cross-service task context.
+
 - WHEN IMPLEMENTING NEW CODE using library dependencies: always use Context7 to ensure updated library API context.
+- WHEN PERFORMING A **CODE REVIEW**: If task is **code review** create a new file in `.claude/archive/code-reviews/` using <WHAT_IS_BEING_REVIEWED_YEAR_MONTH_DAY.md>. After each task phase, Always stop to update `.claude/archive/code-reviews/<WHAT_IS_BEING_REVIEWED_YEAR_MONTH_DAY.md>` with any new information + ask user any clarifying questions to retain alignment with user's intent.
 
 ### 2. Task Execution
 
@@ -17,7 +19,7 @@
 2. **Select Mode**: Use `.claude/rules/110-ai-agent-interaction-modes.md` to choose mode (Planning, Coding, Debugging)
 3. **Rule Reference**: Consult `.claude/rules/000-rule-index.md` for relevant rules
 cross-service task context.
-4. **Update**: After each task phase, Always stop to update `.claude/work/session/handoff.md` and `.claude/work/session/readme-first.md` with any new information + ask user any clarifying questions to retain alignment with user's intent.
+4. **Update**: After each task phase, Always stop to update 1. **active task documents** 2.`.claude/work/session/handoff.md` and `.claude/work/session/readme-first.md` with any new information + ask user any clarifying questions to retain alignment with user's intent.
 ```
 
 ### 3. Error Resolution Protocol
@@ -30,13 +32,33 @@ cross-service task context.
 
 ### 4. Documentation & Testing
 
-```markdown
-- Update relevant task documents per `.claude/rules/090-documentation-standards.md`
-- Never create files in root - follow folder patterns
+**Task Tracking:**
+- Create: `python scripts/task_mgmt/new_task.py --domain <domain> --title "Title"` → `TASKS/<domain>/<id>.md`
+- Update: Active tasks in `TASKS/`, session context in `.claude/work/session/handoff.md`
+- ⚠️ `.claude/work/tasks/` is DEPRECATED
+
+**Documentation:**
+- Runbooks: `docs/operations/` (requires frontmatter)
+- ADRs: `docs/decisions/` (requires frontmatter)
+- How-tos: `docs/how-to/`
+- Reports: `.claude/work/reports/` (research-diagnostic agent)
+
+**Naming:**
+- All files: lowercase `kebab-case` (filename must match frontmatter `id` for tasks)
+- No spaces in filenames
+
+**Testing:**
 - All code changes require tests (run and verified)
-- Never lint style issues manually before having run format-all and lint-fix --unsafe-fixes
-- Always run typecheck-all from root after creating a test or implementing new code
+- Never lint manually before `format-all` and `lint-fix --unsafe-fixes`
+- Always `typecheck-all` from root after implementation
+
+**Validate:**
+```bash
+python scripts/task_mgmt/validate_front_matter.py --verbose
+python scripts/docs_mgmt/validate_docs_structure.py --verbose
 ```
+
+**Specs:** `TASKS/_REORGANIZATION_PROPOSAL.md`, `docs/DOCS_STRUCTURE_SPEC.md`, `.claude/CLAUDE_STRUCTURE_SPEC.md`
 
 ---
 
@@ -170,8 +192,7 @@ When asked to launch two or more agents in parallel: launch all agents in a sing
 ### Code Quality
 
 ```markdown
-- **Formatting**: `pdm run format-all` (Ruff)
-- **Linting**: `pdm run lint-fix --unsafe-fixes` (Ruff)
+- **Linting**: *run `pdm run format-all` and `pdm run lint-fix --unsafe-fixes` (Ruff) after each file edit*
 - **Pre-commit**: `pdm run pre-commit install`
 ```
 
@@ -196,15 +217,7 @@ pdm run dev-stop [service]           # Stop running containers
 pdm run dev-logs [service]           # Follow container logs
 pdm run dev-check                    # Check what needs rebuilding
 
-# Production (optimized)
-pdm run prod-build [service]         # Build for production with cache
-pdm run prod-build-clean [service]   # Build for production without cache
-pdm run prod-start [service]         # Start production containers
-pdm run prod-stop [service]          # Stop production containers
-pdm run prod-restart [service]       # Restart production containers
-pdm run prod-logs [service]          # Follow production logs
-pdm run prod-health                  # Check production service health
-pdm run prod-deploy [service]        # Full production deployment workflow
+
 ```
 
 ### Database Access (Common Issue)
@@ -250,7 +263,7 @@ pdm run prod-migrate               # Run production migrations
 ### Metrics
 
 ```markdown
-- Use Prometheus for service metrics
+- Use Prometheus, for service metrics
 - Instrument key operations with timing and counters
 - Follow naming conventions: `service_operation_total`, `service_operation_duration_seconds`
 ```

@@ -1,7 +1,5 @@
 # HuleEdu Developer Reference
 
-When operating in the Claude Code cloud sandbox (web, not access to local machine. To check if True: make tool call checking if local machine is available), apply `.claude/rules/111-cloud-vm-execution-standards.md` to understand tooling limits (no Docker/services) and required workflow.
-
 ## Core Workflow
 
 ### 1. Initial Setup
