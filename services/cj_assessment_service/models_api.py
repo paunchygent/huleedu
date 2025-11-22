@@ -19,6 +19,8 @@ from common_core.events.cj_assessment_events import LLMConfigOverrides
 from common_core.models.error_models import ErrorDetail as CanonicalErrorDetail
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from services.cj_assessment_service.models_prompt import PromptBlockList
+
 
 class EssayForComparison(BaseModel):
     """Represents an essay prepared for comparison.
@@ -45,6 +47,13 @@ class ComparisonTask(BaseModel):
     essay_a: EssayForComparison
     essay_b: EssayForComparison
     prompt: str
+    prompt_blocks: PromptBlockList | None = Field(
+        default=None,
+        description=(
+            "Structured prompt blocks for cache-friendly composition. "
+            "The legacy prompt string is derived from these blocks when present."
+        ),
+    )
 
 
 class CJLLMComparisonMetadata(BaseModel):

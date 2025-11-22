@@ -198,7 +198,7 @@ class Settings(SecureServiceSettings, JWTValidationSettings):
     ]  # Explicit defaults for transient network/API issues
 
     # CJ assessment parameters
-    MAX_PAIRWISE_COMPARISONS: int = 350
+    MAX_PAIRWISE_COMPARISONS: int = 150
     COMPARISONS_PER_STABILITY_CHECK_ITERATION: int = 10
 
     # NOTE:

@@ -182,8 +182,6 @@ exclude = [
 # Per-module settings for new microservices (stricter)
 [[tool.mypy.overrides]]
 module = [
-    "common_core.*",
-    "libs.*",
     "services.content_service.*",
     "services.spellchecker_service.*",
     "services.batch_orchestrator_service.*",
@@ -447,9 +445,9 @@ docker-clean = "docker system prune -af"  # Clean Docker resources (use with cau
 codex = "scripts/codex-exec"  # Start codex with full system access and high reasoning
 
 # Task Management
-new-task = {shell = "python scripts/task_mgmt/new_task.py $@"}  # Create new task with frontmatter
+new-task = {cmd = ["python", "scripts/task_mgmt/new_task.py"]}  # Create new task with frontmatter
 validate-tasks = "python scripts/task_mgmt/validate_front_matter.py --verbose"  # Validate task frontmatter
-tasks = {shell = "python scripts/task_mgmt/filter_tasks.py $@"}  # Filter and query tasks by frontmatter
+tasks = {cmd = ["python", "scripts/task_mgmt/filter_tasks.py"]}  # Filter and query tasks by frontmatter
 tasks-now = "python scripts/task_mgmt/filter_tasks.py --priority high --status in_progress"  # High priority tasks in progress
 tasks-next = "python scripts/task_mgmt/filter_tasks.py --priority high --priority medium --status research --sort priority"  # Research tasks ready to start (high priority first)
 

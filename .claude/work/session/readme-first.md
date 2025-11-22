@@ -57,6 +57,8 @@ pdm run pytest-root tests/integration/  # Cross-service tests
 - Stability-first completion shipped: callbacks now trigger scoring immediately; batches finalize on stability or when callbacks hit the capped denominator (min(total_budget, nC2)). BatchMonitor is recovery-only.
 - Anthropic regression coverage extended to 529 overload + stop_reason=max_tokens; prompt cache metrics (`llm_provider_prompt_cache_events_total`, `llm_provider_prompt_cache_tokens_total`) now available with hit/miss and tokens-saved visibility.
 - Grafana wiring: new dashboard `LLM Provider Prompt Cache` (uid `huleedu-llm-prompt-cache`) plus alert `LLMPromptCacheLowHitRate` (Anthropic) firing when hit rate <20% with traffic; links in PromQL doc/runbook.
+- Phase 1.3 prompt cache integration plan drafted (see `.claude/work/session/handoff.md`); next action is wiring `PromptTemplateBuilder` through pair generation and dual-sending prompt blocks to LPS.
+- Default `MAX_PAIRWISE_COMPARISONS` reduced to 150 for cost safety; per-request overrides still honored; tests updated.
 
 ### Hot-Reload Development
 

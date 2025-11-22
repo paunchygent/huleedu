@@ -267,10 +267,10 @@ async def test_check_continuation_false_when_nothing_submitted(monkeypatch: Any)
             75,
             False,
         ),
-        (None, 350, False),
+        (None, 150, False),
         (
             {"comparison_budget": {"max_pairs_requested": 0, "source": "service_default"}},
-            350,
+            150,
             False,
         ),
     ],
@@ -279,7 +279,7 @@ def test_resolve_comparison_budget(
     metadata: dict[str, Any] | None, max_pairs_expected: int, enforce_full_budget: bool
 ) -> None:
     settings = Mock(spec=Settings)
-    settings.MAX_PAIRWISE_COMPARISONS = 350
+    settings.MAX_PAIRWISE_COMPARISONS = 150
 
     max_pairs, enforce_budget = wc._resolve_comparison_budget(metadata, settings)
 
@@ -290,7 +290,7 @@ def test_resolve_comparison_budget(
 @pytest.mark.asyncio
 async def test_trigger_continuation_finalizes_when_callbacks_hit_cap(monkeypatch: Any) -> None:
     settings = Mock(spec=Settings)
-    settings.MAX_PAIRWISE_COMPARISONS = 350
+    settings.MAX_PAIRWISE_COMPARISONS = 150
     settings.MIN_COMPARISONS_FOR_STABILITY_CHECK = 5
     settings.SCORE_STABILITY_THRESHOLD = 0.05
 
@@ -305,7 +305,7 @@ async def test_trigger_continuation_finalizes_when_callbacks_hit_cap(monkeypatch
     batch_state.completed_comparisons = 6
     batch_state.failed_comparisons = 0
     batch_state.total_comparisons = 6
-    batch_state.total_budget = 350
+    batch_state.total_budget = 150
     batch_state.current_iteration = 1
     batch_state.processing_metadata = {}
 

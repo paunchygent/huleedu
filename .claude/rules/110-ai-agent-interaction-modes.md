@@ -8,13 +8,13 @@ alwaysApply: true
 
 ## 1. General Interaction Principles
 
-- **MUST** understand user request, codebase context, and applicable rules before action
+- **MUST** understand user request, ask user story questions (epic), codebase context, and applicable rules before action.
 - **MUST** adhere to rules and HuleEdu architecture
 - **MUST** use provided tools (no simulation)
 - **MUST** explain tool actions briefly
 - **MUST** structure responses clearly
 - **MUST** cite sources with file and line numbers
-- **MUST** update documentation as part of task completion
+- **MUST** update all relevant documentation as part of task completion
 
 ## 2. Operational Modes
 

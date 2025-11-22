@@ -215,3 +215,14 @@ class PromptTemplateBuilder:
             raise ValueError(msg)
 
         return prompt_list
+
+    @staticmethod
+    def render_prompt_text(prompt_blocks: PromptBlockList) -> str:
+        """Render prompt blocks into a monolithic text prompt.
+
+        This is a compatibility shim for components that still require a single
+        prompt string (e.g., current LLM Provider API). The content order matches
+        the block order produced by `assemble_full_prompt`.
+        """
+
+        return "\n\n".join(block.content for block in prompt_blocks.blocks)
