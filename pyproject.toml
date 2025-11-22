@@ -463,6 +463,7 @@ eng5-runner = {shell = "scripts/run_eng5_np_runner.sh $@"}  # Run ENG5 NP runner
 cj-admin = "python -m services.cj_assessment_service.cli_admin"
 llm-check-models = "python -m services.llm_provider_service.cli_check_models"
 llm-admin = "python -m services.llm_provider_service.admin_cli"
+prompt-cache-benchmark = "python -m scripts.prompt_cache_benchmark.cli"
 
 [build-system]
 requires = ["pdm-backend"]

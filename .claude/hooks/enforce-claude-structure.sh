@@ -199,6 +199,11 @@ fi
 
 # Check Bash operations that might create directories
 if [[ "$TOOL_NAME" == "Bash" ]] && [[ -n "$COMMAND" ]]; then
+  # Allow all operations in .claude/work/reports/ (agent output directory)
+  if [[ "$COMMAND" =~ \.claude/work/reports/ ]]; then
+    exit 0
+  fi
+
   # Check for mkdir commands in .claude/
   if [[ "$COMMAND" =~ mkdir.*\.claude/ ]]; then
     # Extract the directory being created
@@ -209,26 +214,43 @@ if [[ "$TOOL_NAME" == "Bash" ]] && [[ -n "$COMMAND" ]]; then
       DIR_PATH="${DIR_PATH%/}"
       DIR_PATH="${DIR_PATH//\"/}"
 
-      cat >&2 << EOF
+      # Extract the path relative to .claude/
+      RELATIVE_PATH="${DIR_PATH#*/.claude/}"
+
+      # Split into path components
+      IFS='/' read -ra PATH_PARTS <<< "$RELATIVE_PATH"
+
+      # Get the top-level directory being created
+      if [[ ${#PATH_PARTS[@]} -ge 1 ]]; then
+        TOP_DIR="${PATH_PARTS[0]}"
+
+        # Only block if creating a NEW unauthorized top-level directory
+        if ! contains "$TOP_DIR" "${ALLOWED_TOP_LEVEL[@]}"; then
+          cat >&2 << EOF
 🚫 CLAUDE STRUCTURE VIOLATION
 
-Direct mkdir operations in .claude/ are blocked.
+Cannot create new top-level directory in .claude/:
   Command: $COMMAND
+  Directory: $TOP_DIR
   Target: $DIR_PATH
 
-The .claude/ directory structure is locked and enforced.
+Allowed top-level directories:
+  ${ALLOWED_TOP_LEVEL[*]}
 
-If you need to create a new directory:
+To modify the .claude/ structure, you must:
   1. Discuss the change with the user
-  2. Update the structure documentation
-  3. Update the enforcement hook: .claude/hooks/enforce-claude-structure.sh
+  2. Update the structure documentation (.claude/CLAUDE_STRUCTURE_SPEC.md)
+  3. Update this enforcement hook
   4. Get explicit approval
-
-Use the Write tool to create files in existing directories instead.
 
 Operation blocked.
 EOF
-      exit 2
+          exit 2
+        fi
+
+        # Allow mkdir for authorized subdirectories within allowed top-level dirs
+        # This includes .claude/work/reports/, .claude/archive/2025/, etc.
+      fi
     fi
   fi
 

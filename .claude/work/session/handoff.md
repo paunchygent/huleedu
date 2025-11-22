@@ -12,7 +12,32 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 
 ---
 
-## 🎯 ACTIVE WORK (2025-11-22)
+## 🎯 ACTIVE WORK (2025-11-23)
+
+### Rule Frontmatter Schema (2025-11-22 - Ready for Implementation)
+
+**Status**: Schema designed, validated, ready for frontmatter addition
+
+**Completed**:
+- ✅ Systematic analysis of all 92 rules (4 batch reports in `.claude/work/reports/2025-11-22-rule-analysis-batch-{1,2,3,4-FINAL}.md`)
+- ✅ Minimal Pydantic schema: 8 fields (5 required, 3 optional) at `scripts/claude_mgmt/rule_frontmatter_schema.py`
+- ✅ Tight enums: RuleType (9), RuleScope (7)
+- ✅ Lintable: Literal enums → Ruff/MyPy validate at edit time
+- ✅ Business rules: Sub-rules must have parent, service rules must have service_name, etc.
+- ✅ Updated `.claude/CLAUDE_STRUCTURE_SPEC.md`: Allow NNN.N- decimal notation
+- ✅ Fixed hooks: Whitelisted `.claude/work/reports/` for agent outputs
+
+**Schema (8 fields)**:
+- Required: `id`, `type`, `created`, `last_updated`, `scope`
+- Optional: `parent_rule`, `child_rules`, `service_name`
+
+**Next**:
+1. Update `scripts/claude_mgmt/validate_claude_structure.py` to use new Pydantic schema
+2. Run validation to identify rules needing frontmatter (~24 rules + 2 with ID mismatches)
+3. Add frontmatter systematically using batch reports as reference
+4. Fix ID mismatches in rules 052, 054
+
+---
 
 ### Infrastructure & Tooling Improvements (2025-11-22)
 
@@ -106,6 +131,16 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 - New integration suite `services/llm_provider_service/tests/integration/test_anthropic_prompt_cache_blocks.py` (8 tests) covering block preference, legacy fallback, system/tool cache_control, TTL ordering pass/fail, callback cache usage propagation, and cache-bypass metrics.
 - Warm-up acceptance criteria captured: seed exactly one request per prompt hash (cacheable static blocks + tool schema; essays stay non-cacheable), avoid concurrent first-writes (ordered/jittered), require post-seed miss rate per hash ≤20% converging to near-0, enforce TTL alignment with `USE_EXTENDED_TTL_FOR_SERVICE_CONSTANTS`, and include `prompt_sha256` + provider cache usage in callbacks without overwriting caller metadata. Metrics to watch: `llm_provider_prompt_cache_events_total` hit/miss/bypass and `llm_provider_prompt_cache_tokens_total`.
 - Observability: added block-level metrics (blocks/tokens/scope), scope-aware Grafana panels, hit-rate alert now assignment-scoped (<40%), and new TTL-violation alert.
+
+### CJ Prompt Cache Benchmark (In Progress)
+
+- Added Typer CLI `pdm run prompt-cache-benchmark` with serialized seeding (50–150ms jitter), dual request/token buckets, optional extended TTL, PromQL snapshots, and artefact writers.
+- Fixtures live at `scripts/prompt_cache_benchmark/fixtures.py` (smoke 4×4, full 10×10 cross anchor/student), using `PromptTemplateBuilder` so cacheable block hashes align with LPS.
+- Wrapper scripts: `scripts/run-prompt-cache-smoke.sh`, `scripts/run-prompt-cache-full.sh`; report templates under `.claude/work/reports/benchmarks/`.
+- Tests: `scripts/tests/test_prompt_cache_benchmark.py` covers rate limiter and aggregation. Format/lint/typecheck/pytest passed (2025-11-22).
+- ENG5 real fixture: `python -m scripts.prompt_cache_benchmark.build_eng5_fixture` exports DOCX anchors/students + prompts/rubric/system prompt into `data/eng5_prompt_cache_fixture.json`; CLI accepts `--fixture-path` to consume this real dataset. Default `--redact-output` (hash/metrics only); `--no-redact-output` includes full text for validation.
+- Created `data/eng5_smoke_fixture.json` (4×4 subset) for smoke test B; A/B protocol now uses synthetic (A) + ENG5 real (B) with identical 16-comparison profile.
+- **Blocker (2025-11-23)**: Smoke A failed 100% (16/16) — HTTP 400: Anthropic rejects custom `metadata` fields (`correlation_id`, `provider`, `prompt_sha256`). Fix required: remove from API request payload; verify response metadata + callback propagation intact (queue_processor line 1084 dependency).
 
 ---
 

@@ -60,6 +60,8 @@ pdm run pytest-root tests/integration/  # Cross-service tests
 - Phase 1.3 prompt cache integration plan drafted (see `.claude/work/session/handoff.md`); next action is wiring `PromptTemplateBuilder` through pair generation and dual-sending prompt blocks to LPS.
 - Default `MAX_PAIRWISE_COMPARISONS` reduced to 150 for cost safety; per-request overrides still honored; tests updated.
 - CJ prompt block serialization guard tightened: non-production now raises (production falls back to legacy prompt), closing prior unit test failure in `test_llm_interaction_impl_unit.py`.
+- Prompt cache benchmark runner added (`pdm run prompt-cache-benchmark`; wrappers `scripts/run-prompt-cache-smoke.sh` / `scripts/run-prompt-cache-full.sh`) with serialized seeds, dual buckets, PromQL snapshots, and artefact templates in `.claude/work/reports/benchmarks/`; smoke/full fixtures ready once Anthropic keys are present.
+- ENG5 fixture exporter: `python -m scripts.prompt_cache_benchmark.build_eng5_fixture` converts the runner's DOCX anchors/students + prompts/rubric/system prompt into `data/eng5_prompt_cache_fixture.json`; use `--fixture-path` flag on the benchmark CLI for real-data runs. Default `--redact-output` (hash/metrics only); `--no-redact-output` for validation (includes essay text, prompts, blocks).
 
 ### Hot-Reload Development
 

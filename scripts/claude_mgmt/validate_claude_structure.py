@@ -4,7 +4,7 @@ Validate .claude/ directory structure and rule file frontmatter.
 No external dependencies required.
 
 Validates:
-- Rule file naming conventions (NNN-descriptive-name.md)
+- Rule file naming conventions (NNN-descriptive-name.md or NNN.N-descriptive-name.md)
 - Rule file frontmatter schema
 - Hook documentation in hooks/README.md
 - Deprecated directory usage (.claude/work/tasks/)
@@ -23,8 +23,8 @@ from typing import Any, Dict, Tuple
 ROOT = Path(__file__).resolve().parents[2]
 CLAUDE_DIR = ROOT / ".claude"
 
-# Rule file naming pattern: NNN-descriptive-name.md
-RULE_FILE_PATTERN = re.compile(r"^(\d{3})-([a-z0-9-]+)\.md$")
+# Rule file naming pattern: NNN-descriptive-name.md or NNN.N-descriptive-name.md
+RULE_FILE_PATTERN = re.compile(r"^(\d{3}(?:\.\d+)?)-([a-z0-9-]+)\.md$")
 
 # Allowed rule categories
 ALLOWED_CATEGORIES = {
@@ -110,7 +110,8 @@ def validate_rule_file_naming(p: Path) -> list[str]:
     if not RULE_FILE_PATTERN.match(filename):
         errors.append(
             f"filename '{filename}' must follow pattern 'NNN-descriptive-name.md' "
-            "(e.g., '010-foundational-principles.md')"
+            "or 'NNN.N-descriptive-name.md' "
+            "(e.g., '010-foundational-principles.md' or '020.1-content-service-architecture.md')"
         )
 
     return errors

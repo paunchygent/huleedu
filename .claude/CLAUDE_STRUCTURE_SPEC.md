@@ -71,9 +71,14 @@ The canonical `.claude/` root has the following structure:
 
 ### 4.1 File Naming
 
-- Rule files MUST use pattern: `NNN-descriptive-name.md`
+- Rule files MUST use pattern: `NNN-descriptive-name.md` or `NNN.N-descriptive-name.md`
 - Where `NNN` is a three-digit number (000-999)
-- Examples: `000-rule-index.md`, `010-foundational-principles.md`
+- Optional decimal suffix `.N` (where N is one or more digits) allows sub-rule grouping
+- Examples:
+  - `000-rule-index.md` (top-level rule)
+  - `010-foundational-principles.md` (top-level rule)
+  - `020.1-content-service-architecture.md` (sub-rule of 020)
+  - `041.2-fastapi-integration-patterns.md` (sub-rule of 041)
 
 ### 4.2 Rule File Frontmatter
 
@@ -81,7 +86,7 @@ All rule files MUST include YAML frontmatter:
 
 ```yaml
 ---
-id: NNN-descriptive-name        # Must match filename
+id: NNN-descriptive-name        # Must match filename (or NNN.N-descriptive-name)
 title: Human-Readable Title
 category: foundation | architecture | implementation | testing | documentation | operations
 priority: critical | high | medium | low
@@ -201,7 +206,7 @@ Archive structure:
 A validation script MUST exist at `scripts/claude_mgmt/validate_claude_structure.py` that:
 
 - Validates all rule files have proper frontmatter
-- Checks rule file naming conventions (NNN-descriptive-name.md)
+- Checks rule file naming conventions (NNN-descriptive-name.md or NNN.N-descriptive-name.md)
 - Verifies hook files are documented in `hooks/README.md`
 - Warns about deprecated `.claude/work/tasks/` usage
 - Validates directory structure compliance
