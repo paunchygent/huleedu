@@ -55,6 +55,8 @@ pdm run pytest-root tests/integration/  # Cross-service tests
 - No batches remain in WAITING_CALLBACKS/GENERATING_PAIRS; monitor new runs via Loki query `{service="cj_assessment_service"} | json | event="BatchMonitor heartbeat"` and completion sweep logs.
 - E2E CJ test latency note: callbacks returned in ~12s, but `completion_threshold` (95% of budget 350) kept batch in WAITING_CALLBACKS until 5‑minute monitor sweep forced completion (~3m42s delay). Pending follow-up to switch completion to stability-first and cap budget to nC2.
 - Stability-first completion shipped: callbacks now trigger scoring immediately; batches finalize on stability or when callbacks hit the capped denominator (min(total_budget, nC2)). BatchMonitor is recovery-only.
+- Anthropic regression coverage extended to 529 overload + stop_reason=max_tokens; prompt cache metrics (`llm_provider_prompt_cache_events_total`, `llm_provider_prompt_cache_tokens_total`) now available with hit/miss and tokens-saved visibility.
+- Grafana wiring: new dashboard `LLM Provider Prompt Cache` (uid `huleedu-llm-prompt-cache`) plus alert `LLMPromptCacheLowHitRate` (Anthropic) firing when hit rate <20% with traffic; links in PromQL doc/runbook.
 
 ### Hot-Reload Development
 

@@ -12,9 +12,57 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 
 ---
 
-## 🎯 ACTIVE WORK (2025-11-21)
+## 🎯 ACTIVE WORK (2025-11-22)
 
-### Uncommitted Changes Ready for Commit
+### New Work: CJ Prompt Cache Template Builder (Phase 1 Complete)
+
+**Status**: Phase 1 implementation complete, all tests passing, ready for integration
+
+**New Files Created** (+3 files, ~1,150 lines):
+- `services/cj_assessment_service/models_prompt.py` (134 lines) - PromptBlock data models
+- `services/cj_assessment_service/cj_core_logic/prompt_templates.py` (317 lines) - Template builder
+- `services/cj_assessment_service/tests/unit/test_prompt_templates.py` (499 lines) - Rule 075 compliant tests
+- `TASKS/assessment/cj-prompt-cache-template-builder.md` - Full task documentation
+
+**Key Deliverables**:
+1. ✅ **Prompt Block Models**: `PromptBlock`, `CacheableBlockTarget`, `AnthropicCacheTTL`, `PromptBlockList`
+   - SHA256 content hashing for cache fragmentation tracking
+   - TTL validation (1h must precede 5m per Anthropic requirements)
+   - `to_api_dict_list()` for LPS integration
+
+2. ✅ **Template Builder**: Static/dynamic separation for cache optimization
+   - `build_static_blocks()`: Assignment-level cacheable content
+   - `render_dynamic_essays()`: Per-comparison non-cacheable content
+   - `assemble_full_prompt()`: Full prompt with TTL ordering validation
+   - `build_legacy_monolithic_prompt()`: Backward compatibility
+
+3. ✅ **Comprehensive Tests**: 40 tests (16 parametrized), 100% passing
+   - Hash stability across identical contexts
+   - TTL mapping (5m default, 1h extended)
+   - Block ordering and structure
+   - Unicode handling (Swedish characters)
+   - Empty context edge cases
+   - Legacy format compatibility
+
+**Anthropic API Compliance**:
+- TTL values limited to `"5m"` or `"1h"` (strings, not seconds)
+- 1h TTL blocks precede 5m TTL blocks
+- Graceful handling of <1024 token threshold (API handles, no client logic)
+- Multi-block user messages with selective cache_control
+
+**Quality Gates**: All passed
+- ✅ typecheck-all: 0 errors
+- ✅ format-all + lint-fix: 0 issues
+- ✅ pytest: 40/40 tests passing
+- ✅ Rule 075 compliance: 16 parametrized tests, <500 LoC
+
+**Next Session**:
+- Phase 1.3: Integrate `PromptTemplateBuilder` with `pair_generation.py`
+- Phase 2: Extend LPS for multi-block cache support
+
+---
+
+### Uncommitted Changes Ready for Commit (2025-11-21)
 
 **Status**: Stability-first completion + critical JSON serialization bug fix complete, all tests passing
 
@@ -31,6 +79,8 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 3. **JSON Serialization Bug Fix**: Replace `float("inf")` with `None` in `workflow_continuation.py:180` - PostgreSQL JSON columns reject `Infinity` token, was causing batch finalization to fail silently on first iteration
 4. **Callback Counter Updates**: `last_activity_at` updated on each callback; BatchMonitor progress/sweep now include failed callbacks
 5. **Anthropic Hardening**: Retry-After on 429 (bounded sleep), 529/overloaded treated retryable, stop_reason=max_tokens raises structured error, correlation_id + prompt_sha256 metadata, optional system-block prompt caching (ENABLE_PROMPT_CACHING, PROMPT_CACHE_TTL_SECONDS)
+6. **New Coverage & Metrics (2025-11-22)**: Added Anthropic error-path tests for 529 overload and stop_reason=max_tokens; added prompt cache hit/miss + token read/write counters (`llm_provider_prompt_cache_events_total`, `llm_provider_prompt_cache_tokens_total`) with PromQL in docs; regression test ensures `workflow_continuation` persists JSON-serializable metadata when no prior scores.
+7. **Observability Wiring**: New Grafana dashboard `HuleEdu_LLM_Prompt_Cache.json` (uid `huleedu-llm-prompt-cache`) + Prometheus alert `LLMPromptCacheLowHitRate` (Anthropic) watching hit-rate <20% with traffic; dashboard/readme updated.
 
 **Workflow Continuation Enhancements**:
 - Waits until all submitted callbacks arrive (`pending_callbacks == 0`)
@@ -41,7 +91,7 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 - ✅ Typecheck: All passing
 - ✅ Format: All passing
 - ✅ Lint: All passing (except pre-existing F821 in health_routes.py files)
-- ✅ Tests: All passing including `test_real_database_integration.py`
+- ✅ Tests: All passing including `test_real_database_integration.py`, `test_anthropic_error_diagnostics.py`, `test_workflow_continuation.py`
 
 **Test Coverage**:
 ```bash
