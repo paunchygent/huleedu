@@ -57,6 +57,13 @@ This directory contains the three-tier dashboard system for HuleEdu monitoring.
 - **Purpose**: Database performance correlation and investigation
 - **Key Features**: Performance outliers, connection pool exhaustion detection, cross-service load correlation
 
+### LLM Prompt Cache (LLM Provider)
+- **File**: `HuleEdu_LLM_Prompt_Cache.json`
+- **UID**: `huleedu-llm-prompt-cache`
+- **Purpose**: Prompt cache efficiency and token-savings visibility for LLM Provider
+- **Key Panels**: Hit rate, events by result/provider/model, tokens saved (reads), tokens written (cache creation)
+- **Navigation**: Linked from prompt cache alerts; use together with Service Deep Dive for provider health
+
 ## Import Instructions
 
 1. Access Grafana UI at <http://localhost:3000>

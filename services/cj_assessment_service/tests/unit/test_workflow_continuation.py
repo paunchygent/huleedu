@@ -5,6 +5,7 @@ Validates periodic and threshold-based continuation logic with minimal mocks.
 
 from __future__ import annotations
 
+import json
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator
 from unittest.mock import AsyncMock, Mock
@@ -320,7 +321,7 @@ async def test_trigger_continuation_finalizes_when_callbacks_hit_cap(monkeypatch
         Mock(els_essay_id=str(i), assessment_input_text=f"essay-{i}", current_bt_score=0.0)
         for i in range(4)
     ]
-    repo.get_essays_for_cj_batch = AsyncMock(return_value=essays)
+    monkeypatch.setattr(repo, "get_essays_for_cj_batch", AsyncMock(return_value=essays))
 
     monkeypatch.setattr(
         wc.scoring_ranking,
@@ -356,6 +357,85 @@ async def test_trigger_continuation_finalizes_when_callbacks_hit_cap(monkeypatch
     )
 
     finalize_called.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_trigger_continuation_metadata_serializable_without_previous_scores(
+    monkeypatch: Any,
+) -> None:
+    """Regression: last_score_change should be JSON-serializable when no previous scores."""
+
+    settings = Mock(spec=Settings)
+    settings.MAX_PAIRWISE_COMPARISONS = 1
+    settings.MIN_COMPARISONS_FOR_STABILITY_CHECK = 5
+    settings.SCORE_STABILITY_THRESHOLD = 0.05
+
+    repo = _Repo(_FakeSession(completed_count=0))
+    event_publisher = AsyncMock()
+    content_client = AsyncMock()
+    llm_interaction = AsyncMock()
+
+    batch_state = CJBatchState()
+    batch_state.batch_id = 11
+    batch_state.submitted_comparisons = 1
+    batch_state.completed_comparisons = 1
+    batch_state.failed_comparisons = 0
+    batch_state.total_comparisons = 1
+    batch_state.total_budget = 1
+    batch_state.current_iteration = 0
+    batch_state.processing_metadata = {
+        "comparison_budget": {"max_pairs_requested": 1, "source": "service_default"}
+    }
+    batch_state.batch_upload = _make_upload(expected_count=2)
+
+    async def fake_get_batch_state(*_args: Any, **_kwargs: Any) -> Any:
+        return batch_state
+
+    monkeypatch.setattr(wc, "get_batch_state", fake_get_batch_state)
+
+    essays = [
+        Mock(els_essay_id=str(i), assessment_input_text=f"essay-{i}", current_bt_score=0.0)
+        for i in range(2)
+    ]
+    monkeypatch.setattr(repo, "get_essays_for_cj_batch", AsyncMock(return_value=essays))
+
+    current_scores = {"essay-1": 0.2, "essay-2": -0.2}
+    monkeypatch.setattr(
+        wc.scoring_ranking,
+        "record_comparisons_and_update_scores",
+        AsyncMock(return_value=current_scores),
+    )
+    merge_metadata = AsyncMock()
+    monkeypatch.setattr(wc, "merge_batch_processing_metadata", merge_metadata)
+
+    finalize_called = AsyncMock()
+
+    class _Finalizer:
+        def __init__(self, *_args: Any, **_kwargs: Any) -> None:
+            pass
+
+        async def finalize_scoring(self, *_args: Any, **_kwargs: Any) -> None:
+            await finalize_called()
+
+    monkeypatch.setattr(wc, "BatchFinalizer", _Finalizer)
+
+    await wc.trigger_existing_workflow_continuation(
+        batch_id=11,
+        database=repo,
+        event_publisher=event_publisher,
+        settings=settings,
+        content_client=content_client,
+        correlation_id=uuid4(),
+        llm_interaction=llm_interaction,
+    )
+
+    merge_metadata.assert_awaited_once()
+    await_args = merge_metadata.await_args
+    assert await_args is not None
+    metadata_updates = await_args.kwargs["metadata_updates"]
+    assert metadata_updates["last_score_change"] is None
+    # Ensure metadata can be JSON serialized without Infinity/NaN
+    json.dumps(metadata_updates)
 
 
 @pytest.mark.asyncio
@@ -395,7 +475,7 @@ async def test_trigger_continuation_requests_more_when_not_finalized(monkeypatch
         Mock(els_essay_id=str(i), assessment_input_text=f"essay-{i}", current_bt_score=0.0)
         for i in range(5)
     ]
-    repo.get_essays_for_cj_batch = AsyncMock(return_value=essays)
+    monkeypatch.setattr(repo, "get_essays_for_cj_batch", AsyncMock(return_value=essays))
 
     monkeypatch.setattr(
         wc.scoring_ranking,

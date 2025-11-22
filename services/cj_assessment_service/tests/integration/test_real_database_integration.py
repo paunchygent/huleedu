@@ -187,6 +187,7 @@ class TestRealDatabaseIntegration:
             assert batch_state.submitted_comparisons == 10, (
                 f"Expected submitted_comparisons=10, got {batch_state.submitted_comparisons}"
             )
+            assert batch_state.total_budget is not None, "total_budget should be backfilled"
             assert batch_state.total_budget > 0, (
                 f"Expected total_budget > 0, got {batch_state.total_budget}"
             )

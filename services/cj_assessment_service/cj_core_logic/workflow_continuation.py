@@ -51,7 +51,7 @@ async def check_workflow_continuation(
 
         callbacks_received = batch_state.completed_comparisons + batch_state.failed_comparisons
         pending_callbacks = max(batch_state.submitted_comparisons - callbacks_received, 0)
-        iteration_complete = batch_state.submitted_comparisons > 0 and pending_callbacks == 0
+        iteration_complete = bool(batch_state.submitted_comparisons > 0 and pending_callbacks == 0)
 
         denominator = batch_state.completion_denominator()
 

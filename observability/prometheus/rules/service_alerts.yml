@@ -23,6 +23,23 @@ groups:
       dashboard_url: "http://localhost:3000/d/huleedu-system-health/huleedu-system-health-overview"
       runbook_url: "file:///app/Documentation/OPERATIONS/01-Grafana-Playbook.md#high-error-rate"
 
+  - alert: LLMPromptCacheLowHitRate
+    expr: |
+      (
+        sum(rate(llm_provider_prompt_cache_events_total{provider="anthropic", result="hit"}[5m]))
+        /
+        clamp_min(sum(rate(llm_provider_prompt_cache_events_total{provider="anthropic", result=~"hit|miss|bypass"}[5m])), 0.001)
+      ) < 0.2
+      and sum(rate(llm_provider_prompt_cache_events_total{provider="anthropic"}[5m])) > 0.1
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "LLM prompt cache hit rate low (Anthropic)"
+      description: "Prompt cache hit rate is {{ $value | humanizePercentage }} over 5m; review prompt segmentation or TTL configuration."
+      dashboard_url: "http://localhost:3000/d/huleedu-llm-prompt-cache/llm-provider-prompt-cache"
+      runbook_url: "http://localhost:3000/d/huleedu-llm-prompt-cache/llm-provider-prompt-cache"
+
 - name: DistributedTracingAlerts
   rules:
   - alert: HighTraceErrorRate

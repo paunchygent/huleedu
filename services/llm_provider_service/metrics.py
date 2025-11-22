@@ -198,6 +198,18 @@ def _create_metrics() -> dict[str, Any]:
                 ["provider"],
                 registry=REGISTRY,
             ),
+            "llm_provider_prompt_cache_events_total": Counter(
+                "llm_provider_prompt_cache_events_total",
+                "Prompt cache events by provider/model/result (hit, miss, bypass)",
+                ["provider", "model", "result"],
+                registry=REGISTRY,
+            ),
+            "llm_provider_prompt_cache_tokens_total": Counter(
+                "llm_provider_prompt_cache_tokens_total",
+                "Prompt cache token accounting (read/write) by provider and model",
+                ["provider", "model", "direction"],
+                registry=REGISTRY,
+            ),
         }
         return metrics
     except ValueError as e:
@@ -244,6 +256,12 @@ def get_llm_metrics() -> dict[str, Any]:
         ),
         "llm_provider_availability_percentage": all_metrics.get(
             "llm_provider_availability_percentage"
+        ),
+        "llm_provider_prompt_cache_events_total": all_metrics.get(
+            "llm_provider_prompt_cache_events_total"
+        ),
+        "llm_provider_prompt_cache_tokens_total": all_metrics.get(
+            "llm_provider_prompt_cache_tokens_total"
         ),
     }
 
@@ -305,6 +323,8 @@ def _get_existing_metrics() -> dict[str, Any]:
         "llm_queue_expiry_age_seconds": "llm_provider_queue_expiry_age_seconds",
         "llm_serial_bundle_calls_total": "llm_provider_serial_bundle_calls_total",
         "llm_serial_bundle_items_per_call": "llm_provider_serial_bundle_items_per_call",
+        "llm_provider_prompt_cache_events_total": "llm_provider_prompt_cache_events_total",
+        "llm_provider_prompt_cache_tokens_total": "llm_provider_prompt_cache_tokens_total",
     }
 
     existing: dict[str, Any] = {}

@@ -244,6 +244,38 @@ class AnthropicProviderImpl(LLMProviderProtocol):
         msg = err.get("message") if isinstance(err.get("message"), str) else None
         return code, err_type, msg
 
+    def _record_prompt_cache_metrics(self, *, model: str, usage: dict[str, Any] | None) -> None:
+        """Record prompt cache hit/miss and token utilization metrics when enabled."""
+
+        if not self.enable_prompt_caching or not self.metrics or not isinstance(usage, dict):
+            return
+
+        cache_events = self.metrics.get("llm_provider_prompt_cache_events_total")
+        cache_tokens = self.metrics.get("llm_provider_prompt_cache_tokens_total")
+
+        cache_read_tokens = int(usage.get("cache_read_input_tokens") or 0)
+        cache_write_tokens = int(usage.get("cache_creation_input_tokens") or 0)
+
+        if cache_read_tokens > 0:
+            result = "hit"
+        elif cache_write_tokens > 0:
+            result = "miss"
+        else:
+            result = "bypass"
+
+        if cache_events is not None:
+            cache_events.labels(provider="anthropic", model=model, result=result).inc()
+
+        if cache_tokens is not None:
+            if cache_read_tokens > 0:
+                cache_tokens.labels(provider="anthropic", model=model, direction="read").inc(
+                    cache_read_tokens
+                )
+            if cache_write_tokens > 0:
+                cache_tokens.labels(provider="anthropic", model=model, direction="write").inc(
+                    cache_write_tokens
+                )
+
     async def _make_api_request(
         self,
         system_prompt: str,
@@ -450,6 +482,7 @@ class AnthropicProviderImpl(LLMProviderProtocol):
 
                 # Get token usage
                 usage = response_data.get("usage", {})
+                self._record_prompt_cache_metrics(model=model, usage=usage)
                 prompt_tokens = usage.get("input_tokens", 0)
                 completion_tokens = usage.get("output_tokens", 0)
                 total_tokens = prompt_tokens + completion_tokens
