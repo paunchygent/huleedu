@@ -4,6 +4,14 @@
 repos:
 -   repo: local
     hooks:
+    -   id: sync-agents-md
+        name: Sync AGENTS.md to AI assistant files
+        entry: python scripts/utils/sync_agents_md.py
+        language: python
+        files: ^AGENTS\.md$
+        pass_filenames: false
+        stages: [pre-commit]
+
     -   id: sync-rules
         name: Sync Rules from .md to .md
         entry: python scripts/utils/sync_rules.py --source .claude/rules --target .windsurf/rules
