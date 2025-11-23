@@ -52,6 +52,8 @@ Purpose: single reference for defaults, reasoning, metrics, and open work across
 - No essay caching or A/B slot tricks; cacheable scope is system/rubric/instructions/tool schema only.
 - Warm-up scheduling avoids concurrent first-writes (light jitter or ordered dequeue) to prevent thundering-herd misses.
 - Callback metadata must include `prompt_sha256` and provider cache usage (`usage`, `cache_read_input_tokens`, `cache_creation_input_tokens`) without overwriting caller metadata (essay IDs, batch IDs, etc.).
+- **Benchmark runs paused (2025-11-23):** Smoke artefacts are sufficient for operational decisions; final validation runs are deferred until deployment window. Do not run prompt-cache benchmarks until unpaused.
+- **Haiku caching stance:** Leave cacheable prefix uninflated (1.0–1.3k tokens) and accept bypass for Haiku; use Sonnet for caching validation. Haiku remains the default dev model; ENG5 Runner experiments will compare Haiku vs Sonnet and drive the production model choice based on hit-rate + cost/latency tradeoffs.
 
 ## Open work (align with .claude/work/tasks)
 - PR2: Pair position fairness (balanced A/B for anchors/students).
