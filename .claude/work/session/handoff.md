@@ -225,21 +225,6 @@ See individual task documents for details.
 
 ---
 
-### 3. Prompt Amendment API (Uncommitted - Lint Blocking)
-
-**Status**: Implementation complete, tests passing, lint errors blocking commit
-
-**Completed**:
-- ✅ Shared contract `BatchPromptAmendmentRequest` (common_core)
-- ✅ BOS PATCH `/v1/batches/<batch_id>/prompt` with ownership + status guard
-- ✅ API Gateway proxy PATCH `/v1/batches/{batch_id}/prompt`
-- ✅ Tests passing
-- ✅ Format passing
-
-**Remaining**: Fix pre-existing F821 lint errors (`logger` undefined in multiple `*health_routes.py` files)
-
----
-
 ## ✅ RECENTLY COMPLETED (Reference Only)
 
 - **2025-11-21 Task Migration Complete** - 36 files migrated from `.claude/work/tasks/` to `TASKS/` with proper frontmatter and domain organization. See `MIGRATION_SUMMARY_2025-11-21.md`
