@@ -1,0 +1,290 @@
+{
+  "fixture": "smoke",
+  "timestamp": "20251123T001927Z",
+  "seeds": 1,
+  "total_requests": 16,
+  "hits": 0,
+  "misses": 0,
+  "bypass": 15,
+  "hit_rate": 0.0,
+  "post_seed_miss_rate": 0.0,
+  "ttl_violations": 0,
+  "rate_limit_errors": 0,
+  "tokens": {
+    "read": 0,
+    "write": 0
+  },
+  "latency_ms": {
+    "p50": 2204.845332998957,
+    "p95": 4467.671915997926
+  },
+  "per_cache_key": [
+    {
+      "cache_key": "aa6186a176c34a8bf5a7cc4d68975d4b51c779c9aa81b87a800a2ee10c8919c1|fae7918e3cbf89e159c973e514c51238b2c426f099e5c061d8859594549080f8",
+      "hits": 0,
+      "misses": 0,
+      "bypass": 15,
+      "post_seed_miss_rate": 0.0
+    }
+  ],
+  "promql_snapshots": [
+    {
+      "query": "sum(rate(llm_provider_cache_scope_total{scope=\"assignment\",result=\"hit\"}[5m])) / sum(rate(llm_provider_cache_scope_total{scope=\"assignment\"}[5m]))",
+      "status": "success",
+      "data": {
+        "resultType": "vector",
+        "result": []
+      }
+    },
+    {
+      "query": "sum(rate(llm_provider_prompt_cache_tokens_total{direction=\"read\"}[5m]))",
+      "status": "success",
+      "data": {
+        "resultType": "vector",
+        "result": []
+      }
+    },
+    {
+      "query": "increase(llm_provider_prompt_ttl_violations_total[1h])",
+      "status": "success",
+      "data": {
+        "resultType": "vector",
+        "result": []
+      }
+    },
+    {
+      "query": "sum(rate(llm_provider_api_errors_total{error_type=\"rate_limit\"}[5m]))",
+      "status": "success",
+      "data": {
+        "resultType": "vector",
+        "result": []
+      }
+    }
+  ],
+  "requests": [
+    {
+      "cache_key": "aa6186a176c34a8bf5a7cc4d68975d4b51c779c9aa81b87a800a2ee10c8919c1|fae7918e3cbf89e159c973e514c51238b2c426f099e5c061d8859594549080f8",
+      "essay_a": "anchor-1",
+      "essay_b": "essay-1",
+      "status": "success",
+      "latency_ms": 1744.087834005768,
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "total_prompt_tokens": 2057,
+      "prompt_hash": "1276128fc15ccfb10edb6326ce1400e93036a7fae21961fad597e15f67f9d26a",
+      "error": null,
+      "status_code": null,
+      "is_seed": true
+    },
+    {
+      "cache_key": "aa6186a176c34a8bf5a7cc4d68975d4b51c779c9aa81b87a800a2ee10c8919c1|fae7918e3cbf89e159c973e514c51238b2c426f099e5c061d8859594549080f8",
+      "essay_a": "anchor-1",
+      "essay_b": "essay-2",
+      "status": "success",
+      "latency_ms": 1867.5675420017797,
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "total_prompt_tokens": 2045,
+      "prompt_hash": "c48fde9dd882bca0b3bf40e5fe34abe2d5599b2b9e00112b7f21760047fae7fa",
+      "error": null,
+      "status_code": null,
+      "is_seed": false
+    },
+    {
+      "cache_key": "aa6186a176c34a8bf5a7cc4d68975d4b51c779c9aa81b87a800a2ee10c8919c1|fae7918e3cbf89e159c973e514c51238b2c426f099e5c061d8859594549080f8",
+      "essay_a": "anchor-1",
+      "essay_b": "essay-3",
+      "status": "success",
+      "latency_ms": 2444.5020830025896,
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "total_prompt_tokens": 2042,
+      "prompt_hash": "649d8a042c1beff7d739c68f27fda06adc7503e6330de5583e6829962aaca86f",
+      "error": null,
+      "status_code": null,
+      "is_seed": false
+    },
+    {
+      "cache_key": "aa6186a176c34a8bf5a7cc4d68975d4b51c779c9aa81b87a800a2ee10c8919c1|fae7918e3cbf89e159c973e514c51238b2c426f099e5c061d8859594549080f8",
+      "essay_a": "anchor-2",
+      "essay_b": "essay-1",
+      "status": "success",
+      "latency_ms": 2186.53975000052,
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "total_prompt_tokens": 2045,
+      "prompt_hash": "5082911c8c931dde742256f17615acfde846511ad364c2ffb857f3e9dc61d61f",
+      "error": null,
+      "status_code": null,
+      "is_seed": false
+    },
+    {
+      "cache_key": "aa6186a176c34a8bf5a7cc4d68975d4b51c779c9aa81b87a800a2ee10c8919c1|fae7918e3cbf89e159c973e514c51238b2c426f099e5c061d8859594549080f8",
+      "essay_a": "anchor-1",
+      "essay_b": "essay-4",
+      "status": "validation_error",
+      "latency_ms": 0.0,
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "total_prompt_tokens": 0,
+      "prompt_hash": "8809eb89f266cbe1efcc91a4bcb03a5ac42a60b9c71d94a6ee578d69e60890a2",
+      "error": "[VALIDATION_ERROR] Validation failed: justification: String should have at most 500 characters",
+      "status_code": null,
+      "is_seed": false
+    },
+    {
+      "cache_key": "aa6186a176c34a8bf5a7cc4d68975d4b51c779c9aa81b87a800a2ee10c8919c1|fae7918e3cbf89e159c973e514c51238b2c426f099e5c061d8859594549080f8",
+      "essay_a": "anchor-2",
+      "essay_b": "essay-2",
+      "status": "success",
+      "latency_ms": 2204.845332998957,
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "total_prompt_tokens": 2033,
+      "prompt_hash": "4c7dbb016a5372a8211466404f862d382bf3de2300f63caeaae6bc837ebb9bf3",
+      "error": null,
+      "status_code": null,
+      "is_seed": false
+    },
+    {
+      "cache_key": "aa6186a176c34a8bf5a7cc4d68975d4b51c779c9aa81b87a800a2ee10c8919c1|fae7918e3cbf89e159c973e514c51238b2c426f099e5c061d8859594549080f8",
+      "essay_a": "anchor-2",
+      "essay_b": "essay-4",
+      "status": "success",
+      "latency_ms": 1708.189165998192,
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "total_prompt_tokens": 2039,
+      "prompt_hash": "602bb3e3c652b977e791f6def62aa52a686909c9354012ba694e663ebabc159b",
+      "error": null,
+      "status_code": null,
+      "is_seed": false
+    },
+    {
+      "cache_key": "aa6186a176c34a8bf5a7cc4d68975d4b51c779c9aa81b87a800a2ee10c8919c1|fae7918e3cbf89e159c973e514c51238b2c426f099e5c061d8859594549080f8",
+      "essay_a": "anchor-2",
+      "essay_b": "essay-3",
+      "status": "success",
+      "latency_ms": 2432.7747499992256,
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "total_prompt_tokens": 2030,
+      "prompt_hash": "3b17deee869b71bbd2e351c42f38208028cb91e069f6b831e7ad8a57e190bfe2",
+      "error": null,
+      "status_code": null,
+      "is_seed": false
+    },
+    {
+      "cache_key": "aa6186a176c34a8bf5a7cc4d68975d4b51c779c9aa81b87a800a2ee10c8919c1|fae7918e3cbf89e159c973e514c51238b2c426f099e5c061d8859594549080f8",
+      "essay_a": "anchor-3",
+      "essay_b": "essay-1",
+      "status": "success",
+      "latency_ms": 2234.7348340044846,
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "total_prompt_tokens": 2050,
+      "prompt_hash": "e6f864ac80992901597d2944d218fb6d1f760860125aaed0dd28d9b2d050b72c",
+      "error": null,
+      "status_code": null,
+      "is_seed": false
+    },
+    {
+      "cache_key": "aa6186a176c34a8bf5a7cc4d68975d4b51c779c9aa81b87a800a2ee10c8919c1|fae7918e3cbf89e159c973e514c51238b2c426f099e5c061d8859594549080f8",
+      "essay_a": "anchor-3",
+      "essay_b": "essay-2",
+      "status": "success",
+      "latency_ms": 2250.4428749962244,
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "total_prompt_tokens": 2038,
+      "prompt_hash": "55014976fcfa321b3cc3a18d3f77c447a1da5652fa0a182bbb9883f1341cbdbf",
+      "error": null,
+      "status_code": null,
+      "is_seed": false
+    },
+    {
+      "cache_key": "aa6186a176c34a8bf5a7cc4d68975d4b51c779c9aa81b87a800a2ee10c8919c1|fae7918e3cbf89e159c973e514c51238b2c426f099e5c061d8859594549080f8",
+      "essay_a": "anchor-3",
+      "essay_b": "essay-3",
+      "status": "success",
+      "latency_ms": 2179.586707999988,
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "total_prompt_tokens": 2035,
+      "prompt_hash": "d5822e5fd22409e5fc687b5bfcec8e3d0b50c96f30a713cb6c301c5588bd9ab8",
+      "error": null,
+      "status_code": null,
+      "is_seed": false
+    },
+    {
+      "cache_key": "aa6186a176c34a8bf5a7cc4d68975d4b51c779c9aa81b87a800a2ee10c8919c1|fae7918e3cbf89e159c973e514c51238b2c426f099e5c061d8859594549080f8",
+      "essay_a": "anchor-3",
+      "essay_b": "essay-4",
+      "status": "success",
+      "latency_ms": 2173.344167000323,
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "total_prompt_tokens": 2044,
+      "prompt_hash": "071a3cbee6c051b7d2ca433e438d0b9cde03f5ba4dee07b6d5cd4fe22d57e690",
+      "error": null,
+      "status_code": null,
+      "is_seed": false
+    },
+    {
+      "cache_key": "aa6186a176c34a8bf5a7cc4d68975d4b51c779c9aa81b87a800a2ee10c8919c1|fae7918e3cbf89e159c973e514c51238b2c426f099e5c061d8859594549080f8",
+      "essay_a": "anchor-4",
+      "essay_b": "essay-1",
+      "status": "success",
+      "latency_ms": 1572.5872910043108,
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "total_prompt_tokens": 2043,
+      "prompt_hash": "f85245a4f51afe2ba63274e2401fdf82a667b8af3b42212f2a0c84cc7f26bc1c",
+      "error": null,
+      "status_code": null,
+      "is_seed": false
+    },
+    {
+      "cache_key": "aa6186a176c34a8bf5a7cc4d68975d4b51c779c9aa81b87a800a2ee10c8919c1|fae7918e3cbf89e159c973e514c51238b2c426f099e5c061d8859594549080f8",
+      "essay_a": "anchor-4",
+      "essay_b": "essay-2",
+      "status": "success",
+      "latency_ms": 2244.241083993984,
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "total_prompt_tokens": 2031,
+      "prompt_hash": "4075914e7923619ef9c950da035ca79faab74ce144c3839beace32d93ed58b22",
+      "error": null,
+      "status_code": null,
+      "is_seed": false
+    },
+    {
+      "cache_key": "aa6186a176c34a8bf5a7cc4d68975d4b51c779c9aa81b87a800a2ee10c8919c1|fae7918e3cbf89e159c973e514c51238b2c426f099e5c061d8859594549080f8",
+      "essay_a": "anchor-4",
+      "essay_b": "essay-3",
+      "status": "success",
+      "latency_ms": 3386.7319999990286,
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "total_prompt_tokens": 2028,
+      "prompt_hash": "214ddd83ed2f4a6f4935700a23fbe2e7f681303923ccad694823e5ee5d82da03",
+      "error": null,
+      "status_code": null,
+      "is_seed": false
+    },
+    {
+      "cache_key": "aa6186a176c34a8bf5a7cc4d68975d4b51c779c9aa81b87a800a2ee10c8919c1|fae7918e3cbf89e159c973e514c51238b2c426f099e5c061d8859594549080f8",
+      "essay_a": "anchor-4",
+      "essay_b": "essay-4",
+      "status": "success",
+      "latency_ms": 4467.671915997926,
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "total_prompt_tokens": 2037,
+      "prompt_hash": "dec0a5c2d89de06ad22f0e7ba17f63d76ae7707376d98b985cfc883c2b6b5fc7",
+      "error": null,
+      "status_code": null,
+      "is_seed": false
+    }
+  ]
+}

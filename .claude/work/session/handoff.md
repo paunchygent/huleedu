@@ -14,130 +14,6 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 
 ## 🎯 ACTIVE WORK (2025-11-23)
 
-### Rule Frontmatter Schema (2025-11-22 - Ready for Implementation)
-
-**Status**: Schema designed, validated, ready for frontmatter addition
-
-**Completed**:
-- ✅ Systematic analysis of all 92 rules (4 batch reports in `.claude/work/reports/2025-11-22-rule-analysis-batch-{1,2,3,4-FINAL}.md`)
-- ✅ Minimal Pydantic schema: 8 fields (5 required, 3 optional) at `scripts/claude_mgmt/rule_frontmatter_schema.py`
-- ✅ Tight enums: RuleType (9), RuleScope (7)
-- ✅ Lintable: Literal enums → Ruff/MyPy validate at edit time
-- ✅ Business rules: Sub-rules must have parent, service rules must have service_name, etc.
-- ✅ Updated `.claude/CLAUDE_STRUCTURE_SPEC.md`: Allow NNN.N- decimal notation
-- ✅ Fixed hooks: Whitelisted `.claude/work/reports/` for agent outputs
-
-**Schema (8 fields)**:
-- Required: `id`, `type`, `created`, `last_updated`, `scope`
-- Optional: `parent_rule`, `child_rules`, `service_name`
-
-**Next**:
-1. Update `scripts/claude_mgmt/validate_claude_structure.py` to use new Pydantic schema
-2. Run validation to identify rules needing frontmatter (~24 rules + 2 with ID mismatches)
-3. Add frontmatter systematically using batch reports as reference
-4. Fix ID mismatches in rules 052, 054
-
----
-
-### Infrastructure & Tooling Improvements (2025-11-22)
-
-**Completed**:
-- ✅ Task filtering system: `pdm run tasks`, `tasks-now`, `tasks-next` (`scripts/task_mgmt/filter_tasks.py`)
-- ✅ PDM migration: PEP 735 dependency groups (removed legacy `[tool.pdm.dev-dependencies]`)
-- ✅ AGENTS.md sync hook: Auto-sync to CLAUDE.md, CODEX.md, GEMINI.md on commit
-- ✅ Task creation enforcement: Added to AGENTS.md (use `pdm run new-task`)
-- ✅ Linting consolidation: Ruff per-file-ignores (11 entries → 8, wildcards, section headers)
-- ✅ **MyPy Configuration Consolidation** (2025-11-22) - See `TASKS/infrastructure/MYPY_CONFIGURATION_INVESTIGATION_AND_CONSOLIDATION.md`
-  - Investigated apparent conflict between global `exclude` and `[[tool.mypy.overrides]]` (no actual conflict found)
-  - Removed ineffective overrides (`common_core.*`, `libs.*`) from pyproject.toml for clarity
-  - Fixed `libs/mypy.ini`: Added missing `mypy_path` configuration (was broken, now working)
-  - Fixed PDM scripts `new-task` and `tasks`: Changed from shell to cmd array (handles quoted args)
-  - Documentation: Added Rule 086 section 6 explaining exclude/override interaction
-  - **Result**: All typecheck scripts now functional (typecheck-all, typecheck-libs, typecheck-common-core, typecheck-service-libs)
-  - **Files changed**: pyproject.toml, libs/mypy.ini, .claude/rules/086-mypy-configuration-standards.md
-
-**Next**:
-- Consider adding type checking to CI/CD workflows (typecheck-all + typecheck-libs)
-
----
-
-### CJ Prompt Cache Template Builder (Phase 1 Complete)
-
-**Status**: Completed (Phase 1 implemented and integrated; no active work)
-
-**New Files Created** (+3 files, ~1,150 lines):
-- `services/cj_assessment_service/models_prompt.py` (134 lines) - PromptBlock data models
-- `services/cj_assessment_service/cj_core_logic/prompt_templates.py` (317 lines) - Template builder
-- `services/cj_assessment_service/tests/unit/test_prompt_templates.py` (499 lines) - Rule 075 compliant tests
-- `TASKS/assessment/cj-prompt-cache-template-builder.md` - Full task documentation
-
-**Key Deliverables**:
-1. ✅ **Prompt Block Models**: `PromptBlock`, `CacheableBlockTarget`, `AnthropicCacheTTL`, `PromptBlockList`
-   - SHA256 content hashing for cache fragmentation tracking
-   - TTL validation (1h must precede 5m per Anthropic requirements)
-   - `to_api_dict_list()` for LPS integration
-
-2. ✅ **Template Builder**: Static/dynamic separation for cache optimization
-   - `build_static_blocks()`: Assignment-level cacheable content
-   - `render_dynamic_essays()`: Per-comparison non-cacheable content
-   - `assemble_full_prompt()`: Full prompt with TTL ordering validation
-   - `build_legacy_monolithic_prompt()`: Backward compatibility
-
-3. ✅ **Comprehensive Tests**: 40 tests (16 parametrized), 100% passing
-   - Hash stability across identical contexts
-   - TTL mapping (5m default, 1h extended)
-   - Block ordering and structure
-   - Unicode handling (Swedish characters)
-   - Empty context edge cases
-   - Legacy format compatibility
-
-**Anthropic API Compliance**:
-- TTL values limited to `"5m"` or `"1h"` (strings, not seconds)
-- 1h TTL blocks precede 5m TTL blocks
-- Graceful handling of <1024 token threshold (API handles, no client logic)
-- Multi-block user messages with selective cache_control
-
-**Quality Gates**: All passed
-- ✅ typecheck-all: 0 errors
-- ✅ format-all + lint-fix: 0 issues
-- ✅ pytest: 40/40 tests passing
-- ✅ Rule 075 compliance: 16 parametrized tests, <500 LoC
-
-**Notes**: Phase 1.3 wiring (pair_generation → LPS dual-send of prompt blocks) and related tests are already merged; benchmarking tasks are paused per latest ops guidance.
-
-### CJ Prompt Cache Benchmark (In Progress)
-
-- Added Typer CLI `pdm run prompt-cache-benchmark` with serialized seeding (50–150ms jitter), dual request/token buckets, optional extended TTL, PromQL snapshots, and artefact writers.
-- Fixtures live at `scripts/prompt_cache_benchmark/fixtures.py` (smoke 4×4, full 10×10 cross anchor/student), using `PromptTemplateBuilder` so cacheable block hashes align with LPS.
-- Wrapper scripts: `scripts/run-prompt-cache-smoke.sh`, `scripts/run-prompt-cache-full.sh`; report templates under `.claude/work/reports/benchmarks/`.
-- Tests: `scripts/tests/test_prompt_cache_benchmark.py` covers rate limiter and aggregation. Format/lint/typecheck/pytest passed (2025-11-22).
-- ENG5 real fixture: `python -m scripts.prompt_cache_benchmark.build_eng5_fixture` exports DOCX anchors/students + prompts/rubric/system prompt into `data/eng5_prompt_cache_fixture.json`; CLI accepts `--fixture-path` to consume this real dataset. Default `--redact-output` (hash/metrics only); `--no-redact-output` includes full text for validation.
-- Created `data/eng5_smoke_fixture.json` (4×4 subset) for smoke test B; A/B protocol now uses synthetic (A) + ENG5 real (B) with identical 16-comparison profile.
-- **Blocker (2025-11-23)**: Smoke A failed 100% (16/16) — HTTP 400: Anthropic rejects custom `metadata` fields (`correlation_id`, `provider`, `prompt_sha256`). Fix required: remove from API request payload; verify response metadata + callback propagation intact (queue_processor line 1084 dependency).
-- **Update (2025-11-23)**: Anthropic payload now uses only `metadata.user_id` (correlation_id) and includes prompt-caching beta header. Validator cap raised to 1000 chars; prompt now explicitly asks for ≤50-char justification. Runs:
-  - Smoke A (redacted) pre-change: 15/16 success, 1 validation_error (`justification` >500), cache bypass (hits 0, writes 0).
-  - Smoke A (unredacted) post-change with beta header: 16/16 success, cache bypass (hits 0, writes 0), latency p50/p95 ≈ 1.77s/2.08s. Artefacts: `.claude/work/reports/benchmarks/20251123T004138Z-prompt-cache-warmup.{json,md}` (unredacted).
-  - Observation: zero cache reads/writes likely because prompt caching unsupported for `claude-haiku-4-5-20251001` or blocks below Anthropic caching thresholds; cache_key remained constant across all calls.
-- **Benchmark runtime guardrail**: When invoking `pdm run prompt-cache-benchmark`, **do not wrap with external timeouts** (e.g., `timeout_ms` in tool calls); previous 180s wrapper killed runs after requests were sent. CLI help now includes this warning.
-
-### Prompt Cache Benchmark Raw Capture (2025-11-23)
-
-- Added raw Anthropic response capture to benchmark runner (`LLMCallResult.raw_response`); artefacts now include provider JSON for audit/BT-score calc.
-- New run (Sonnet, ENG5 4×4, unredacted): `pdm run prompt-cache-benchmark --fixture smoke --fixture-path data/eng5_smoke_fixture.json --model claude-sonnet-4-5-20250929 --no-redact-output --prom-url http://localhost:9091 --grafana-url http://localhost:3000`
-  - Artefacts: `.claude/work/reports/benchmarks/20251123T011800Z-prompt-cache-warmup.{json,md}` (contains raw_response per request).
-  - Metrics: hits 16, misses 0, bypass 0; read 43,112 / write 1,408 tokens; latency p50/p95 ≈ 3.26s/3.91s.
-  - Normalized stats (post-processed): hits 15, misses 1, bypass 0 on the prior Sonnet run (00:59Z). Raw-response run uses corrected exclusive aggregation in code.
-  - Note: Haiku caching remains bypassed due to <2,048 cacheable tokens; Sonnet works without inflating prompts.
-
-### Queue Processor Completion/Removal Tests (Resolved 2025-11-23)
-- Integration failures in `services/llm_provider_service/tests/integration/test_queue_processor_completion_removal.py` are fixed. Root cause was `_process_request` taking the `serial_bundle` path (from `.env` default) and calling `process_comparison_batch`, which returned a mock and triggered "Unexpected processing result type". `_process_request` now always uses the per-request path, leaving serial bundle handling to `_process_request_serial_bundle`. All four tests now pass via `pdm run pytest-root services/llm_provider_service/tests/integration/test_queue_processor_completion_removal.py`.
-
-### Remaining To-Dos
-- If Haiku caching is required: either inflate cacheable prefix to >2,048 tokens or accept bypass on Haiku. Current recommendation: use Sonnet for caching scenarios to avoid prompt bloat.
-- Optional: post-process existing artefacts to slim raw_response for BT-score input (no extra API cost).
-
----
-
 ### CJ Stability & Validation Fixes (In Progress)
 
 **Status**: Multiple high-priority fixes in progress across CJ service
@@ -200,6 +76,12 @@ See individual task documents for details.
 
 ## ✅ RECENTLY COMPLETED (Reference Only)
 
+- **2025-11-23 Rule Frontmatter Schema** - All 92 rules now have Pydantic-compliant frontmatter (8 fields: 5 required, 3 optional). Validation passes with zero errors. See `README_FIRST.md` for summary.
+- **2025-11-23 Prompt Cache Benchmark Complete** - Typer CLI, ENG5 fixtures, raw response capture, Sonnet validation (hits 16, read 43K/write 1.4K tokens). Results persisted in `docs/research/benchmarks/prompt-cache/`.
+- **2025-11-23 Queue Processor Tests Fixed** - `test_queue_processor_completion_removal.py` integration tests passing (4/4).
+- **2025-11-22 MyPy Configuration Consolidation** - All typecheck scripts functional. Fixed `libs/mypy.ini`, updated Rule 086. See `TASKS/infrastructure/MYPY_CONFIGURATION_INVESTIGATION_AND_CONSOLIDATION.md`
+- **2025-11-22 Infrastructure Tooling** - Task filtering (`pdm run tasks-now`), PEP 735 migration, AGENTS.md sync hook, linting consolidation
+- **2025-11-22 CJ Prompt Cache Template Builder** - Phase 1 complete with PromptBlock models, template builder, 40/40 tests passing. Wiring merged.
 - **2025-11-21 Task Migration Complete** - 36 files migrated from `.claude/work/tasks/` to `TASKS/` with proper frontmatter and domain organization. See `MIGRATION_SUMMARY_2025-11-21.md`
 - **2025-11-21 CJ Completion Idempotency** - Guard + unique constraint migration applied, 6/6 tests passing. See `TASKS/assessment/cj-completion-event-idempotency.md`
 - **2025-11-21 Database Enum Audit** - 9 services checked, 2 fixed (ELS, BOS), prevention implemented (`pdm run validate-enum-drift`). See `.claude/research/database-enum-audit-2025-11-21.md`

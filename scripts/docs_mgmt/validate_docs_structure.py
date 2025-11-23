@@ -47,6 +47,8 @@ ALLOWED_DECISION_STATUSES = {"proposed", "accepted", "superseded", "rejected"}
 KEBAB_CASE_PATTERN = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 # SCREAMING_SNAKE_CASE: uppercase letters, digits, underscores only
 SCREAMING_SNAKE_CASE_PATTERN = re.compile(r"^[A-Z0-9]+(_[A-Z0-9]+)*$")
+# Timestamp-prefixed: YYYYMMDDTHHMMSSZ-kebab-case-name (for benchmark/experiment outputs)
+TIMESTAMP_PREFIXED_PATTERN = re.compile(r"^\d{8}T\d{6}Z-[a-z0-9]+(-[a-z0-9]+)*$")
 
 # Directory naming patterns (§4)
 # kebab-case for directories
@@ -154,8 +156,15 @@ def validate_filename_format(p: Path) -> list[str]:
         return errors
 
     # Check against patterns
-    if not KEBAB_CASE_PATTERN.match(stem) and not SCREAMING_SNAKE_CASE_PATTERN.match(stem):
-        errors.append(f"filename '{filename}' must be kebab-case or SCREAMING_SNAKE_CASE")
+    if not (
+        KEBAB_CASE_PATTERN.match(stem)
+        or SCREAMING_SNAKE_CASE_PATTERN.match(stem)
+        or TIMESTAMP_PREFIXED_PATTERN.match(stem)
+    ):
+        errors.append(
+            f"filename '{filename}' must be kebab-case, SCREAMING_SNAKE_CASE, "
+            "or timestamp-prefixed (YYYYMMDDTHHMMSSjZ-kebab-case)"
+        )
     return errors
 
 

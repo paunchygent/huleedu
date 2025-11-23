@@ -49,6 +49,20 @@ pdm run pytest-root services/<service>/tests/
 pdm run pytest-root tests/integration/  # Cross-service tests
 ```
 
+### Rule Frontmatter Schema Implementation (2025-11-23)
+
+**Status**: ✅ Complete - All 92 rules have valid Pydantic-compliant frontmatter
+
+**Deliverables**:
+- Pydantic schema: `scripts/claude_mgmt/rule_frontmatter_schema.py` (8 fields: 5 required, 3 optional)
+- Updated validation: `scripts/claude_mgmt/validate_claude_structure.py` (using Pydantic model)
+- Reference data: `.claude/work/session/frontmatter-reference.txt` (git dates + hierarchy)
+- Zero validation errors across all 92 rules
+
+**Schema**: Required (`id`, `type`, `created`, `last_updated`, `scope`) + Optional (`parent_rule`, `child_rules`, `service_name`)
+
+**Parent-child hierarchies**: 12 parents with 45 children (bidirectional references)
+
 ### Latest Ops Status (2025-11-21)
 - CJ pipeline stall resolved after infra restore: Kafka/ZooKeeper/Redis/CJ DB healthy; `huleedu_cj_assessment_service` restarted with BatchMonitor running.
 - Stalled batch 588f04f4-219f-4545-9040-eabae4161f72 (corr 4cc75b6c-0fb2-465f-a20d-dfa0fb7de79f) now COMPLETED_STABLE; completion + RAS ready events published at ~11:48:59 UTC.
