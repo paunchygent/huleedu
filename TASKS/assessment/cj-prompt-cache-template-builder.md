@@ -11,12 +11,8 @@ last_updated: '2025-11-23'
 service: cj_assessment_service, llm_provider_service
 owner: ''
 program: ''
-related:
-  - TASKS/infrastructure/lps-rate-limiting-implementation.md
-labels:
-  - cache-optimization
-  - cost-reduction
-  - anthropic-api
+related: [lps-rate-limiting-implementation]
+labels: [cache-optimization, cost-reduction, anthropic-api]
 ---
 
 # TASK: CJ Prompt Cache Template Builder

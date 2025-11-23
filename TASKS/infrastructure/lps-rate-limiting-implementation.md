@@ -12,10 +12,7 @@ service: llm_provider_service
 owner: ''
 program: ''
 related: []
-labels:
-  - rate-limiting
-  - anthropic
-  - architecture-validated
+labels: [rate-limiting, anthropic, architecture-validated]
 ---
 
 # TASK: LLM Provider Service Rate Limiting Implementation

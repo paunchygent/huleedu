@@ -11,13 +11,8 @@ last_updated: '2025-11-23'
 service: cj_assessment_service, llm_provider_service
 owner: ''
 program: ''
-related:
-  - cj-prompt-cache-template-builder
-  - lps-rate-limiting-implementation
-labels:
-  - cache-optimization
-  - benchmarking
-  - anthropic-api
+related: [cj-prompt-cache-template-builder, lps-rate-limiting-implementation]
+labels: [cache-optimization, benchmarking, anthropic-api]
 ---
 
 # Task: CJ Prompt Cache Benchmark & Warm-Up Validation (Paused)

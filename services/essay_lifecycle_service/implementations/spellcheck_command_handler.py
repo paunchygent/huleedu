@@ -69,7 +69,7 @@ class SpellcheckCommandHandler:
                 for essay_ref in command_data.essays_to_process:
                     essay_id = essay_ref.essay_id
                     try:
-                        essay_state_model = await self.repository.get_essay_state(essay_id)
+                        essay_state_model = await self.repository.get_essay_state(essay_id, session)
                         if essay_state_model is None:
                             logger.error(
                                 f"Essay {essay_id} not found in state store for spellcheck command",
@@ -169,7 +169,7 @@ class SpellcheckCommandHandler:
                         for essay_ref in successfully_transitioned_essays:
                             try:
                                 essay_state_model = await self.repository.get_essay_state(
-                                    essay_ref.essay_id
+                                    essay_ref.essay_id, session
                                 )
                                 if essay_state_model:
                                     essay_machine = EssayStateMachine(

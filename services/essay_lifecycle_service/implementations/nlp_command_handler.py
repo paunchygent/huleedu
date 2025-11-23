@@ -76,7 +76,9 @@ class NlpCommandHandler:
                 # Update essay states to reflect NLP processing has been initiated
                 for essay_ref in command_data.essays_to_process:
                     try:
-                        essay_state = await self.repository.get_essay_state(essay_ref.essay_id)
+                        essay_state = await self.repository.get_essay_state(
+                            essay_ref.essay_id, session
+                        )
                         if essay_state:
                             # Use state machine to properly transition to NLP state
                             essay_machine = EssayStateMachine(

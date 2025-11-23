@@ -146,7 +146,7 @@ class TestSpellcheckCommandHandler:
 
             # Verify repository interactions (called twice: initial + started event)
             assert mock_repository.get_essay_state.call_count == 2
-            mock_repository.get_essay_state.assert_any_call(essay_id)
+            mock_repository.get_essay_state.assert_any_call(essay_id, ANY)
 
             # Verify state machine updates (both initial transition and started event succeed)
             assert mock_repository.update_essay_status_via_machine.call_count == 2
@@ -248,7 +248,7 @@ class TestSpellcheckCommandHandler:
         )
 
         # Verify repository was queried
-        mock_repository.get_essay_state.assert_called_once_with(essay_id)
+        mock_repository.get_essay_state.assert_called_once_with(essay_id, ANY)
 
         # Verify no further processing for missing essay
         mock_repository.update_essay_status_via_machine.assert_not_called()

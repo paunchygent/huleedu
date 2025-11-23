@@ -297,10 +297,13 @@ class TestContentAssignmentService:
         assert event_data.expected_count == 1
         assert event_data.user_id == "test_user"
 
+        # Verify the same session is used for outbox writes
+        assert call_args.kwargs["session"] == mock_session
+
         # Verify completion marking (no immediate cleanup)
         mock_batch_tracker.cleanup_batch.assert_not_called()
         if should_mark_completed:
-            mock_batch_tracker.mark_batch_completed.assert_called_once()
+            mock_batch_tracker.mark_batch_completed.assert_called_once_with(batch_id, mock_session)
         else:
             mock_batch_tracker.mark_batch_completed.assert_not_called()
 

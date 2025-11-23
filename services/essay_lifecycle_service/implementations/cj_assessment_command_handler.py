@@ -74,8 +74,8 @@ class CJAssessmentCommandHandler:
                     essay_id = essay_ref.essay_id
 
                     try:
-                        # Get current essay state
-                        essay_state_model = await self.repository.get_essay_state(essay_id)
+                        # Get current essay state within the active transaction
+                        essay_state_model = await self.repository.get_essay_state(essay_id, session)
                         if not essay_state_model:
                             logger.warning(
                                 f"Essay {essay_id} not found for CJ assessment command",
