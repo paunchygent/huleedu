@@ -1,8 +1,11 @@
 ---
-description: Critical anti-patterns that cause production failures and their corrections
-globs: 
-alwaysApply: true
+id: "077-service-anti-patterns"
+type: "standards"
+created: 2025-07-07
+last_updated: 2025-11-17
+scope: "all"
 ---
+
 # 077: Service Anti-Patterns
 
 ## Infrastructure Client Anti-Patterns

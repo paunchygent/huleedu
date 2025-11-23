@@ -1,7 +1,9 @@
 ---
-description: 
-globs: 
-alwaysApply: false
+id: "045-retry-logic"
+type: "implementation"
+created: 2025-06-23
+last_updated: 2025-11-17
+scope: "backend"
 ---
 # 045: Retry Logic Standards
 

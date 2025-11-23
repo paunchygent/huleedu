@@ -1,8 +1,11 @@
 ---
-description: Read before any interaction with pyproject.toml or  git commands
-globs: 
-alwaysApply: false
+id: "080-repository-workflow-and-tooling"
+type: "operational"
+created: 2025-05-25
+last_updated: 2025-11-17
+scope: "all"
 ---
+
 # 080: Repository Workflow and Tooling
 
 ## 1. PDM Monorepo Management

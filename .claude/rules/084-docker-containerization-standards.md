@@ -1,7 +1,10 @@
 ---
-description: rules for correct docker containerization patterns
-globs: 
-alwaysApply: false
+id: "084-docker-containerization-standards"
+type: "standards"
+created: 2025-05-30
+last_updated: 2025-11-17
+scope: "infrastructure"
+child_rules: ["084.1-docker-compose-v2-command-reference"]
 ---
 # 084: Docker Containerization Standards
 

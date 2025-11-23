@@ -1,7 +1,9 @@
 ---
-description: Defines the canonical project structure for the HuleEdu monorepo, including root layout, service patterns, and documentation standards. This is a foundational rule.
-globs: []
-alwaysApply: true
+id: "015-project-structure-standards"
+type: "standards"
+created: 2025-05-25
+last_updated: 2025-11-17
+scope: "all"
 ---
 # 015: Project Structure Standards
 

@@ -1,7 +1,9 @@
 ---
-description: Textual TUI development patterns and corrections to AI training data
-globs:
-alwaysApply: false
+id: "095-textual-tui-patterns"
+type: "library"
+created: 2025-11-01
+last_updated: 2025-11-17
+scope: "backend"
 ---
 # 095: Textual TUI Patterns
 

@@ -1,9 +1,12 @@
 ---
-description: Always read when asked to convert .md docs with mermaid to html
-globs: 
-alwaysApply: false
+id: "054-utility-markdown-mermaid-conversion"
+type: "operational"
+created: 2025-09-01
+last_updated: 2025-11-17
+scope: "documentation"
 ---
-# 051: Markdown to HTML Conversion with Mermaid
+
+# 054: Markdown to HTML Conversion with Mermaid
 
 ## 1. Default Implementation
 

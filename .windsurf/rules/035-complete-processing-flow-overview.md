@@ -1,3 +1,11 @@
+---
+id: "035-complete-processing-flow-overview"
+type: "workflow"
+created: 2025-09-01
+last_updated: 2025-11-17
+scope: "cross-service"
+---
+
 # Complete Processing Flow Overview
 
 **Purpose:** High-level map of HuleEdu's complete batch processing architecture  

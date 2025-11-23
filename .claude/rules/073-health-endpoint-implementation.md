@@ -1,8 +1,11 @@
 ---
-description: Health endpoint implementation patterns for all service types
-globs: 
-alwaysApply: false
+id: "073-health-endpoint-implementation"
+type: "implementation"
+created: 2025-07-07
+last_updated: 2025-11-17
+scope: "backend"
 ---
+
 # 073: Health Endpoint Implementation
 
 ## Requirements by Service Type

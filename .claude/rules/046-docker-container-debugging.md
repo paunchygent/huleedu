@@ -1,7 +1,9 @@
 ---
-description: Systematic approach for debugging HuleEdu Docker containers and services
-globs: 
-alwaysApply: false
+id: "046-docker-container-debugging"
+type: "operational"
+created: 2025-08-08
+last_updated: 2025-11-17
+scope: "infrastructure"
 ---
 # 046: Docker Container Debugging Protocol
 

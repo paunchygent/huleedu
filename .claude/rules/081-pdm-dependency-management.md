@@ -1,8 +1,11 @@
 ---
-description: MUST READ whenever working on or discussing pdm resolution, versioning, and .toml files
-globs: 
-alwaysApply: false
+id: "081-pdm-dependency-management"
+type: "operational"
+created: 2025-05-25
+last_updated: 2025-11-17
+scope: "all"
 ---
+
 # 081: PDM Dependency Management Standards
 
 ## 1. PDM Configuration Standards

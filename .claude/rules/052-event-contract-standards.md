@@ -1,10 +1,12 @@
 ---
-description: Always read before creating new event contracts or using them in code implementations
-globs: 
-alwaysApply: false
+id: "052-event-contract-standards"
+type: "standards"
+created: 2025-05-31
+last_updated: 2025-11-17
+scope: "cross-service"
 ---
 
-# 035: Common Core Usage Patterns
+# 052: Event Contract Standards
 
 ## 1. Purpose
 

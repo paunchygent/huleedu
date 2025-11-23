@@ -1,9 +1,10 @@
 ---
-description: Read before attempting to edit .cursor/rules
-globs: 
-alwaysApply: false
+id: "999-rule-management"
+type: "operational"
+created: 2025-05-25
+last_updated: 2025-11-17
+scope: "documentation"
 ---
-===
 # 999: Rule Management
 
 ## 1. Purpose

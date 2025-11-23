@@ -1,3 +1,11 @@
+---
+id: "036-phase1-processing-flow"
+type: "workflow"
+created: 2025-09-01
+last_updated: 2025-11-17
+scope: "cross-service"
+---
+
      # Phase 1 Processing Flow - Student Matching Integration
 
      **Purpose:** Pre-readiness student matching for REGULAR batches  

@@ -1,7 +1,9 @@
 ---
-description: Read before any updates to documentation and rules
-globs: 
-alwaysApply: false
+id: "090-documentation-standards"
+type: "standards"
+created: 2025-05-25
+last_updated: 2025-11-21
+scope: "documentation"
 ---
 # 090: Documentation Standards
 

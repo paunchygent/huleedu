@@ -1,7 +1,9 @@
 ---
-description: Security configuration patterns for HuleEdu services
-globs: 
-alwaysApply: false
+id: "047-security-configuration-standards"
+type: "standards"
+created: 2025-08-23
+last_updated: 2025-11-17
+scope: "all"
 ---
 # 047: Security Configuration Standards
 

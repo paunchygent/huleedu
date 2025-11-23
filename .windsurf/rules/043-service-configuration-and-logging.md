@@ -1,7 +1,10 @@
 ---
-description: Defines configuration management and logging standards for all services.
-globs: 
-alwaysApply: false
+id: "043-service-configuration-and-logging"
+type: "standards"
+created: 2025-06-05
+last_updated: 2025-11-20
+scope: "all"
+child_rules: ["043.1-kafka-redis-configuration-standards", "043.2-correlation-context-pattern"]
 ---
 # 043: Service Configuration and Logging
 

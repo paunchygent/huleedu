@@ -1,7 +1,10 @@
 ---
-description: 
-globs: 
-alwaysApply: true
+id: "020-architectural-mandates"
+type: "architecture"
+created: 2025-05-25
+last_updated: 2025-11-18
+scope: "all"
+child_rules: ["020.1-content-service-architecture", "020.2-spellchecker-service-architecture", "020.3-batch-orchestrator-service-architecture", "020.4-common-core-architecture", "020.5-essay-lifecycle-service-architecture", "020.6-file-service-architecture", "020.7-cj-assessment-service", "020.8-batch-conductor-service", "020.9-class-management-service", "020.10-api-gateway-service", "020.11-service-libraries-architecture", "020.12-result-aggregator-service-architecture", "020.13-llm-provider-service-architecture", "020.14-websocket-service", "020.15-nlp-service-architecture", "020.16-email-service-architecture", "020.17-entitlements-service-architecture", "020.18-language-tool-service-patterns", "020.19-eng5-np-runner-container", "020.20-cj-llm-prompt-contract"]
 ---
 # 020: Architectural Mandates
 

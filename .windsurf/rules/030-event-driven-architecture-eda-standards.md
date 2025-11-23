@@ -1,7 +1,9 @@
 ---
-description: 
-globs: 
-alwaysApply: true
+id: "030-event-driven-architecture-eda-standards"
+type: "architecture"
+created: 2025-05-25
+last_updated: 2025-11-17
+scope: "all"
 ---
 # 030: Event-Driven Architecture (EDA) Standards
 

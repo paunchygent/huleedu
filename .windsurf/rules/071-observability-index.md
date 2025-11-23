@@ -1,8 +1,12 @@
 ---
-description: Index of observability patterns and sub-rules
-globs: 
-alwaysApply: false
+id: "071-observability-index"
+type: "observability"
+created: 2025-06-30
+last_updated: 2025-11-17
+scope: "all"
+child_rules: ["071.1-observability-core-patterns", "071.2-prometheus-metrics-patterns", "071.3-jaeger-tracing-patterns", "071.4-grafana-loki-patterns", "071.5-llm-debugging-with-observability"]
 ---
+
 # 071: Observability Index
 
 ## Purpose

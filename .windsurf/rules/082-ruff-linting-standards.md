@@ -1,7 +1,9 @@
 ---
-description: Read whenever discussing linter settings
-globs: 
-alwaysApply: false
+id: "082-ruff-linting-standards"
+type: "standards"
+created: 2025-05-25
+last_updated: 2025-11-17
+scope: "all"
 ---
 # 082: Ruff Linting Standards
 

@@ -1,10 +1,13 @@
 ---
-description: 
-globs: 
-alwaysApply: true
-
-# 070 Testing and Quality Assurance
+id: "070-testing-and-quality-assurance"
+type: "testing"
+created: 2025-05-25
+last_updated: 2025-11-17
+scope: "all"
+child_rules: ["070.1-performance-testing-methodology"]
 ---
+
+# 070: Testing and Quality Assurance
 ## 1. Testing Pyramid
 - **Unit Tests**: Individual components in isolation (high coverage)
 - **Contract Tests**: **CRITICAL** - Verify Pydantic contracts between services

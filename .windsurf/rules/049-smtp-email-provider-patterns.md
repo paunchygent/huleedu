@@ -1,7 +1,9 @@
 ---
-description: SMTP email provider configuration patterns
-globs: services/email_service/**/*.py, docker-compose*.yml, .env
-alwaysApply: true
+id: "049-smtp-email-provider-patterns"
+type: "implementation"
+created: 2025-09-01
+last_updated: 2025-11-17
+scope: "backend"
 ---
 # 090: SMTP Email Provider Patterns
 

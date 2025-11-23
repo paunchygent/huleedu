@@ -6,24 +6,24 @@ repos:
     hooks:
     -   id: sync-agents-md
         name: Sync AGENTS.md to AI assistant files
-        entry: python scripts/utils/sync_agents_md.py
-        language: python
+        entry: bash -c 'cd "$(git rev-parse --show-toplevel)" && pdm run python scripts/utils/sync_agents_md.py'
+        language: system
         files: ^AGENTS\.md$
         pass_filenames: false
         stages: [pre-commit]
 
     -   id: sync-rules
         name: Sync Rules from .md to .md
-        entry: python scripts/utils/sync_rules.py --source .claude/rules --target .windsurf/rules
-        language: python
+        entry: bash -c 'cd "$(git rev-parse --show-toplevel)" && pdm run python scripts/utils/sync_rules.py --source .claude/rules --target .windsurf/rules'
+        language: system
         always_run: true
         pass_filenames: false
         stages: [pre-commit]
 
     -   id: validate-tasks-frontmatter
         name: Validate TASKS frontmatter and structure
-        entry: python scripts/task_mgmt/validate_front_matter.py
-        language: python
+        entry: bash -c 'cd "$(git rev-parse --show-toplevel)" && pdm run python scripts/task_mgmt/validate_front_matter.py'
+        language: system
         files: ^TASKS/.*\.md$
         exclude: ^TASKS/(_REORGANIZATION_PROPOSAL|INDEX|README|archive/)
         pass_filenames: false
@@ -31,8 +31,8 @@ repos:
 
     -   id: validate-docs-structure
         name: Validate documentation structure
-        entry: python scripts/docs_mgmt/validate_docs_structure.py
-        language: python
+        entry: bash -c 'cd "$(git rev-parse --show-toplevel)" && pdm run python scripts/docs_mgmt/validate_docs_structure.py'
+        language: system
         files: ^docs/.*\.md$
         exclude: ^docs/(DOCS_STRUCTURE_SPEC|_archive/)
         pass_filenames: false
@@ -40,8 +40,8 @@ repos:
 
     -   id: validate-claude-structure
         name: Validate .claude/ structure and rule frontmatter
-        entry: python scripts/claude_mgmt/validate_claude_structure.py
-        language: python
+        entry: bash -c 'cd "$(git rev-parse --show-toplevel)" && pdm run python scripts/claude_mgmt/validate_claude_structure.py'
+        language: system
         files: ^\.claude/rules/.*\.md$
         exclude: ^\.claude/rules/README\.md$
         pass_filenames: false

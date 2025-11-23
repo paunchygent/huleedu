@@ -1,8 +1,9 @@
 ---
-description: Teacher dashboard patterns and real-time UI components for HuleEdu - batch monitoring, status updates, notification management
-globs:
-  - frontend/src/routes/dashboard/**
-  - frontend/src/lib/components/dashboard/**
+id: "210-frontend-dashboard-rules"
+type: "implementation"
+created: 2025-08-17
+last_updated: 2025-11-17
+scope: "frontend"
 ---
 
 # 210: Frontend Dashboard Rules

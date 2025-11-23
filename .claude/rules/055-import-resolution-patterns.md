@@ -1,3 +1,11 @@
+---
+id: "055-import-resolution-patterns"
+type: "standards"
+created: 2025-06-29
+last_updated: 2025-11-17
+scope: "all"
+---
+
 # Import Resolution Patterns in HuleEdu Monorepo
 
 ## Context

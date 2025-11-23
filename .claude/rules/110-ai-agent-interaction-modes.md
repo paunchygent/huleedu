@@ -1,9 +1,11 @@
 ---
-description: 
-globs: 
-alwaysApply: true
+id: "110-ai-agent-interaction-modes"
+type: "workflow"
+created: 2025-05-25
+last_updated: 2025-11-22
+scope: "all"
+child_rules: ["110.1-planning-mode", "110.2-coding-mode", "110.3-testing-mode", "110.4-debugging-mode", "110.5-refactoring-linting-mode", "110.6-agentic-implementation-flow", "110.7-task-creation-and-decomposition-methodology"]
 ---
-===
 # 110: AI Agent Interaction Modes
 
 ## 1. General Interaction Principles

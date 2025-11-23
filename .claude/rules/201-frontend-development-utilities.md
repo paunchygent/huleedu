@@ -1,4 +1,11 @@
-# Rule 085: Frontend Development Utilities Standards
+---
+id: "201-frontend-development-utilities"
+type: "implementation"
+created: 2025-09-01
+last_updated: 2025-11-17
+scope: "frontend"
+---
+# 201: Frontend Development Utilities Standards
 
 ## **ULTRATHINK: Development-First Frontend Integration**
 

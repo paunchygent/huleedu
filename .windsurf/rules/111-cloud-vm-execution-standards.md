@@ -1,9 +1,9 @@
 ---
-description: Mandatory guidance for Claude Code cloud sandbox sessions
-globs:
-  - "**/*.py"
-  - "**/*.md"
-alwaysApply: true
+id: "111-cloud-vm-execution-standards"
+type: "operational"
+created: 2025-11-10
+last_updated: 2025-11-17
+scope: "all"
 ---
 # 111: Claude Cloud VM Execution Standards
 

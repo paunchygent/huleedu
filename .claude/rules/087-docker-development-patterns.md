@@ -1,7 +1,9 @@
 ---
-description: Docker development patterns - multi-stage builds, layer optimization, workflow commands
-globs: ["Dockerfile*", "docker-compose*.yml", "scripts/dev.sh", "scripts/prod.sh"]
-alwaysApply: true
+id: "087-docker-development-patterns"
+type: "implementation"
+created: 2025-09-04
+last_updated: 2025-11-17
+scope: "infrastructure"
 ---
 
 # 087: Docker Development Patterns

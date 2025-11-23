@@ -1,8 +1,12 @@
 ---
-description: Systematic test creation methodology for comprehensive, maintainable test coverage following battle-tested patterns
-globs: 
-alwaysApply: false
+id: "075-test-creation-methodology"
+type: "testing"
+created: 2025-08-03
+last_updated: 2025-11-17
+scope: "all"
+child_rules: ["075.1-parallel-test-creation-methodology"]
 ---
+
 # 075: Test Creation Methodology
 
 ## 1. ULTRATHINK Test Creation Protocol

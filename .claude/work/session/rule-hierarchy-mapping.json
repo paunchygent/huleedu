@@ -1,0 +1,114 @@
+{
+  "parent_rules": {
+    "020-architectural-mandates": {
+      "child_rules": [
+        "020.1-content-service-architecture",
+        "020.2-spellchecker-service-architecture",
+        "020.3-batch-orchestrator-service-architecture",
+        "020.4-common-core-architecture",
+        "020.5-essay-lifecycle-service-architecture",
+        "020.6-file-service-architecture",
+        "020.7-cj-assessment-service",
+        "020.8-batch-conductor-service",
+        "020.9-class-management-service",
+        "020.10-api-gateway-service",
+        "020.11-service-libraries-architecture",
+        "020.12-result-aggregator-service-architecture",
+        "020.13-llm-provider-service-architecture",
+        "020.14-websocket-service",
+        "020.15-nlp-service-architecture",
+        "020.16-email-service-architecture",
+        "020.17-entitlements-service-architecture",
+        "020.18-language-tool-service-patterns",
+        "020.19-eng5-np-runner-container",
+        "020.20-cj-llm-prompt-contract"
+      ]
+    },
+    "037-phase2-processing-flow": {
+      "child_rules": [
+        "037.1-cj-assessment-phase-processing-flow"
+      ]
+    },
+    "041-http-service-blueprint": {
+      "child_rules": [
+        "041.1-fastapi-integration-patterns"
+      ]
+    },
+    "042-async-patterns-and-di": {
+      "child_rules": [
+        "042.1-transactional-outbox-pattern",
+        "042.2-http-proxy-service-patterns"
+      ]
+    },
+    "043-service-configuration-and-logging": {
+      "child_rules": [
+        "043.1-kafka-redis-configuration-standards",
+        "043.2-correlation-context-pattern"
+      ]
+    },
+    "044-service-debugging-and-troubleshooting": {
+      "child_rules": [
+        "044.1-circuit-breaker-observability",
+        "044.2-redis-kafka-state-debugging"
+      ]
+    },
+    "053-sqlalchemy-core": {
+      "child_rules": [
+        "053.1-migration-patterns"
+      ]
+    },
+    "070-testing-and-quality-assurance": {
+      "child_rules": [
+        "070.1-performance-testing-methodology"
+      ]
+    },
+    "071-observability-index": {
+      "child_rules": [
+        "071.1-observability-core-patterns",
+        "071.2-prometheus-metrics-patterns",
+        "071.3-jaeger-tracing-patterns",
+        "071.4-grafana-loki-patterns",
+        "071.5-llm-debugging-with-observability"
+      ]
+    },
+    "075-test-creation-methodology": {
+      "child_rules": [
+        "075.1-parallel-test-creation-methodology"
+      ]
+    },
+    "084-docker-containerization-standards": {
+      "child_rules": [
+        "084.1-docker-compose-v2-command-reference"
+      ]
+    },
+    "110-ai-agent-interaction-modes": {
+      "child_rules": [
+        "110.1-planning-mode",
+        "110.2-coding-mode",
+        "110.3-testing-mode",
+        "110.4-debugging-mode",
+        "110.5-refactoring-linting-mode",
+        "110.6-agentic-implementation-flow",
+        "110.7-task-creation-and-decomposition-methodology"
+      ]
+    }
+  },
+  "service_rules": {
+    "020.1-content-service-architecture": "content_service",
+    "020.2-spellchecker-service-architecture": "spellchecker_service",
+    "020.3-batch-orchestrator-service-architecture": "batch_orchestrator_service",
+    "020.5-essay-lifecycle-service-architecture": "essay_lifecycle_service",
+    "020.6-file-service-architecture": "file_service",
+    "020.7-cj-assessment-service": "cj_assessment_service",
+    "020.8-batch-conductor-service": "batch_conductor_service",
+    "020.9-class-management-service": "class_management_service",
+    "020.10-api-gateway-service": "api_gateway_service",
+    "020.12-result-aggregator-service-architecture": "result_aggregator_service",
+    "020.13-llm-provider-service-architecture": "llm_provider_service",
+    "020.14-websocket-service": "websocket_service",
+    "020.15-nlp-service-architecture": "nlp_service",
+    "020.16-email-service-architecture": "email_service",
+    "020.17-entitlements-service-architecture": "entitlements_service",
+    "020.18-language-tool-service-patterns": "language_tool_service"
+  }
+}

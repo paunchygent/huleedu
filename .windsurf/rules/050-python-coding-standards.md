@@ -1,9 +1,11 @@
 ---
-description: 
-globs: 
-alwaysApply: true
+id: "050-python-coding-standards"
+type: "standards"
+created: 2025-05-25
+last_updated: 2025-11-18
+scope: "all"
 ---
-===
+
 # 050: Python Coding Standards
 
 ## 1. Core Philosophy
@@ -111,4 +113,3 @@ class ConcreteImpl:
 - Confirm environment variable alignment
 
 See [044-service-debugging-and-troubleshooting.md](mdc:044-service-debugging-and-troubleshooting.md) for systematic debugging approach
-===

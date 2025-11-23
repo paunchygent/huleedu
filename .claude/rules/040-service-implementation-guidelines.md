@@ -1,7 +1,9 @@
 ---
-description: Service implementation patterns and requirements for HuleEdu microservices
-globs: 
-alwaysApply: false
+id: "040-service-implementation-guidelines"
+type: "implementation"
+created: 2025-05-25
+last_updated: 2025-11-17
+scope: "backend"
 ---
 
 # 040: Service Implementation Guidelines

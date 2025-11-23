@@ -1,7 +1,10 @@
 ---
-description: Async patterns, protocols, dependency injection, resource management, and worker service structure
-globs: 
-alwaysApply: false
+id: "042-async-patterns-and-di"
+type: "implementation"
+created: 2025-06-05
+last_updated: 2025-11-17
+scope: "backend"
+child_rules: ["042.1-transactional-outbox-pattern", "042.2-http-proxy-service-patterns"]
 ---
 # 042: Async Patterns and DI
 

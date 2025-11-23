@@ -1,9 +1,10 @@
 ---
-description: 
-globs: 
-alwaysApply: true
+id: "100-terminology-and-definitions"
+type: "standards"
+created: 2025-05-25
+last_updated: 2025-11-17
+scope: "all"
 ---
-===
 # 100: Terminology and Definitions
 
 ## 1. Core Concepts

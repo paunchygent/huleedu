@@ -1,3 +1,12 @@
+---
+id: "037-phase2-processing-flow"
+type: "workflow"
+created: 2025-09-01
+last_updated: 2025-11-17
+scope: "cross-service"
+child_rules: ["037.1-cj-assessment-phase-processing-flow"]
+---
+
 # Phase 2 Processing Flow - Pipeline Execution
 
 **Status:** IMPLEMENTED - Core services operational, AI Feedback pending  

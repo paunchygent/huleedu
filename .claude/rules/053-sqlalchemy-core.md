@@ -1,7 +1,10 @@
 ---
-description: Core SQLAlchemy patterns - enums, timestamps, JSON serialization, outbox integration
-globs: 
-alwaysApply: false
+id: "053-sqlalchemy-core"
+type: "library"
+created: 2025-09-04
+last_updated: 2025-11-17
+scope: "backend"
+child_rules: ["053.1-migration-patterns"]
 ---
 
 # 053: SQLAlchemy Core Standards

@@ -1,7 +1,10 @@
 ---
-description: debugging approach for HuleEdu microservice import and initialization of services during container startup
-globs: 
-alwaysApply: false
+id: "044-service-debugging-and-troubleshooting"
+type: "operational"
+created: 2025-06-06
+last_updated: 2025-11-17
+scope: "all"
+child_rules: ["044.1-circuit-breaker-observability", "044.2-redis-kafka-state-debugging"]
 ---
 # 044: Service Debugging and Troubleshooting
 

@@ -1,7 +1,9 @@
 ---
-description: Database migration standards for HuleEdu microservices
-globs: 
-alwaysApply: true
+id: "085-database-migration-standards"
+type: "standards"
+created: 2025-07-14
+last_updated: 2025-11-21
+scope: "backend"
 ---
 # 085: Database Migration Standards
 

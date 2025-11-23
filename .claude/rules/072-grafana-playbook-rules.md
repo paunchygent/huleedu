@@ -1,8 +1,11 @@
 ---
-description: Grafana dashboard standards and operational patterns
-globs: 
-alwaysApply: false
+id: "072-grafana-playbook-rules"
+type: "observability"
+created: 2025-06-20
+last_updated: 2025-11-17
+scope: "infrastructure"
 ---
+
 # 072: Grafana Playbook Rules
 
 ## Dashboard Standards

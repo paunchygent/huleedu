@@ -1,7 +1,9 @@
 ---
-description: Index of all .cursor/rules/
-globs: 
-alwaysApply: false
+id: "000-rule-index"
+type: "standards"
+created: 2025-05-25
+last_updated: 2025-11-17
+scope: "all"
 ---
 # HuleEdu Development Rules: Index
 

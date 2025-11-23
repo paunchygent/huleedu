@@ -1,8 +1,11 @@
 ---
-description: Read when tasked with data models, and data storage
-globs: 
-alwaysApply: false
+id: "060-data-and-metadata-management"
+type: "architecture"
+created: 2025-05-25
+last_updated: 2025-11-17
+scope: "all"
 ---
+
 # 060: Data and Metadata Management
 
 ## 1. Common Data Models (Pydantic)

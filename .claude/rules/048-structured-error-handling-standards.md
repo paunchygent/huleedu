@@ -1,7 +1,9 @@
 ---
-description: Exception-based error handling and Result monad patterns
-globs:
-alwaysApply: false
+id: "048-structured-error-handling-standards"
+type: "implementation"
+created: 2025-07-09
+last_updated: 2025-11-17
+scope: "backend"
 ---
 # 048: Error Handling Patterns
 

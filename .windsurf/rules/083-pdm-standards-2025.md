@@ -1,7 +1,9 @@
 ---
-description: CRITICAL: Must be applied whenever you are editing or discussing pdm and pyproject.toml
-globs: 
-alwaysApply: false
+id: "083-pdm-standards-2025"
+type: "standards"
+created: 2025-05-25
+last_updated: 2025-11-17
+scope: "all"
 ---
 # 083: PDM Standards 2025
 

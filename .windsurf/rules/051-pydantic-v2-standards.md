@@ -1,11 +1,9 @@
 ---
-description: Pydantic v2 standards. Follow when defining data models, schemas, or validation logic to ensure type safety and data consistency.
-globs: 
-alwaysApply: false
----
----
-trigger: model_decision
-description: "Pydantic v2 standards. Follow when defining data models, schemas, or validation logic to ensure type safety and data consistency."
+id: "051-pydantic-v2-standards"
+type: "library"
+created: 2025-05-25
+last_updated: 2025-11-17
+scope: "backend"
 ---
 
 # 051: Pydantic V2 Standards

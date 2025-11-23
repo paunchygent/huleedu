@@ -1,7 +1,9 @@
 ---
-description: MyPy configuration and monorepo type checking standards
-globs: 
-alwaysApply: false
+id: "086-mypy-configuration-standards"
+type: "standards"
+created: 2025-07-07
+last_updated: 2025-11-22
+scope: "all"
 ---
 # 086: MyPy Configuration Standards
 

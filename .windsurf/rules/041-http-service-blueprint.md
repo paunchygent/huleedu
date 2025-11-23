@@ -1,7 +1,10 @@
 ---
-description: Defines all HTTP (HuleEduApp-based) service architectural patterns and directory structure.
-globs: 
-alwaysApply: false
+id: "041-http-service-blueprint"
+type: "implementation"
+created: 2025-06-05
+last_updated: 2025-11-17
+scope: "backend"
+child_rules: ["041.1-fastapi-integration-patterns"]
 ---
 # 041: HTTP Service Blueprint
 
