@@ -61,9 +61,9 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 
 ---
 
-### New Work: CJ Prompt Cache Template Builder (Phase 1 Complete)
+### CJ Prompt Cache Template Builder (Phase 1 Complete)
 
-**Status**: Phase 1 implementation complete, all tests passing, ready for integration
+**Status**: Completed (Phase 1 implemented and integrated; no active work)
 
 **New Files Created** (+3 files, ~1,150 lines):
 - `services/cj_assessment_service/models_prompt.py` (134 lines) - PromptBlock data models
@@ -103,34 +103,7 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 - ✅ pytest: 40/40 tests passing
 - ✅ Rule 075 compliance: 16 parametrized tests, <500 LoC
 
-**Next Session**:
-- Phase 1.3: Integrate `PromptTemplateBuilder` with `pair_generation.py`
-- Phase 2: Extend LPS for multi-block cache support
-
-**Phase 1.3 Plan (2025-11-22)**:
-- Wire `generate_comparison_tasks` to `PromptTemplateBuilder.assemble_full_prompt`, attaching `prompt_blocks` while keeping the legacy monolithic prompt for backward compatibility.
-- Extend `ComparisonTask` / LLM interaction path to carry `prompt_blocks` through `BatchProcessor → LLMInteractionImpl → LLMProviderServiceClient` (dual-send: `prompt_blocks` + `user_prompt`).
-- Add CJ config toggle for extended TTL usage (default 5m) and enforce TTL ordering validation before dispatch.
-- Update unit coverage (pair_generation + client) to assert block structure, TTL ordering, and legacy prompt parity; prep fixture for Phase 2 LPS block handling tests.
-- Measure cache hit rate/cost deltas using existing LPS metrics (`llm_provider_prompt_cache_events_total`, `llm_provider_prompt_cache_tokens_total`) after integration.
-- Lowered default CJ global cap `MAX_PAIRWISE_COMPARISONS` to 150 (was 350); tests that assert defaults updated; explicit overrides in tests still in place.
-
-**Phase 1.3 progress (2025-11-22)**:
-- Replaced legacy `_build_comparison_prompt` with `PromptTemplateBuilder` in `pair_generation`; `ComparisonTask` now carries `prompt_blocks` plus a prompt string rendered from those blocks.
-- Added render helper in `prompt_templates` to produce the monolithic string strictly from blocks (legacy template fully removed).
-- Threaded `prompt_blocks` through `LLMInteractionImpl` → `LLMProviderServiceClient`; HTTP payload now includes `prompt_blocks` (dual-send for now).
-- Updated unit + integration coverage for block payloads (`test_llm_provider_service_client`, `test_llm_payload_construction_integration`); string/block parity asserted.
-- Default comparison cap set to 150; related test expectations updated.
-
-**Phase 2 (LPS block handling) progress (2025-11-22)**:
-- Anthropic provider now prefers `prompt_blocks`, builds system/user block arrays with `cache_control` + TTL validation (1h before 5m), and only falls back to legacy `user_prompt` when blocks are absent.
-- API/queue/orchestrator/comparison processor propagate `prompt_blocks`; callback metadata retains prompt hashes; prompt cache usage metrics are surfaced in provider response metadata.
-- Added unit coverage for cache_control payload + TTL ordering (`test_anthropic_prompt_blocks.py`) and prompt_blocks acceptance on request models.
-- Added cache-sandbox CLI (6-essay, two-pass, 5m TTL) using Anthropic provider to report cache read/write tokens.
-- Added `USE_EXTENDED_TTL_FOR_SERVICE_CONSTANTS` flag (default false) so legacy/system/tool TTLs stay 5m unless explicitly extended; Anthropic TTL selection updated to honor the flag.
-- New integration suite `services/llm_provider_service/tests/integration/test_anthropic_prompt_cache_blocks.py` (8 tests) covering block preference, legacy fallback, system/tool cache_control, TTL ordering pass/fail, callback cache usage propagation, and cache-bypass metrics.
-- Warm-up acceptance criteria captured: seed exactly one request per prompt hash (cacheable static blocks + tool schema; essays stay non-cacheable), avoid concurrent first-writes (ordered/jittered), require post-seed miss rate per hash ≤20% converging to near-0, enforce TTL alignment with `USE_EXTENDED_TTL_FOR_SERVICE_CONSTANTS`, and include `prompt_sha256` + provider cache usage in callbacks without overwriting caller metadata. Metrics to watch: `llm_provider_prompt_cache_events_total` hit/miss/bypass and `llm_provider_prompt_cache_tokens_total`.
-- Observability: added block-level metrics (blocks/tokens/scope), scope-aware Grafana panels, hit-rate alert now assignment-scoped (<40%), and new TTL-violation alert.
+**Notes**: Phase 1.3 wiring (pair_generation → LPS dual-send of prompt blocks) and related tests are already merged; benchmarking tasks are paused per latest ops guidance.
 
 ### CJ Prompt Cache Benchmark (In Progress)
 
