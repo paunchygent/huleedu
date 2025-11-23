@@ -2,12 +2,12 @@
 id: cj-prompt-cache-template-builder
 title: CJ Prompt Cache Template Builder
 type: task
-status: in_progress
+status: completed
 priority: high
 domain: assessment
 owner_team: agents
 created: '2025-11-22'
-last_updated: '2025-11-22'
+last_updated: '2025-11-23'
 service: cj_assessment_service, llm_provider_service
 owner: ''
 program: ''
@@ -22,7 +22,7 @@ labels:
 # TASK: CJ Prompt Cache Template Builder
 
 **Created**: 2025-11-22
-**Status**: 🔄 IN PROGRESS
+**Status**: ✅ COMPLETED
 **Priority**: P2 MEDIUM
 **Services**: CJ Assessment Service, LLM Provider Service
 **Related**: Anthropic Prompt Caching Infrastructure (completed 2025-11-21)
@@ -414,3 +414,22 @@ With caching (5min TTL, 90% hit rate):
 **Graceful Degradation**: Requests below 1024 token threshold process normally without caching. No client-side logic needed - API handles automatically.
 
 **Service Autonomy**: CJ sends simple `PromptBlock` list; LPS transforms to Anthropic-specific format (system array, cache_control). Other LPS providers (OpenAI, etc.) can implement differently.
+
+## Current Status (2025-11-23)
+
+- Phase 1 builder shipped (PromptBlockList, hashing, TTL validation) with tests green.
+- Integrated with CJ pair generation and LPS payloads; dual-send prompt_blocks + monolithic prompt maintained.
+- Benchmark sibling task (cj-prompt-cache-benchmark) now has raw-response artefacts (Sonnet ENG5 smoke 4x4, cache hits 16/16). Artefacts: `.claude/work/reports/benchmarks/20251123T011800Z-prompt-cache-warmup.{json,md}`.
+- Haiku prompt caching still bypass due to cacheable prefix <2,048 tokens; Sonnet works without inflating prompts.
+- CLI help warns: do not wrap prompt-cache-benchmark in external timeouts.
+
+## Next Steps
+
+- Consume raw-response artefacts for BT-score audits and cache efficacy analysis.
+- Decide whether to inflate cacheable prefix for Haiku or standardize on Sonnet for caching scenarios.
+- Keep validator cap (1000 chars) and tool schema (50-char justification) aligned; no retries/truncation planned.
+
+## Progress Update (2025-11-23)
+
+- Raw-response capture landed in benchmark sibling; Sonnet smoke run completed with 16/16 cache hits (assignment scope), unredacted data available for BT-score calc.
+- Acceptance items still open (Template Builder): warm-up enforcement, rate-limit safety, >80% hit rate, latency checks, and benchmark performance suite remain unchecked until BT-score/benchmark analysis is completed via the new artefact.

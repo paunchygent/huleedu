@@ -14,25 +14,24 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
-import os
 import re
 import sys
 from pathlib import Path
 
-ALLOWED_DOMAINS = {
-    "assessment",
-    "content",
-    "identity",
-    "frontend",
-    "infrastructure",
-    "security",
-    "integrations",
-    "architecture",
-}
-ALLOWED_STATUSES = {"research", "blocked", "in_progress", "completed", "paused", "archived"}
-ALLOWED_PRIORITIES = {"low", "medium", "high", "critical"}
+from pydantic import ValidationError
 
 ROOT = Path(__file__).resolve().parents[2]  # repo root
+# Ensure repo root is importable when running via `python scripts/...`
+if str(ROOT) not in sys.path:
+    sys.path.append(str(ROOT))
+
+from scripts.task_mgmt.task_frontmatter_schema import (  # noqa: E402
+    TaskDomain,
+    TaskFrontmatter,
+    TaskPriority,
+    TaskStatus,
+)
+
 TASKS_DIR = ROOT / "TASKS"
 
 
@@ -57,11 +56,15 @@ def build_path(domain: str, program: str | None, filename: str) -> Path:
 def main(argv: list[str]) -> int:
     p = argparse.ArgumentParser(description="Create a new task document")
     p.add_argument("--title", required=True, help="Human title for the task")
-    p.add_argument("--domain", required=True, choices=sorted(ALLOWED_DOMAINS))
+    p.add_argument("--domain", required=True, choices=sorted([d.value for d in TaskDomain]))
     p.add_argument("--program", help="Optional programme bucket (e.g., cj_confidence)")
     p.add_argument("--service", help="Optional service slug (e.g., nlp_lang_tool_service)")
-    p.add_argument("--status", default="research", choices=sorted(ALLOWED_STATUSES))
-    p.add_argument("--priority", default="medium", choices=sorted(ALLOWED_PRIORITIES))
+    p.add_argument(
+        "--status", default=TaskStatus.research.value, choices=[s.value for s in TaskStatus]
+    )
+    p.add_argument(
+        "--priority", default=TaskPriority.medium.value, choices=[p.value for p in TaskPriority]
+    )
     p.add_argument("--owner-team", default="agents", dest="owner_team")
     p.add_argument("--owner", default="", help="Optional owner handle like @me")
     p.add_argument("--id", default="", help="Optional external ID like TASK-052")
@@ -79,9 +82,10 @@ def main(argv: list[str]) -> int:
 
     dest.parent.mkdir(parents=True, exist_ok=True)
 
-    fm = {
+    fm_dict = {
         "id": args.id or "",
         "title": args.title,
+        "type": "task",
         "status": args.status,
         "priority": args.priority,
         "domain": args.domain,
@@ -95,31 +99,52 @@ def main(argv: list[str]) -> int:
         "labels": [],
     }
 
-    body = f"""---
-{os.linesep.join(f"{k}: {v!r}" for k, v in fm.items())}
----
-# {args.title}
+    # Validate with Pydantic to catch enum typos early
+    try:
+        TaskFrontmatter.model_validate(fm_dict)
+    except ValidationError as e:
+        print("Frontmatter validation failed:", file=sys.stderr)
+        for err in e.errors():
+            loc = ".".join(str(p) for p in err["loc"])
+            print(f"  {loc}: {err['msg']}", file=sys.stderr)
+        return 1
 
-## Objective
+    frontmatter_lines = ["---"]
+    for k, v in fm_dict.items():
+        if isinstance(v, list):
+            sv = "[" + ", ".join(repr(x) for x in v) + "]"
+        else:
+            sv = repr(v)
+        frontmatter_lines.append(f"{k}: {sv}")
+    frontmatter_lines.append("---")
 
-[What are we trying to achieve?]
-
-## Context
-
-[Why is this needed?]
-
-## Plan
-
-[Key steps]
-
-## Success Criteria
-
-[How do we know it's done?]
-
-## Related
-
-[List related tasks or docs]
-"""
+    body = "\n".join(
+        frontmatter_lines
+        + [
+            f"# {args.title}",
+            "",
+            "## Objective",
+            "",
+            "[What are we trying to achieve?]",
+            "",
+            "## Context",
+            "",
+            "[Why is this needed?]",
+            "",
+            "## Plan",
+            "",
+            "[Key steps]",
+            "",
+            "## Success Criteria",
+            "",
+            "[How do we know it's done?]",
+            "",
+            "## Related",
+            "",
+            "[List related tasks or docs]",
+            "",
+        ]
+    )
 
     dest.write_text(body, encoding="utf-8")
     print(f"Created {dest.relative_to(ROOT)}")

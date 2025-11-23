@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
 Validate .claude/ directory structure and rule file frontmatter.
-No external dependencies required.
 
 Validates:
 - Rule file naming conventions (NNN-descriptive-name.md or NNN.N-descriptive-name.md)
-- Rule file frontmatter schema
+- Rule file frontmatter schema (using Pydantic RuleFrontmatter model)
+- Parent-child rule relationships
 - Hook documentation in hooks/README.md
 - Deprecated directory usage (.claude/work/tasks/)
 - Directory structure compliance
@@ -14,11 +14,17 @@ Validates:
 from __future__ import annotations
 
 import argparse
-import datetime as dt
 import re
 import sys
+from datetime import date
 from pathlib import Path
-from typing import Any, Dict, Tuple
+from typing import Any
+
+import yaml
+from pydantic import ValidationError
+
+# Import the Pydantic schema
+from rule_frontmatter_schema import RuleFrontmatter
 
 ROOT = Path(__file__).resolve().parents[2]
 CLAUDE_DIR = ROOT / ".claude"
@@ -26,42 +32,10 @@ CLAUDE_DIR = ROOT / ".claude"
 # Rule file naming pattern: NNN-descriptive-name.md or NNN.N-descriptive-name.md
 RULE_FILE_PATTERN = re.compile(r"^(\d{3}(?:\.\d+)?)-([a-z0-9-]+)\.md$")
 
-# Allowed rule categories
-ALLOWED_CATEGORIES = {
-    "foundation",
-    "architecture",
-    "implementation",
-    "testing",
-    "documentation",
-    "operations",
-}
 
-# Allowed priority levels
-ALLOWED_PRIORITIES = {"critical", "high", "medium", "low"}
-
-# Allowed applies_to values
-ALLOWED_APPLIES_TO = {
-    "all",
-    "backend",
-    "frontend",
-    "infrastructure",
-}
-
-# Required frontmatter fields for rule files
-RULE_FRONTMATTER_REQUIRED = [
-    "id",
-    "title",
-    "category",
-    "priority",
-    "applies_to",
-    "created",
-    "last_updated",
-]
-
-
-def read_front_matter(p: Path) -> Tuple[Dict[str, Any], str]:
+def read_front_matter(p: Path) -> tuple[dict[str, Any], str]:
     """
-    Parse YAML-like frontmatter from a file.
+    Parse YAML frontmatter from a file.
 
     Args:
         p: Path to file
@@ -72,25 +46,21 @@ def read_front_matter(p: Path) -> Tuple[Dict[str, Any], str]:
     text = p.read_text(encoding="utf-8")
     if not text.startswith("---\n"):
         return {}, text
-    parts = text.split("\n---\n", 1)
+
+    # Split on first occurrence of closing ---
+    parts = text[4:].split("\n---\n", 1)
     if len(parts) != 2:
         return {}, text
-    header = parts[0][4:]
+
+    header_text = parts[0]
     body = parts[1]
-    data: Dict[str, Any] = {}
-    for line in header.splitlines():
-        if not line.strip() or line.strip().startswith("#"):
-            continue
-        m = re.match(r"^([A-Za-z0-9_]+):\s*(.*)$", line)
-        if not m:
-            continue
-        k, v = m.group(1), m.group(2).strip()
-        if v.startswith("[") and v.endswith("]"):
-            # Parse list of comma-separated quoted items
-            items = [i.strip().strip("'\"") for i in v[1:-1].split(",") if i.strip()]
-            data[k] = items
-        else:
-            data[k] = v.strip("'\"")
+
+    # Parse YAML frontmatter
+    try:
+        data = yaml.safe_load(header_text) or {}
+    except yaml.YAMLError:
+        return {}, text
+
     return data, body
 
 
@@ -117,13 +87,14 @@ def validate_rule_file_naming(p: Path) -> list[str]:
     return errors
 
 
-def validate_rule_frontmatter(p: Path, fm: Dict[str, Any]) -> list[str]:
+def validate_rule_frontmatter(p: Path, fm: dict[str, Any], all_rule_ids: set[str]) -> list[str]:
     """
-    Validate rule file frontmatter against schema.
+    Validate rule file frontmatter against Pydantic schema.
 
     Args:
         p: Path to rule file
         fm: Parsed frontmatter dict
+        all_rule_ids: Set of all valid rule IDs for cross-validation
 
     Returns:
         List of error messages (empty if valid)
@@ -134,58 +105,55 @@ def validate_rule_frontmatter(p: Path, fm: Dict[str, Any]) -> list[str]:
         errors.append("missing frontmatter")
         return errors
 
-    # Validate required fields
-    for key in RULE_FRONTMATTER_REQUIRED:
-        if key not in fm or not str(fm.get(key, "")).strip():
-            errors.append(f"missing required field '{key}'")
-
-    # Validate id matches filename
-    filename_stem = p.stem
-    fm_id = fm.get("id", "")
-    if fm_id != filename_stem:
-        errors.append(f"frontmatter id '{fm_id}' must match filename '{filename_stem}'")
-
-    # Validate category
-    category = fm.get("category", "")
-    if category and category not in ALLOWED_CATEGORIES:
-        allowed_str = ", ".join(sorted(ALLOWED_CATEGORIES))
-        errors.append(f"invalid category '{category}' (allowed: {allowed_str})")
-
-    # Validate priority
-    priority = fm.get("priority", "")
-    if priority and priority not in ALLOWED_PRIORITIES:
-        allowed_str = ", ".join(sorted(ALLOWED_PRIORITIES))
-        errors.append(f"invalid priority '{priority}' (allowed: {allowed_str})")
-
-    # Validate applies_to (can be single value or service name)
-    applies_to = fm.get("applies_to", "")
-    if applies_to and applies_to not in ALLOWED_APPLIES_TO:
-        # Allow specific service names (e.g., "cj_assessment_service")
-        if not re.match(r"^[a-z][a-z0-9_]*$", applies_to):
-            allowed_str = ", ".join(sorted(ALLOWED_APPLIES_TO))
-            errors.append(
-                f"invalid applies_to '{applies_to}' "
-                f"(allowed: {allowed_str} or specific service name)"
-            )
-
-    # Validate dates
-    for key in ("created", "last_updated"):
-        val = str(fm.get(key, ""))
-        if val:
+    # Convert date strings to date objects for Pydantic validation
+    fm_copy = fm.copy()
+    for date_field in ("created", "last_updated"):
+        if date_field in fm_copy and isinstance(fm_copy[date_field], str):
             try:
-                dt.date.fromisoformat(val)
+                fm_copy[date_field] = date.fromisoformat(fm_copy[date_field])
             except ValueError:
-                errors.append(f"invalid date '{key}': '{val}' (expected YYYY-MM-DD)")
+                errors.append(
+                    f"invalid date '{date_field}': '{fm_copy[date_field]}' (expected YYYY-MM-DD)"
+                )
+                return errors
+
+    # Validate with Pydantic model
+    try:
+        rule_fm = RuleFrontmatter.model_validate(fm_copy)
+    except ValidationError as e:
+        for error in e.errors():
+            field = ".".join(str(x) for x in error["loc"])
+            msg = error["msg"]
+            errors.append(f"{field}: {msg}")
+        return errors
+
+    # Additional cross-file validations
+    filename_stem = p.stem
+
+    # Validate ID matches filename
+    if rule_fm.id != filename_stem:
+        errors.append(f"frontmatter id '{rule_fm.id}' must match filename '{filename_stem}'")
+
+    # Validate parent_rule reference exists
+    if rule_fm.parent_rule and rule_fm.parent_rule not in all_rule_ids:
+        errors.append(f"parent_rule '{rule_fm.parent_rule}' does not exist in rules directory")
+
+    # Validate child_rules references exist
+    if rule_fm.child_rules:
+        for child_id in rule_fm.child_rules:
+            if child_id not in all_rule_ids:
+                errors.append(f"child_rule '{child_id}' does not exist in rules directory")
 
     return errors
 
 
-def validate_rule_file(p: Path) -> list[str]:
+def validate_rule_file(p: Path, all_rule_ids: set[str]) -> list[str]:
     """
     Validate a rule file for compliance with .claude/ specification.
 
     Args:
         p: Path to rule file
+        all_rule_ids: Set of all valid rule IDs for cross-validation
 
     Returns:
         List of error messages (empty if valid)
@@ -197,7 +165,7 @@ def validate_rule_file(p: Path) -> list[str]:
 
     # Parse and validate frontmatter
     fm, _ = read_front_matter(p)
-    errors.extend(validate_rule_frontmatter(p, fm))
+    errors.extend(validate_rule_frontmatter(p, fm, all_rule_ids))
 
     return errors
 
@@ -322,13 +290,23 @@ def main(argv: list[str]) -> int:
     # Validate rule files
     rules_dir = claude_root / "rules"
     if rules_dir.exists():
+        # First pass: collect all rule IDs
+        all_rule_ids: set[str] = set()
+        rule_files: list[Path] = []
+
         for p in rules_dir.glob("*.md"):
             # Skip non-normative files
             if p.name in ("README.md",):
                 continue
 
+            rule_files.append(p)
+            # Extract rule ID from filename
+            all_rule_ids.add(p.stem)
+
+        # Second pass: validate each rule with complete ID set
+        for p in rule_files:
             rel = p.relative_to(ROOT)
-            errs = validate_rule_file(p)
+            errs = validate_rule_file(p, all_rule_ids)
 
             if errs:
                 failures += 1

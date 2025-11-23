@@ -141,6 +141,27 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 - ENG5 real fixture: `python -m scripts.prompt_cache_benchmark.build_eng5_fixture` exports DOCX anchors/students + prompts/rubric/system prompt into `data/eng5_prompt_cache_fixture.json`; CLI accepts `--fixture-path` to consume this real dataset. Default `--redact-output` (hash/metrics only); `--no-redact-output` includes full text for validation.
 - Created `data/eng5_smoke_fixture.json` (4×4 subset) for smoke test B; A/B protocol now uses synthetic (A) + ENG5 real (B) with identical 16-comparison profile.
 - **Blocker (2025-11-23)**: Smoke A failed 100% (16/16) — HTTP 400: Anthropic rejects custom `metadata` fields (`correlation_id`, `provider`, `prompt_sha256`). Fix required: remove from API request payload; verify response metadata + callback propagation intact (queue_processor line 1084 dependency).
+- **Update (2025-11-23)**: Anthropic payload now uses only `metadata.user_id` (correlation_id) and includes prompt-caching beta header. Validator cap raised to 1000 chars; prompt now explicitly asks for ≤50-char justification. Runs:
+  - Smoke A (redacted) pre-change: 15/16 success, 1 validation_error (`justification` >500), cache bypass (hits 0, writes 0).
+  - Smoke A (unredacted) post-change with beta header: 16/16 success, cache bypass (hits 0, writes 0), latency p50/p95 ≈ 1.77s/2.08s. Artefacts: `.claude/work/reports/benchmarks/20251123T004138Z-prompt-cache-warmup.{json,md}` (unredacted).
+  - Observation: zero cache reads/writes likely because prompt caching unsupported for `claude-haiku-4-5-20251001` or blocks below Anthropic caching thresholds; cache_key remained constant across all calls.
+- **Benchmark runtime guardrail**: When invoking `pdm run prompt-cache-benchmark`, **do not wrap with external timeouts** (e.g., `timeout_ms` in tool calls); previous 180s wrapper killed runs after requests were sent. CLI help now includes this warning.
+
+### Prompt Cache Benchmark Raw Capture (2025-11-23)
+
+- Added raw Anthropic response capture to benchmark runner (`LLMCallResult.raw_response`); artefacts now include provider JSON for audit/BT-score calc.
+- New run (Sonnet, ENG5 4×4, unredacted): `pdm run prompt-cache-benchmark --fixture smoke --fixture-path data/eng5_smoke_fixture.json --model claude-sonnet-4-5-20250929 --no-redact-output --prom-url http://localhost:9091 --grafana-url http://localhost:3000`
+  - Artefacts: `.claude/work/reports/benchmarks/20251123T011800Z-prompt-cache-warmup.{json,md}` (contains raw_response per request).
+  - Metrics: hits 16, misses 0, bypass 0; read 43,112 / write 1,408 tokens; latency p50/p95 ≈ 3.26s/3.91s.
+  - Normalized stats (post-processed): hits 15, misses 1, bypass 0 on the prior Sonnet run (00:59Z). Raw-response run uses corrected exclusive aggregation in code.
+  - Note: Haiku caching remains bypassed due to <2,048 cacheable tokens; Sonnet works without inflating prompts.
+
+### Queue Processor Completion/Removal Tests (Resolved 2025-11-23)
+- Integration failures in `services/llm_provider_service/tests/integration/test_queue_processor_completion_removal.py` are fixed. Root cause was `_process_request` taking the `serial_bundle` path (from `.env` default) and calling `process_comparison_batch`, which returned a mock and triggered "Unexpected processing result type". `_process_request` now always uses the per-request path, leaving serial bundle handling to `_process_request_serial_bundle`. All four tests now pass via `pdm run pytest-root services/llm_provider_service/tests/integration/test_queue_processor_completion_removal.py`.
+
+### Remaining To-Dos
+- If Haiku caching is required: either inflate cacheable prefix to >2,048 tokens or accept bypass on Haiku. Current recommendation: use Sonnet for caching scenarios to avoid prompt bloat.
+- Optional: post-process existing artefacts to slim raw_response for BT-score input (no extra API cost).
 
 ---
 

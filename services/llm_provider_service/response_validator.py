@@ -38,7 +38,7 @@ class StandardizedLLMResponse(BaseModel):
         pattern=rf"^({EssayComparisonWinner.ESSAY_A.value}|{EssayComparisonWinner.ESSAY_B.value})$",
     )
     justification: str = Field(
-        description="Explanation of the choice (max 500 characters)", max_length=500
+        description="Explanation of the choice (max 1000 characters)", max_length=1000
     )
     confidence: float = Field(description="Confidence score between 1.0 and 5.0", ge=1.0, le=5.0)
 

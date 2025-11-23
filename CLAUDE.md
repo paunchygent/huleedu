@@ -37,6 +37,7 @@ cross-service task context.
 - Create: `pdm run new-task --domain <domain> --title "Title"` → `TASKS/<domain>/<id>.md`
 - Update: Active tasks in `TASKS/`, session context in `.claude/work/session/handoff.md`
 - ⚠️ `.claude/work/tasks/` is DEPRECATED
+- Allowed task frontmatter enums (validated by hooks): `status` ∈ {research, blocked, in_progress, paused, completed, archived}; `priority` ∈ {low, medium, high, critical}; `domain` ∈ {assessment, content, identity, frontend, infrastructure, security, integrations, architecture, programs}. Use `python scripts/task_mgmt/validate_front_matter.py --verbose` to check.
 
 **Documentation:**
 - Runbooks: `docs/operations/` (requires frontmatter)

@@ -218,38 +218,13 @@ class QueueProcessorImpl:
                 )
 
                 result: LLMOrchestratorResponse | LLMQueuedResult
-                if self.queue_processing_mode is QueueProcessingMode.PER_REQUEST:
-                    result = await self.comparison_processor.process_comparison(
-                        provider=provider,
-                        user_prompt=req_data.user_prompt,
-                        prompt_blocks=req_data.prompt_blocks,
-                        correlation_id=req_data.correlation_id or request.queue_id,
-                        **overrides,
-                    )
-                else:
-                    batch_item = BatchComparisonItem(
-                        provider=provider,
-                        user_prompt=req_data.user_prompt,
-                        prompt_blocks=req_data.prompt_blocks,
-                        correlation_id=req_data.correlation_id or request.queue_id,
-                        overrides=overrides or None,
-                    )
-                    batch_results = await self.comparison_processor.process_comparison_batch(
-                        [batch_item]
-                    )
-                    if not batch_results:
-                        raise_processing_error(
-                            service="llm_provider_service",
-                            operation="queue_request_processing",
-                            message="Batch processor returned no results",
-                            correlation_id=req_data.correlation_id or request.queue_id,
-                            details={
-                                "provider": provider.value,
-                                "queue_id": str(request.queue_id),
-                                "queue_processing_mode": self.queue_processing_mode.value,
-                            },
-                        )
-                    result = batch_results[0]
+                result = await self.comparison_processor.process_comparison(
+                    provider=provider,
+                    user_prompt=req_data.user_prompt,
+                    prompt_blocks=req_data.prompt_blocks,
+                    correlation_id=req_data.correlation_id or request.queue_id,
+                    **overrides,
+                )
 
             if isinstance(result, LLMOrchestratorResponse):
                 await self._handle_request_success(request, result)

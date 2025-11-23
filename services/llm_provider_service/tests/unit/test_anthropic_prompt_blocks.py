@@ -104,6 +104,52 @@ async def test_anthropic_prefers_prompt_blocks_and_sets_cache_control() -> None:
 
 
 @pytest.mark.asyncio
+async def test_anthropic_metadata_only_sends_user_id() -> None:
+    """Anthropic payload metadata must only include user_id to avoid 400s."""
+
+    settings = Settings(ANTHROPIC_API_KEY="test-key", ENABLE_PROMPT_CACHING=True)
+    mock_session = Mock()
+    mock_retry_manager = AsyncMock(spec=LLMRetryManagerProtocol)
+    mock_retry_manager.with_retry.side_effect = _execute_operation
+
+    provider = AnthropicProviderImpl(
+        session=mock_session,
+        settings=settings,
+        retry_manager=mock_retry_manager,
+    )
+
+    captured_payload: dict[str, Any] = {}
+
+    async def fake_http_request(**kwargs: Any) -> str:
+        captured_payload["payload"] = kwargs["payload"]
+        return json.dumps(
+            {
+                "content": [
+                    {
+                        "type": "tool_use",
+                        "name": "comparison_result",
+                        "input": {"winner": "Essay A", "justification": "A", "confidence": 3},
+                    }
+                ]
+            }
+        )
+
+    provider._perform_http_request_with_metrics = fake_http_request  # type: ignore[method-assign]
+
+    correlation_id = uuid4()
+    await provider.generate_comparison(
+        user_prompt="prompt",
+        prompt_blocks=None,
+        correlation_id=correlation_id,
+    )
+
+    payload = captured_payload["payload"]
+    assert payload.get("metadata") == {"user_id": str(correlation_id)}
+    assert "correlation_id" not in payload["metadata"]
+    assert "provider" not in payload["metadata"]
+
+
+@pytest.mark.asyncio
 async def test_anthropic_rejects_ttl_ordering_violation() -> None:
     """A 1h block after 5m should raise a validation error."""
 

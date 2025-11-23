@@ -129,7 +129,8 @@ class AnthropicProviderImpl(LLMProviderProtocol):
         # Use system prompt from override or default comparison prompt
         system_prompt = system_prompt_override or (
             "You are an LLM comparison engine. Follow the caller-supplied "
-            "instructions and ensure your output satisfies the required tool schema."
+            "instructions and ensure your output satisfies the required tool schema. "
+            "Keep the justification at or below 50 characters (one concise sentence)."
         )
 
         # Execute with retry
@@ -510,6 +511,7 @@ class AnthropicProviderImpl(LLMProviderProtocol):
             "x-api-key": self.api_key,
             "anthropic-version": api_version,
             "content-type": "application/json",
+            "anthropic-beta": "prompt-caching-2024-07-31",
         }
 
         temperature = (
@@ -553,13 +555,8 @@ class AnthropicProviderImpl(LLMProviderProtocol):
             model=model,
         )
 
-        metadata: dict[str, Any] = {
-            "correlation_id": str(correlation_id),
-            "provider": "anthropic",
-        }
-
-        if prompt_sha256:
-            metadata["prompt_sha256"] = prompt_sha256
+        # Anthropic only allows `metadata.user_id`; custom keys are rejected.
+        metadata = {"user_id": str(correlation_id)}
 
         payload = {
             "model": model,

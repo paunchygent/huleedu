@@ -67,6 +67,7 @@ class LLMCallResult:
     error: str | None = None
     status_code: int | None = None
     is_seed: bool = False
+    raw_response: dict[str, Any] | None = None
 
 
 class LLMClientProtocol(Protocol):
@@ -113,6 +114,12 @@ class AnthropicLLMClient(LLMClientProtocol):
 
         prompt_tokens = int(usage.get("input_tokens") or 0)
 
+        raw_response: dict[str, Any] | None = None
+        try:
+            raw_response = response.raw_response  # type: ignore[attr-defined]
+        except Exception:
+            raw_response = None
+
         return LLMCallResult(
             request=request,
             status="success",
@@ -121,6 +128,7 @@ class AnthropicLLMClient(LLMClientProtocol):
             cache_write_tokens=cache_write,
             total_prompt_tokens=prompt_tokens,
             prompt_hash=metadata.get("prompt_sha256") or request.prompt_hash,
+            raw_response=raw_response,
         )
 
 
@@ -203,6 +211,7 @@ class BenchmarkResult:
                     "error": r.error,
                     "status_code": r.status_code,
                     "is_seed": r.is_seed,
+                    "raw_response": r.raw_response,
                 }
                 for r in self.results
             ],
@@ -376,15 +385,28 @@ class BenchmarkRunner:
     def _summarize(
         self, results: list[LLMCallResult], *, seeds: int, promql_snapshots: list[dict[str, Any]]
     ) -> BenchmarkResult:
-        hits = sum(1 for r in results if r.cache_read_tokens > 0)
-        misses = sum(1 for r in results if r.cache_write_tokens > 0)
-        bypass = sum(
-            1
-            for r in results
-            if r.cache_read_tokens == 0 and r.cache_write_tokens == 0 and r.status == "success"
-        )
-        ttl_violations = sum(1 for r in results if r.status == "ttl_violation")
-        rate_limit_errors = sum(1 for r in results if r.status in {"rate_limit", "quota_exceeded"})
+        hits = 0
+        misses = 0
+        bypass = 0
+        ttl_violations = 0
+        rate_limit_errors = 0
+
+        for r in results:
+            if r.status == "ttl_violation":
+                ttl_violations += 1
+                continue
+            if r.status in {"rate_limit", "quota_exceeded"}:
+                rate_limit_errors += 1
+                continue
+            if r.status != "success":
+                continue
+
+            if r.cache_read_tokens > 0:
+                hits += 1
+            elif r.cache_write_tokens > 0:
+                misses += 1
+            else:
+                bypass += 1
 
         per_key: list[PerCacheKeyStats] = []
         post_seed_total = 0
@@ -392,15 +414,25 @@ class BenchmarkRunner:
 
         for key in {r.request.cache_key for r in results}:
             key_results = [r for r in results if r.request.cache_key == key]
-            key_hits = sum(1 for r in key_results if r.cache_read_tokens > 0)
-            key_misses = sum(1 for r in key_results if r.cache_write_tokens > 0)
-            key_bypass = sum(
-                1
-                for r in key_results
-                if r.cache_read_tokens == 0 and r.cache_write_tokens == 0 and r.status == "success"
+
+            key_hits = 0
+            key_misses = 0
+            key_bypass = 0
+
+            for r in key_results:
+                if r.status != "success":
+                    continue
+                if r.cache_read_tokens > 0:
+                    key_hits += 1
+                elif r.cache_write_tokens > 0:
+                    key_misses += 1
+                else:
+                    key_bypass += 1
+
+            remainder = [r for r in key_results[1:] if r.status == "success"] if key_results else []
+            remainder_misses = sum(
+                1 for r in remainder if r.cache_read_tokens == 0 and r.cache_write_tokens > 0
             )
-            remainder = key_results[1:] if key_results else []
-            remainder_misses = sum(1 for r in remainder if r.cache_write_tokens > 0)
             remainder_total = len(remainder)
             post_seed_total += remainder_total
             post_seed_misses += remainder_misses

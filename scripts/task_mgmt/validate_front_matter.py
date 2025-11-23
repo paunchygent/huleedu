@@ -15,6 +15,21 @@ from pathlib import Path
 from typing import Any, Dict, Tuple
 
 ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.append(str(ROOT))
+
+try:  # Optional: schema validation if pydantic is available
+    from pydantic import ValidationError  # type: ignore
+
+    from scripts.task_mgmt.task_frontmatter_schema import (
+        TaskFrontmatter,
+    )
+
+    HAVE_SCHEMA = True
+except Exception:  # pragma: no cover - fallback when deps unavailable
+    HAVE_SCHEMA = False
+
+ROOT = Path(__file__).resolve().parents[2]
 TASKS_DIR = ROOT / "TASKS"
 
 ALLOWED_DOMAINS = {
@@ -216,6 +231,21 @@ def validate_directory_naming(p: Path, tasks_root: Path) -> list[str]:
     return errors
 
 
+def validate_with_schema(fm: Dict[str, Any], p: Path) -> list[str]:
+    """Validate frontmatter against the shared Pydantic schema."""
+    if not fm or not HAVE_SCHEMA:
+        return []
+    try:
+        TaskFrontmatter.model_validate(fm)
+    except ValidationError as e:
+        errs = []
+        for err in e.errors():
+            loc = ".".join(str(x) for x in err["loc"])
+            errs.append(f"{loc}: {err['msg']}")
+        return [f"schema validation failed: {errs}"]
+    return []
+
+
 def validate_file(p: Path, tasks_root: Path, strict: bool = False) -> list[str]:
     """
     Validate a task file for compliance with TASKS specification.
@@ -241,7 +271,7 @@ def validate_file(p: Path, tasks_root: Path, strict: bool = False) -> list[str]:
         if key not in fm or not str(fm[key]).strip():
             errors.append(f"missing required '{key}'")
 
-    # Validate enum fields
+    # Validate enum fields (legacy guard; schema validation will also catch)
     if fm.get("domain") not in ALLOWED_DOMAINS:
         errors.append(f"invalid domain '{fm.get('domain')}'")
     if fm.get("status") not in ALLOWED_STATUSES:
@@ -264,6 +294,7 @@ def validate_file(p: Path, tasks_root: Path, strict: bool = False) -> list[str]:
     # New validations from spec §13
     errors.extend(validate_filename_id_match(p, fm))
     errors.extend(validate_id_format(fm))
+    errors.extend(validate_with_schema(fm, p))
 
     return errors
 
@@ -306,7 +337,7 @@ def main(argv: list[str]) -> int:
         if should_exclude_file(p, root, args.exclude_archive):
             continue
 
-        rel = p.relative_to(ROOT)
+        rel = p.relative_to(root)
         errs: list[str] = []
 
         # Validate path structure (before parsing frontmatter)

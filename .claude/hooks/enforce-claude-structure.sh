@@ -254,15 +254,27 @@ EOF
     fi
   fi
 
-  # Check for mv/rm commands affecting .claude/ structure directories
-  if [[ "$COMMAND" =~ (mv|rm).*\.claude/(config|agents|skills|commands|hooks|rules|work|archive|research) ]]; then
-    cat >&2 << EOF
+  # Check for mv/rm/rmdir commands that would remove/move .claude/ top-level directories
+  # Only block if the command would affect the directory structure itself
+  # Allow: file operations, git commands, read-only operations
+  if [[ "$COMMAND" =~ ^[[:space:]]*(mv|rm|rmdir)[[:space:]]+ ]]; then
+    # Check if targeting a top-level .claude/ directory (ending with / or no further path)
+    for dir in "${ALLOWED_TOP_LEVEL[@]}"; do
+      # Match patterns like: "rm -rf .claude/rules" or "mv .claude/work elsewhere"
+      if [[ "$COMMAND" =~ (mv|rm|rmdir)[[:space:]]+([-a-zA-Z]*[[:space:]]+)*\.claude/${dir}[[:space:]]*$ ]] || \
+         [[ "$COMMAND" =~ (mv|rm|rmdir)[[:space:]]+([-a-zA-Z]*[[:space:]]+)*\.claude/${dir}/[[:space:]]*$ ]] || \
+         [[ "$COMMAND" =~ \.claude/${dir}[[:space:]]+ ]]; then
+        cat >&2 << EOF
 🚫 CLAUDE STRUCTURE VIOLATION
 
-Moving or removing core .claude/ directories is blocked.
+Moving or removing core .claude/ top-level directories is blocked.
   Command: $COMMAND
+  Target: .claude/$dir/
 
 The .claude/ directory structure is locked and enforced.
+
+Note: Operations on FILES within these directories are allowed.
+      Only moving/removing the directories themselves is blocked.
 
 If you need to modify the structure:
   1. Discuss the change with the user
@@ -272,7 +284,9 @@ If you need to modify the structure:
 
 Operation blocked.
 EOF
-    exit 2
+        exit 2
+      fi
+    done
   fi
 fi
 

@@ -233,7 +233,7 @@ class TestSuccessCallbackPublishing:
         successful_llm_response: LLMOrchestratorResponse,
         mock_event_publisher: AsyncMock,
     ) -> None:
-        """Test that justification is preserved up to 500 characters."""
+        """Test that justification is preserved up to 1000 characters."""
         # Arrange - set long justification
         long_justification = "This is a very long justification that should be truncated"
         successful_llm_response.justification = long_justification
@@ -247,7 +247,7 @@ class TestSuccessCallbackPublishing:
         event_data = envelope.data
 
         assert event_data.justification == long_justification
-        assert len(event_data.justification) <= 500
+        assert len(event_data.justification) <= 1000
 
     @pytest.mark.asyncio
     async def test_success_callback_token_usage_mapping(

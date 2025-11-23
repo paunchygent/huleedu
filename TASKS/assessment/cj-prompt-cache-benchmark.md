@@ -2,12 +2,12 @@
 id: cj-prompt-cache-benchmark
 title: CJ Prompt Cache Benchmark & Warm-Up Validation
 type: task
-status: in_progress
+status: paused
 priority: medium
 domain: assessment
 owner_team: agents
 created: '2025-11-22'
-last_updated: '2025-11-22'
+last_updated: '2025-11-23'
 service: cj_assessment_service, llm_provider_service
 owner: ''
 program: ''
@@ -20,7 +20,7 @@ labels:
   - anthropic-api
 ---
 
-# Task: CJ Prompt Cache Benchmark & Warm-Up Validation
+# Task: CJ Prompt Cache Benchmark & Warm-Up Validation (Paused)
 
 ## Goal
 Design and execute a reproducible benchmark to validate Anthropic prompt caching efficacy (hit rate, token savings, latency) and warm-up scheduling behavior without breaching tier-1 rate limits.
@@ -73,3 +73,28 @@ Design and execute a reproducible benchmark to validate Anthropic prompt caching
 - ENG5 real-data path: new exporter `python -m scripts.prompt_cache_benchmark.build_eng5_fixture` generates `data/eng5_prompt_cache_fixture.json` from existing ENG5 DOCX assets (12 anchors + 12 students + prompts/rubric/system prompt). CLI now accepts `--fixture-path` to use this JSON instead of synthetic fixtures. Default: `--redact-output` (hash/metrics only); use `--no-redact-output` for validation runs (adds essay text, prompts, blocks to JSON).
 - Created `data/eng5_smoke_fixture.json` (4×4 subset from full) for A/B smoke test parity; both synthetic and ENG5 smoke now execute 16 comparisons with identical operational profile.
 - Pre-flight smoke A executed (2025-11-23): **100% failure (16/16) — HTTP 400 "metadata.correlation_id: Extra inputs are not permitted"**. Anthropic API `metadata` field only accepts `user_id`; custom fields (`correlation_id`, `provider`, `prompt_sha256`) rejected. Location: `anthropic_provider_impl.py:556-572`. Open question: Remove fields from API payload (confirm response metadata + callback propagation unaffected); verify no regression in queue_processor (line 1084: reads `prompt_sha256` from response.metadata) or downstream consumers.
+
+## Current Status (2025-11-23)
+
+- Synthetic + ENG5 fixtures wired; CLI (`pdm run prompt-cache-benchmark`) with dual-bucket limiter and jittered seeds. Artefacts live in `.claude/work/reports/benchmarks/`.
+- Haiku caching: bypass (cacheable prefix ~1.0-1.3k tokens < 2,048 floor). Sonnet caching works without inflating prompts (1,024 floor).
+- Runs to date:
+  - Smoke A redacted (Haiku): 15/16 success, 1 validation_error (justification >500), cache bypass.
+  - Smoke A unredacted (Haiku): 16/16 success, cache bypass; artefacts `.claude/work/reports/benchmarks/20251123T004138Z-prompt-cache-warmup.{json,md}`.
+  - Smoke B (ENG5 smoke) Sonnet: cache reads 23,925 / writes 20,595; hits double-counted in stored artefact (effective hits 15/16). Artefacts `.claude/work/reports/benchmarks/20251123T005924Z-prompt-cache-warmup.{json,md}` + normalized post-process `.json`.
+- Smoke B (ENG5 smoke) Sonnet with raw_response capture: hits 16, misses 0, bypass 0; read 43,112 / write 1,408; artefacts `.claude/work/reports/benchmarks/20251123T011800Z-prompt-cache-warmup.{json,md}` (includes raw Anthropic tool responses).
+- Validator cap raised to 1000 chars; tool schema still enforces 50-char justification; prompt text explicitly asks for ≤50 chars. Anthropic beta header added; payload metadata restricted to `user_id`.
+- CLI help now warns: do not wrap the command in external timeouts; prior 180s wrapper killed runs after requests were sent.
+- LLM Provider queue processor completion/removal integration tests now pass despite `.env` defaulting `QUEUE_PROCESSING_MODE=serial_bundle`; `_process_request` always uses the per-request path. Verified via `pdm run pytest-root services/llm_provider_service/tests/integration/test_queue_processor_completion_removal.py`.
+- Paused: further validation runs are deferred until the go-live window; current smoke artefacts are sufficient for operational decisions.
+
+## Risks / Blockers
+
+- Haiku prompt caching floor (2,048 tokens) exceeds current cacheable prefix; would require inflating static blocks to see writes/reads.
+- Tier-1 Anthropic limits still apply; full-run concurrency must stay within bucket budgets.
+
+## Next Steps (Deferred)
+
+- Final full-scale validation runs are on hold until the deployment window; keep Sonnet as the caching baseline.
+- Optional: rerun Smoke B on Haiku with inflated cacheable prefix to validate cache writes (cost/latency tradeoff).
+- Optional: post-process existing artefacts to slim raw_response for BT-score input (no new API calls).

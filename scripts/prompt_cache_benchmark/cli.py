@@ -23,7 +23,12 @@ from services.llm_provider_service.implementations.retry_manager_impl import (
     RetryManagerImpl,
 )
 
-app = typer.Typer(help="CJ prompt cache warm-up benchmark runner")
+app = typer.Typer(
+    help=(
+        "CJ prompt cache warm-up benchmark runner. "
+        "Do NOT wrap this command in external timeouts; allow it to finish so artefacts persist."
+    )
+)
 
 
 async def _run_benchmark(

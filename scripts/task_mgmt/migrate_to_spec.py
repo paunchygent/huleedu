@@ -25,6 +25,23 @@ from pathlib import Path
 from typing import Any, Dict, Tuple
 
 ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.append(str(ROOT))
+
+try:
+    from pydantic import ValidationError  # type: ignore
+
+    from scripts.task_mgmt.task_frontmatter_schema import (  # noqa: E402
+        TaskFrontmatter,
+        TaskStatus,
+    )
+
+    HAVE_SCHEMA = True
+except Exception:  # pragma: no cover - fallback when deps unavailable
+    HAVE_SCHEMA = False
+    TaskFrontmatter = None  # type: ignore
+    TaskStatus = None  # type: ignore
+
 TASKS_DIR = ROOT / "TASKS"
 
 ALLOWED_DOMAINS = {
@@ -298,7 +315,7 @@ def generate_frontmatter(
         "id": task_id,
         "title": title,
         "type": "task",
-        "status": "research",
+        "status": TaskStatus.research.value if HAVE_SCHEMA else "research",
         "priority": "medium",
         "domain": domain,
         "service": "",
@@ -323,6 +340,16 @@ def generate_frontmatter(
                 fm["program"] = program
         if program and filepath.name == "HUB.md":
             fm["id"] = f"{program.upper()}_HUB"
+
+    # Validate before emitting text to catch enum/domain issues early
+    if HAVE_SCHEMA:
+        try:
+            TaskFrontmatter.model_validate(fm)
+        except ValidationError as e:  # pragma: no cover - defensive
+            errors = "; ".join(
+                f"{'.'.join(str(x) for x in err['loc'])}: {err['msg']}" for err in e.errors()
+            )
+            raise ValueError(f"Frontmatter validation failed for {filepath}: {errors}") from e
 
     lines = ["---"]
     for key, value in fm.items():

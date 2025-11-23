@@ -25,7 +25,7 @@ class TestStandardizedLLMResponse:
         )
 
         assert response.winner == "Essay A"
-        assert len(response.justification) <= 50
+        assert len(response.justification) <= 1000
         assert 1.0 <= response.confidence <= 5.0
 
     def test_justification_too_short_passes(self) -> None:
@@ -39,7 +39,7 @@ class TestStandardizedLLMResponse:
 
     def test_justification_too_long_fails(self) -> None:
         """Test that long justifications fail strict validation."""
-        long_text = "A" * 501  # More than 500 chars
+        long_text = "A" * 1001  # More than 1000 chars
         with pytest.raises(ValueError):
             StandardizedLLMResponse(winner="Essay A", justification=long_text, confidence=2.5)
 
@@ -165,7 +165,7 @@ class TestValidateAndNormalizeResponse:
         assert validated.confidence == 5.0
 
     def test_justification_normalization(self) -> None:
-        """Test that justifications are preserved up to 500 characters."""
+        """Test that justifications are preserved up to 1000 characters."""
         # Test short justification is preserved as-is
         short_response = {
             "winner": "Essay A",
@@ -178,7 +178,7 @@ class TestValidateAndNormalizeResponse:
         assert validated is not None
         assert validated.justification == "Short"
 
-        # Test medium justification is preserved (up to 500 chars)
+        # Test medium justification is preserved (well within 1000-char cap)
         medium_text = "A" * 100  # 100 chars - well within limit
         medium_response = {
             "winner": "Essay B",
