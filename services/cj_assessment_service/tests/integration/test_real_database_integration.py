@@ -30,6 +30,10 @@ from common_core.metadata_models import (
 )
 from common_core.status_enums import BatchStatus, CJBatchStateEnum, ProcessingStage
 
+from services.cj_assessment_service.cj_core_logic.grade_projection.context_service import (
+    ProjectionContextService,
+)
+from services.cj_assessment_service.cj_core_logic.grade_projector import GradeProjector
 from services.cj_assessment_service.cj_core_logic.workflow_continuation import (
     trigger_existing_workflow_continuation,
 )
@@ -37,9 +41,15 @@ from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.event_processor import process_single_message
 from services.cj_assessment_service.models_db import CJBatchState
 from services.cj_assessment_service.protocols import (
-    CJRepositoryProtocol,
+    AnchorRepositoryProtocol,
+    AssessmentInstructionRepositoryProtocol,
+    CJBatchRepositoryProtocol,
+    CJComparisonRepositoryProtocol,
+    CJEssayRepositoryProtocol,
     ContentClientProtocol,
+    SessionProviderProtocol,
 )
+from services.cj_assessment_service.tests.fixtures.database_fixtures import PostgresDataAccess
 from services.cj_assessment_service.tests.integration.callback_simulator import (
     CallbackSimulator,
 )
@@ -134,7 +144,13 @@ class TestRealDatabaseIntegration:
     @pytest.mark.slow
     async def test_full_batch_lifecycle_with_real_database(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_session_provider: SessionProviderProtocol,
+        postgres_batch_repository: CJBatchRepositoryProtocol,
+        postgres_essay_repository: CJEssayRepositoryProtocol,
+        postgres_instruction_repository: AssessmentInstructionRepositoryProtocol,
+        postgres_anchor_repository: AnchorRepositoryProtocol,
+        postgres_comparison_repository: CJComparisonRepositoryProtocol,
+        postgres_data_access: PostgresDataAccess,
         mock_content_client: ContentClientProtocol,
         mock_event_publisher: AsyncMock,
         mock_llm_interaction_async: AsyncMock,  # Use async mock
@@ -162,20 +178,35 @@ class TestRealDatabaseIntegration:
         )
 
         # Act - Process the request using real database
+        grade_projector = GradeProjector(
+            session_provider=postgres_session_provider,
+            context_service=ProjectionContextService(
+                session_provider=postgres_session_provider,
+                instruction_repository=postgres_instruction_repository,
+                anchor_repository=postgres_anchor_repository,
+            ),
+        )
+
         result = await process_single_message(
             kafka_msg,
-            postgres_repository,
+            postgres_session_provider,
+            postgres_batch_repository,
+            postgres_essay_repository,
+            postgres_instruction_repository,
+            postgres_anchor_repository,
+            postgres_comparison_repository,
             mock_content_client,
             mock_event_publisher,
-            mock_llm_interaction_async,  # Use async mock
-            test_settings,
+            mock_llm_interaction_async,  # llm_interaction
+            test_settings,  # settings_obj
+            grade_projector,
         )
 
         # Assert - Verify message processed successfully
         assert result is True
 
         # Find the actual CJ batch ID and initialize batch state
-        async with postgres_repository.session() as session:
+        async with postgres_session_provider.session() as session:
             cj_batch = await db_verification_helpers.find_batch_by_bos_id(session, batch_id)
             assert cj_batch is not None, f"CJ batch not found for BOS batch ID: {batch_id}"
             actual_cj_batch_id = cj_batch.id
@@ -196,19 +227,24 @@ class TestRealDatabaseIntegration:
         # This bridges the async gap in testing by processing the mock results as callbacks
         callback_simulator = CallbackSimulator()
         callbacks_processed = await callback_simulator.simulate_callbacks_from_mock_results(
-            mock_llm_interaction=mock_llm_interaction_async,  # Use async mock
-            database=postgres_repository,
-            event_publisher=mock_event_publisher,
+            mock_llm_interaction_async,
+            mock_event_publisher,
             settings=test_settings,
             content_client=mock_content_client,
             correlation_id=correlation_id,
+            session_provider=postgres_session_provider,
+            batch_repository=postgres_batch_repository,
+            essay_repository=postgres_essay_repository,
+            comparison_repository=postgres_comparison_repository,
+            instruction_repository=postgres_instruction_repository,
+            grade_projector=grade_projector,
         )
 
         # Verify callbacks were processed
         assert callbacks_processed > 0, "No callbacks were processed"
 
         # Verify batch state reflects all callbacks before forcing continuation
-        async with postgres_repository.session() as session:
+        async with postgres_session_provider.session() as session:
             batch_state = await session.get(CJBatchState, actual_cj_batch_id)
             assert batch_state is not None
             # All processed callbacks should be recorded in completed/failed counters
@@ -222,24 +258,32 @@ class TestRealDatabaseIntegration:
                 f"callbacks_processed={callbacks_processed}"
             )
 
-        # Trigger final workflow continuation to ensure completion event is published
-        # New logic: continuation runs after all submitted callbacks have arrived
+        # Trigger final workflow continuation to ensure completion event is published.
+        # New logic: continuation runs after all submitted callbacks have arrived,
+        # using real session provider and repositories for a true integration path.
         if callbacks_processed >= (essay_count * (essay_count - 1)) // 2:
             await trigger_existing_workflow_continuation(
                 batch_id=actual_cj_batch_id,
-                database=postgres_repository,
+                session_provider=postgres_session_provider,
+                batch_repository=postgres_batch_repository,
+                comparison_repository=postgres_comparison_repository,
+                essay_repository=postgres_essay_repository,
+                instruction_repository=postgres_instruction_repository,
                 event_publisher=mock_event_publisher,
                 settings=test_settings,
                 content_client=mock_content_client,
                 correlation_id=correlation_id,
                 llm_interaction=mock_llm_interaction_async,
                 retry_processor=None,
+                grade_projector=grade_projector,
             )
 
         # Verify database operations occurred
-        async with postgres_repository.session() as session:
+        async with postgres_session_provider.session() as session:
             # Verify batch was created with correct essay count
-            batches = await postgres_repository.get_essays_for_cj_batch(session, actual_cj_batch_id)
+            batches = await postgres_data_access.get_essays_for_cj_batch(
+                session, actual_cj_batch_id
+            )
             assert len(batches) == essay_count
 
             # Verify essays were stored
@@ -322,19 +366,19 @@ class TestRealDatabaseIntegration:
 
     async def test_database_isolation_between_tests(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_data_access: PostgresDataAccess,
         db_verification_helpers: Any,
     ) -> None:
         """Test that database transactions are properly isolated between tests."""
         # This test should start with a clean database
-        async with postgres_repository.session() as session:
+        async with postgres_data_access.session() as session:
             # Verify no data leakage from previous tests
             assert await db_verification_helpers.verify_no_data_leakage(session)
 
             # Create some test data
             from services.cj_assessment_service.enums_db import CJBatchStatusEnum
 
-            batch = await postgres_repository.create_new_cj_batch(
+            batch = await postgres_data_access.create_new_cj_batch(
                 session=session,
                 bos_batch_id=str(uuid4()),
                 event_correlation_id=str(uuid4()),
@@ -353,7 +397,7 @@ class TestRealDatabaseIntegration:
 
     async def test_real_database_operations_with_postgresql(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_data_access: PostgresDataAccess,
         db_verification_helpers: Any,
     ) -> None:
         """Test with PostgreSQL for production parity.
@@ -363,7 +407,7 @@ class TestRealDatabaseIntegration:
         sessions per architectural standards.
         """
         # Test PostgreSQL-specific operations with repository-managed sessions
-        async with postgres_repository.session() as session:
+        async with postgres_data_access.session() as session:
             # Verify clean state (cleanup fixture ensures this)
             assert await db_verification_helpers.verify_no_data_leakage(session)
 
@@ -371,7 +415,7 @@ class TestRealDatabaseIntegration:
             from services.cj_assessment_service.enums_db import CJBatchStatusEnum
 
             # Create batch
-            batch = await postgres_repository.create_new_cj_batch(
+            batch = await postgres_data_access.create_new_cj_batch(
                 session=session,
                 bos_batch_id=str(uuid4()),
                 event_correlation_id=str(uuid4()),
@@ -385,7 +429,7 @@ class TestRealDatabaseIntegration:
             # Create essays
             essays = []
             for i in range(5):
-                essay = await postgres_repository.create_or_update_cj_processed_essay(
+                essay = await postgres_data_access.create_or_update_cj_processed_essay(
                     session=session,
                     cj_batch_id=batch.id,
                     els_essay_id=f"essay-{i}",
@@ -401,14 +445,14 @@ class TestRealDatabaseIntegration:
 
             # Test ranking operations
             scores = {f"essay-{i}": float(i) * 0.1 for i in range(5)}
-            await postgres_repository.update_essay_scores_in_batch(
+            await postgres_data_access.update_essay_scores_in_batch(
                 session=session,
                 cj_batch_id=batch.id,
                 scores=scores,
             )
 
             # Get rankings
-            rankings = await postgres_repository.get_final_cj_rankings(
+            rankings = await postgres_data_access.get_final_cj_rankings(
                 session=session,
                 cj_batch_id=batch.id,
             )

@@ -16,7 +16,12 @@ from quart import Quart
 from quart_dishka import QuartDishka
 
 from services.cj_assessment_service.api.anchor_management import bp
-from services.cj_assessment_service.protocols import CJRepositoryProtocol, ContentClientProtocol
+from services.cj_assessment_service.protocols import (
+    AnchorRepositoryProtocol,
+    AssessmentInstructionRepositoryProtocol,
+    ContentClientProtocol,
+    SessionProviderProtocol,
+)
 from services.cj_assessment_service.tests.unit.anchor_api_test_helpers import (
     FailingMockRepository,
     MissingStorageIdClient,
@@ -57,7 +62,15 @@ class TestAnchorAPIErrorHandling:
                 return failing_content_client
 
             @provide(scope=Scope.REQUEST)
-            def provide_repository(self) -> CJRepositoryProtocol:
+            def provide_session_provider(self) -> SessionProviderProtocol:
+                return mock_repository
+
+            @provide(scope=Scope.REQUEST)
+            def provide_anchor_repository(self) -> AnchorRepositoryProtocol:
+                return mock_repository
+
+            @provide(scope=Scope.REQUEST)
+            def provide_instruction_repository(self) -> AssessmentInstructionRepositoryProtocol:
                 return mock_repository
 
         app = Quart(__name__)
@@ -101,7 +114,15 @@ class TestAnchorAPIErrorHandling:
                 return missing_storage_id_client
 
             @provide(scope=Scope.REQUEST)
-            def provide_repository(self) -> CJRepositoryProtocol:
+            def provide_session_provider(self) -> SessionProviderProtocol:
+                return mock_repository
+
+            @provide(scope=Scope.REQUEST)
+            def provide_anchor_repository(self) -> AnchorRepositoryProtocol:
+                return mock_repository
+
+            @provide(scope=Scope.REQUEST)
+            def provide_instruction_repository(self) -> AssessmentInstructionRepositoryProtocol:
                 return mock_repository
 
         app = Quart(__name__)
@@ -143,7 +164,15 @@ class TestAnchorAPIErrorHandling:
                 return mock_content_client
 
             @provide(scope=Scope.REQUEST)
-            def provide_repository(self) -> CJRepositoryProtocol:
+            def provide_session_provider(self) -> SessionProviderProtocol:
+                return failing_repository
+
+            @provide(scope=Scope.REQUEST)
+            def provide_anchor_repository(self) -> AnchorRepositoryProtocol:
+                return failing_repository
+
+            @provide(scope=Scope.REQUEST)
+            def provide_instruction_repository(self) -> AssessmentInstructionRepositoryProtocol:
                 return failing_repository
 
         app = Quart(__name__)
@@ -185,7 +214,15 @@ class TestAnchorAPIErrorHandling:
                 return mock_content_client
 
             @provide(scope=Scope.REQUEST)
-            def provide_repository(self) -> CJRepositoryProtocol:
+            def provide_session_provider(self) -> SessionProviderProtocol:
+                return FailingMockRepository()  # type: ignore[return-value]
+
+            @provide(scope=Scope.REQUEST)
+            def provide_anchor_repository(self) -> AnchorRepositoryProtocol:
+                return FailingMockRepository()  # type: ignore[return-value]
+
+            @provide(scope=Scope.REQUEST)
+            def provide_instruction_repository(self) -> AssessmentInstructionRepositoryProtocol:
                 return FailingMockRepository()  # type: ignore[return-value]
 
         app = Quart(__name__)
@@ -229,7 +266,15 @@ class TestAnchorAPIErrorHandling:
                 return mock_content_client
 
             @provide(scope=Scope.REQUEST)
-            def provide_repository(self) -> CJRepositoryProtocol:
+            def provide_session_provider(self) -> SessionProviderProtocol:
+                return mock_repository
+
+            @provide(scope=Scope.REQUEST)
+            def provide_anchor_repository(self) -> AnchorRepositoryProtocol:
+                return mock_repository
+
+            @provide(scope=Scope.REQUEST)
+            def provide_instruction_repository(self) -> AssessmentInstructionRepositoryProtocol:
                 return mock_repository
 
         app = Quart(__name__)

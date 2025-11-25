@@ -19,7 +19,12 @@ from quart.typing import TestClientProtocol as QuartTestClient
 from quart_dishka import QuartDishka
 
 from services.cj_assessment_service.api.anchor_management import bp
-from services.cj_assessment_service.protocols import CJRepositoryProtocol, ContentClientProtocol
+from services.cj_assessment_service.protocols import (
+    AnchorRepositoryProtocol,
+    AssessmentInstructionRepositoryProtocol,
+    ContentClientProtocol,
+    SessionProviderProtocol,
+)
 from services.cj_assessment_service.tests.unit.anchor_api_test_helpers import (
     MockCJRepository,
     MockContentClient,
@@ -40,7 +45,7 @@ class TestAnchorAPIRequestValidation:
         return MockContentClient(behavior="success")
 
     @pytest.fixture
-    def mock_repository(self) -> CJRepositoryProtocol:
+    def mock_repository(self) -> MockCJRepository:
         """Create repository mock for validation tests."""
         repo = MockCJRepository(behavior="success")
         repo.register_assignment_context("test")
@@ -51,7 +56,7 @@ class TestAnchorAPIRequestValidation:
 
     @pytest.fixture
     def test_app(
-        self, mock_content_client: ContentClientProtocol, mock_repository: CJRepositoryProtocol
+        self, mock_content_client: ContentClientProtocol, mock_repository: MockCJRepository
     ) -> Any:
         """Create test app for validation tests."""
 
@@ -61,7 +66,15 @@ class TestAnchorAPIRequestValidation:
                 return mock_content_client
 
             @provide(scope=Scope.REQUEST)
-            def provide_repository(self) -> CJRepositoryProtocol:
+            def provide_session_provider(self) -> SessionProviderProtocol:
+                return mock_repository
+
+            @provide(scope=Scope.REQUEST)
+            def provide_anchor_repository(self) -> AnchorRepositoryProtocol:
+                return mock_repository
+
+            @provide(scope=Scope.REQUEST)
+            def provide_instruction_repository(self) -> AssessmentInstructionRepositoryProtocol:
                 return mock_repository
 
         app = Quart(__name__)

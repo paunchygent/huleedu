@@ -13,6 +13,11 @@ from services.cj_assessment_service.cj_core_logic import pair_generation
 from services.cj_assessment_service.cj_core_logic.pair_generation import _fetch_assessment_context
 from services.cj_assessment_service.cj_core_logic.prompt_templates import PromptTemplateBuilder
 from services.cj_assessment_service.models_api import EssayForComparison
+from services.cj_assessment_service.protocols import (
+    AssessmentInstructionRepositoryProtocol,
+    CJComparisonRepositoryProtocol,
+    SessionProviderProtocol,
+)
 
 
 class FakeResult:
@@ -195,12 +200,14 @@ async def test_generate_comparison_tasks_respects_thresholds_and_global_cap(
         for task in tasks:
             existing_pairs_store.add(tuple(sorted((task.essay_a.id, task.essay_b.id))))
 
-    session = AsyncMock(spec=AsyncSession)
+    AsyncMock(spec=AsyncSession)
     correlation_id = uuid4()
 
     tasks_first_call = await pair_generation.generate_comparison_tasks(
         essays_for_comparison=essays,
-        db_session=session,
+        session_provider=AsyncMock(spec=SessionProviderProtocol),
+        comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
+        instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
         cj_batch_id=123,
         existing_pairs_threshold=per_call_threshold,
         max_pairwise_comparisons=global_cap,
@@ -211,7 +218,9 @@ async def test_generate_comparison_tasks_respects_thresholds_and_global_cap(
 
     tasks_second_call = await pair_generation.generate_comparison_tasks(
         essays_for_comparison=essays,
-        db_session=session,
+        session_provider=AsyncMock(spec=SessionProviderProtocol),
+        comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
+        instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
         cj_batch_id=123,
         existing_pairs_threshold=per_call_threshold,
         max_pairwise_comparisons=global_cap,
@@ -222,7 +231,9 @@ async def test_generate_comparison_tasks_respects_thresholds_and_global_cap(
 
     tasks_third_call = await pair_generation.generate_comparison_tasks(
         essays_for_comparison=essays,
-        db_session=session,
+        session_provider=AsyncMock(spec=SessionProviderProtocol),
+        comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
+        instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
         cj_batch_id=123,
         existing_pairs_threshold=per_call_threshold,
         max_pairwise_comparisons=global_cap,

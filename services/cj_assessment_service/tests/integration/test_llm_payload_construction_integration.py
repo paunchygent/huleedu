@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import uuid
 from typing import TYPE_CHECKING, Any
+from unittest.mock import AsyncMock
 from uuid import UUID
 
 import pytest
@@ -28,9 +29,13 @@ from services.cj_assessment_service.models_db import (
     ComparisonPair,
 )
 from services.cj_assessment_service.protocols import (
-    CJRepositoryProtocol,
+    AssessmentInstructionRepositoryProtocol,
+    CJBatchRepositoryProtocol,
+    CJComparisonRepositoryProtocol,
     LLMInteractionProtocol,
+    SessionProviderProtocol,
 )
+from services.cj_assessment_service.tests.fixtures.database_fixtures import PostgresDataAccess
 
 if TYPE_CHECKING:
     from .llm_payload_fixtures import CapturedRequestExtractor
@@ -49,7 +54,9 @@ DEFAULT_COURSE_CODE = "ENG5"
 class TestLLMPayloadConstructionIntegration:
     async def test_user_prompt_contains_formatted_essays(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_session_provider: SessionProviderProtocol,
+        postgres_repository: PostgresDataAccess,
+        postgres_batch_repository: CJBatchRepositoryProtocol,
         real_llm_interaction: tuple[LLMInteractionProtocol, aioresponses],
         capture_requests_from_mocker: CapturedRequestExtractor,
         test_settings: Settings,
@@ -64,7 +71,9 @@ class TestLLMPayloadConstructionIntegration:
         essays = _build_mock_essays("formatted")
 
         http_request = await _submit_and_capture_request(
+            postgres_session_provider=postgres_session_provider,
             postgres_repository=postgres_repository,
+            postgres_batch_repository=postgres_batch_repository,
             llm_interaction=real_llm_interaction,
             capture_requests_from_mocker=capture_requests_from_mocker,
             test_settings=test_settings,
@@ -84,7 +93,9 @@ class TestLLMPayloadConstructionIntegration:
 
     async def test_user_prompt_with_full_assessment_context(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_session_provider: SessionProviderProtocol,
+        postgres_repository: PostgresDataAccess,
+        postgres_batch_repository: CJBatchRepositoryProtocol,
         real_llm_interaction: tuple[LLMInteractionProtocol, aioresponses],
         capture_requests_from_mocker: CapturedRequestExtractor,
         test_settings: Settings,
@@ -108,7 +119,9 @@ class TestLLMPayloadConstructionIntegration:
         essays = _build_mock_essays("full-context")
 
         http_request = await _submit_and_capture_request(
+            postgres_session_provider=postgres_session_provider,
             postgres_repository=postgres_repository,
+            postgres_batch_repository=postgres_batch_repository,
             llm_interaction=real_llm_interaction,
             capture_requests_from_mocker=capture_requests_from_mocker,
             test_settings=test_settings,
@@ -131,7 +144,9 @@ class TestLLMPayloadConstructionIntegration:
 
     async def test_user_prompt_with_partial_context(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_session_provider: SessionProviderProtocol,
+        postgres_repository: PostgresDataAccess,
+        postgres_batch_repository: CJBatchRepositoryProtocol,
         real_llm_interaction: tuple[LLMInteractionProtocol, aioresponses],
         capture_requests_from_mocker: CapturedRequestExtractor,
         test_settings: Settings,
@@ -148,7 +163,9 @@ class TestLLMPayloadConstructionIntegration:
         essays = _build_mock_essays("partial-context")
 
         http_request = await _submit_and_capture_request(
+            postgres_session_provider=postgres_session_provider,
             postgres_repository=postgres_repository,
+            postgres_batch_repository=postgres_batch_repository,
             llm_interaction=real_llm_interaction,
             capture_requests_from_mocker=capture_requests_from_mocker,
             test_settings=test_settings,
@@ -167,7 +184,9 @@ class TestLLMPayloadConstructionIntegration:
 
     async def test_user_prompt_without_assessment_context(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_session_provider: SessionProviderProtocol,
+        postgres_repository: PostgresDataAccess,
+        postgres_batch_repository: CJBatchRepositoryProtocol,
         real_llm_interaction: tuple[LLMInteractionProtocol, aioresponses],
         capture_requests_from_mocker: CapturedRequestExtractor,
         test_settings: Settings,
@@ -182,7 +201,9 @@ class TestLLMPayloadConstructionIntegration:
         essays = _build_mock_essays("no-context")
 
         http_request = await _submit_and_capture_request(
+            postgres_session_provider=postgres_session_provider,
             postgres_repository=postgres_repository,
+            postgres_batch_repository=postgres_batch_repository,
             llm_interaction=real_llm_interaction,
             capture_requests_from_mocker=capture_requests_from_mocker,
             test_settings=test_settings,
@@ -201,7 +222,9 @@ class TestLLMPayloadConstructionIntegration:
 
     async def test_user_prompt_matches_blocks_joined_text(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_session_provider: SessionProviderProtocol,
+        postgres_repository: PostgresDataAccess,
+        postgres_batch_repository: CJBatchRepositoryProtocol,
         real_llm_interaction: tuple[LLMInteractionProtocol, aioresponses],
         capture_requests_from_mocker: CapturedRequestExtractor,
         test_settings: Settings,
@@ -219,7 +242,9 @@ class TestLLMPayloadConstructionIntegration:
         essays = _build_mock_essays("block-parity")
 
         http_request = await _submit_and_capture_request(
+            postgres_session_provider=postgres_session_provider,
             postgres_repository=postgres_repository,
+            postgres_batch_repository=postgres_batch_repository,
             llm_interaction=real_llm_interaction,
             capture_requests_from_mocker=capture_requests_from_mocker,
             test_settings=test_settings,
@@ -235,7 +260,9 @@ class TestLLMPayloadConstructionIntegration:
 
     async def test_complete_http_payload_structure(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_session_provider: SessionProviderProtocol,
+        postgres_repository: PostgresDataAccess,
+        postgres_batch_repository: CJBatchRepositoryProtocol,
         real_llm_interaction: tuple[LLMInteractionProtocol, aioresponses],
         capture_requests_from_mocker: CapturedRequestExtractor,
         test_settings: Settings,
@@ -250,7 +277,9 @@ class TestLLMPayloadConstructionIntegration:
         essays = _build_mock_essays("payload-structure")
 
         http_request = await _submit_and_capture_request(
+            postgres_session_provider=postgres_session_provider,
             postgres_repository=postgres_repository,
+            postgres_batch_repository=postgres_batch_repository,
             llm_interaction=real_llm_interaction,
             capture_requests_from_mocker=capture_requests_from_mocker,
             test_settings=test_settings,
@@ -279,7 +308,9 @@ class TestLLMPayloadConstructionIntegration:
 
     async def test_eng5_overrides_reach_llm_provider(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_session_provider: SessionProviderProtocol,
+        postgres_repository: PostgresDataAccess,
+        postgres_batch_repository: CJBatchRepositoryProtocol,
         real_llm_interaction: tuple[LLMInteractionProtocol, aioresponses],
         capture_requests_from_mocker: CapturedRequestExtractor,
         test_settings: Settings,
@@ -301,7 +332,9 @@ class TestLLMPayloadConstructionIntegration:
         )
 
         http_request = await _submit_and_capture_request(
+            postgres_session_provider=postgres_session_provider,
             postgres_repository=postgres_repository,
+            postgres_batch_repository=postgres_batch_repository,
             llm_interaction=real_llm_interaction,
             capture_requests_from_mocker=capture_requests_from_mocker,
             test_settings=test_settings,
@@ -323,7 +356,9 @@ class TestLLMPayloadConstructionIntegration:
 
     async def test_metadata_correlation_id_flow(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_session_provider: SessionProviderProtocol,
+        postgres_repository: PostgresDataAccess,
+        postgres_batch_repository: CJBatchRepositoryProtocol,
         real_llm_interaction: tuple[LLMInteractionProtocol, aioresponses],
         capture_requests_from_mocker: CapturedRequestExtractor,
         test_settings: Settings,
@@ -339,7 +374,9 @@ class TestLLMPayloadConstructionIntegration:
         explicit_correlation_id = uuid.uuid4()
 
         http_request = await _submit_and_capture_request(
+            postgres_session_provider=postgres_session_provider,
             postgres_repository=postgres_repository,
+            postgres_batch_repository=postgres_batch_repository,
             llm_interaction=real_llm_interaction,
             capture_requests_from_mocker=capture_requests_from_mocker,
             test_settings=test_settings,
@@ -382,7 +419,7 @@ def _build_mock_essays(tag: str) -> list[EssayForComparison]:
 
 
 async def _create_batch_with_context(
-    repository: CJRepositoryProtocol,
+    repository: PostgresDataAccess,
     *,
     assignment_id: str | None = None,
     teacher_instructions: str | None = None,
@@ -442,7 +479,7 @@ async def _create_batch_with_context(
 
 
 async def _persist_essays(
-    repository: CJRepositoryProtocol,
+    repository: PostgresDataAccess,
     cj_batch_id: int,
     essays: list[EssayForComparison],
 ) -> None:
@@ -462,7 +499,9 @@ async def _persist_essays(
 
 async def _submit_and_capture_request(
     *,
-    postgres_repository: CJRepositoryProtocol,
+    postgres_session_provider: SessionProviderProtocol,
+    postgres_repository: PostgresDataAccess,
+    postgres_batch_repository: CJBatchRepositoryProtocol,
     llm_interaction: tuple[LLMInteractionProtocol, aioresponses],
     capture_requests_from_mocker: CapturedRequestExtractor,
     test_settings: Settings,
@@ -493,8 +532,11 @@ async def _submit_and_capture_request(
     await submit_comparisons_for_async_processing(
         essays_for_api_model=essays,
         cj_batch_id=cj_batch_id,
+        session_provider=postgres_session_provider,
+        batch_repository=postgres_batch_repository,
+        comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
+        instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
         request_data=request_data,
-        database=postgres_repository,
         llm_interaction=llm_interaction_impl,
         settings=test_settings,
         correlation_id=correlation_id or uuid.uuid4(),
@@ -516,7 +558,7 @@ def _print_prompt(label: str, prompt: str) -> None:
 
 async def _print_context_records(
     *,
-    repository: CJRepositoryProtocol,
+    repository: PostgresDataAccess,
     cj_batch_id: int,
     assignment_id: str | None,
     label: str,

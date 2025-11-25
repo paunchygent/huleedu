@@ -18,14 +18,20 @@ from services.cj_assessment_service.cj_core_logic import (
     comparison_processing,
     scoring_ranking,
 )
+from services.cj_assessment_service.cj_core_logic.grade_projector import GradeProjector
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
 from services.cj_assessment_service.models_api import CJAssessmentRequestData
 from services.cj_assessment_service.protocols import (
+    AnchorRepositoryProtocol,
+    AssessmentInstructionRepositoryProtocol,
+    CJBatchRepositoryProtocol,
+    CJComparisonRepositoryProtocol,
+    CJEssayRepositoryProtocol,
     CJEventPublisherProtocol,
-    CJRepositoryProtocol,
     ContentClientProtocol,
     LLMInteractionProtocol,
+    SessionProviderProtocol,
 )
 
 logger = create_service_logger("cj_assessment_service.workflow_orchestrator")
@@ -49,22 +55,34 @@ class CJAssessmentWorkflowResult(BaseModel):
 async def run_cj_assessment_workflow(
     request_data: CJAssessmentRequestData,
     correlation_id: UUID,
-    database: CJRepositoryProtocol,
+    session_provider: SessionProviderProtocol,
+    batch_repository: CJBatchRepositoryProtocol,
+    essay_repository: CJEssayRepositoryProtocol,
+    instruction_repository: AssessmentInstructionRepositoryProtocol,
+    anchor_repository: AnchorRepositoryProtocol,
+    comparison_repository: CJComparisonRepositoryProtocol,
     content_client: ContentClientProtocol,
     llm_interaction: LLMInteractionProtocol,
     event_publisher: CJEventPublisherProtocol,
     settings: Settings,
+    grade_projector: GradeProjector,
 ) -> CJAssessmentWorkflowResult:
     """Run the complete CJ assessment workflow for a batch of essays.
 
     Args:
         request_data: The CJ assessment request data from ELS
         correlation_id: Optional correlation ID for event tracing
-        database: Database access protocol implementation
+        session_provider: Session provider for database transactions
+        batch_repository: Batch repository for batch-level operations
+        essay_repository: Essay repository for essay operations
+        instruction_repository: Instruction repository for assessment instructions
+        anchor_repository: Anchor repository for anchor essay management
+        comparison_repository: Comparison repository for comparison pair operations
         content_client: Content client protocol implementation
         llm_interaction: LLM interaction protocol implementation
         event_publisher: Event publisher protocol implementation
         settings: Application settings
+        grade_projector: Grade projector for grade predictions
 
     Raises:
         Exception: If the workflow encounters an unrecoverable error
@@ -78,7 +96,9 @@ async def run_cj_assessment_workflow(
         cj_batch_id = await batch_preparation.create_cj_batch(
             request_data,
             correlation_id,
-            database,
+            session_provider,
+            batch_repository,
+            instruction_repository,
             content_client,
             log_extra,
         )
@@ -87,7 +107,11 @@ async def run_cj_assessment_workflow(
         essays_for_api_model = await batch_preparation.prepare_essays_for_assessment(
             request_data,
             cj_batch_id,
-            database,
+            session_provider,
+            batch_repository,
+            essay_repository,
+            instruction_repository,
+            anchor_repository,
             content_client,
             correlation_id,
             log_extra,
@@ -106,19 +130,21 @@ async def run_cj_assessment_workflow(
                 BatchFinalizer,
             )
 
-            async with database.session() as session:
-                finalizer = BatchFinalizer(
-                    database=database,
-                    event_publisher=event_publisher,
-                    content_client=content_client,
-                    settings=settings,
-                )
-                await finalizer.finalize_single_essay(
-                    batch_id=cj_batch_id,
-                    correlation_id=correlation_id,
-                    session=session,
-                    log_extra=log_extra,
-                )
+            finalizer = BatchFinalizer(
+                session_provider=session_provider,
+                batch_repository=batch_repository,
+                comparison_repository=comparison_repository,
+                essay_repository=essay_repository,
+                event_publisher=event_publisher,
+                content_client=content_client,
+                settings=settings,
+                grade_projector=grade_projector,
+            )
+            await finalizer.finalize_single_essay(
+                batch_id=cj_batch_id,
+                correlation_id=correlation_id,
+                log_extra=log_extra,
+            )
 
             # Return empty result; events published via outbox
             return CJAssessmentWorkflowResult(rankings=[], batch_id=str(cj_batch_id))
@@ -129,7 +155,10 @@ async def run_cj_assessment_workflow(
         await comparison_processing.submit_comparisons_for_async_processing(
             essays_for_api_model,
             cj_batch_id,
-            database,
+            session_provider,
+            batch_repository,
+            comparison_repository,
+            instruction_repository,
             llm_interaction,
             request_data,
             settings,
@@ -162,8 +191,8 @@ async def run_cj_assessment_workflow(
         # Try to update batch status to error if we have a batch ID
         if cj_batch_id:
             try:
-                async with database.session() as session:
-                    await database.update_cj_batch_status(
+                async with session_provider.session() as session:
+                    await batch_repository.update_cj_batch_status(
                         session=session,
                         cj_batch_id=cj_batch_id,
                         status=CJBatchStatusEnum.ERROR_PROCESSING,
@@ -184,26 +213,30 @@ async def run_cj_assessment_workflow(
 
 async def _finalize_batch_results(
     cj_batch_id: int,
-    database: CJRepositoryProtocol,
+    session_provider: SessionProviderProtocol,
+    batch_repository: CJBatchRepositoryProtocol,
+    essay_repository: CJEssayRepositoryProtocol,
     final_scores: dict[str, float],
     correlation_id: UUID,
     log_extra: dict[str, Any],
 ) -> list[dict[str, Any]]:
     """Finalize batch results and determine completion status."""
-    async with database.session() as session:
+    async with session_provider.session() as session:
         # Determine final status based on how comparison process ended
         # This is simplified - the comparison_processing module can return
         # additional metadata about stability if needed
         final_status = CJBatchStatusEnum.COMPLETE_STABLE
 
-        await database.update_cj_batch_status(
+        await batch_repository.update_cj_batch_status(
             session=session,
             cj_batch_id=cj_batch_id,
             status=final_status,
         )
 
         # Get final rankings
-        rankings = await scoring_ranking.get_essay_rankings(session, cj_batch_id, correlation_id)
+        rankings = await scoring_ranking.get_essay_rankings(
+            session_provider, essay_repository, cj_batch_id, correlation_id
+        )
 
         logger.info(
             f"Finalized batch {cj_batch_id} with {len(rankings)} ranked essays",

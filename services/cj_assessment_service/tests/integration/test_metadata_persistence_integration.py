@@ -9,24 +9,67 @@ import pytest
 from common_core.events.cj_assessment_events import LLMConfigOverrides
 
 from services.cj_assessment_service.cj_core_logic import comparison_processing
+from services.cj_assessment_service.cj_core_logic.grade_projection.context_service import (
+    ProjectionContextService,
+)
+from services.cj_assessment_service.cj_core_logic.grade_projection.projection_repository import (
+    GradeProjectionRepository,
+)
+from services.cj_assessment_service.cj_core_logic.grade_projector import GradeProjector
 from services.cj_assessment_service.cj_core_logic.workflow_orchestrator import (
     run_cj_assessment_workflow,
 )
 from services.cj_assessment_service.config import Settings
+from services.cj_assessment_service.implementations.anchor_repository import (
+    PostgreSQLAnchorRepository,
+)
+from services.cj_assessment_service.implementations.assessment_instruction_repository import (
+    PostgreSQLAssessmentInstructionRepository,
+)
+from services.cj_assessment_service.implementations.essay_repository import (
+    PostgreSQLCJEssayRepository,
+)
 from services.cj_assessment_service.models_api import CJAssessmentRequestData, EssayToProcess
 from services.cj_assessment_service.models_db import CJBatchState, CJBatchUpload
 from services.cj_assessment_service.protocols import (
+    AnchorRepositoryProtocol,
+    AssessmentInstructionRepositoryProtocol,
+    CJBatchRepositoryProtocol,
+    CJComparisonRepositoryProtocol,
     CJEventPublisherProtocol,
-    CJRepositoryProtocol,
     ContentClientProtocol,
     LLMInteractionProtocol,
+    SessionProviderProtocol,
 )
+
+
+def _make_grade_projector(
+    *,
+    session_provider: SessionProviderProtocol,
+    instruction_repository: AssessmentInstructionRepositoryProtocol,
+    anchor_repository: AnchorRepositoryProtocol,
+) -> GradeProjector:
+    """Create a properly initialized GradeProjector for integration tests."""
+    context_service = ProjectionContextService(
+        session_provider=session_provider,
+        instruction_repository=instruction_repository,
+        anchor_repository=anchor_repository,
+    )
+    return GradeProjector(
+        session_provider=session_provider,
+        context_service=context_service,
+        repository=GradeProjectionRepository(),
+    )
 
 
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_original_request_metadata_persists_and_rehydrates(
-    postgres_repository: CJRepositoryProtocol,
+    postgres_session_provider: SessionProviderProtocol,
+    postgres_batch_repository: CJBatchRepositoryProtocol,
+    postgres_essay_repository: PostgreSQLCJEssayRepository,
+    postgres_instruction_repository: PostgreSQLAssessmentInstructionRepository,
+    postgres_anchor_repository: PostgreSQLAnchorRepository,
     mock_content_client: ContentClientProtocol,
     mock_event_publisher: CJEventPublisherProtocol,
     mock_llm_interaction_async: LLMInteractionProtocol,
@@ -67,16 +110,26 @@ async def test_original_request_metadata_persists_and_rehydrates(
     workflow_result = await run_cj_assessment_workflow(
         request_data=request_data,
         correlation_id=correlation_id,
-        database=postgres_repository,
+        session_provider=postgres_session_provider,
+        batch_repository=postgres_batch_repository,
+        essay_repository=postgres_essay_repository,
+        instruction_repository=postgres_instruction_repository,
+        anchor_repository=postgres_anchor_repository,
+        comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
         content_client=mock_content_client,
         llm_interaction=mock_llm_interaction_async,
         event_publisher=mock_event_publisher,
+        grade_projector=_make_grade_projector(
+            session_provider=postgres_session_provider,
+            instruction_repository=postgres_instruction_repository,
+            anchor_repository=postgres_anchor_repository,
+        ),
         settings=test_settings,
     )
 
     batch_id = int(workflow_result.batch_id)
 
-    async with postgres_repository.session() as session:
+    async with postgres_session_provider.session() as session:
         batch_upload = await session.get(CJBatchUpload, batch_id)
         assert batch_upload is not None
         assert batch_upload.processing_metadata is not None
@@ -102,7 +155,11 @@ async def test_original_request_metadata_persists_and_rehydrates(
 
     continuation_result = await comparison_processing.request_additional_comparisons_for_batch(
         cj_batch_id=batch_id,
-        database=postgres_repository,
+        session_provider=postgres_session_provider,
+        batch_repository=postgres_batch_repository,
+        essay_repository=postgres_essay_repository,
+        comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
+        instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
         llm_interaction=mock_llm_interaction_async,
         settings=test_settings,
         correlation_id=uuid4(),

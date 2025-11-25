@@ -265,7 +265,8 @@ class OpenAIModelChecker:
     def _should_include_model(self, model: DiscoveredModel) -> bool:
         """Determine if a discovered model should be included in results.
 
-        Filters out legacy models that are no longer relevant for comparison.
+        Filters out models that are not in the currently supported GPT families
+        (gpt-5, gpt-4.1, gpt-4o).
 
         Args:
             model: Discovered model to evaluate
@@ -273,17 +274,7 @@ class OpenAIModelChecker:
         Returns:
             True if model should be included
         """
-        # Include GPT-4, GPT-5 and newer models
-        # Filter out GPT-3.5 and earlier (legacy)
-        model_id_lower = model.model_id.lower()
-
-        # Include if it's a GPT-4+ model
-        if any(x in model_id_lower for x in ["gpt-4", "gpt-5", "o1", "o3"]):
-            return True
-
-        # Exclude GPT-3.5 and earlier
-        if "gpt-3" in model_id_lower:
-            return False
-
-        # Include everything else (future models)
-        return True
+        # Restrict GPT families to gpt-5, gpt-4.1, and gpt-4o
+        family = self._extract_family(model.model_id)
+        allowed_families = {"gpt-5", "gpt-4.1", "gpt-4o"}
+        return family in allowed_families

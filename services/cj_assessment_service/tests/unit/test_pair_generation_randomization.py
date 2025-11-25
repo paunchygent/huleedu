@@ -9,6 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.cj_assessment_service.cj_core_logic import pair_generation
 from services.cj_assessment_service.models_api import EssayForComparison
+from services.cj_assessment_service.protocols import (
+    AssessmentInstructionRepositoryProtocol,
+    CJComparisonRepositoryProtocol,
+    SessionProviderProtocol,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -51,7 +56,9 @@ async def test_seed_produces_deterministic_pair_order(
 
     tasks_first = await pair_generation.generate_comparison_tasks(
         essays_for_comparison=sample_essays,
-        db_session=sample_session,
+        session_provider=AsyncMock(spec=SessionProviderProtocol),
+        comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
+        instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
         cj_batch_id=99,
         existing_pairs_threshold=10,
         correlation_id=None,
@@ -60,7 +67,9 @@ async def test_seed_produces_deterministic_pair_order(
 
     tasks_second = await pair_generation.generate_comparison_tasks(
         essays_for_comparison=sample_essays,
-        db_session=sample_session,
+        session_provider=AsyncMock(spec=SessionProviderProtocol),
+        comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
+        instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
         cj_batch_id=99,
         existing_pairs_threshold=10,
         correlation_id=None,
@@ -92,7 +101,9 @@ async def test_randomization_swaps_positions_when_triggered(
 
     tasks = await pair_generation.generate_comparison_tasks(
         essays_for_comparison=sample_essays,
-        db_session=sample_session,
+        session_provider=AsyncMock(spec=SessionProviderProtocol),
+        comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
+        instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
         cj_batch_id=1,
         existing_pairs_threshold=5,
         correlation_id=None,
@@ -118,7 +129,9 @@ async def test_anchor_positions_are_balanced(
     for seed in range(200):
         tasks = await pair_generation.generate_comparison_tasks(
             essays_for_comparison=sample_essays,
-            db_session=sample_session,
+            session_provider=AsyncMock(spec=SessionProviderProtocol),
+            comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
+            instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
             cj_batch_id=2,
             existing_pairs_threshold=10,
             randomization_seed=seed,
@@ -154,7 +167,9 @@ async def test_anchor_position_chi_squared(
     for seed in range(200):
         tasks = await pair_generation.generate_comparison_tasks(
             essays_for_comparison=sample_essays,
-            db_session=sample_session,
+            session_provider=AsyncMock(spec=SessionProviderProtocol),
+            comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
+            instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
             cj_batch_id=seed,
             existing_pairs_threshold=10,
             randomization_seed=seed,

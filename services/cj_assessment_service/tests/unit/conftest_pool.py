@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from types import SimpleNamespace
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
 
@@ -22,7 +21,6 @@ if TYPE_CHECKING:
     from services.cj_assessment_service.models_db import CJBatchState
     from services.cj_assessment_service.protocols import (
         BatchProcessorProtocol,
-        CJRepositoryProtocol,
         LLMInteractionProtocol,
     )
 
@@ -39,41 +37,63 @@ from services.cj_assessment_service.models_api import (
 from services.cj_assessment_service.models_db import CJBatchState
 from services.cj_assessment_service.protocols import (
     BatchProcessorProtocol,
-    CJRepositoryProtocol,
+    CJBatchRepositoryProtocol,
     LLMInteractionProtocol,
+    SessionProviderProtocol,
 )
-
-
-@pytest.fixture
-def mock_get_batch_state(monkeypatch: pytest.MonkeyPatch) -> AsyncMock:
-    """Opt-in patch for get_batch_state so only requesting tests are affected."""
-
-    mock = AsyncMock()
-    mock.return_value = SimpleNamespace(processing_metadata=None)
-    monkeypatch.setattr(
-        "services.cj_assessment_service.cj_core_logic.batch_submission.get_batch_state",
-        mock,
-    )
-    return mock
+from services.cj_assessment_service.tests.unit.test_mocks import MockSessionProvider
 
 
 @pytest.fixture
 def mock_settings() -> Settings:
     """Create mock settings with failed pool configuration."""
 
-    class MockSettings:
-        ENABLE_FAILED_COMPARISON_RETRY = True
-        FAILED_COMPARISON_RETRY_THRESHOLD = 5
-        MAX_RETRY_ATTEMPTS = 3
-        RETRY_BATCH_SIZE = 10
-
-    return MockSettings()  # type: ignore
+    settings = Settings()
+    settings.ENABLE_FAILED_COMPARISON_RETRY = True
+    settings.FAILED_COMPARISON_RETRY_THRESHOLD = 5
+    settings.MAX_RETRY_ATTEMPTS = 3
+    settings.RETRY_BATCH_SIZE = 10
+    return settings
 
 
 @pytest.fixture
-def mock_database() -> AsyncMock:
-    """Create mock database protocol."""
-    return AsyncMock(spec=CJRepositoryProtocol)
+def mock_session_provider() -> MockSessionProvider:
+    """Create mock session provider."""
+    return MockSessionProvider()
+
+
+@pytest.fixture
+def mock_batch_repo() -> AsyncMock:
+    """Create mock batch repository protocol."""
+    return AsyncMock(spec=CJBatchRepositoryProtocol)
+
+
+@pytest.fixture
+def mock_database(
+    mock_session_provider: MockSessionProvider, mock_batch_repo: AsyncMock
+) -> AsyncMock:
+    """Create mock database protocol for backward compatibility.
+
+    This fixture provides backward compatibility for tests not yet migrated
+    to per-aggregate repositories. Creates an AsyncMock wrapper that shares
+    the session provider with batch_pool_manager but allows test configuration.
+
+    Note: Tests using this fixture should be migrated to use mock_session_provider
+    and specific repository mocks (e.g., mock_batch_repo) directly.
+    """
+    # Create a wrapper with a configurable session mock
+    wrapper = AsyncMock()
+
+    # Create a session mock that tests can configure
+    # but that delegates to the real session provider when called
+    wrapper.session = AsyncMock(side_effect=mock_session_provider.session)
+
+    # Wire batch repository methods for tests that need them
+    wrapper.get_batch_state_for_update = mock_batch_repo.get_batch_state_for_update
+    wrapper.get_cj_batch_upload = mock_batch_repo.get_cj_batch_upload
+    wrapper.get_batch_state = mock_batch_repo.get_batch_state
+
+    return wrapper
 
 
 @pytest.fixture
@@ -84,26 +104,30 @@ def mock_llm_interaction() -> LLMInteractionProtocol:
 
 @pytest.fixture
 def batch_processor(
-    mock_database: CJRepositoryProtocol,
+    mock_session_provider: SessionProviderProtocol,
+    mock_batch_repo: AsyncMock,
     mock_llm_interaction: LLMInteractionProtocol,
     mock_settings: Settings,
 ) -> BatchProcessor:
     """Create BatchProcessor instance with mocks."""
     return BatchProcessor(
-        database=mock_database,
+        session_provider=mock_session_provider,
         llm_interaction=mock_llm_interaction,
         settings=mock_settings,
+        batch_repository=mock_batch_repo,
     )
 
 
 @pytest.fixture
 def batch_pool_manager(
-    mock_database: CJRepositoryProtocol,
+    mock_session_provider: SessionProviderProtocol,
+    mock_batch_repo: AsyncMock,
     mock_settings: Settings,
 ) -> BatchPoolManager:
     """Create BatchPoolManager instance with mocks."""
     return BatchPoolManager(
-        database=mock_database,
+        session_provider=mock_session_provider,
+        batch_repository=mock_batch_repo,
         settings=mock_settings,
     )
 
@@ -116,7 +140,7 @@ def mock_batch_submitter() -> AsyncMock:
 
 @pytest.fixture
 def batch_retry_processor(
-    mock_database: CJRepositoryProtocol,
+    mock_session_provider: SessionProviderProtocol,
     mock_llm_interaction: LLMInteractionProtocol,
     mock_settings: Settings,
     batch_pool_manager: BatchPoolManager,
@@ -124,7 +148,7 @@ def batch_retry_processor(
 ) -> BatchRetryProcessor:
     """Create BatchRetryProcessor instance with mocks."""
     return BatchRetryProcessor(
-        database=mock_database,
+        session_provider=mock_session_provider,
         llm_interaction=mock_llm_interaction,
         settings=mock_settings,
         pool_manager=batch_pool_manager,

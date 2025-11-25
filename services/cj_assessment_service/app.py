@@ -35,13 +35,17 @@ from services.cj_assessment_service.api.admin import (
 )
 from services.cj_assessment_service.api.health_routes import health_bp
 from services.cj_assessment_service.batch_monitor import BatchMonitor
+from services.cj_assessment_service.cj_core_logic.grade_projector import GradeProjector
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.di import CJAssessmentServiceProvider
 from services.cj_assessment_service.kafka_consumer import CJAssessmentKafkaConsumer
 from services.cj_assessment_service.protocols import (
+    CJBatchRepositoryProtocol,
+    CJComparisonRepositoryProtocol,
+    CJEssayRepositoryProtocol,
     CJEventPublisherProtocol,
-    CJRepositoryProtocol,
     ContentClientProtocol,
+    SessionProviderProtocol,
 )
 from services.cj_assessment_service.startup_setup import initialize_services, shutdown_services
 
@@ -131,9 +135,13 @@ def create_app(settings: Settings | None = None) -> HuleEduApp:
             async with app.container() as request_container:
                 app.kafka_consumer = await request_container.get(CJAssessmentKafkaConsumer)
                 app.relay_worker = await request_container.get(EventRelayWorker)
-                repository = await request_container.get(CJRepositoryProtocol)
+                session_provider = await request_container.get(SessionProviderProtocol)
+                batch_repository = await request_container.get(CJBatchRepositoryProtocol)
+                essay_repository = await request_container.get(CJEssayRepositoryProtocol)
+                comparison_repository = await request_container.get(CJComparisonRepositoryProtocol)
                 event_publisher = await request_container.get(CJEventPublisherProtocol)
                 content_client = await request_container.get(ContentClientProtocol)
+                grade_projector = await request_container.get(GradeProjector)
 
             # Start EventRelayWorker for outbox pattern
             assert app.relay_worker is not None, "EventRelayWorker must be initialized"
@@ -146,10 +154,14 @@ def create_app(settings: Settings | None = None) -> HuleEduApp:
 
             # Start BatchMonitor in-process (non-testing) to ensure completion progression
             app.batch_monitor = BatchMonitor(
-                repository=repository,
+                session_provider=session_provider,
+                batch_repository=batch_repository,
+                essay_repository=essay_repository,
+                comparison_repository=comparison_repository,
                 event_publisher=event_publisher,
                 content_client=content_client,
                 settings=settings,
+                grade_projector=grade_projector,
             )
             app.monitor_task = asyncio.create_task(app.batch_monitor.check_stuck_batches())
             logger.info("BatchMonitor task started")

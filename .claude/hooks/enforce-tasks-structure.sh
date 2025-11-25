@@ -108,7 +108,9 @@ EOF
   fi
 
   # Check for mv/rm commands affecting TASKS/ structure directories
-  if [[ "$COMMAND" =~ (mv|rm).*TASKS/(programs|assessment|content|identity|frontend|infrastructure|security|integrations|architecture|archive) ]]; then
+  # Must start with mv or rm and have TASKS dir as target (not just mentioned in message)
+  if [[ "$COMMAND" =~ ^(mv|rm)[[:space:]].*[[:space:]]TASKS/(programs|assessment|content|identity|frontend|infrastructure|security|integrations|architecture|archive)([[:space:]]|$) ]] || \
+     [[ "$COMMAND" =~ ^(mv|rm)[[:space:]]+TASKS/(programs|assessment|content|identity|frontend|infrastructure|security|integrations|architecture|archive)([[:space:]]|$) ]]; then
     cat >&2 << EOF
 🚫 TASKS STRUCTURE VIOLATION
 

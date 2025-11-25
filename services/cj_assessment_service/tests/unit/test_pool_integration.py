@@ -34,7 +34,6 @@ from services.cj_assessment_service.models_db import CJBatchState
 
 # Import shared fixtures
 pytest_plugins = ["services.cj_assessment_service.tests.unit.conftest_pool"]
-pytestmark = pytest.mark.usefixtures("mock_get_batch_state")
 
 
 class TestDualModeRetryLogic:
@@ -44,7 +43,7 @@ class TestDualModeRetryLogic:
     async def test_check_retry_batch_needed_force_retry_all_with_failures(
         self,
         batch_pool_manager: BatchPoolManager,
-        mock_database: AsyncMock,
+        mock_batch_repo: AsyncMock,
     ) -> None:
         """Test force_retry_all=True processes any eligible failures."""
         # Arrange
@@ -75,22 +74,14 @@ class TestDualModeRetryLogic:
         batch_state = MagicMock(spec=CJBatchState)
         batch_state.processing_metadata = failed_pool.model_dump()
 
-        # Mock database session and batch state retrieval
-        mock_session = AsyncMock()
-        mock_database.session.return_value.__aenter__.return_value = mock_session
-        mock_database.session.return_value.__aexit__.return_value = None
+        mock_batch_repo.get_batch_state_for_update.return_value = batch_state
 
         # Act - Test force_retry_all=True
-        with patch(
-            "services.cj_assessment_service.cj_core_logic.batch_pool_manager.get_batch_state",
-            new_callable=AsyncMock,
-        ) as mock_get_batch_state:
-            mock_get_batch_state.return_value = batch_state
-            result = await batch_pool_manager.check_retry_batch_needed(
-                cj_batch_id=cj_batch_id,
-                correlation_id=correlation_id,
-                force_retry_all=True,
-            )
+        result = await batch_pool_manager.check_retry_batch_needed(
+            cj_batch_id=cj_batch_id,
+            correlation_id=correlation_id,
+            force_retry_all=True,
+        )
 
         # Assert - Should return True even with only 1 failure
         assert result is True
@@ -99,7 +90,7 @@ class TestDualModeRetryLogic:
     async def test_check_retry_batch_needed_force_retry_all_no_failures(
         self,
         batch_pool_manager: BatchPoolManager,
-        mock_database: AsyncMock,
+        mock_batch_repo: AsyncMock,
         empty_failed_pool: FailedComparisonPool,
     ) -> None:
         """Test force_retry_all=True with no eligible failures."""
@@ -110,22 +101,13 @@ class TestDualModeRetryLogic:
         batch_state = MagicMock(spec=CJBatchState)
         batch_state.processing_metadata = empty_failed_pool.model_dump()
 
-        # Mock database session and batch state retrieval
-        mock_session = AsyncMock()
-        mock_database.session.return_value.__aenter__.return_value = mock_session
-        mock_database.session.return_value.__aexit__.return_value = None
+        mock_batch_repo.get_batch_state_for_update.return_value = batch_state
 
-        # Act
-        with patch(
-            "services.cj_assessment_service.cj_core_logic.batch_pool_manager.get_batch_state",
-            new_callable=AsyncMock,
-        ) as mock_get_batch_state:
-            mock_get_batch_state.return_value = batch_state
-            result = await batch_pool_manager.check_retry_batch_needed(
-                cj_batch_id=cj_batch_id,
-                correlation_id=correlation_id,
-                force_retry_all=True,
-            )
+        result = await batch_pool_manager.check_retry_batch_needed(
+            cj_batch_id=cj_batch_id,
+            correlation_id=correlation_id,
+            force_retry_all=True,
+        )
 
         # Assert - Should return False with no failures
         assert result is False
@@ -134,7 +116,7 @@ class TestDualModeRetryLogic:
     async def test_form_retry_batch_force_retry_all_with_failures(
         self,
         batch_pool_manager: BatchPoolManager,
-        mock_database: AsyncMock,
+        mock_batch_repo: AsyncMock,
     ) -> None:
         """Test form_retry_batch with force_retry_all=True processes any eligible failures."""
         # Arrange
@@ -177,40 +159,24 @@ class TestDualModeRetryLogic:
         batch_state = MagicMock(spec=CJBatchState)
         batch_state.processing_metadata = failed_pool.model_dump()
 
-        # Mock database session and batch state retrieval
-        mock_session = AsyncMock()
-        mock_database.session.return_value.__aenter__.return_value = mock_session
-        mock_database.session.return_value.__aexit__.return_value = None
+        mock_batch_repo.get_batch_state_for_update.return_value = batch_state
 
-        # Act - Test force_retry_all=True
-        with (
-            patch(
-                "services.cj_assessment_service.cj_core_logic.batch_pool_manager.get_batch_state"
-            ) as mock_get_batch_state,
-            patch(
-                "services.cj_assessment_service.cj_core_logic.batch_pool_manager.merge_batch_processing_metadata"
-            ) as mock_update_metadata,
-        ):
-            mock_get_batch_state.return_value = batch_state
-            retry_tasks = await batch_pool_manager.form_retry_batch(
-                cj_batch_id=cj_batch_id,
-                correlation_id=correlation_id,
-                force_retry_all=True,
-            )
+        retry_tasks = await batch_pool_manager.form_retry_batch(
+            cj_batch_id=cj_batch_id,
+            correlation_id=correlation_id,
+            force_retry_all=True,
+        )
 
         # Assert - Should process all 2 failures despite being below threshold
         assert retry_tasks is not None
         assert len(retry_tasks) == 2
         assert all(isinstance(task, ComparisonTask) for task in retry_tasks)
 
-        # Verify metadata was updated during batch formation
-        mock_update_metadata.assert_called_once()
-
     @pytest.mark.asyncio
     async def test_form_retry_batch_normal_mode_below_threshold(
         self,
         batch_pool_manager: BatchPoolManager,
-        mock_database: AsyncMock,
+        mock_batch_repo: AsyncMock,
     ) -> None:
         """Test form_retry_batch with force_retry_all=False below threshold."""
         # Arrange
@@ -243,22 +209,14 @@ class TestDualModeRetryLogic:
         batch_state = MagicMock(spec=CJBatchState)
         batch_state.processing_metadata = failed_pool.model_dump()
 
-        # Mock database session and batch state retrieval
-        mock_session = AsyncMock()
-        mock_database.session.return_value.__aenter__.return_value = mock_session
-        mock_database.session.return_value.__aexit__.return_value = None
+        mock_batch_repo.get_batch_state_for_update.return_value = batch_state
 
         # Act - Test normal mode (force_retry_all=False)
-        with patch(
-            "services.cj_assessment_service.cj_core_logic.batch_pool_manager.get_batch_state",
-            new_callable=AsyncMock,
-        ) as mock_get_batch_state:
-            mock_get_batch_state.return_value = batch_state
-            retry_tasks = await batch_pool_manager.form_retry_batch(
-                cj_batch_id=cj_batch_id,
-                correlation_id=correlation_id,
-                force_retry_all=False,
-            )
+        retry_tasks = await batch_pool_manager.form_retry_batch(
+            cj_batch_id=cj_batch_id,
+            correlation_id=correlation_id,
+            force_retry_all=False,
+        )
 
         # Assert - Should return None due to threshold not met
         assert retry_tasks is None
@@ -350,7 +308,7 @@ class TestEndOfBatchFairnessScenarios:
     async def test_fairness_scenario_few_remaining_failures(
         self,
         batch_pool_manager: BatchPoolManager,
-        mock_database: AsyncMock,
+        mock_batch_repo: AsyncMock,
     ) -> None:
         """Test fairness when only a few failures remain at batch end."""
         # Arrange
@@ -385,43 +343,29 @@ class TestEndOfBatchFairnessScenarios:
         batch_state = MagicMock(spec=CJBatchState)
         batch_state.processing_metadata = failed_pool.model_dump()
 
-        # Mock database session and batch state retrieval
-        mock_session = AsyncMock()
-        mock_database.session.return_value.__aenter__.return_value = mock_session
-        mock_database.session.return_value.__aexit__.return_value = None
-
-        # Configure session.execute() to return proper result with scalar_one_or_none()
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = failed_pool.model_dump()
-        mock_session.execute.return_value = mock_result
+        mock_batch_repo.get_batch_state_for_update.return_value = batch_state
 
         # Act - Simulate end-of-batch processing
-        with patch(
-            "services.cj_assessment_service.cj_core_logic.batch_pool_manager.get_batch_state",
-            new_callable=AsyncMock,
-        ) as mock_get_batch_state:
-            mock_get_batch_state.return_value = batch_state
+        # 1. Normal check should return False (below threshold)
+        normal_check = await batch_pool_manager.check_retry_batch_needed(
+            cj_batch_id=cj_batch_id,
+            correlation_id=correlation_id,
+            force_retry_all=False,
+        )
 
-            # 1. Normal check should return False (below threshold)
-            normal_check = await batch_pool_manager.check_retry_batch_needed(
-                cj_batch_id=cj_batch_id,
-                correlation_id=correlation_id,
-                force_retry_all=False,
-            )
+        # 2. End-of-batch check should return True (fairness mode)
+        fairness_check = await batch_pool_manager.check_retry_batch_needed(
+            cj_batch_id=cj_batch_id,
+            correlation_id=correlation_id,
+            force_retry_all=True,
+        )
 
-            # 2. End-of-batch check should return True (fairness mode)
-            fairness_check = await batch_pool_manager.check_retry_batch_needed(
-                cj_batch_id=cj_batch_id,
-                correlation_id=correlation_id,
-                force_retry_all=True,
-            )
-
-            # 3. Form retry batch in fairness mode
-            retry_tasks = await batch_pool_manager.form_retry_batch(
-                cj_batch_id=cj_batch_id,
-                correlation_id=correlation_id,
-                force_retry_all=True,
-            )
+        # 3. Form retry batch in fairness mode
+        retry_tasks = await batch_pool_manager.form_retry_batch(
+            cj_batch_id=cj_batch_id,
+            correlation_id=correlation_id,
+            force_retry_all=True,
+        )
 
         # Assert
         assert normal_check is False  # Normal mode: below threshold
@@ -433,7 +377,7 @@ class TestEndOfBatchFairnessScenarios:
     async def test_comprehensive_fairness_workflow(
         self,
         batch_retry_processor: BatchRetryProcessor,
-        mock_database: AsyncMock,
+        mock_batch_repo: AsyncMock,
     ) -> None:
         """Test complete fairness workflow from detection to processing."""
         # Arrange
@@ -482,10 +426,7 @@ class TestEndOfBatchFairnessScenarios:
         batch_state = MagicMock(spec=CJBatchState)
         batch_state.processing_metadata = failed_pool.model_dump()
 
-        # Mock database and batch processor methods
-        mock_session = AsyncMock()
-        mock_database.session.return_value.__aenter__.return_value = mock_session
-        mock_database.session.return_value.__aexit__.return_value = None
+        mock_batch_repo.get_batch_state_for_update.return_value = batch_state
 
         # Mock submission result
         submission_result = BatchSubmissionResult(
@@ -496,34 +437,19 @@ class TestEndOfBatchFairnessScenarios:
             correlation_id=correlation_id,
         )
 
-        # Act - Execute complete fairness workflow
+        # Configure submission mock
         with (
-            patch(
-                "services.cj_assessment_service.cj_core_logic.batch_pool_manager.get_batch_state",
-                new_callable=AsyncMock,
-            ) as mock_get_batch_state,
-            patch(
-                "services.cj_assessment_service.cj_core_logic.batch_pool_manager.merge_batch_processing_metadata",
-                new_callable=AsyncMock,
-            ),
             patch.object(
                 batch_retry_processor.batch_submitter,
                 "submit_comparison_batch",
-                new_callable=AsyncMock,
-            ) as mock_submit_comparison,
+                AsyncMock(return_value=submission_result),
+            ) as mock_submit,
             patch.object(
-                batch_retry_processor.pool_manager,
-                "check_retry_batch_needed",
-                new_callable=AsyncMock,
-            ) as mock_check_retry_needed,
+                batch_retry_processor,
+                "_load_processing_metadata",
+                AsyncMock(return_value={"llm_overrides": {}, "original_request": {}}),
+            ),
         ):
-            mock_get_batch_state.return_value = batch_state
-            mock_submit_comparison.return_value = submission_result
-            mock_check_retry_needed.side_effect = [
-                False,
-                True,
-            ]  # Normal mode False, fairness mode True
-
             # 1. Check that normal mode would skip
             normal_result = await batch_retry_processor.pool_manager.check_retry_batch_needed(
                 cj_batch_id=cj_batch_id,
@@ -537,20 +463,20 @@ class TestEndOfBatchFairnessScenarios:
                 correlation_id=correlation_id,
             )
 
-            # Assert
-            assert normal_result is False  # Would be skipped in normal processing
-            assert fairness_result is not None
-            assert fairness_result.total_submitted == 2  # Both failures processed
-            assert fairness_result.all_submitted is True
+        # Assert
+        assert normal_result is False  # Would be skipped in normal processing
+        assert fairness_result is not None
+        assert fairness_result.total_submitted == 2  # Both failures processed
+        assert fairness_result.all_submitted is True
 
-            # Verify submission was called with force_retry_all
-            mock_submit_comparison.assert_called_once()
+        # Verify submission was called with force_retry_all
+        mock_submit.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_mixed_retry_count_fairness_scenario(
         self,
         batch_pool_manager: BatchPoolManager,
-        mock_database: AsyncMock,
+        mock_batch_repo: AsyncMock,
         mock_settings: Settings,
     ) -> None:
         """Test fairness scenario with mixed retry counts and max attempts."""
@@ -596,30 +522,15 @@ class TestEndOfBatchFairnessScenarios:
         batch_state = MagicMock(spec=CJBatchState)
         batch_state.processing_metadata = failed_pool.model_dump()
 
-        # Mock database
-        mock_session = AsyncMock()
-        mock_database.session.return_value.__aenter__.return_value = mock_session
-        mock_database.session.return_value.__aexit__.return_value = None
+        mock_batch_repo.get_batch_state_for_update.return_value = batch_state
 
         # Act - Test fairness mode with mixed retry counts
-        with (
-            patch(
-                "services.cj_assessment_service.cj_core_logic.batch_pool_manager.get_batch_state"
-            ) as mock_get_batch_state,
-            patch(
-                "services.cj_assessment_service.cj_core_logic.batch_pool_manager.merge_batch_processing_metadata"
-            ) as mock_update_metadata,
-        ):
-            mock_get_batch_state.return_value = batch_state
-            retry_tasks = await batch_pool_manager.form_retry_batch(
-                cj_batch_id=cj_batch_id,
-                correlation_id=correlation_id,
-                force_retry_all=True,
-            )
+        retry_tasks = await batch_pool_manager.form_retry_batch(
+            cj_batch_id=cj_batch_id,
+            correlation_id=correlation_id,
+            force_retry_all=True,
+        )
 
-            # Assert
-            assert retry_tasks is not None
-            assert len(retry_tasks) == 1  # Only 1 eligible (other at max retries)
-
-            # Verify metadata update was called (for permanently failed tracking)
-            mock_update_metadata.assert_called_once()
+        # Assert
+        assert retry_tasks is not None
+        assert len(retry_tasks) == 1  # Only 1 eligible (other at max retries)

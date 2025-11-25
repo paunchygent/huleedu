@@ -1,531 +1,164 @@
-"""Callback state management utilities for CJ Assessment Service.
-
-This module handles state updates, batch completion detection, and callback-related
-database operations for the LLM callback processing system.
-"""
+"""Callback state management orchestrator for CJ Assessment Service."""
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import Any
 from uuid import UUID
 
-if TYPE_CHECKING:
-    from services.cj_assessment_service.cj_core_logic.batch_pool_manager import BatchPoolManager
-    from services.cj_assessment_service.cj_core_logic.batch_retry_processor import (
-        BatchRetryProcessor,
-    )
-
-from common_core.events.llm_provider_events import LLMComparisonResultV1
-from huleedu_service_libs.error_handling import raise_cj_callback_correlation_failed
 from huleedu_service_libs.logging_utils import create_service_logger
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from services.cj_assessment_service.cj_core_logic.batch_completion_policy import (
+    BatchCompletionPolicy,
+)
+from services.cj_assessment_service.cj_core_logic.callback_persistence_service import (
+    CallbackPersistenceService,
+)
+from services.cj_assessment_service.cj_core_logic.callback_retry_coordinator import (
+    ComparisonRetryCoordinator,
+)
 from services.cj_assessment_service.config import Settings
-from services.cj_assessment_service.models_api import ComparisonTask, EssayForComparison
+from services.cj_assessment_service.models_api import ComparisonTask
 from services.cj_assessment_service.models_db import ComparisonPair
-from services.cj_assessment_service.protocols import CJRepositoryProtocol
+from services.cj_assessment_service.protocols import (
+    CJBatchRepositoryProtocol,
+    CJComparisonRepositoryProtocol,
+    SessionProviderProtocol,
+)
 
 logger = create_service_logger("cj_assessment_service.callback_state_manager")
 
+_completion_policy = BatchCompletionPolicy()
+_retry_coordinator = ComparisonRetryCoordinator()
+_persistence_service = CallbackPersistenceService(
+    completion_policy=_completion_policy, retry_coordinator=_retry_coordinator
+)
+
 
 async def update_comparison_result(
-    comparison_result: LLMComparisonResultV1,
-    database: CJRepositoryProtocol,
+    comparison_result: Any,
+    session_provider: SessionProviderProtocol,
+    comparison_repository: CJComparisonRepositoryProtocol,
+    batch_repository: CJBatchRepositoryProtocol,
     correlation_id: UUID,
     settings: Settings,
-    pool_manager: BatchPoolManager | None = None,
-    retry_processor: BatchRetryProcessor | None = None,
+    pool_manager: Any | None = None,
+    retry_processor: Any | None = None,
 ) -> int | None:
-    """Update comparison pair with LLM callback result.
-
-    Finds ComparisonPair by request_correlation_id and updates with
-    success data or error details. Implements idempotency check.
+    """Delegate comparison result persistence to the dedicated service.
 
     Args:
-        comparison_result: The LLM comparison result callback data
-        database: Database access protocol implementation
+        comparison_result: LLM comparison result callback data
+        session: Active database session for transaction
+        comparison_repository: Repository for comparison pair operations
+        batch_repository: Repository for batch operations
         correlation_id: Request correlation ID for tracing
         settings: Application settings
-        pool_manager: Optional pool manager for failed comparison handling
-        retry_processor: Optional retry processor for failed comparison handling
+        pool_manager: Optional pool manager for retry coordination
+        retry_processor: Optional retry processor for failed comparisons
 
     Returns:
-        The batch_id of the updated comparison, or None if not found
+        Batch ID if comparison pair found, None otherwise
     """
-    async with database.session() as session:
-        # Find comparison pair by request correlation ID
-        stmt = select(ComparisonPair).where(ComparisonPair.request_correlation_id == correlation_id)
-        result = await session.execute(stmt)
-        comparison_pair = result.scalar_one_or_none()
-
-        # DEBUG: Temporarily removed debug output
-
-        if comparison_pair is None:
-            raise_cj_callback_correlation_failed(
-                service="cj_assessment_service",
-                operation="update_comparison_result",
-                message=(
-                    f"Cannot find comparison pair for callback with correlation ID: "
-                    f"{correlation_id}"
-                ),
-                correlation_id=correlation_id,
-                callback_correlation_id=correlation_id,
-            )
-
-        # Check idempotency - skip if already has result
-        if comparison_pair.winner is not None:
-            logger.info(
-                f"Comparison pair {comparison_pair.id} already has result, skipping update",
-                extra={
-                    "correlation_id": str(correlation_id),
-                    "request_id": comparison_result.request_id,
-                    "existing_winner": comparison_pair.winner,
-                },
-            )
-            return comparison_pair.cj_batch_id
-
-        # Update with result or error
-        comparison_pair.completed_at = datetime.now(UTC)
-
-        if comparison_result.is_error and comparison_result.error_detail:
-            # Update error fields
-            comparison_pair.winner = "error"
-            comparison_pair.error_code = (
-                comparison_result.error_detail.error_code.value
-            )  # Convert enum to string
-            comparison_pair.error_correlation_id = comparison_result.error_detail.correlation_id
-            comparison_pair.error_timestamp = comparison_result.error_detail.timestamp
-            comparison_pair.error_service = comparison_result.error_detail.service
-            comparison_pair.error_details = comparison_result.error_detail.details
-
-            error_details = comparison_result.error_detail.details or {}
-            logger.warning(
-                f"Updated comparison pair {comparison_pair.id} with error result",
-                extra={
-                    "correlation_id": str(correlation_id),
-                    "error_code": comparison_result.error_detail.error_code.value,
-                    "error_provider": error_details.get("provider"),
-                    "error_http_status": error_details.get("http_status"),
-                    "error_type": error_details.get("error_type"),
-                    "error_retryable": error_details.get("retryable"),
-                    "error_provider_error_code": error_details.get("provider_error_code"),
-                },
-            )
-
-            # Add to failed comparison pool if pool manager is available
-            # Retry policy: transient provider failures enter the retry pool so they
-            # consume only the failed counter until the fairness processor resubmits them.
-            if pool_manager and retry_processor and settings.ENABLE_FAILED_COMPARISON_RETRY:
-                await add_failed_comparison_to_pool(
-                    pool_manager=pool_manager,
-                    retry_processor=retry_processor,
-                    comparison_pair=comparison_pair,
-                    comparison_result=comparison_result,
-                    correlation_id=correlation_id,
-                )
-        else:
-            # Update success fields
-            # Convert winner enum to database format (lowercase with underscore)
-            if comparison_result.winner:
-                winner_value = comparison_result.winner.value  # e.g., "Essay A" or "Essay B"
-                # Convert to database format: "Essay A" -> "essay_a"
-                comparison_pair.winner = winner_value.lower().replace(" ", "_")
-            else:
-                comparison_pair.winner = None
-
-            comparison_pair.confidence = comparison_result.confidence
-            comparison_pair.justification = comparison_result.justification
-            # Raw response not available in current model
-            comparison_pair.raw_llm_response = None
-
-            # Store additional metadata
-            comparison_pair.processing_metadata = {
-                "provider": comparison_result.provider.value,
-                "model": comparison_result.model,
-                "response_time_ms": comparison_result.response_time_ms,
-                "token_usage": {
-                    "prompt_tokens": comparison_result.token_usage.prompt_tokens,
-                    "completion_tokens": comparison_result.token_usage.completion_tokens,
-                    "total_tokens": comparison_result.token_usage.total_tokens,
-                },
-                "cost_estimate": comparison_result.cost_estimate,
-            }
-
-            logger.info(
-                f"Updated comparison pair {comparison_pair.id} with success result",
-                extra={
-                    "correlation_id": str(correlation_id),
-                    "winner": comparison_pair.winner,
-                    "confidence": comparison_pair.confidence,
-                },
-            )
-
-            # Check if this was a retry and update pool statistics
-            if pool_manager and settings.ENABLE_FAILED_COMPARISON_RETRY:
-                await handle_successful_retry(
-                    pool_manager=pool_manager,
-                    comparison_pair=comparison_pair,
-                    correlation_id=correlation_id,
-                )
-
-        # Update batch state aggregation counters - CRITICAL FOR BATCH COMPLETION TRACKING
-        await _update_batch_completion_counters(
+    async with session_provider.session() as session:
+        return await _persistence_service.update_comparison_result(
+            comparison_result=comparison_result,
             session=session,
-            batch_id=comparison_pair.cj_batch_id,
-            is_error=comparison_result.is_error,
+            comparison_repository=comparison_repository,
+            batch_repository=batch_repository,
             correlation_id=correlation_id,
+            settings=settings,
+            pool_manager=pool_manager,
+            retry_processor=retry_processor,
         )
-
-        await session.commit()
-        return comparison_pair.cj_batch_id
 
 
 async def check_batch_completion_conditions(
     batch_id: int,
-    database: CJRepositoryProtocol,
-    session: AsyncSession,
+    session_provider: SessionProviderProtocol,
+    batch_repository: CJBatchRepositoryProtocol,
     correlation_id: UUID,
 ) -> bool:
-    """Check if batch is approaching completion.
-
-    This is a simplified check for detecting when batch processing is ending.
-    In a complete implementation, this would check:
-    - Maximum comparisons limit reached
-    - Score stability achieved
-    - Batch state transitioning to COMPLETED or FAILED
-    - All submitted comparisons completed (successful + failed = total submitted)
+    """Check completion heuristics using the shared completion policy.
 
     Args:
-        batch_id: The CJ batch ID
-        database: Database access protocol implementation (unused in current implementation)
-        session: Database session
+        batch_id: ID of the batch to check
+        session: Active database session
+        batch_repository: Repository for batch operations
         correlation_id: Request correlation ID for tracing
 
     Returns:
-        True if batch is approaching completion, False otherwise
+        True if batch meets completion conditions, False otherwise
     """
-    from services.cj_assessment_service.models_db import CJBatchState
-
-    # Suppress unused parameter warning
-    _ = database
-
-    try:
-        # Get batch state
-        stmt = select(CJBatchState).where(CJBatchState.batch_id == batch_id)
-        result = await session.execute(stmt)
-        batch_state = result.scalar_one_or_none()
-
-        if not batch_state:
-            return False
-
-        # Simple heuristic: check if batch has significant completion
-        # In practice, this would integrate with proper batch state management
-        denominator = batch_state.completion_denominator()
-        if denominator > 0 and batch_state.completed_comparisons >= denominator * 0.8:
-            completion_rate = batch_state.completed_comparisons / denominator
-            logger.info(
-                f"Batch {batch_id} completion detected: "
-                f"{batch_state.completed_comparisons}/{denominator} "
-                f"comparisons completed (80%+ threshold reached)",
-                extra={
-                    "correlation_id": str(correlation_id),
-                    "batch_id": batch_id,
-                    "completion_rate": completion_rate,
-                },
-            )
-            return True
-
-        return False
-
-    except Exception as e:
-        logger.error(
-            f"Failed to check batch completion conditions for batch {batch_id}: {e}",
-            extra={
-                "correlation_id": str(correlation_id),
-                "batch_id": batch_id,
-                "error": str(e),
-            },
-            exc_info=True,
+    async with session_provider.session() as session:
+        return await _completion_policy.check_batch_completion_conditions(
+            batch_id=batch_id,
+            batch_repo=batch_repository,
+            session=session,
+            correlation_id=correlation_id,
         )
-        return False
 
 
 async def add_failed_comparison_to_pool(
-    pool_manager: BatchPoolManager,
-    retry_processor: BatchRetryProcessor,
+    pool_manager: Any,
+    retry_processor: Any,
     comparison_pair: ComparisonPair,
-    comparison_result: LLMComparisonResultV1,
+    comparison_result: Any,
     correlation_id: UUID,
 ) -> None:
-    """Add failed comparison to the retry pool and check for retry batch need.
+    """Expose retry coordinator add-to-pool behavior for legacy callers."""
 
-    Args:
-        pool_manager: Pool manager instance for failed comparison handling
-        retry_processor: Retry processor instance for batch submission
-        comparison_pair: Failed comparison pair from database
-        comparison_result: LLM comparison result with error
-        correlation_id: Request correlation ID for tracing
-    """
-    try:
-        # Reconstruct the original comparison task from the database record
-        # Note: We need to fetch the essay content from the database
-        # This is a simplified version - in practice, you'd want to fetch the full essay data
-        comparison_task = await reconstruct_comparison_task(
-            comparison_pair=comparison_pair, correlation_id=correlation_id
-        )
-
-        if comparison_task:
-            # Determine failure reason from error details
-            failure_reason = (
-                comparison_result.error_detail.error_code.value
-                if comparison_result.error_detail
-                else "unknown_error"
-            )
-
-            # Add to failed pool
-            await pool_manager.add_to_failed_pool(
-                cj_batch_id=comparison_pair.cj_batch_id,
-                comparison_task=comparison_task,
-                failure_reason=failure_reason,
-                correlation_id=correlation_id,
-            )
-
-            # Check if retry batch needed
-            retry_needed = await pool_manager.check_retry_batch_needed(
-                cj_batch_id=comparison_pair.cj_batch_id,
-                correlation_id=correlation_id,
-                force_retry_all=False,  # Use normal threshold-based checking during callbacks
-            )
-
-            if retry_needed:
-                logger.info(
-                    f"Triggering retry batch for batch {comparison_pair.cj_batch_id}",
-                    extra={
-                        "correlation_id": str(correlation_id),
-                        "cj_batch_id": comparison_pair.cj_batch_id,
-                    },
-                )
-
-                # Submit retry batch
-                await retry_processor.submit_retry_batch(
-                    cj_batch_id=comparison_pair.cj_batch_id,
-                    correlation_id=correlation_id,
-                )
-
-    except Exception as e:
-        logger.error(
-            f"Failed to add comparison to failed pool: {e}",
-            extra={
-                "correlation_id": str(correlation_id),
-                "comparison_pair_id": comparison_pair.id,
-                "cj_batch_id": comparison_pair.cj_batch_id,
-                "error": str(e),
-            },
-            exc_info=True,
-        )
-        # Don't re-raise - we don't want to fail the callback processing
+    await _retry_coordinator.add_failed_comparison_to_pool(
+        pool_manager=pool_manager,
+        retry_processor=retry_processor,
+        comparison_pair=comparison_pair,
+        comparison_result=comparison_result,
+        correlation_id=correlation_id,
+    )
 
 
 async def reconstruct_comparison_task(
     comparison_pair: ComparisonPair, correlation_id: UUID
 ) -> ComparisonTask | None:
-    """Reconstruct comparison task from database comparison pair.
+    """Proxy to retry coordinator reconstruction helper."""
 
-    Args:
-        comparison_pair: Database comparison pair record
-        correlation_id: Request correlation ID for tracing
-
-    Returns:
-        Reconstructed comparison task or None if reconstruction fails
-    """
-    try:
-        # Note: This is a simplified reconstruction
-        # In a complete implementation, you'd fetch the full essay content
-        # from the essay records using comparison_pair.essay_a and essay_b relationships
-
-        # For now, we'll create minimal essay objects
-        # In practice, you'd want to fetch the full text content
-        essay_a = EssayForComparison(
-            id=comparison_pair.essay_a_els_id,
-            text_content="[Essay content would be fetched from database]",
-            current_bt_score=None,
-        )
-
-        essay_b = EssayForComparison(
-            id=comparison_pair.essay_b_els_id,
-            text_content="[Essay content would be fetched from database]",
-            current_bt_score=None,
-        )
-
-        return ComparisonTask(
-            essay_a=essay_a,
-            essay_b=essay_b,
-            prompt=comparison_pair.prompt_text,
-        )
-
-    except Exception as e:
-        logger.error(
-            f"Failed to reconstruct comparison task: {e}",
-            extra={
-                "correlation_id": str(correlation_id),
-                "comparison_pair_id": comparison_pair.id,
-                "error": str(e),
-            },
-            exc_info=True,
-        )
-        return None
+    return await _retry_coordinator.reconstruct_comparison_task(
+        comparison_pair=comparison_pair, correlation_id=correlation_id
+    )
 
 
 async def handle_successful_retry(
-    pool_manager: BatchPoolManager,
-    comparison_pair: ComparisonPair,
-    correlation_id: UUID,
+    pool_manager: Any, comparison_pair: ComparisonPair, correlation_id: UUID
 ) -> None:
-    """Handle successful retry by updating pool statistics.
+    """Forward successful retry handling to the coordinator."""
 
-    Args:
-        pool_manager: Pool manager instance for failed comparison handling
-        comparison_pair: Successful comparison pair from database
-        correlation_id: Request correlation ID for tracing
-    """
-    try:
-        # For successful retries, we need to update the pool statistics
-        # This is a simplified implementation - in practice, you'd want to
-        # track which comparisons were retries and update accordingly
-
-        # Get current batch state and check if there's an active failed pool
-        from .batch_submission import get_batch_state
-
-        async with pool_manager.database.session() as session:
-            batch_state = await get_batch_state(
-                session=session,
-                cj_batch_id=comparison_pair.cj_batch_id,
-                correlation_id=correlation_id,
-            )
-
-            if batch_state and batch_state.processing_metadata:
-                from services.cj_assessment_service.models_api import FailedComparisonPool
-
-                failed_pool = FailedComparisonPool.model_validate(batch_state.processing_metadata)
-
-                # Check if this comparison was in the failed pool and remove it
-                original_pool_size = len(failed_pool.failed_comparison_pool)
-                failed_pool.failed_comparison_pool = [
-                    entry
-                    for entry in failed_pool.failed_comparison_pool
-                    if not (
-                        entry.essay_a_id == comparison_pair.essay_a_els_id
-                        and entry.essay_b_id == comparison_pair.essay_b_els_id
-                    )
-                ]
-
-                # If we removed an entry, update statistics
-                if len(failed_pool.failed_comparison_pool) < original_pool_size:
-                    failed_pool.pool_statistics.successful_retries += 1
-
-                    # Record successful retry metrics
-                    from services.cj_assessment_service.metrics import get_business_metrics
-
-                    business_metrics = get_business_metrics()
-                    successful_retries_metric = business_metrics.get("cj_successful_retries_total")
-                    pool_size_metric = business_metrics.get("cj_failed_pool_size")
-
-                    if successful_retries_metric:
-                        successful_retries_metric.inc()
-
-                    if pool_size_metric:
-                        pool_size_metric.labels(batch_id=str(comparison_pair.cj_batch_id)).set(
-                            len(failed_pool.failed_comparison_pool)
-                        )
-
-                    # Update batch state
-                    from .batch_submission import merge_batch_processing_metadata
-
-                    await merge_batch_processing_metadata(
-                        session=session,
-                        cj_batch_id=comparison_pair.cj_batch_id,
-                        metadata_updates=failed_pool.model_dump(mode="json"),
-                        correlation_id=correlation_id,
-                    )
-
-                    logger.info(
-                        f"Removed successful retry from failed pool for batch "
-                        f"{comparison_pair.cj_batch_id}",
-                        extra={
-                            "correlation_id": str(correlation_id),
-                            "cj_batch_id": comparison_pair.cj_batch_id,
-                            "essay_a_id": comparison_pair.essay_a_els_id,
-                            "essay_b_id": comparison_pair.essay_b_els_id,
-                        },
-                    )
-
-    except Exception as e:
-        logger.error(
-            f"Failed to handle successful retry: {e}",
-            extra={
-                "correlation_id": str(correlation_id),
-                "comparison_pair_id": comparison_pair.id,
-                "cj_batch_id": comparison_pair.cj_batch_id,
-                "error": str(e),
-            },
-            exc_info=True,
-        )
-        # Don't re-raise - we don't want to fail the callback processing
+    await _retry_coordinator.handle_successful_retry(
+        pool_manager=pool_manager,
+        comparison_pair=comparison_pair,
+        correlation_id=correlation_id,
+    )
 
 
 async def _update_batch_completion_counters(
     session: AsyncSession,
+    batch_repository: CJBatchRepositoryProtocol,
     batch_id: int,
     is_error: bool,
     correlation_id: UUID,
 ) -> None:
-    """Update batch state aggregation counters for callback completion.
+    """Compatibility wrapper for legacy tests referencing the private helper.
 
-    This is CRITICAL for batch completion tracking. Updates either
-    completed_comparisons or failed_comparisons atomically.
+    Args:
+        session: Active database session
+        batch_repository: Repository for batch operations
+        batch_id: ID of the batch to update
+        is_error: Whether the comparison resulted in an error
+        correlation_id: Request correlation ID for tracing
     """
-    from services.cj_assessment_service.models_db import CJBatchState
-
-    try:
-        # Get current batch state using the SAME session (no separate locking)
-        stmt = select(CJBatchState).where(CJBatchState.batch_id == batch_id)
-        result = await session.execute(stmt)
-        batch_state = result.scalar_one_or_none()
-
-        if not batch_state:
-            logger.error(f"Batch state not found for batch {batch_id}")
-            return
-
-        # Atomically increment the appropriate counter
-        if is_error:
-            # Retry policy: provider/network failures are recorded as failed comparisons
-            # (eligible for retry pool processing) and never counted as completed work.
-            batch_state.failed_comparisons += 1
-            logger.info(f"Batch {batch_id} failed_comparisons: {batch_state.failed_comparisons}")
-        else:
-            batch_state.completed_comparisons += 1
-            logger.info(
-                f"Batch {batch_id} completed_comparisons: {batch_state.completed_comparisons}"
-            )
-
-        batch_state.last_activity_at = datetime.now(UTC)
-
-        # Check for partial scoring trigger (80% completion threshold)
-        if (
-            batch_state.total_comparisons > 0
-            and not batch_state.partial_scoring_triggered
-            and batch_state.completed_comparisons
-            >= batch_state.total_comparisons * batch_state.completion_threshold_pct / 100
-        ):
-            batch_state.partial_scoring_triggered = True
-            logger.info(
-                f"Batch {batch_id} partial scoring triggered at "
-                f"{batch_state.completion_threshold_pct}% completion"
-            )
-
-    except Exception as e:
-        logger.error(
-            f"Failed to update batch completion counters for batch {batch_id}: {e}", exc_info=True
-        )
+    await _completion_policy.update_batch_completion_counters(
+        batch_repo=batch_repository,
+        session=session,
+        batch_id=batch_id,
+        is_error=is_error,
+        correlation_id=correlation_id,
+    )

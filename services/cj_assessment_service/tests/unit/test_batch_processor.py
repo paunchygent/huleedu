@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
@@ -28,41 +28,25 @@ from services.cj_assessment_service.models_api import (
 )
 from services.cj_assessment_service.models_db import CJBatchState
 from services.cj_assessment_service.protocols import (
-    CJRepositoryProtocol,
+    CJBatchRepositoryProtocol,
     LLMInteractionProtocol,
+    SessionProviderProtocol,
 )
+from services.cj_assessment_service.tests.unit.test_mocks import MockSessionProvider
 
 
 class TestBatchProcessor:
     """Test cases for BatchProcessor class."""
 
     @pytest.fixture
-    def mock_database(self) -> AsyncMock:
-        """Create mock database protocol."""
-        mock_db = AsyncMock(spec=CJRepositoryProtocol)
-        mock_session = AsyncMock()
-        # Ensure session.add doesn't return a coroutine
-        mock_session.add = Mock()
-        mock_session.flush = AsyncMock()
-        mock_session.commit = AsyncMock()
+    def mock_session_provider(self) -> MockSessionProvider:
+        """Create mock session provider."""
+        return MockSessionProvider()
 
-        default_state = CJBatchState()
-        default_state.batch_id = 1
-        default_state.state = CJBatchStateEnum.WAITING_CALLBACKS
-        default_state.total_budget = None
-        default_state.total_comparisons = 0
-        default_state.submitted_comparisons = 0
-        default_state.completed_comparisons = 0
-        default_state.failed_comparisons = 0
-        default_state.current_iteration = 0
-        default_state.processing_metadata = {}
-
-        state_result = Mock()
-        state_result.scalar_one_or_none.return_value = default_state
-        mock_session.execute = AsyncMock(return_value=state_result)
-        mock_db.session.return_value.__aenter__.return_value = mock_session
-        mock_db.session.return_value.__aexit__.return_value = None
-        return mock_db
+    @pytest.fixture
+    def mock_batch_repo(self) -> AsyncMock:
+        """Create mock batch repository protocol."""
+        return AsyncMock(spec=CJBatchRepositoryProtocol)
 
     @pytest.fixture
     def mock_llm_interaction(self) -> AsyncMock:
@@ -77,15 +61,17 @@ class TestBatchProcessor:
     @pytest.fixture
     def batch_processor(
         self,
-        mock_database: AsyncMock,
+        mock_session_provider: SessionProviderProtocol,
+        mock_batch_repo: AsyncMock,
         mock_llm_interaction: AsyncMock,
         settings: Settings,
     ) -> BatchProcessor:
         """Create BatchProcessor instance for testing."""
         return BatchProcessor(
-            database=mock_database,
+            session_provider=mock_session_provider,
             llm_interaction=mock_llm_interaction,
             settings=settings,
+            batch_repository=mock_batch_repo,
         )
 
     @pytest.fixture
@@ -191,8 +177,8 @@ class TestBatchProcessor:
     async def test_update_batch_state_with_totals_uses_locked_fetch(
         self,
         batch_processor: BatchProcessor,
-        mock_database: AsyncMock,
-        monkeypatch: pytest.MonkeyPatch,
+        mock_session_provider: MockSessionProvider,
+        mock_batch_repo: AsyncMock,
     ) -> None:
         """Ensure batch state updates fetch the row with a FOR UPDATE lock."""
 
@@ -206,13 +192,8 @@ class TestBatchProcessor:
         batch_state.submitted_comparisons = 0
         batch_state.current_iteration = 0
 
-        mock_get_batch_state = AsyncMock(return_value=batch_state)
-        monkeypatch.setattr(
-            "services.cj_assessment_service.cj_core_logic.batch_processor.get_batch_state",
-            mock_get_batch_state,
-        )
-
-        mock_session = mock_database.session.return_value.__aenter__.return_value
+        # Configure the batch repository mock to return the batch_state
+        mock_batch_repo.get_batch_state_for_update = AsyncMock(return_value=batch_state)
 
         await batch_processor._update_batch_state_with_totals(
             cj_batch_id=batch_state.batch_id,
@@ -221,10 +202,10 @@ class TestBatchProcessor:
             correlation_id=correlation_id,
         )
 
-        mock_get_batch_state.assert_awaited_once_with(
+        mock_session = mock_session_provider.get_last_session()
+        mock_batch_repo.get_batch_state_for_update.assert_awaited_once_with(
             session=mock_session,
-            cj_batch_id=batch_state.batch_id,
-            correlation_id=correlation_id,
+            batch_id=batch_state.batch_id,
             for_update=True,
         )
 

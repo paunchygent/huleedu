@@ -21,8 +21,9 @@ from quart import Blueprint, g, request
 from quart_dishka import inject
 
 from services.cj_assessment_service.protocols import (
-    CJRepositoryProtocol,
+    AssessmentInstructionRepositoryProtocol,
     ContentClientProtocol,
+    SessionProviderProtocol,
 )
 
 from .common import logger, record_admin_metric, register_admin_auth
@@ -34,7 +35,8 @@ register_admin_auth(judge_rubrics_bp)
 @judge_rubrics_bp.post("/judge-rubrics")
 @inject
 async def upload_judge_rubric(  # type: ignore[override]
-    repository: FromDishka[CJRepositoryProtocol],
+    session_provider: FromDishka[SessionProviderProtocol],
+    instruction_repository: FromDishka[AssessmentInstructionRepositoryProtocol],
     content_client: FromDishka[ContentClientProtocol],
     corr: FromDishka[CorrelationContext],
 ) -> tuple[dict[str, Any], int]:
@@ -65,9 +67,9 @@ async def upload_judge_rubric(  # type: ignore[override]
             correlation_id=corr.uuid,
         )
 
-    async with repository.session() as session:
+    async with session_provider.session() as session:
         try:
-            existing = await repository.get_assessment_instruction(
+            existing = await instruction_repository.get_assessment_instruction(
                 session,
                 assignment_id=req.assignment_id,
                 course_id=None,
@@ -108,7 +110,7 @@ async def upload_judge_rubric(  # type: ignore[override]
                 },
             )
 
-            updated = await repository.upsert_assessment_instruction(
+            updated = await instruction_repository.upsert_assessment_instruction(
                 session=session,
                 assignment_id=existing.assignment_id,
                 course_id=existing.course_id,
@@ -165,15 +167,16 @@ async def upload_judge_rubric(  # type: ignore[override]
 @inject
 async def get_judge_rubric(  # type: ignore[override]
     assignment_id: str,
-    repository: FromDishka[CJRepositoryProtocol],
+    session_provider: FromDishka[SessionProviderProtocol],
+    instruction_repository: FromDishka[AssessmentInstructionRepositoryProtocol],
     content_client: FromDishka[ContentClientProtocol],
     corr: FromDishka[CorrelationContext],
 ) -> tuple[dict[str, Any], int]:
     """Fetch judge rubric with full instruction context."""
 
-    async with repository.session() as session:
+    async with session_provider.session() as session:
         try:
-            instruction = await repository.get_assessment_instruction(
+            instruction = await instruction_repository.get_assessment_instruction(
                 session,
                 assignment_id=assignment_id,
                 course_id=None,

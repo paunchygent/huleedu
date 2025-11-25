@@ -16,12 +16,12 @@ from huleedu_service_libs.error_handling import raise_external_service_error
 from huleedu_service_libs.logging_utils import create_service_logger
 from pydantic import BaseModel, Field
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.cj_assessment_service.models_api import ComparisonTask
 from services.cj_assessment_service.protocols import (
-    CJRepositoryProtocol,
+    CJBatchRepositoryProtocol,
     LLMInteractionProtocol,
+    SessionProviderProtocol,
 )
 
 logger = create_service_logger("cj_assessment_service.batch_submission")
@@ -42,7 +42,8 @@ async def submit_batch_chunk(
     cj_batch_id: int,
     correlation_id: UUID,
     llm_interaction: LLMInteractionProtocol,
-    database: CJRepositoryProtocol | None = None,
+    session_provider: SessionProviderProtocol | None = None,
+    batch_repository: CJBatchRepositoryProtocol | None = None,
     model_override: str | None = None,
     temperature_override: float | None = None,
     max_tokens_override: int | None = None,
@@ -57,7 +58,8 @@ async def submit_batch_chunk(
         cj_batch_id: CJ batch ID for tracking
         correlation_id: Request correlation ID for tracing
         llm_interaction: LLM interaction protocol implementation
-        database: Optional database for creating tracking records
+        session_provider: Optional session provider for creating tracking records
+        batch_repository: Optional batch repository for fetching batch metadata
         model_override: Optional model name override
         temperature_override: Optional temperature override
         max_tokens_override: Optional max tokens override
@@ -71,14 +73,20 @@ async def submit_batch_chunk(
         # Get bos_batch_id for metadata and create tracking records if database is available
         bos_batch_id = None
         tracking_map = {}
-        if database is not None:
-            from services.cj_assessment_service.models_db import CJBatchUpload
-
+        if session_provider is not None:
             from .batch_submission_tracking import create_tracking_records
 
-            async with database.session() as session:
+            async with session_provider.session() as session:
                 # Query batch to get bos_batch_id
-                batch_record = await session.get(CJBatchUpload, cj_batch_id)
+                if batch_repository is not None:
+                    batch_record = await batch_repository.get_cj_batch_upload(
+                        session=session,
+                        cj_batch_id=cj_batch_id,
+                    )
+                else:
+                    from services.cj_assessment_service.models_db import CJBatchUpload
+
+                    batch_record = await session.get(CJBatchUpload, cj_batch_id)
                 if batch_record:
                     bos_batch_id = batch_record.bos_batch_id
                     logger.debug(
@@ -162,8 +170,9 @@ async def submit_batch_chunk(
         )
 
 
-async def update_batch_state_in_session(
-    session: AsyncSession,
+async def update_batch_state(
+    session_provider: SessionProviderProtocol,
+    batch_repository: CJBatchRepositoryProtocol,
     cj_batch_id: int,
     state: CJBatchStateEnum,
     correlation_id: UUID,
@@ -171,39 +180,44 @@ async def update_batch_state_in_session(
     """Update batch state within a database session.
 
     Args:
-        session: Database session
+        session_provider: Database session provider
+        batch_repository: Batch repository for persistence
         cj_batch_id: CJ batch ID
         state: New batch state
         correlation_id: Request correlation ID for tracing
     """
-    from sqlalchemy import update
+    async with session_provider.session() as session:
+        logger.debug(
+            f"Updating batch state to {state.value}",
+            extra={
+                "correlation_id": str(correlation_id),
+                "cj_batch_id": cj_batch_id,
+                "new_state": state.value,
+            },
+        )
 
-    from services.cj_assessment_service.models_db import CJBatchState
-
-    logger.debug(
-        f"Updating batch state to {state.value}",
-        extra={
-            "correlation_id": str(correlation_id),
-            "cj_batch_id": cj_batch_id,
-            "new_state": state.value,
-        },
-    )
-
-    await session.execute(
-        update(CJBatchState).where(CJBatchState.batch_id == cj_batch_id).values(state=state)
-    )
-    await session.commit()
+        await batch_repository.update_batch_state(
+            session=session,
+            batch_id=cj_batch_id,
+            state=state,
+        )
+        await session.commit()
 
 
 async def get_batch_state(
-    session: AsyncSession, cj_batch_id: int, correlation_id: UUID, for_update: bool = False
+    session_provider: SessionProviderProtocol,
+    cj_batch_id: int,
+    correlation_id: UUID,
+    batch_repository: CJBatchRepositoryProtocol | None = None,
+    for_update: bool = False,
 ) -> Any:
     """Get batch state from database.
 
     Args:
-        session: Database session
+        session_provider: Database session provider
         cj_batch_id: CJ batch ID
         correlation_id: Request correlation ID for tracing
+        batch_repository: Optional batch repository for structured access
         for_update: If True, lock the row for update (prevents concurrent modifications)
 
     Returns:
@@ -217,19 +231,28 @@ async def get_batch_state(
     from services.cj_assessment_service.models_db import CJBatchState
 
     try:
-        if for_update:
-            # When locking for update, use a simple query without any relationship loading
-            # to avoid "FOR UPDATE cannot be applied to nullable side of outer join" error
-            stmt = (
-                select(CJBatchState)
-                .where(CJBatchState.batch_id == cj_batch_id)
-                .options(noload("*"))  # Disable all relationship loading
-                .with_for_update()
-            )
-        else:
-            stmt = select(CJBatchState).where(CJBatchState.batch_id == cj_batch_id)
-        result = await session.execute(stmt)
-        return result.scalar_one_or_none()
+        async with session_provider.session() as session:
+            if batch_repository is not None:
+                batch_state = await batch_repository.get_batch_state_for_update(
+                    session=session,
+                    batch_id=cj_batch_id,
+                    for_update=for_update,
+                )
+            else:
+                if for_update:
+                    # When locking for update, use a simple query without any relationship loading
+                    # to avoid "FOR UPDATE cannot be applied to nullable side of outer join" error
+                    stmt = (
+                        select(CJBatchState)
+                        .where(CJBatchState.batch_id == cj_batch_id)
+                        .options(noload("*"))  # Disable all relationship loading
+                        .with_for_update()
+                    )
+                else:
+                    stmt = select(CJBatchState).where(CJBatchState.batch_id == cj_batch_id)
+                result = await session.execute(stmt)
+                batch_state = result.scalar_one_or_none()
+            return batch_state
     except Exception as e:
         logger.error(
             f"Failed to get batch state for CJ batch {cj_batch_id}: {e}",
@@ -244,7 +267,7 @@ async def get_batch_state(
 
 
 async def update_batch_processing_metadata(
-    session: AsyncSession,
+    session_provider: SessionProviderProtocol,
     cj_batch_id: int,
     metadata: dict[str, Any],
     correlation_id: UUID,
@@ -260,25 +283,26 @@ async def update_batch_processing_metadata(
     Raises:
         DatabaseOperationError: On database operation failure
     """
-    from sqlalchemy import update
-
     from services.cj_assessment_service.models_db import CJBatchState
 
     try:
-        await session.execute(
-            update(CJBatchState)
-            .where(CJBatchState.batch_id == cj_batch_id)
-            .values(processing_metadata=metadata)
-        )
-        await session.commit()
+        from sqlalchemy import update
 
-        logger.debug(
-            f"Updated processing metadata for batch {cj_batch_id}",
-            extra={
-                "correlation_id": str(correlation_id),
-                "cj_batch_id": cj_batch_id,
-            },
-        )
+        async with session_provider.session() as session:
+            await session.execute(
+                update(CJBatchState)
+                .where(CJBatchState.batch_id == cj_batch_id)
+                .values(processing_metadata=metadata)
+            )
+            await session.commit()
+
+            logger.debug(
+                f"Updated processing metadata for batch {cj_batch_id}",
+                extra={
+                    "correlation_id": str(correlation_id),
+                    "cj_batch_id": cj_batch_id,
+                },
+            )
 
     except Exception as e:
         logger.error(
@@ -294,7 +318,7 @@ async def update_batch_processing_metadata(
 
 
 async def merge_batch_processing_metadata(
-    session: AsyncSession,
+    session_provider: SessionProviderProtocol,
     cj_batch_id: int,
     metadata_updates: dict[str, Any],
     correlation_id: UUID,
@@ -304,21 +328,26 @@ async def merge_batch_processing_metadata(
     from services.cj_assessment_service.models_db import CJBatchState
 
     try:
-        stmt = select(CJBatchState.processing_metadata).where(CJBatchState.batch_id == cj_batch_id)
-        result = await session.execute(stmt)
-        existing_metadata = result.scalar_one_or_none()
-        if isinstance(existing_metadata, Awaitable):
-            existing_metadata = await existing_metadata
-        if not isinstance(existing_metadata, dict):
-            existing_metadata = {}
-        updated_metadata = {**existing_metadata, **metadata_updates}
+        from sqlalchemy import update
 
-        await update_batch_processing_metadata(
-            session=session,
-            cj_batch_id=cj_batch_id,
-            metadata=updated_metadata,
-            correlation_id=correlation_id,
-        )
+        async with session_provider.session() as session:
+            stmt = select(CJBatchState.processing_metadata).where(
+                CJBatchState.batch_id == cj_batch_id
+            )
+            result = await session.execute(stmt)
+            existing_metadata = result.scalar_one_or_none()
+            if isinstance(existing_metadata, Awaitable):
+                existing_metadata = await existing_metadata
+            if not isinstance(existing_metadata, dict):
+                existing_metadata = {}
+            updated_metadata = {**existing_metadata, **metadata_updates}
+
+            await session.execute(
+                update(CJBatchState)
+                .where(CJBatchState.batch_id == cj_batch_id)
+                .values(processing_metadata=updated_metadata)
+            )
+            await session.commit()
     except Exception as e:
         logger.error(
             f"Failed to merge processing metadata: {e}",
@@ -333,7 +362,7 @@ async def merge_batch_processing_metadata(
 
 
 async def merge_batch_upload_metadata(
-    session: AsyncSession,
+    session_provider: SessionProviderProtocol,
     cj_batch_id: int,
     metadata_updates: dict[str, Any],
     correlation_id: UUID,
@@ -345,30 +374,31 @@ async def merge_batch_upload_metadata(
     from services.cj_assessment_service.models_db import CJBatchUpload
 
     try:
-        stmt = select(CJBatchUpload.processing_metadata).where(CJBatchUpload.id == cj_batch_id)
-        result = await session.execute(stmt)
-        existing_metadata = result.scalar_one_or_none()
-        if isinstance(existing_metadata, Awaitable):
-            existing_metadata = await existing_metadata
-        if not isinstance(existing_metadata, dict):
-            existing_metadata = {}
-        updated_metadata = {**existing_metadata, **metadata_updates}
+        async with session_provider.session() as session:
+            stmt = select(CJBatchUpload.processing_metadata).where(CJBatchUpload.id == cj_batch_id)
+            result = await session.execute(stmt)
+            existing_metadata = result.scalar_one_or_none()
+            if isinstance(existing_metadata, Awaitable):
+                existing_metadata = await existing_metadata
+            if not isinstance(existing_metadata, dict):
+                existing_metadata = {}
+            updated_metadata = {**existing_metadata, **metadata_updates}
 
-        await session.execute(
-            update(CJBatchUpload)
-            .where(CJBatchUpload.id == cj_batch_id)
-            .values(processing_metadata=updated_metadata)
-        )
-        await session.commit()
+            await session.execute(
+                update(CJBatchUpload)
+                .where(CJBatchUpload.id == cj_batch_id)
+                .values(processing_metadata=updated_metadata)
+            )
+            await session.commit()
 
-        logger.debug(
-            "Merged batch upload metadata",
-            extra={
-                "correlation_id": str(correlation_id),
-                "cj_batch_id": cj_batch_id,
-                "keys": list(metadata_updates.keys()),
-            },
-        )
+            logger.debug(
+                "Merged batch upload metadata",
+                extra={
+                    "correlation_id": str(correlation_id),
+                    "cj_batch_id": cj_batch_id,
+                    "keys": list(metadata_updates.keys()),
+                },
+            )
     except Exception as e:
         logger.error(
             f"Failed to merge batch upload metadata: {e}",
@@ -383,7 +413,7 @@ async def merge_batch_upload_metadata(
 
 
 async def merge_essay_processing_metadata(
-    session: AsyncSession,
+    session_provider: SessionProviderProtocol,
     els_essay_id: str,
     metadata_updates: dict[str, Any],
     correlation_id: UUID,
@@ -393,22 +423,24 @@ async def merge_essay_processing_metadata(
     from services.cj_assessment_service.models_db import ProcessedEssay
 
     try:
-        essay = await session.get(ProcessedEssay, els_essay_id)
-        if not essay:
-            raise ValueError(f"Processed essay {els_essay_id} not found for metadata merge")
+        async with session_provider.session() as session:
+            essay = await session.get(ProcessedEssay, els_essay_id)
+            if not essay:
+                raise ValueError(f"Processed essay {els_essay_id} not found for metadata merge")
 
-        existing_metadata = essay.processing_metadata or {}
-        essay.processing_metadata = {**existing_metadata, **metadata_updates}
-        await session.flush()
+            existing_metadata = essay.processing_metadata or {}
+            essay.processing_metadata = {**existing_metadata, **metadata_updates}
+            await session.flush()
+            await session.commit()
 
-        logger.debug(
-            "Merged essay metadata",
-            extra={
-                "correlation_id": str(correlation_id),
-                "els_essay_id": els_essay_id,
-                "keys": list(metadata_updates.keys()),
-            },
-        )
+            logger.debug(
+                "Merged essay metadata",
+                extra={
+                    "correlation_id": str(correlation_id),
+                    "els_essay_id": els_essay_id,
+                    "keys": list(metadata_updates.keys()),
+                },
+            )
     except Exception as e:
         logger.error(
             f"Failed to merge essay metadata: {e}",
@@ -423,7 +455,7 @@ async def merge_essay_processing_metadata(
 
 
 async def append_to_failed_pool_atomic(
-    session: AsyncSession,
+    session_provider: SessionProviderProtocol,
     cj_batch_id: int,
     failed_entry_json: dict[str, Any],
     correlation_id: UUID,
@@ -445,71 +477,72 @@ async def append_to_failed_pool_atomic(
     from sqlalchemy import text
 
     try:
-        # Use raw SQL for atomic JSONB operations
-        # The -> operator extracts as json, so cast back to jsonb for concatenation
-        stmt = text(
-            """
-            UPDATE cj_batch_states
-            SET processing_metadata =
-                (
-                    COALESCE(processing_metadata::jsonb, '{}'::jsonb)
-                    || jsonb_build_object(
-                        'failed_comparison_pool',
-                        (
-                            (COALESCE(
-                                (processing_metadata->'failed_comparison_pool')::jsonb,
-                                '[]'::jsonb
-                            ))
-                            || CAST(:entry AS jsonb)
-                        ),
-                        'pool_statistics',
-                        jsonb_build_object(
-                            'total_failed',
-                            (COALESCE(
-                                (processing_metadata->'pool_statistics'->>'total_failed')::int,
-                                0
-                            ))
-                            + 1,
-                            'retry_attempts',
-                            COALESCE(
-                                (processing_metadata->'pool_statistics'->>'retry_attempts')::int,
-                                0
+        async with session_provider.session() as session:
+            # Use raw SQL for atomic JSONB operations
+            # The -> operator extracts as json, so cast back to jsonb for concatenation
+            stmt = text(
+                """
+                UPDATE cj_batch_states
+                SET processing_metadata =
+                    (
+                        COALESCE(processing_metadata::jsonb, '{}'::jsonb)
+                        || jsonb_build_object(
+                            'failed_comparison_pool',
+                            (
+                                (COALESCE(
+                                    (processing_metadata->'failed_comparison_pool')::jsonb,
+                                    '[]'::jsonb
+                                ))
+                                || CAST(:entry AS jsonb)
                             ),
-                            'last_retry_batch',
-                            processing_metadata->'pool_statistics'->>'last_retry_batch',
-                            'successful_retries',
-                            COALESCE(
-                                (processing_metadata->'pool_statistics'->>'successful_retries')::int,
-                                0
-                            ),
-                            'permanently_failed',
-                            COALESCE(
-                                (processing_metadata->'pool_statistics'->>'permanently_failed')::int,
-                                0
+                            'pool_statistics',
+                            jsonb_build_object(
+                                'total_failed',
+                                (COALESCE(
+                                    (processing_metadata->'pool_statistics'->>'total_failed')::int,
+                                    0
+                                ))
+                                + 1,
+                                'retry_attempts',
+                                COALESCE(
+                                    (processing_metadata->'pool_statistics'->>'retry_attempts')::int,
+                                    0
+                                ),
+                                'last_retry_batch',
+                                processing_metadata->'pool_statistics'->>'last_retry_batch',
+                                'successful_retries',
+                                COALESCE(
+                                    (processing_metadata->'pool_statistics'->>'successful_retries')::int,
+                                    0
+                                ),
+                                'permanently_failed',
+                                COALESCE(
+                                    (processing_metadata->'pool_statistics'->>'permanently_failed')::int,
+                                    0
+                                )
                             )
                         )
-                    )
-                )::json
-            WHERE batch_id = :batch_id
-            """
-        )
+                    )::json
+                WHERE batch_id = :batch_id
+                """
+            )
 
-        await session.execute(
-            stmt,
-            {
-                "batch_id": cj_batch_id,
-                "entry": json.dumps([failed_entry_json]),
-            },
-        )
-        await session.commit()
+            await session.execute(
+                stmt,
+                {
+                    "batch_id": cj_batch_id,
+                    "entry": json.dumps([failed_entry_json]),
+                },
+            )
+            await session.commit()
 
-        logger.debug(
-            f"Atomically appended to failed pool for batch {cj_batch_id}",
-            extra={
-                "correlation_id": str(correlation_id),
-                "cj_batch_id": cj_batch_id,
-            },
-        )
+            logger.debug(
+                f"Atomically appended to failed pool for batch {cj_batch_id}",
+                extra={
+                    "correlation_id": str(correlation_id),
+                    "cj_batch_id": cj_batch_id,
+                },
+            )
 
     except Exception as e:
         logger.error(

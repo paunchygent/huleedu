@@ -40,11 +40,18 @@ from services.cj_assessment_service.models_api import (
 from services.cj_assessment_service.models_db import (
     ProcessedEssay,
 )
+from services.cj_assessment_service.tests.fixtures.database_fixtures import (
+    PostgresDataAccess,
+)
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
-    from services.cj_assessment_service.protocols import CJRepositoryProtocol
+from services.cj_assessment_service.protocols import (
+    CJComparisonRepositoryProtocol,
+    CJEssayRepositoryProtocol,
+    SessionProviderProtocol,
+)
 
 
 @pytest.mark.integration
@@ -53,14 +60,14 @@ class TestBradleyTerryScoring:
 
     async def _create_test_batch(
         self,
-        repository: CJRepositoryProtocol,
+        data_access: PostgresDataAccess,
         session: AsyncSession,
         essay_count: int,
         batch_id: str = "test-batch",
     ) -> tuple[int, list[EssayForComparison]]:
         """Create a test batch with essays."""
         # Create batch
-        cj_batch = await repository.create_new_cj_batch(
+        cj_batch = await data_access.create_new_cj_batch(
             session=session,
             bos_batch_id=batch_id,
             event_correlation_id=str(uuid4()),
@@ -75,7 +82,7 @@ class TestBradleyTerryScoring:
         essays: list[EssayForComparison] = []
         for i in range(essay_count):
             essay_id = f"essay_{i}"
-            await repository.create_or_update_cj_processed_essay(
+            await data_access.create_or_update_cj_processed_essay(
                 session=session,
                 cj_batch_id=cj_batch.id,
                 els_essay_id=essay_id,
@@ -90,7 +97,7 @@ class TestBradleyTerryScoring:
                 )
             )
 
-        await session.flush()  # Flush but don't commit to keep transaction open
+        await session.commit()  # Commit so batch data is visible to other sessions
         return cj_batch.id, essays
 
     def _create_comparison_results(
@@ -134,12 +141,19 @@ class TestBradleyTerryScoring:
 
     async def test_basic_bt_score_computation(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_data_access: PostgresDataAccess,
         postgres_session: AsyncSession,
+        postgres_session_provider: SessionProviderProtocol,
+        postgres_comparison_repository: CJComparisonRepositoryProtocol,
+        postgres_essay_repository: CJEssayRepositoryProtocol,
     ) -> None:
         """Test basic Bradley-Terry score computation with clear winner hierarchy."""
         # Create batch with 4 essays
-        batch_id, essays = await self._create_test_batch(postgres_repository, postgres_session, 4)
+        batch_id, essays = await self._create_test_batch(
+            postgres_data_access,
+            postgres_session,
+            4,
+        )
 
         # Create clear hierarchy: 0 > 1 > 2 > 3
         comparisons = [
@@ -157,7 +171,9 @@ class TestBradleyTerryScoring:
         scores = await record_comparisons_and_update_scores(
             all_essays=essays,
             comparison_results=results,
-            db_session=postgres_session,
+            session_provider=postgres_session_provider,
+            comparison_repository=postgres_comparison_repository,
+            essay_repository=postgres_essay_repository,
             cj_batch_id=batch_id,
             correlation_id=uuid4(),
         )
@@ -184,12 +200,19 @@ class TestBradleyTerryScoring:
 
     async def test_incremental_score_evolution(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_data_access: PostgresDataAccess,
         postgres_session: AsyncSession,
+        postgres_session_provider: SessionProviderProtocol,
+        postgres_comparison_repository: CJComparisonRepositoryProtocol,
+        postgres_essay_repository: CJEssayRepositoryProtocol,
     ) -> None:
         """Test how scores evolve as comparisons arrive incrementally."""
         # Create batch with 6 essays
-        batch_id, essays = await self._create_test_batch(postgres_repository, postgres_session, 6)
+        batch_id, essays = await self._create_test_batch(
+            postgres_data_access,
+            postgres_session,
+            6,
+        )
 
         # Define all comparisons (15 total for complete graph)
         all_comparisons = [
@@ -222,7 +245,9 @@ class TestBradleyTerryScoring:
             scores = await record_comparisons_and_update_scores(
                 all_essays=essays,
                 comparison_results=results,
-                db_session=postgres_session,
+                session_provider=postgres_session_provider,
+                comparison_repository=postgres_comparison_repository,
+                essay_repository=postgres_essay_repository,
                 cj_batch_id=batch_id,
                 correlation_id=uuid4(),
             )
@@ -250,12 +275,19 @@ class TestBradleyTerryScoring:
 
     async def test_bt_standard_errors(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_data_access: PostgresDataAccess,
         postgres_session: AsyncSession,
+        postgres_session_provider: SessionProviderProtocol,
+        postgres_comparison_repository: CJComparisonRepositoryProtocol,
+        postgres_essay_repository: CJEssayRepositoryProtocol,
     ) -> None:
         """Test analytical standard error computation."""
         # Create batch with 5 essays
-        batch_id, essays = await self._create_test_batch(postgres_repository, postgres_session, 5)
+        batch_id, essays = await self._create_test_batch(
+            postgres_data_access,
+            postgres_session,
+            5,
+        )
 
         # Create comparisons with varying density
         comparisons = [
@@ -276,28 +308,31 @@ class TestBradleyTerryScoring:
         await record_comparisons_and_update_scores(
             all_essays=essays,
             comparison_results=results,
-            db_session=postgres_session,
+            session_provider=postgres_session_provider,
+            comparison_repository=postgres_comparison_repository,
+            essay_repository=postgres_essay_repository,
             cj_batch_id=batch_id,
             correlation_id=uuid4(),
         )
 
-        # Fetch essays with SEs from database
-        stmt = select(ProcessedEssay).where(ProcessedEssay.cj_batch_id == batch_id)
-        result = await postgres_session.execute(stmt)
-        db_essays = result.scalars().all()
+        # Use a fresh session to see the committed updates from record_comparisons_and_update_scores
+        async with postgres_session_provider.session() as fresh_session:
+            stmt = select(ProcessedEssay).where(ProcessedEssay.cj_batch_id == batch_id)
+            result = await fresh_session.execute(stmt)
+            db_essays = result.scalars().all()
 
-        # Validate SE properties
-        for essay in db_essays:
-            assert essay.current_bt_se is not None, f"SE missing for {essay.els_essay_id}"
-            assert essay.current_bt_se >= 0, f"SE must be non-negative for {essay.els_essay_id}"
-            assert essay.current_bt_se <= 2.0, f"SE capped at 2.0 for {essay.els_essay_id}"
+            # Validate SE properties
+            for essay in db_essays:
+                assert essay.current_bt_se is not None, f"SE missing for {essay.els_essay_id}"
+                assert essay.current_bt_se >= 0, "SE must be non-negative"
+                assert essay.current_bt_se <= 2.0, "SE capped at 2.0"
 
-            # Essay 4 is used as reference (SE=0) by choix/BT inference
-            # So skip this check for essay_4
-            if essay.comparison_count == 1 and essay.els_essay_id != "essay_4":
-                assert essay.current_bt_se > 0.1, (
-                    f"Sparse essays should have higher SE: {essay.els_essay_id}"
-                )
+                # Essay 4 is used as reference (SE=0) by choix/BT inference
+                # So skip this check for essay_4
+                if essay.comparison_count == 1 and essay.els_essay_id != "essay_4":
+                    assert essay.current_bt_se > 0.1, (
+                        f"Sparse essays should have higher SE: {essay.els_essay_id}"
+                    )
 
     async def test_score_stability_checking(self) -> None:
         """Test score stability convergence checking."""
@@ -340,8 +375,11 @@ class TestBradleyTerryScoring:
     )
     async def test_edge_cases(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_data_access: PostgresDataAccess,
         postgres_session: AsyncSession,
+        postgres_session_provider: SessionProviderProtocol,
+        postgres_comparison_repository: CJComparisonRepositoryProtocol,
+        postgres_essay_repository: CJEssayRepositoryProtocol,
         scenario: str,
         essay_count: int,
         comparisons: list[tuple[int, int, str]],
@@ -352,7 +390,9 @@ class TestBradleyTerryScoring:
 
         # Create batch and essays
         batch_id, essays = await self._create_test_batch(
-            postgres_repository, postgres_session, essay_count
+            postgres_data_access,
+            postgres_session,
+            essay_count,
         )
 
         results = self._create_comparison_results(essays, comparisons)
@@ -362,7 +402,9 @@ class TestBradleyTerryScoring:
                 await record_comparisons_and_update_scores(
                     all_essays=essays,
                     comparison_results=results,
-                    db_session=postgres_session,
+                    session_provider=postgres_session_provider,
+                    comparison_repository=postgres_comparison_repository,
+                    essay_repository=postgres_essay_repository,
                     cj_batch_id=batch_id,
                     correlation_id=uuid4(),
                 )
@@ -370,7 +412,9 @@ class TestBradleyTerryScoring:
             scores = await record_comparisons_and_update_scores(
                 all_essays=essays,
                 comparison_results=results,
-                db_session=postgres_session,
+                session_provider=postgres_session_provider,
+                comparison_repository=postgres_comparison_repository,
+                essay_repository=postgres_essay_repository,
                 cj_batch_id=batch_id,
                 correlation_id=uuid4(),
             )
@@ -392,12 +436,19 @@ class TestBradleyTerryScoring:
 
     async def test_database_persistence(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_data_access: PostgresDataAccess,
         postgres_session: AsyncSession,
+        postgres_session_provider: SessionProviderProtocol,
+        postgres_comparison_repository: CJComparisonRepositoryProtocol,
+        postgres_essay_repository: CJEssayRepositoryProtocol,
     ) -> None:
         """Test that scores are correctly persisted to database."""
         # Create batch
-        batch_id, essays = await self._create_test_batch(postgres_repository, postgres_session, 3)
+        batch_id, essays = await self._create_test_batch(
+            postgres_data_access,
+            postgres_session,
+            3,
+        )
 
         # Initial check - essays should have no scores
         stmt = select(ProcessedEssay).where(ProcessedEssay.cj_batch_id == batch_id)
@@ -416,31 +467,41 @@ class TestBradleyTerryScoring:
         scores = await record_comparisons_and_update_scores(
             all_essays=essays,
             comparison_results=results,
-            db_session=postgres_session,
+            session_provider=postgres_session_provider,
+            comparison_repository=postgres_comparison_repository,
+            essay_repository=postgres_essay_repository,
             cj_batch_id=batch_id,
             correlation_id=uuid4(),
         )
 
-        # Verify persistence
-        result = await postgres_session.execute(stmt)
-        updated_essays = result.scalars().all()
+        # Use a fresh session to see the committed updates
+        async with postgres_session_provider.session() as fresh_session:
+            result = await fresh_session.execute(stmt)
+            updated_essays = result.scalars().all()
 
-        for essay in updated_essays:
-            assert essay.current_bt_score is not None, f"Score missing for {essay.els_essay_id}"
-            assert essay.current_bt_se is not None, f"SE missing for {essay.els_essay_id}"
-            assert essay.comparison_count > 0, f"Count not updated for {essay.els_essay_id}"
+            for essay in updated_essays:
+                assert essay.current_bt_score is not None, "Score missing"
+                assert essay.current_bt_se is not None, "SE missing"
+                assert essay.comparison_count > 0, "Count not updated"
 
-            # Verify score matches returned value
-            assert abs(essay.current_bt_score - scores[essay.els_essay_id]) < 1e-10
+                # Verify score matches returned value
+                assert abs(essay.current_bt_score - scores[essay.els_essay_id]) < 1e-10
 
     async def test_get_essay_rankings(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_data_access: PostgresDataAccess,
         postgres_session: AsyncSession,
+        postgres_session_provider: SessionProviderProtocol,
+        postgres_comparison_repository: CJComparisonRepositoryProtocol,
+        postgres_essay_repository: CJEssayRepositoryProtocol,
     ) -> None:
         """Test ranking generation from scores."""
         # Create batch and compute scores
-        batch_id, essays = await self._create_test_batch(postgres_repository, postgres_session, 4)
+        batch_id, essays = await self._create_test_batch(
+            postgres_data_access,
+            postgres_session,
+            4,
+        )
 
         comparisons = [
             (0, 1, "a"),
@@ -455,14 +516,17 @@ class TestBradleyTerryScoring:
         await record_comparisons_and_update_scores(
             all_essays=essays,
             comparison_results=results,
-            db_session=postgres_session,
+            session_provider=postgres_session_provider,
+            comparison_repository=postgres_comparison_repository,
+            essay_repository=postgres_essay_repository,
             cj_batch_id=batch_id,
             correlation_id=uuid4(),
         )
 
         # Get rankings
         rankings = await get_essay_rankings(
-            db_session=postgres_session,
+            session_provider=postgres_session_provider,
+            essay_repository=postgres_essay_repository,
             cj_batch_id=batch_id,
             correlation_id=uuid4(),
         )

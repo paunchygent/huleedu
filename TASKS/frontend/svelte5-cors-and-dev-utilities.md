@@ -34,7 +34,7 @@ The current backend services are configured with React-centric CORS origins and 
 
 - **API Gateway**: `CORS_ORIGINS` defaults to `["http://localhost:3000", "http://localhost:3001"]` (React ports)
 - **WebSocket Service**: `CORS_ORIGINS` defaults to `["http://localhost:3000"]` only
-- **Comments**: Still reference "React frontend" instead of "Svelte 5 + Vite"
+- **Comments**: Still reference "React frontend" instead of "Vue 3 + Vite"
 - **Environment Detection**: Basic `ENV_TYPE` field exists but underutilized
 
 ### Development Infrastructure

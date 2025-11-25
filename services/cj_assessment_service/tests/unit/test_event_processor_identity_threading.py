@@ -7,8 +7,9 @@ and their proper inclusion in converted_request_data passed to workflows.
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, AsyncGenerator
 from unittest.mock import AsyncMock, MagicMock, Mock
 from uuid import uuid4
 
@@ -19,12 +20,16 @@ from common_core.events.cj_assessment_events import ELS_CJAssessmentRequestV1
 from common_core.events.envelope import EventEnvelope
 from common_core.models.error_models import ErrorDetail
 from huleedu_service_libs.error_handling import HuleEduError
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from services.cj_assessment_service.cj_core_logic.grade_projector import GradeProjector
 from services.cj_assessment_service.event_processor import process_single_message
 from services.cj_assessment_service.protocols import (
+    CJComparisonRepositoryProtocol,
     CJEventPublisherProtocol,
     ContentClientProtocol,
     LLMInteractionProtocol,
+    SessionProviderProtocol,
 )
 
 PROMPT_TEXT = "Prompt text for CJ assessment."
@@ -34,13 +39,6 @@ DEFAULT_INSTRUCTIONS = "Compare the quality of these essays."
 
 class TestEventProcessorIdentityThreading:
     """Tests for identity threading behavior in CJ Assessment event processor."""
-
-    @pytest.fixture
-    def mock_cj_repository(self) -> Any:
-        """Create mock CJ repository with required methods."""
-        from services.cj_assessment_service.tests.unit.mocks import MockDatabase
-
-        return MockDatabase()
 
     @pytest.fixture
     def mock_content_client(self) -> AsyncMock:
@@ -79,6 +77,22 @@ class TestEventProcessorIdentityThreading:
             workflow_mock,
         )
         return workflow_mock
+
+    @pytest.fixture
+    def mock_session_provider(self) -> AsyncMock:
+        """Provide a session provider with an async context manager."""
+        provider: AsyncMock = AsyncMock(spec=SessionProviderProtocol)
+        captured_session: dict[str, AsyncMock] = {}
+
+        @asynccontextmanager
+        async def session_cm() -> AsyncGenerator[AsyncSession, None]:
+            session = AsyncMock(spec=AsyncSession)
+            captured_session["session"] = session
+            yield session
+
+        provider.session = session_cm
+        provider.captured_session = captured_session
+        return provider
 
     @pytest.fixture
     def test_settings(self) -> Mock:
@@ -131,12 +145,12 @@ class TestEventProcessorIdentityThreading:
         expected_user_id: str | None,
         expected_org_id: str | None,
         cj_assessment_request_data_with_overrides: ELS_CJAssessmentRequestV1,
-        mock_cj_repository: Any,
         mock_content_client: AsyncMock,
         mock_event_publisher: AsyncMock,
         mock_llm_interaction: AsyncMock,
         mock_workflow_function: AsyncMock,
         test_settings: Mock,
+        mock_session_provider: AsyncMock,
     ) -> None:
         """Test identity extraction from ELS_CJAssessmentRequestV1 events.
 
@@ -162,10 +176,16 @@ class TestEventProcessorIdentityThreading:
         # Act
         await process_single_message(
             msg=kafka_msg,
-            database=mock_cj_repository,
+            session_provider=mock_session_provider,
+            batch_repository=Mock(),
+            essay_repository=Mock(),
+            instruction_repository=Mock(),
+            anchor_repository=Mock(),
+            comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
             content_client=mock_content_client,
             event_publisher=mock_event_publisher,
             llm_interaction=mock_llm_interaction,
+            grade_projector=Mock(spec=GradeProjector),
             settings_obj=test_settings,
         )
 
@@ -191,12 +211,12 @@ class TestEventProcessorIdentityThreading:
     async def test_converted_request_data_structure_completeness(
         self,
         cj_assessment_request_data_with_overrides: ELS_CJAssessmentRequestV1,
-        mock_cj_repository: Any,
         mock_content_client: AsyncMock,
         mock_event_publisher: AsyncMock,
         mock_llm_interaction: AsyncMock,
         mock_workflow_function: AsyncMock,
         test_settings: Mock,
+        mock_session_provider: AsyncMock,
     ) -> None:
         """Test that converted_request_data contains all required fields including identities.
 
@@ -225,10 +245,16 @@ class TestEventProcessorIdentityThreading:
         # Act
         await process_single_message(
             msg=kafka_msg,
-            database=mock_cj_repository,
+            session_provider=mock_session_provider,
+            batch_repository=Mock(),
+            essay_repository=Mock(),
+            instruction_repository=Mock(),
+            anchor_repository=Mock(),
+            comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
             content_client=mock_content_client,
             event_publisher=mock_event_publisher,
             llm_interaction=mock_llm_interaction,
+            grade_projector=Mock(spec=GradeProjector),
             settings_obj=test_settings,
         )
 
@@ -290,12 +316,12 @@ class TestEventProcessorIdentityThreading:
         org_id: str | None,
         should_process_normally: bool,
         cj_assessment_request_data_with_overrides: ELS_CJAssessmentRequestV1,
-        mock_cj_repository: Any,
         mock_content_client: AsyncMock,
         mock_event_publisher: AsyncMock,
         mock_llm_interaction: AsyncMock,
         mock_workflow_function: AsyncMock,
         test_settings: Mock,
+        mock_session_provider: AsyncMock,
     ) -> None:
         """Test behavior with edge case identity field values.
 
@@ -321,10 +347,16 @@ class TestEventProcessorIdentityThreading:
         # Act
         result = await process_single_message(
             msg=kafka_msg,
-            database=mock_cj_repository,
+            session_provider=mock_session_provider,
+            batch_repository=Mock(),
+            essay_repository=Mock(),
+            instruction_repository=Mock(),
+            anchor_repository=Mock(),
+            comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
             content_client=mock_content_client,
             event_publisher=mock_event_publisher,
             llm_interaction=mock_llm_interaction,
+            grade_projector=Mock(spec=GradeProjector),
             settings_obj=test_settings,
         )
 
@@ -344,13 +376,13 @@ class TestEventProcessorIdentityThreading:
     async def test_prompt_fetch_failure_records_metric(
         self,
         cj_assessment_request_data_with_overrides: ELS_CJAssessmentRequestV1,
-        mock_cj_repository: Any,
         mock_content_client: AsyncMock,
         mock_event_publisher: AsyncMock,
         mock_llm_interaction: AsyncMock,
         mock_workflow_function: AsyncMock,
         test_settings: Mock,
         monkeypatch: pytest.MonkeyPatch,
+        mock_session_provider: AsyncMock,
     ) -> None:
         """Ensure prompt fetch failures increment the dedicated metric."""
 
@@ -394,10 +426,16 @@ class TestEventProcessorIdentityThreading:
 
         await process_single_message(
             msg=kafka_msg,
-            database=mock_cj_repository,
+            session_provider=mock_session_provider,
+            batch_repository=Mock(),
+            essay_repository=Mock(),
+            instruction_repository=Mock(),
+            anchor_repository=Mock(),
+            comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
             content_client=mock_content_client,
             event_publisher=mock_event_publisher,
             llm_interaction=mock_llm_interaction,
+            grade_projector=Mock(spec=GradeProjector),
             settings_obj=test_settings,
         )
 
@@ -417,12 +455,12 @@ class TestEventProcessorIdentityThreading:
     async def test_correlation_id_preservation_with_identities(
         self,
         cj_assessment_request_data_with_overrides: ELS_CJAssessmentRequestV1,
-        mock_cj_repository: Any,
         mock_content_client: AsyncMock,
         mock_event_publisher: AsyncMock,
         mock_llm_interaction: AsyncMock,
         mock_workflow_function: AsyncMock,
         test_settings: Mock,
+        mock_session_provider: AsyncMock,
     ) -> None:
         """Test that correlation_id is preserved through workflow calls with identity data.
 
@@ -452,10 +490,16 @@ class TestEventProcessorIdentityThreading:
         # Act
         await process_single_message(
             msg=kafka_msg,
-            database=mock_cj_repository,
+            session_provider=mock_session_provider,
+            batch_repository=Mock(),
+            essay_repository=Mock(),
+            instruction_repository=Mock(),
+            anchor_repository=Mock(),
+            comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
             content_client=mock_content_client,
             event_publisher=mock_event_publisher,
             llm_interaction=mock_llm_interaction,
+            grade_projector=Mock(spec=GradeProjector),
             settings_obj=test_settings,
         )
 
@@ -492,12 +536,12 @@ class TestEventProcessorIdentityThreading:
         special_characters: str,
         expected_preserved: bool,
         cj_assessment_request_data_with_overrides: ELS_CJAssessmentRequestV1,
-        mock_cj_repository: Any,
         mock_content_client: AsyncMock,
         mock_event_publisher: AsyncMock,
         mock_llm_interaction: AsyncMock,
         mock_workflow_function: AsyncMock,
         test_settings: Mock,
+        mock_session_provider: AsyncMock,
     ) -> None:
         """Test handling of Swedish characters and special characters in identity fields.
 
@@ -526,10 +570,16 @@ class TestEventProcessorIdentityThreading:
         # Act
         await process_single_message(
             msg=kafka_msg,
-            database=mock_cj_repository,
+            session_provider=mock_session_provider,
+            batch_repository=Mock(),
+            essay_repository=Mock(),
+            instruction_repository=Mock(),
+            anchor_repository=Mock(),
+            comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
             content_client=mock_content_client,
             event_publisher=mock_event_publisher,
             llm_interaction=mock_llm_interaction,
+            grade_projector=Mock(spec=GradeProjector),
             settings_obj=test_settings,
         )
 
@@ -550,12 +600,12 @@ class TestEventProcessorIdentityThreading:
     async def test_identity_threading_with_multiple_essays(
         self,
         cj_assessment_request_data_no_overrides: ELS_CJAssessmentRequestV1,
-        mock_cj_repository: Any,
         mock_content_client: AsyncMock,
         mock_event_publisher: AsyncMock,
         mock_llm_interaction: AsyncMock,
         mock_workflow_function: AsyncMock,
         test_settings: Mock,
+        mock_session_provider: AsyncMock,
     ) -> None:
         """Test identity threading with multiple essays in the batch.
 
@@ -578,10 +628,16 @@ class TestEventProcessorIdentityThreading:
         # Act
         await process_single_message(
             msg=kafka_msg,
-            database=mock_cj_repository,
+            session_provider=mock_session_provider,
+            batch_repository=Mock(),
+            essay_repository=Mock(),
+            instruction_repository=Mock(),
+            anchor_repository=Mock(),
+            comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
             content_client=mock_content_client,
             event_publisher=mock_event_publisher,
             llm_interaction=mock_llm_interaction,
+            grade_projector=Mock(spec=GradeProjector),
             settings_obj=test_settings,
         )
 
@@ -608,12 +664,12 @@ class TestEventProcessorIdentityThreading:
     async def test_workflow_call_parameters_with_identity_data(
         self,
         cj_assessment_request_data_with_overrides: ELS_CJAssessmentRequestV1,
-        mock_cj_repository: Any,
         mock_content_client: AsyncMock,
         mock_event_publisher: AsyncMock,
         mock_llm_interaction: AsyncMock,
         mock_workflow_function: AsyncMock,
         test_settings: Mock,
+        mock_session_provider: AsyncMock,
     ) -> None:
         """Test that workflow function receives all required parameters including identity context.
 
@@ -643,10 +699,16 @@ class TestEventProcessorIdentityThreading:
         # Act
         await process_single_message(
             msg=kafka_msg,
-            database=mock_cj_repository,
+            session_provider=mock_session_provider,
+            batch_repository=Mock(),
+            essay_repository=Mock(),
+            instruction_repository=Mock(),
+            anchor_repository=Mock(),
+            comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
             content_client=mock_content_client,
             event_publisher=mock_event_publisher,
             llm_interaction=mock_llm_interaction,
+            grade_projector=Mock(spec=GradeProjector),
             settings_obj=test_settings,
         )
 
@@ -655,7 +717,7 @@ class TestEventProcessorIdentityThreading:
         call_args = mock_workflow_function.call_args
 
         # Check positional parameters are correct
-        assert call_args.kwargs["database"] == mock_cj_repository
+        assert call_args.kwargs["session_provider"] is mock_session_provider
         assert call_args.kwargs["content_client"] == mock_content_client
         assert call_args.kwargs["llm_interaction"] == mock_llm_interaction
         assert call_args.kwargs["event_publisher"] == mock_event_publisher

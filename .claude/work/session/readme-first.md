@@ -49,53 +49,34 @@ pdm run pytest-root services/<service>/tests/
 pdm run pytest-root tests/integration/  # Cross-service tests
 ```
 
-### Rule Frontmatter Schema Implementation (2025-11-23)
+## CJ Assessment POC Validation (Sprint Focus)
 
-**Status**: ✅ Complete - All 92 rules have valid Pydantic-compliant frontmatter
+### Validation Objectives
+1. Anchor creation system (human-AI interface) using Bayesian model
+2. ENG5 Runner validation with full observability
+3. Serial bundle batching mode for cost efficiency
+4. Main pipeline compatibility (BOS → ELS → RAS) preserved
 
-**Deliverables**:
-- Pydantic schema: `scripts/claude_mgmt/rule_frontmatter_schema.py` (8 fields: 5 required, 3 optional)
-- Updated validation: `scripts/claude_mgmt/validate_claude_structure.py` (using Pydantic model)
-- Reference data: `.claude/work/session/frontmatter-reference.txt` (git dates + hierarchy)
-- Zero validation errors across all 92 rules
+### Critical Fixes Applied (2025-11-19 to 2025-11-23)
+- ✅ **Batch state tracking**: `total_budget` field, cumulative counters across iterations
+- ✅ **Completion logic**: Stability-first, denominator capping (min(budget, nC2))
+- ✅ **Error exclusion**: Only valid comparisons count toward completion threshold
+- ✅ **Position randomization**: Eliminates 86% anchor bias → ~50% balanced distribution
+- ✅ **API failure diagnostics**: Prometheus metrics + detailed HTTP status/error classification
+- ✅ **2025-11-24**: Callback persistence and batch completion policies now call `CJRepositoryProtocol` (`get_comparison_pair_by_correlation_id`, `get_batch_state`) instead of raw `AsyncSession` selects; unit tests updated to AsyncMock sessions to drop casts/monkeypatching.
 
-**Schema**: Required (`id`, `type`, `created`, `last_updated`, `scope`) + Optional (`parent_rule`, `child_rules`, `service_name`)
+### Validation Status
+- **ENG5 Runner**: Execute mode operational, persistent logs at `.claude/research/data/eng5_np_2016/logs/eng5-{batch_id}-{timestamp}.log`
+- **Grade Projections**: 12/12 anchor grades resolved, BT-scores valid (no degenerate values)
+- **Serial Bundle**: Infrastructure complete (Phases 1-3), awaiting production rollout validation
+- **Main Pipeline**: BOS → ELS → RAS flow preserved, no breaking changes
+- **Completion Logic**: Stability-first mode active (callbacks trigger scoring immediately, BatchMonitor is recovery-only)
+- **Cost Safety**: Default `MAX_PAIRWISE_COMPARISONS` reduced to 150 (per-request overrides honored)
 
-**Parent-child hierarchies**: 12 parents with 45 children (bidirectional references)
-
-### Latest Ops Status (2025-11-21)
-- CJ pipeline stall resolved after infra restore: Kafka/ZooKeeper/Redis/CJ DB healthy; `huleedu_cj_assessment_service` restarted with BatchMonitor running.
-- Stalled batch 588f04f4-219f-4545-9040-eabae4161f72 (corr 4cc75b6c-0fb2-465f-a20d-dfa0fb7de79f) now COMPLETED_STABLE; completion + RAS ready events published at ~11:48:59 UTC.
-- No batches remain in WAITING_CALLBACKS/GENERATING_PAIRS; monitor new runs via Loki query `{service="cj_assessment_service"} | json | event="BatchMonitor heartbeat"` and completion sweep logs.
-- E2E CJ test latency note: callbacks returned in ~12s, but `completion_threshold` (95% of budget 350) kept batch in WAITING_CALLBACKS until 5‑minute monitor sweep forced completion (~3m42s delay). Pending follow-up to switch completion to stability-first and cap budget to nC2.
-- Stability-first completion shipped: callbacks now trigger scoring immediately; batches finalize on stability or when callbacks hit the capped denominator (min(total_budget, nC2)). BatchMonitor is recovery-only.
-- Anthropic regression coverage extended to 529 overload + stop_reason=max_tokens; prompt cache metrics (`llm_provider_prompt_cache_events_total`, `llm_provider_prompt_cache_tokens_total`) now available with hit/miss and tokens-saved visibility.
-- Anthropic metadata + caching fix (2025-11-23): payload now sends only `metadata.user_id` and adds `anthropic-beta: prompt-caching-2024-07-31`; validator cap raised to 1000 chars, prompt nudges ≤50-char justification. Smoke A unredacted run: 16/16 success, cache reads/writes still 0 (likely model cache unsupported or blocks under threshold); artefacts `.claude/work/reports/benchmarks/20251123T004138Z-prompt-cache-warmup.{json,md}`.
-- Prompt cache benchmark ops: run `pdm run prompt-cache-benchmark ...` **without external timeouts**; prior 180s wrapper killed runs after sending requests and prevented artefact writes.
-- Grafana wiring: `LLM Provider Prompt Cache` dashboard now shows scope-aware hit rates (assignment vs ad-hoc), block mix, and static vs dynamic token size; alert `LLMPromptCacheLowHitRate` now keys off assignment scope <40%, and new `LLMPromptTTLOutOfOrder` warns on TTL ordering violations.
-- Phase 1.3 prompt cache integration plan drafted (see `.claude/work/session/handoff.md`); next action is wiring `PromptTemplateBuilder` through pair generation and dual-sending prompt blocks to LPS.
-- Default `MAX_PAIRWISE_COMPARISONS` reduced to 150 for cost safety; per-request overrides still honored; tests updated.
-- CJ prompt block serialization guard tightened: non-production now raises (production falls back to legacy prompt), closing prior unit test failure in `test_llm_interaction_impl_unit.py`.
-- Prompt cache benchmark runner added (`pdm run prompt-cache-benchmark`; wrappers `scripts/run-prompt-cache-smoke.sh` / `scripts/run-prompt-cache-full.sh`) with serialized seeds, dual buckets, PromQL snapshots, and artefact templates in `.claude/work/reports/benchmarks/`; smoke/full fixtures ready once Anthropic keys are present.
-- Prompt cache benchmark runner: now captures raw Anthropic responses (for audit/BT scores). Run without external timeouts; CLI help warns against wrapping. Latest Sonnet ENG5 smoke run artefacts: `.claude/work/reports/benchmarks/20251123T011800Z-prompt-cache-warmup.{json,md}` (hits 16, misses 0, read 43,112/write 1,408 tokens).
-- ENG5 fixture exporter: `python -m scripts.prompt_cache_benchmark.build_eng5_fixture` converts the runner's DOCX anchors/students + prompts/rubric/system prompt into `data/eng5_prompt_cache_fixture.json`; use `--fixture-path` flag on the benchmark CLI for real-data runs. Default `--redact-output` (hash/metrics only); `--no-redact-output` for validation (includes essay text, prompts, blocks).
-- LLM Provider queue processor completion/removal integration tests now pass (2025-11-23). `_process_request` no longer uses `process_comparison_batch` when `QUEUE_PROCESSING_MODE=serial_bundle`; per-request path is enforced to avoid "Unexpected processing result type" with mocks. Command validated: `pdm run pytest-root services/llm_provider_service/tests/integration/test_queue_processor_completion_removal.py`.
-
-### Hot-Reload Development
-
-All services use automatic code reload in development:
-- **Quart services** (11): `hypercorn --reload`
-- **FastAPI services** (2): `uvicorn --reload`
-
-Changes to `.py` files trigger automatic restart (~9-11 seconds). No manual rebuild needed.
-
-### Logging & Observability (2025-11-20)
-
-**Infrastructure**: File-based logging + Docker bounded rotation operational. See Rule 043 §3.2, Grafana playbook (Loki access).
-
-**OTEL Trace Context**: ✅ Operational across all 15 API services. Health endpoints log with trace_id/span_id. Jaeger integration active. Use `scripts/validate_otel_trace_context.sh` to validate.
-
-**ENG5 Runner**: Execute mode → persistent logs at `.claude/research/data/eng5_np_2016/logs/eng5-{batch_id}-{timestamp}.log`
+### Next Steps
+- [ ] Complete serial bundle production validation
+- [ ] Finalize ENG5 JSON artefact schema (`Documentation/schemas/eng5_np/assessment_run.schema.json`)
+- [ ] Prepare reproducible research bundles for empirical validation
 
 ## Critical Development Info
 
@@ -172,10 +153,6 @@ pdm run python -m scripts.cj_experiments_runners.eng5_np.cli \
 ```
 
 **Validation**: All artefacts are schema-compliant (see `Documentation/schemas/eng5_np/`)
-
-### Essay Lifecycle Slot Assignment (2025-11-21)
-- Added lock-aware retry to Option B content assignment (`assign_via_essay_states_immediate_commit`) to prevent false "no slot" responses under contention.
-- Regression coverage: `test_option_b_assignment_retries_when_slots_locked` + distributed `test_concurrent_identical_content_provisioning_race_prevention` now green.
 
 ### Bayesian Consensus Model
 
@@ -270,59 +247,9 @@ from common_core import LLMComparisonRequest  # ✅
 - Use real HTTP/Kafka boundaries only
 - Require services running (`@pytest.mark.integration`, `@pytest.mark.docker`)
 
-### 4. Database URL Centralization (Nov 2025)
+## Troubleshooting
 
-**Pattern**: `build_database_url()` utility with service-specific overrides
-
-**Phase 1 Complete**: Identity service migrated (1/12 services)
-**Next**: Batch migration of remaining services
-
-### 5. Prompt Reference Architecture (Nov 2025)
-
-**Contract**: All services use Content Service storage IDs for prompts
-- CJ Assessment: `student_prompt_storage_id` in instructions table
-- NLP Service: Hydrates via Content Service with fallback
-- Result Aggregator: Consumes from event metadata
-
-**Metrics**: Monitor `huleedu_{cj|nlp}_prompt_fetch_failures_total{reason}`
-
-## Configuration Files
-
-- `.env` - Environment variables (not in git)
-- `pyproject.toml` - PDM dependencies and scripts
-- `docker-compose.yml` - Production config
-- `docker-compose.dev.yml` - Development overrides with hot-reload
-- `.claude/rules/` - Development standards and patterns
-- `CLAUDE.md` - Detailed technical reference
-
-## Common Issues
-
-### Container Build/Start
-
-```bash
-# Rebuild specific service
-pdm run dev-build [service]
-
-# Force recreation (picks up env var changes)
-pdm run dev-recreate [service]
-
-# Check logs for startup errors
-pdm run dev-logs [service]
-```
-
-### Database Access
-
-```bash
-# Source .env first (required for credentials)
-source .env
-
-# Access database
-docker exec huleedu_<service>_db psql -U "$HULEEDU_DB_USER" -d <db_name>
-
-# Database names follow pattern: huleedu_<service_name>
-```
-
-### Test Failures
+### Integration Test Failures
 
 ```bash
 # Ensure services are running for integration tests
@@ -331,6 +258,27 @@ docker ps | grep huleedu
 # Check service health
 curl http://localhost:<port>/healthz
 
-# View service logs
+# View service logs for errors
 pdm run dev-logs [service]
 ```
+
+For Docker/database troubleshooting, see `CLAUDE.md` sections on Docker Development and Database Access.
+
+### Admin Surface Note (2025-11-25)
+- Admin student prompt upload endpoint now commits inside `upload_student_prompt`; unit tests must supply a session mock that implements `commit`, `rollback`, and `flush` (e.g., `AsyncMock(spec=AsyncSession)`), otherwise the endpoint returns HTTP 500.
+
+## Documentation & Standards
+
+- **`.claude/rules/`** - Development standards and architectural patterns
+- **`CLAUDE.md`** - Comprehensive technical reference and workflow guide (includes Docker, database, testing commands)
+- **`docs/operations/`** - Operational runbooks and playbooks
+- **`TASKS/`** - Detailed task documentation with frontmatter tracking
+
+## Session Addendum (2025-11-24)
+
+- PostgresDataAccess now wraps `session_provider.session()` with `@asynccontextmanager` so the integration fixtures expose a proper async context manager and align with the new typing expectations.
+- BatchMonitor unit fixtures drop the obsolete `repository` argument and the multi-round batch state integration test now types `postgres_session_provider` as `CJSessionProviderImpl` per the updated API surface.
+- System prompt hierarchy, metadata persistence, pair generation, real database, and async workflow continuation integration suites now call the refactored APIs (no `database=` arguments) and the callback simulator/continuation helpers use the session_provider/repo contracts directly.
+- Callback simulator now builds comparison pairs and correlation mappings directly via the shared `SessionProviderProtocol`, fully dropping the legacy `CJRepositoryProtocol` dependency from that helper.
+- Additional unit/integration suites (`test_llm_callback_processing`, `test_event_processor_*`, `test_comparison_processing`, `test_workflow_continuation`, `test_cj_idempotency_failures`) have been updated to pass the new session_provider + repo keywords instead of the deprecated `database=` argument.
+- Fixed the remaining typecheck blockers for workflow_continuation/callback_state_manager tests, wired the identity-threading fixture and integration suites to the reshaped session_provider/repo APIs, and reran `pdm run typecheck-all` (now reports zero errors).

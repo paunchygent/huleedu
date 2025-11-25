@@ -31,28 +31,58 @@ from services.cj_assessment_service.cj_core_logic.batch_completion_checker impor
 from services.cj_assessment_service.cj_core_logic.batch_pool_manager import BatchPoolManager
 from services.cj_assessment_service.cj_core_logic.batch_processor import BatchProcessor
 from services.cj_assessment_service.cj_core_logic.batch_retry_processor import BatchRetryProcessor
+from services.cj_assessment_service.cj_core_logic.grade_projection.context_service import (
+    ProjectionContextService,
+)
+from services.cj_assessment_service.cj_core_logic.grade_projector import GradeProjector
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.config import settings as service_settings
+from services.cj_assessment_service.implementations.anchor_repository import (
+    PostgreSQLAnchorRepository,
+)
+from services.cj_assessment_service.implementations.assessment_instruction_repository import (
+    PostgreSQLAssessmentInstructionRepository,
+)
+from services.cj_assessment_service.implementations.batch_repository import (
+    PostgreSQLCJBatchRepository,
+)
+from services.cj_assessment_service.implementations.comparison_repository import (
+    PostgreSQLCJComparisonRepository,
+)
 from services.cj_assessment_service.implementations.content_client_impl import ContentClientImpl
-from services.cj_assessment_service.implementations.db_access_impl import PostgreSQLCJRepositoryImpl
+from services.cj_assessment_service.implementations.essay_repository import (
+    PostgreSQLCJEssayRepository,
+)
 from services.cj_assessment_service.implementations.event_publisher_impl import CJEventPublisherImpl
+from services.cj_assessment_service.implementations.grade_projection_repository import (
+    PostgreSQLGradeProjectionRepository,
+)
 from services.cj_assessment_service.implementations.llm_interaction_impl import LLMInteractionImpl
 from services.cj_assessment_service.implementations.llm_provider_service_client import (
     LLMProviderServiceClient,
 )
 from services.cj_assessment_service.implementations.retry_manager_impl import RetryManagerImpl
+from services.cj_assessment_service.implementations.session_provider_impl import (
+    CJSessionProviderImpl,
+)
 from services.cj_assessment_service.kafka_consumer import CJAssessmentKafkaConsumer
 from services.cj_assessment_service.metrics import setup_cj_assessment_database_monitoring
 from services.cj_assessment_service.protocols import (
+    AnchorRepositoryProtocol,
+    AssessmentInstructionRepositoryProtocol,
     BatchCompletionCheckerProtocol,
     BatchProcessorProtocol,
     BatchRetryProcessorProtocol,
+    CJBatchRepositoryProtocol,
+    CJComparisonRepositoryProtocol,
+    CJEssayRepositoryProtocol,
     CJEventPublisherProtocol,
-    CJRepositoryProtocol,
     ContentClientProtocol,
+    GradeProjectionRepositoryProtocol,
     LLMInteractionProtocol,
     LLMProviderProtocol,
     RetryManagerProtocol,
+    SessionProviderProtocol,
 )
 
 
@@ -218,11 +248,39 @@ class CJAssessmentServiceProvider(Provider):
         )
 
     @provide(scope=Scope.APP)
-    def provide_database_handler(
-        self, settings: Settings, database_metrics: DatabaseMetrics, engine: AsyncEngine
-    ) -> CJRepositoryProtocol:
-        """Provide database handler with injected engine from HuleEduApp."""
-        return PostgreSQLCJRepositoryImpl(settings, database_metrics, engine)
+    def provide_session_provider(self, engine: AsyncEngine) -> SessionProviderProtocol:
+        """Provide shared session provider using the service engine."""
+        return CJSessionProviderImpl(engine)
+
+    @provide(scope=Scope.APP)
+    def provide_cj_batch_repository(self) -> CJBatchRepositoryProtocol:
+        """Provide batch aggregate repository."""
+        return PostgreSQLCJBatchRepository()
+
+    @provide(scope=Scope.APP)
+    def provide_cj_essay_repository(self) -> CJEssayRepositoryProtocol:
+        """Provide essay aggregate repository."""
+        return PostgreSQLCJEssayRepository()
+
+    @provide(scope=Scope.APP)
+    def provide_cj_comparison_repository(self) -> CJComparisonRepositoryProtocol:
+        """Provide comparison repository."""
+        return PostgreSQLCJComparisonRepository()
+
+    @provide(scope=Scope.APP)
+    def provide_assessment_instruction_repository(self) -> AssessmentInstructionRepositoryProtocol:
+        """Provide assessment instruction repository."""
+        return PostgreSQLAssessmentInstructionRepository()
+
+    @provide(scope=Scope.APP)
+    def provide_anchor_repository(self) -> AnchorRepositoryProtocol:
+        """Provide anchor repository."""
+        return PostgreSQLAnchorRepository()
+
+    @provide(scope=Scope.APP)
+    def provide_grade_projection_repository(self) -> GradeProjectionRepositoryProtocol:
+        """Provide grade projection repository."""
+        return PostgreSQLGradeProjectionRepository()
 
     @provide(scope=Scope.APP)
     def provide_content_client(
@@ -266,41 +324,49 @@ class CJAssessmentServiceProvider(Provider):
     @provide(scope=Scope.APP)
     def provide_batch_processor(
         self,
-        database: CJRepositoryProtocol,
+        session_provider: SessionProviderProtocol,
         llm_interaction: LLMInteractionProtocol,
         settings: Settings,
+        batch_repo: CJBatchRepositoryProtocol,
     ) -> BatchProcessorProtocol:
         """Provide core batch processor for submission orchestration."""
         return BatchProcessor(
-            database=database,
+            session_provider=session_provider,
             llm_interaction=llm_interaction,
             settings=settings,
+            batch_repository=batch_repo,
         )
 
     @provide(scope=Scope.APP)
     def provide_batch_completion_checker(
         self,
-        database: CJRepositoryProtocol,
+        session_provider: SessionProviderProtocol,
+        batch_repo: CJBatchRepositoryProtocol,
     ) -> BatchCompletionCheckerProtocol:
         """Provide batch completion checker for threshold evaluation."""
-        return BatchCompletionChecker(database=database)
+        return BatchCompletionChecker(
+            session_provider=session_provider,
+            batch_repo=batch_repo,
+        )
 
     @provide(scope=Scope.APP)
     def provide_batch_pool_manager(
         self,
-        database: CJRepositoryProtocol,
+        session_provider: SessionProviderProtocol,
+        batch_repository: CJBatchRepositoryProtocol,
         settings: Settings,
     ) -> BatchPoolManager:
         """Provide batch pool manager for failed comparison handling."""
         return BatchPoolManager(
-            database=database,
+            session_provider=session_provider,
+            batch_repository=batch_repository,
             settings=settings,
         )
 
     @provide(scope=Scope.APP)
     def provide_batch_retry_processor(
         self,
-        database: CJRepositoryProtocol,
+        session_provider: SessionProviderProtocol,
         llm_interaction: LLMInteractionProtocol,
         settings: Settings,
         pool_manager: BatchPoolManager,
@@ -308,7 +374,7 @@ class CJAssessmentServiceProvider(Provider):
     ) -> BatchRetryProcessorProtocol:
         """Provide batch retry processor for end-of-batch fairness logic."""
         return BatchRetryProcessor(
-            database=database,
+            session_provider=session_provider,
             llm_interaction=llm_interaction,
             settings=settings,
             pool_manager=pool_manager,
@@ -316,23 +382,61 @@ class CJAssessmentServiceProvider(Provider):
         )
 
     @provide(scope=Scope.APP)
+    def provide_projection_context_service(
+        self,
+        session_provider: SessionProviderProtocol,
+        instruction_repository: AssessmentInstructionRepositoryProtocol,
+        anchor_repository: AnchorRepositoryProtocol,
+    ) -> ProjectionContextService:
+        """Provide projection context service for grade projector."""
+        return ProjectionContextService(
+            session_provider=session_provider,
+            instruction_repository=instruction_repository,
+            anchor_repository=anchor_repository,
+        )
+
+    @provide(scope=Scope.APP)
+    def provide_grade_projector(
+        self,
+        session_provider: SessionProviderProtocol,
+        context_service: ProjectionContextService,
+    ) -> GradeProjector:
+        """Provide grade projector with all required dependencies."""
+        return GradeProjector(
+            session_provider=session_provider,
+            context_service=context_service,
+        )
+
+    @provide(scope=Scope.APP)
     def provide_kafka_consumer(
         self,
         settings: Settings,
-        database: CJRepositoryProtocol,
+        session_provider: SessionProviderProtocol,
+        batch_repository: CJBatchRepositoryProtocol,
+        essay_repository: CJEssayRepositoryProtocol,
+        comparison_repository: CJComparisonRepositoryProtocol,
+        instruction_repository: AssessmentInstructionRepositoryProtocol,
+        anchor_repository: AnchorRepositoryProtocol,
         content_client: ContentClientProtocol,
         event_publisher: CJEventPublisherProtocol,
         llm_interaction: LLMInteractionProtocol,
         redis_client: AtomicRedisClientProtocol,
+        grade_projector: GradeProjector,
         tracer: Tracer,
     ) -> CJAssessmentKafkaConsumer:
         """Provide Kafka consumer for CJ Assessment Service."""
         return CJAssessmentKafkaConsumer(
             settings=settings,
-            database=database,
+            session_provider=session_provider,
+            batch_repository=batch_repository,
+            essay_repository=essay_repository,
+            comparison_repository=comparison_repository,
+            instruction_repository=instruction_repository,
+            anchor_repository=anchor_repository,
             content_client=content_client,
             event_publisher=event_publisher,
             llm_interaction=llm_interaction,
             redis_client=redis_client,
+            grade_projector=grade_projector,
             tracer=tracer,
         )

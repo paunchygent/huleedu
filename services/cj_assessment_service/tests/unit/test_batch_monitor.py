@@ -9,21 +9,33 @@ from uuid import UUID
 
 import pytest
 from common_core.status_enums import CJBatchStateEnum
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.cj_assessment_service.batch_monitor import BatchMonitor
 from services.cj_assessment_service.models_db import CJBatchState
-from services.cj_assessment_service.protocols import ContentClientProtocol
+from services.cj_assessment_service.protocols import (
+    CJBatchRepositoryProtocol,
+    CJComparisonRepositoryProtocol,
+    ContentClientProtocol,
+    SessionProviderProtocol,
+)
 
 if TYPE_CHECKING:
     pass
 
 
 @pytest.fixture
-def mock_repository() -> AsyncMock:
-    """Create a mock repository."""
-    repo = AsyncMock()
-    repo.session = MagicMock()
-    return repo
+def mock_session_provider() -> AsyncMock:
+    """Create a mock session provider."""
+    provider = AsyncMock(spec=SessionProviderProtocol)
+    provider.session = MagicMock()
+    return provider
+
+
+@pytest.fixture
+def mock_batch_repository() -> AsyncMock:
+    """Create a mock batch repository."""
+    return AsyncMock(spec=CJBatchRepositoryProtocol)
 
 
 @pytest.fixture
@@ -43,11 +55,30 @@ def mock_settings() -> MagicMock:
 
 @pytest.fixture
 def batch_monitor(
-    mock_repository: AsyncMock, mock_event_publisher: AsyncMock, mock_settings: MagicMock
+    mock_session_provider: AsyncMock,
+    mock_batch_repository: AsyncMock,
+    mock_event_publisher: AsyncMock,
+    mock_settings: MagicMock,
 ) -> BatchMonitor:
     """Create a BatchMonitor instance."""
+    from services.cj_assessment_service.cj_core_logic.grade_projector import (
+        GradeProjector,
+    )
+    from services.cj_assessment_service.protocols import CJEssayRepositoryProtocol
+
     mock_content_client = AsyncMock(spec=ContentClientProtocol)
-    return BatchMonitor(mock_repository, mock_event_publisher, mock_content_client, mock_settings)
+    mock_essay_repository = AsyncMock(spec=CJEssayRepositoryProtocol)
+    mock_grade_projector = AsyncMock(spec=GradeProjector)
+    return BatchMonitor(
+        session_provider=mock_session_provider,
+        batch_repository=mock_batch_repository,
+        comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
+        essay_repository=mock_essay_repository,
+        event_publisher=mock_event_publisher,
+        content_client=mock_content_client,
+        settings=mock_settings,
+        grade_projector=mock_grade_projector,
+    )
 
 
 class TestBatchMonitor:
@@ -60,7 +91,10 @@ class TestBatchMonitor:
         assert batch_monitor._running is True
 
     async def test_handle_stuck_batch_high_progress(
-        self, batch_monitor: BatchMonitor, mock_repository: AsyncMock
+        self,
+        batch_monitor: BatchMonitor,
+        mock_session_provider: AsyncMock,
+        mock_batch_repository: AsyncMock,
     ) -> None:
         """Test handling stuck batch with >= 80% progress forces to SCORING."""
         # Create mock batch state with 85% progress
@@ -76,12 +110,12 @@ class TestBatchMonitor:
         mock_batch_state.completion_denominator.return_value = 100
 
         # Mock database operations
-        mock_session = AsyncMock()
-        mock_result = MagicMock()
-        mock_result.scalar_one.return_value = mock_batch_state
-        mock_session.execute.return_value = mock_result
+        mock_session = AsyncMock(spec=AsyncSession)
         mock_session.__aenter__.return_value = mock_session
-        mock_repository.session.return_value = mock_session
+        mock_session_provider.session.return_value = mock_session
+
+        # Mock batch repository to return the batch state for FOR UPDATE query
+        mock_batch_repository.get_batch_state_for_update.return_value = mock_batch_state
 
         # Execute
         await batch_monitor._handle_stuck_batch(mock_batch_state)
@@ -89,9 +123,13 @@ class TestBatchMonitor:
         # Verify state was changed to SCORING
         assert mock_batch_state.state == CJBatchStateEnum.SCORING
         assert mock_session.commit.called
+        mock_batch_repository.get_batch_state_for_update.assert_called_once()
 
     async def test_handle_stuck_batch_low_progress(
-        self, batch_monitor: BatchMonitor, mock_repository: AsyncMock
+        self,
+        batch_monitor: BatchMonitor,
+        mock_session_provider: AsyncMock,
+        mock_batch_repository: AsyncMock,
     ) -> None:
         """Test handling stuck batch with < 80% progress marks as FAILED."""
         # Create mock batch state with 50% progress
@@ -107,12 +145,12 @@ class TestBatchMonitor:
         mock_batch_state.completion_denominator.return_value = 100
 
         # Mock database operations
-        mock_session = AsyncMock()
-        mock_result = MagicMock()
-        mock_result.scalar_one.return_value = mock_batch_state
-        mock_session.execute.return_value = mock_result
+        mock_session = AsyncMock(spec=AsyncSession)
         mock_session.__aenter__.return_value = mock_session
-        mock_repository.session.return_value = mock_session
+        mock_session_provider.session.return_value = mock_session
+
+        # Mock batch repository to return the batch state for FOR UPDATE query
+        mock_batch_repository.get_batch_state_for_update.return_value = mock_batch_state
 
         # Execute
         await batch_monitor._handle_stuck_batch(mock_batch_state)
@@ -120,6 +158,7 @@ class TestBatchMonitor:
         # Verify state was changed to FAILED
         assert mock_batch_state.state == CJBatchStateEnum.FAILED
         assert mock_session.commit.called
+        mock_batch_repository.get_batch_state_for_update.assert_called_once()
 
     async def test_stop(self, batch_monitor: BatchMonitor) -> None:
         """Test graceful shutdown."""

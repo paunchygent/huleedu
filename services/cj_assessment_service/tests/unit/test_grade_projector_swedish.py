@@ -8,8 +8,41 @@ from uuid import uuid4
 
 import pytest
 
+from services.cj_assessment_service.cj_core_logic.grade_projection.context_service import (
+    ProjectionContextService,
+)
 from services.cj_assessment_service.cj_core_logic.grade_projector import GradeProjector
-from services.cj_assessment_service.protocols import ContentClientProtocol
+from services.cj_assessment_service.protocols import (
+    AnchorRepositoryProtocol,
+    AssessmentInstructionRepositoryProtocol,
+    ContentClientProtocol,
+    SessionProviderProtocol,
+)
+
+
+def _create_test_projector() -> GradeProjector:
+    """Create a GradeProjector with mocked dependencies for testing."""
+    mock_session_provider = Mock(spec=SessionProviderProtocol)
+    # Mock the async session context manager properly
+    mock_session = AsyncMock()
+    mock_session.add_all = Mock()  # add_all is synchronous in SQLAlchemy
+    mock_session_provider.session.return_value = mock_session
+    mock_session.__aenter__.return_value = mock_session
+    mock_session.__aexit__.return_value = None
+
+    mock_instruction_repo = Mock(spec=AssessmentInstructionRepositoryProtocol)
+    mock_anchor_repo = Mock(spec=AnchorRepositoryProtocol)
+
+    context_service = ProjectionContextService(
+        session_provider=mock_session_provider,
+        instruction_repository=mock_instruction_repo,
+        anchor_repository=mock_anchor_repo,
+    )
+
+    return GradeProjector(
+        session_provider=mock_session_provider,
+        context_service=context_service,
+    )
 
 
 class TestSwedishGradeSystem:
@@ -116,7 +149,7 @@ class TestSwedishGradeSystem:
     ) -> None:
         """Test system handles non-uniform anchor distribution gracefully."""
         # Arrange
-        grade_projector = GradeProjector()
+        grade_projector = _create_test_projector()
         correlation_id = uuid4()
 
         mock_context = Mock()
@@ -131,7 +164,6 @@ class TestSwedishGradeSystem:
 
             # Act
             result = await grade_projector.calculate_projections(
-                session=mock_database_session,
                 rankings=sparse_anchor_rankings,
                 cj_batch_id=1,
                 assignment_id="sparse_test",
@@ -177,7 +209,7 @@ class TestSwedishGradeSystem:
     ) -> None:
         """Test minus grades assigned at lower boundaries."""
         # Arrange
-        grade_projector = GradeProjector()
+        grade_projector = _create_test_projector()
         correlation_id = uuid4()
 
         # Anchors designed to create clear boundaries
@@ -297,7 +329,6 @@ class TestSwedishGradeSystem:
 
             # Act
             result = await grade_projector.calculate_projections(
-                session=mock_database_session,
                 rankings=rankings,
                 cj_batch_id=1,
                 assignment_id="minus_grade_test",
@@ -320,7 +351,7 @@ class TestSwedishGradeSystem:
     ) -> None:
         """Verify improved confidence with fewer grades."""
         # Arrange
-        grade_projector = GradeProjector()
+        grade_projector = _create_test_projector()
         correlation_id = uuid4()
 
         # Rankings with good anchor coverage for the 8-grade system
@@ -551,7 +582,6 @@ class TestSwedishGradeSystem:
 
             # Act
             result = await grade_projector.calculate_projections(
-                session=mock_database_session,
                 rankings=rankings,
                 cj_batch_id=1,
                 assignment_id="confidence_test",
@@ -769,7 +799,7 @@ class TestSwedishGradeSystem:
         ]
 
         # Initialize projector
-        grade_projector = GradeProjector()
+        grade_projector = _create_test_projector()
         correlation_id = uuid4()
 
         mock_context = Mock()
@@ -784,7 +814,6 @@ class TestSwedishGradeSystem:
 
             # Act
             result = await grade_projector.calculate_projections(
-                session=mock_database_session,
                 rankings=realistic_rankings,
                 cj_batch_id=1,
                 assignment_id="realistic_test",

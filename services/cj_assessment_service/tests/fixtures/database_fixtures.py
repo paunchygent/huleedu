@@ -8,6 +8,7 @@ Replaces over-mocked internal components with actual database operations.
 from __future__ import annotations
 
 import asyncio
+from contextlib import asynccontextmanager
 from typing import Any, AsyncGenerator, AsyncIterator, Generator
 from unittest.mock import AsyncMock
 
@@ -17,13 +18,30 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engin
 from testcontainers.postgres import PostgresContainer
 
 from services.cj_assessment_service.config import Settings
-from services.cj_assessment_service.implementations.db_access_impl import (
-    PostgreSQLCJRepositoryImpl,
+from services.cj_assessment_service.implementations.anchor_repository import (
+    PostgreSQLAnchorRepository,
+)
+from services.cj_assessment_service.implementations.assessment_instruction_repository import (
+    PostgreSQLAssessmentInstructionRepository,
+)
+from services.cj_assessment_service.implementations.batch_repository import (
+    PostgreSQLCJBatchRepository,
+)
+from services.cj_assessment_service.implementations.comparison_repository import (
+    PostgreSQLCJComparisonRepository,
+)
+from services.cj_assessment_service.implementations.essay_repository import (
+    PostgreSQLCJEssayRepository,
+)
+from services.cj_assessment_service.implementations.grade_projection_repository import (
+    PostgreSQLGradeProjectionRepository,
+)
+from services.cj_assessment_service.implementations.session_provider_impl import (
+    CJSessionProviderImpl,
 )
 from services.cj_assessment_service.models_db import Base
 from services.cj_assessment_service.protocols import (
     CJEventPublisherProtocol,
-    CJRepositoryProtocol,
     ContentClientProtocol,
     LLMInteractionProtocol,
 )
@@ -83,21 +101,12 @@ async def postgres_engine(
 
 
 @pytest.fixture
-async def postgres_session(postgres_engine: AsyncEngine) -> AsyncGenerator[AsyncSession, None]:
-    """Create isolated PostgreSQL session with automatic rollback."""
-    from sqlalchemy.ext.asyncio import async_sessionmaker
-
-    session_maker = async_sessionmaker(
-        postgres_engine,
-        expire_on_commit=False,
-        class_=AsyncSession,
-    )
-
-    async with session_maker() as session:
-        # Use a transaction that will be rolled back
-        async with session.begin():
-            yield session
-            # Rollback happens automatically when exiting the context
+async def postgres_session(
+    postgres_session_provider: CJSessionProviderImpl,
+) -> AsyncGenerator[AsyncSession, None]:
+    """Create isolated PostgreSQL session via session provider."""
+    async with postgres_session_provider.session() as session:
+        yield session
 
 
 # ==================== Repository Fixtures ====================
@@ -131,23 +140,160 @@ def test_settings() -> Generator[Settings, None, None]:
         del os.environ["CJ_ASSESSMENT_SERVICE_DATABASE_URL"]
 
 
-# real_repository fixture removed - consolidated into postgres_repository
+@pytest.fixture
+def postgres_session_provider(postgres_engine: AsyncEngine) -> CJSessionProviderImpl:
+    """Provide session provider for integration tests."""
+    return CJSessionProviderImpl(postgres_engine)
 
 
 @pytest.fixture
-async def postgres_repository(
-    postgres_engine: AsyncEngine, test_settings: Settings
-) -> AsyncGenerator[CJRepositoryProtocol, None]:
-    """Create real repository implementation with PostgreSQL backend."""
-    repository = PostgreSQLCJRepositoryImpl(
-        settings=test_settings,
-        engine=postgres_engine,
+def postgres_batch_repository() -> PostgreSQLCJBatchRepository:
+    """Provide batch repository for integration tests."""
+    return PostgreSQLCJBatchRepository()
+
+
+@pytest.fixture
+def postgres_essay_repository() -> PostgreSQLCJEssayRepository:
+    """Provide essay repository for integration tests."""
+    return PostgreSQLCJEssayRepository()
+
+
+@pytest.fixture
+def postgres_instruction_repository() -> PostgreSQLAssessmentInstructionRepository:
+    """Provide instruction repository for integration tests."""
+    return PostgreSQLAssessmentInstructionRepository()
+
+
+@pytest.fixture
+def postgres_anchor_repository() -> PostgreSQLAnchorRepository:
+    """Provide anchor repository for integration tests."""
+    return PostgreSQLAnchorRepository()
+
+
+@pytest.fixture
+def postgres_comparison_repository() -> PostgreSQLCJComparisonRepository:
+    """Provide comparison repository for integration tests."""
+    return PostgreSQLCJComparisonRepository()
+
+
+@pytest.fixture
+def postgres_grade_projection_repository() -> PostgreSQLGradeProjectionRepository:
+    """Provide grade projection repository for integration tests."""
+    return PostgreSQLGradeProjectionRepository()
+
+
+# ==================== Aggregated Data Access Fixture ====================
+
+
+class PostgresDataAccess:
+    """Test façade routing to per-aggregate repos via shared session provider."""
+
+    def __init__(
+        self,
+        session_provider: CJSessionProviderImpl,
+        batch_repo: PostgreSQLCJBatchRepository,
+        essay_repo: PostgreSQLCJEssayRepository,
+        instruction_repo: PostgreSQLAssessmentInstructionRepository,
+        anchor_repo: PostgreSQLAnchorRepository,
+        comparison_repo: PostgreSQLCJComparisonRepository,
+        grade_projection_repo: PostgreSQLGradeProjectionRepository,
+    ) -> None:
+        self.session_provider = session_provider
+        self.batch_repo = batch_repo
+        self.essay_repo = essay_repo
+        self.instruction_repo = instruction_repo
+        self.anchor_repo = anchor_repo
+        self.comparison_repo = comparison_repo
+        self.grade_projection_repo = grade_projection_repo
+
+    # Session context manager (compatibility with previous fixture)
+    @asynccontextmanager
+    async def session(self) -> AsyncGenerator[AsyncSession, None]:
+        async with self.session_provider.session() as session:
+            yield session
+
+    # Batch operations
+    async def create_new_cj_batch(self, *args: Any, **kwargs: Any) -> Any:
+        return await self.batch_repo.create_new_cj_batch(*args, **kwargs)
+
+    async def get_batch_state(self, *args: Any, **kwargs: Any) -> Any:
+        return await self.batch_repo.get_batch_state(*args, **kwargs)
+
+    async def get_cj_batch_upload(self, *args: Any, **kwargs: Any) -> Any:
+        return await self.batch_repo.get_cj_batch_upload(*args, **kwargs)
+
+    async def update_cj_batch_status(self, *args: Any, **kwargs: Any) -> None:
+        await self.batch_repo.update_cj_batch_status(*args, **kwargs)
+
+    # Essay operations
+    async def create_or_update_cj_processed_essay(self, *args: Any, **kwargs: Any) -> Any:
+        return await self.essay_repo.create_or_update_cj_processed_essay(*args, **kwargs)
+
+    async def get_essays_for_cj_batch(self, *args: Any, **kwargs: Any) -> Any:
+        return await self.essay_repo.get_essays_for_cj_batch(*args, **kwargs)
+
+    async def update_essay_scores_in_batch(self, *args: Any, **kwargs: Any) -> None:
+        await self.essay_repo.update_essay_scores_in_batch(*args, **kwargs)
+
+    async def get_final_cj_rankings(self, *args: Any, **kwargs: Any) -> Any:
+        return await self.essay_repo.get_final_cj_rankings(*args, **kwargs)
+
+    # Instruction operations
+    async def upsert_assessment_instruction(self, *args: Any, **kwargs: Any) -> Any:
+        return await self.instruction_repo.upsert_assessment_instruction(*args, **kwargs)
+
+    async def get_assessment_instruction(self, *args: Any, **kwargs: Any) -> Any:
+        return await self.instruction_repo.get_assessment_instruction(*args, **kwargs)
+
+    # Anchor operations
+    async def upsert_anchor_reference(self, *args: Any, **kwargs: Any) -> Any:
+        return await self.anchor_repo.upsert_anchor_reference(*args, **kwargs)
+
+    async def get_anchor_essay_references(self, *args: Any, **kwargs: Any) -> Any:
+        return await self.anchor_repo.get_anchor_essay_references(*args, **kwargs)
+
+    # Comparison operations
+    async def store_comparison_results(self, *args: Any, **kwargs: Any) -> None:
+        await self.comparison_repo.store_comparison_results(*args, **kwargs)
+
+    async def get_comparison_pair_by_correlation_id(self, *args: Any, **kwargs: Any) -> Any:
+        return await self.comparison_repo.get_comparison_pair_by_correlation_id(*args, **kwargs)
+
+    async def get_comparison_pairs_for_batch(self, *args: Any, **kwargs: Any) -> Any:
+        return await self.comparison_repo.get_comparison_pairs_for_batch(*args, **kwargs)
+
+    async def get_valid_comparisons_for_batch(self, *args: Any, **kwargs: Any) -> Any:
+        return await self.comparison_repo.get_valid_comparisons_for_batch(*args, **kwargs)
+
+
+@pytest.fixture
+def postgres_data_access(
+    postgres_session_provider: CJSessionProviderImpl,
+    postgres_batch_repository: PostgreSQLCJBatchRepository,
+    postgres_essay_repository: PostgreSQLCJEssayRepository,
+    postgres_instruction_repository: PostgreSQLAssessmentInstructionRepository,
+    postgres_anchor_repository: PostgreSQLAnchorRepository,
+    postgres_comparison_repository: PostgreSQLCJComparisonRepository,
+    postgres_grade_projection_repository: PostgreSQLGradeProjectionRepository,
+) -> PostgresDataAccess:
+    """Aggregate fixture exposing legacy repository methods via per-aggregate repos."""
+
+    return PostgresDataAccess(
+        session_provider=postgres_session_provider,
+        batch_repo=postgres_batch_repository,
+        essay_repo=postgres_essay_repository,
+        instruction_repo=postgres_instruction_repository,
+        anchor_repo=postgres_anchor_repository,
+        comparison_repo=postgres_comparison_repository,
+        grade_projection_repo=postgres_grade_projection_repository,
     )
 
-    # Initialize schema
-    await repository.initialize_db_schema()
 
-    yield repository
+@pytest.fixture
+def postgres_repository(postgres_data_access: PostgresDataAccess) -> PostgresDataAccess:
+    """Backward-compatible fixture alias returning PostgresDataAccess façade."""
+
+    return postgres_data_access
 
 
 # ==================== External Service Mocks (Keep These) ====================

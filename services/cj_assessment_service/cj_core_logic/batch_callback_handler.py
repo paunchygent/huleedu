@@ -23,20 +23,26 @@ from services.cj_assessment_service.cj_core_logic.workflow_continuation import (
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.metrics import get_business_metrics
 from services.cj_assessment_service.protocols import (
+    AssessmentInstructionRepositoryProtocol,
+    CJBatchRepositoryProtocol,
+    CJComparisonRepositoryProtocol,
+    CJEssayRepositoryProtocol,
     CJEventPublisherProtocol,
-    CJRepositoryProtocol,
     ContentClientProtocol,
     LLMInteractionProtocol,
+    SessionProviderProtocol,
 )
 
 if TYPE_CHECKING:
     from services.cj_assessment_service.cj_core_logic.batch_retry_processor import (
         BatchRetryProcessor,
     )
+    from services.cj_assessment_service.cj_core_logic.grade_projector import (
+        GradeProjector,
+    )
 
-# Module-level placeholders for lazy imports to satisfy type checking
+# Module-level placeholder for lazy scoring_ranking import to satisfy type checking
 scoring_ranking: types.ModuleType | None = None
-grade_projector: types.ModuleType | None = None
 
 # Import existing proven workflow logic for integration
 
@@ -46,11 +52,16 @@ logger = create_service_logger("cj_assessment_service.batch_callback_handler")
 async def continue_cj_assessment_workflow(
     comparison_result: LLMComparisonResultV1,
     correlation_id: UUID,
-    database: CJRepositoryProtocol,
+    session_provider: SessionProviderProtocol,
+    batch_repository: CJBatchRepositoryProtocol,
+    essay_repository: CJEssayRepositoryProtocol,
+    comparison_repository: CJComparisonRepositoryProtocol,
     event_publisher: CJEventPublisherProtocol,
     settings: Settings,
     content_client: ContentClientProtocol,
     llm_interaction: LLMInteractionProtocol,
+    instruction_repository: AssessmentInstructionRepositoryProtocol,
+    grade_projector: "GradeProjector",
     retry_processor: BatchRetryProcessor | None = None,
 ) -> None:
     """Process LLM callback and continue existing workflow.
@@ -61,22 +72,23 @@ async def continue_cj_assessment_workflow(
     Args:
         comparison_result: The LLM comparison result callback data
         correlation_id: Request correlation ID for tracing
-        database: Database access protocol implementation
+        session_provider: Session provider for database transactions
+        batch_repository: Batch repository for batch operations
+        essay_repository: Essay repository for essay operations
+        comparison_repository: Comparison repository for comparison operations
         event_publisher: Event publisher protocol implementation
         settings: Application settings
         content_client: Content client for fetching anchor essays
+        llm_interaction: LLM interaction protocol
+        instruction_repository: Instruction repository for assessment instructions
         retry_processor: Optional retry processor for failed comparison handling
     """
     # Lazy imports to avoid scipy/coverage conflict at module initialization
-    global scoring_ranking, grade_projector
+    global scoring_ranking
     if scoring_ranking is None:
         from services.cj_assessment_service.cj_core_logic import scoring_ranking as _sr
 
         scoring_ranking = _sr
-    if grade_projector is None:
-        from services.cj_assessment_service.cj_core_logic import grade_projector as _gp
-
-        grade_projector = _gp
 
     # Get business metrics
     business_metrics = get_business_metrics()
@@ -98,7 +110,9 @@ async def continue_cj_assessment_workflow(
         # Use the correlation_id from the callback event (which is the request_correlation_id)
         batch_id = await update_comparison_result(
             comparison_result=comparison_result,
-            database=database,
+            session_provider=session_provider,
+            comparison_repository=comparison_repository,
+            batch_repository=batch_repository,
             correlation_id=comparison_result.correlation_id,  # Use callback's correlation_id
             settings=settings,
             pool_manager=None,  # Will need proper injection
@@ -124,7 +138,8 @@ async def continue_cj_assessment_workflow(
         # Step 2: Check if this callback enables workflow continuation
         should_continue = await check_workflow_continuation(
             batch_id=batch_id,
-            database=database,
+            session_provider=session_provider,
+            batch_repository=batch_repository,
             correlation_id=correlation_id,
         )
 
@@ -136,13 +151,18 @@ async def continue_cj_assessment_workflow(
             # Delegate to existing proven workflow logic
             await trigger_existing_workflow_continuation(
                 batch_id=batch_id,
-                database=database,
+                session_provider=session_provider,
+                batch_repository=batch_repository,
+                comparison_repository=comparison_repository,
+                essay_repository=essay_repository,
+                instruction_repository=instruction_repository,
                 event_publisher=event_publisher,
                 settings=settings,
                 content_client=content_client,
                 correlation_id=correlation_id,
                 llm_interaction=llm_interaction,
                 retry_processor=retry_processor,
+                grade_projector=grade_projector,
             )
         else:
             logger.info(

@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from datetime import datetime
 from typing import Any, AsyncContextManager, AsyncIterator, cast
 from uuid import UUID, uuid4
 
 import pytest
+from common_core.status_enums import CJBatchStateEnum
 from dishka import Provider, Scope, make_async_container, provide
 from huleedu_service_libs.error_handling.correlation import (
     CorrelationContext,
@@ -22,11 +24,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.cj_assessment_service.api.admin import judge_rubrics_bp
 from services.cj_assessment_service.config import Settings
-from services.cj_assessment_service.protocols import CJRepositoryProtocol, ContentClientProtocol
-from services.cj_assessment_service.tests.unit.instruction_store import AssessmentInstructionStore
+from services.cj_assessment_service.models_db import CJBatchState, ComparisonPair
+from services.cj_assessment_service.protocols import (
+    AssessmentInstructionRepositoryProtocol,
+    ContentClientProtocol,
+    SessionProviderProtocol,
+)
+from services.cj_assessment_service.tests.unit.test_mocks import AssessmentInstructionStore
 
 
-class AdminRepositoryMock(CJRepositoryProtocol):
+class AdminRepositoryMock(AssessmentInstructionRepositoryProtocol, SessionProviderProtocol):
     """In-memory repository mock for admin rubric tests."""
 
     def __init__(self) -> None:
@@ -96,6 +103,16 @@ class AdminRepositoryMock(CJRepositoryProtocol):
 
     async def get_cj_batch_upload(self, session: AsyncSession, cj_batch_id: int) -> Any:
         raise NotImplementedError("Not needed for admin rubric tests")
+
+    async def get_batch_state(
+        self, session: AsyncSession, cj_batch_id: int, *, for_update: bool = False
+    ) -> CJBatchState | None:
+        return None
+
+    async def get_comparison_pair_by_correlation_id(
+        self, session: AsyncSession, request_correlation_id: UUID
+    ) -> ComparisonPair | None:
+        return None
 
     async def get_anchor_essay_references(
         self, session: AsyncSession, assignment_id: str, grade_scale: str | None = None
@@ -178,6 +195,40 @@ class AdminRepositoryMock(CJRepositoryProtocol):
         """Stub implementation for test mocks."""
         return 1  # Return a mock anchor ID
 
+    async def get_stuck_batches(
+        self,
+        session: AsyncSession,
+        states: list[CJBatchStateEnum],
+        stuck_threshold: datetime,
+    ) -> list[CJBatchState]:
+        """Get batches stuck in specified states beyond threshold."""
+        return []
+
+    async def get_batches_ready_for_completion(
+        self,
+        session: AsyncSession,
+    ) -> list[CJBatchState]:
+        """Get batches ready for final completion."""
+        return []
+
+    async def get_batch_state_for_update(
+        self,
+        session: AsyncSession,
+        batch_id: int,
+        for_update: bool = False,
+    ) -> CJBatchState | None:
+        """Get batch state with optional row locking."""
+        return None
+
+    async def update_batch_state(
+        self,
+        session: AsyncSession,
+        batch_id: int,
+        state: CJBatchStateEnum,
+    ) -> None:
+        """Update batch state."""
+        pass
+
 
 class ContentClientMock(ContentClientProtocol):
     """Mock content client for rubric upload/retrieval tests."""
@@ -207,7 +258,11 @@ class TestProvider(Provider):
         self._content_client = content_client
 
     @provide(scope=Scope.REQUEST)
-    def get_repository(self) -> CJRepositoryProtocol:
+    def provide_session_provider(self) -> SessionProviderProtocol:
+        return self._repo
+
+    @provide(scope=Scope.REQUEST)
+    def provide_instruction_repository(self) -> AssessmentInstructionRepositoryProtocol:
         return self._repo
 
     @provide(scope=Scope.REQUEST)

@@ -16,9 +16,42 @@ from uuid import uuid4
 
 import pytest
 
+from services.cj_assessment_service.cj_core_logic.grade_projection.context_service import (
+    ProjectionContextService,
+)
 from services.cj_assessment_service.cj_core_logic.grade_projector import GradeProjector
 from services.cj_assessment_service.cj_core_logic.grade_utils import _grade_to_normalized
-from services.cj_assessment_service.protocols import ContentClientProtocol
+from services.cj_assessment_service.protocols import (
+    AnchorRepositoryProtocol,
+    AssessmentInstructionRepositoryProtocol,
+    ContentClientProtocol,
+    SessionProviderProtocol,
+)
+
+
+def _create_test_projector() -> GradeProjector:
+    """Create a GradeProjector with mocked dependencies for testing."""
+    mock_session_provider = Mock(spec=SessionProviderProtocol)
+    # Mock the async session context manager properly
+    mock_session = AsyncMock()
+    mock_session.add_all = Mock()  # add_all is synchronous in SQLAlchemy
+    mock_session_provider.session.return_value = mock_session
+    mock_session.__aenter__.return_value = mock_session
+    mock_session.__aexit__.return_value = None
+
+    mock_instruction_repo = Mock(spec=AssessmentInstructionRepositoryProtocol)
+    mock_anchor_repo = Mock(spec=AnchorRepositoryProtocol)
+
+    context_service = ProjectionContextService(
+        session_provider=mock_session_provider,
+        instruction_repository=mock_instruction_repo,
+        anchor_repository=mock_anchor_repo,
+    )
+
+    return GradeProjector(
+        session_provider=mock_session_provider,
+        context_service=context_service,
+    )
 
 
 class TestGradeProjectorSystem:
@@ -143,7 +176,7 @@ class TestGradeProjectorSystem:
     ) -> None:
         """Test statistical calibration produces valid grade probabilities and confidence scores."""
         # Arrange
-        grade_projector = GradeProjector()
+        grade_projector = _create_test_projector()
         correlation_id = uuid4()
 
         # Mock the context builder to return anchors
@@ -154,7 +187,6 @@ class TestGradeProjectorSystem:
 
             # Act
             result = await grade_projector.calculate_projections(
-                session=mock_database_session,
                 rankings=sample_rankings_with_anchors,
                 cj_batch_id=1,
                 assignment_id="assignment_789",
@@ -264,7 +296,7 @@ class TestGradeProjectorSystem:
     ) -> None:
         """Test that system returns projections_available=False when no anchor essays exist."""
         # Arrange
-        grade_projector = GradeProjector()
+        grade_projector = _create_test_projector()
         correlation_id = uuid4()
 
         # Rankings without any anchors flagged
@@ -293,7 +325,6 @@ class TestGradeProjectorSystem:
 
             # Act
             result = await grade_projector.calculate_projections(
-                session=mock_database_session,
                 rankings=sample_rankings,
                 cj_batch_id=1,
                 assignment_id="assignment_789",
@@ -319,12 +350,11 @@ class TestGradeProjectorSystem:
         """Test that empty rankings list produces valid empty projections
         with projections_available=False."""
         # Arrange
-        grade_projector = GradeProjector()
+        grade_projector = _create_test_projector()
         correlation_id = uuid4()
 
         # Act
         result = await grade_projector.calculate_projections(
-            session=mock_database_session,
             rankings=[],  # Empty rankings
             cj_batch_id=1,
             assignment_id="assignment_789",
@@ -350,7 +380,7 @@ class TestGradeProjectorSystem:
     ) -> None:
         """Test that system handles anchor retrieval errors gracefully."""
         # Arrange
-        grade_projector = GradeProjector()
+        grade_projector = _create_test_projector()
         correlation_id = uuid4()
 
         sample_rankings = [
@@ -372,7 +402,6 @@ class TestGradeProjectorSystem:
             # Act & Assert - Should propagate error (not silently fail)
             with pytest.raises(Exception, match="Content service unavailable"):
                 await grade_projector.calculate_projections(
-                    session=mock_database_session,
                     rankings=sample_rankings,
                     cj_batch_id=1,
                     assignment_id="assignment_789",
@@ -390,7 +419,7 @@ class TestGradeProjectorSystem:
     ) -> None:
         """Test that system requires sufficient grade diversity in anchors for calibration."""
         # Arrange
-        grade_projector = GradeProjector()
+        grade_projector = _create_test_projector()
         correlation_id = uuid4()
 
         # Rankings with anchors all having the same grade (insufficient diversity)
@@ -428,7 +457,6 @@ class TestGradeProjectorSystem:
 
             # Act
             result = await grade_projector.calculate_projections(
-                session=mock_database_session,
                 rankings=sample_rankings,
                 cj_batch_id=1,
                 assignment_id="assignment_789",
@@ -450,7 +478,7 @@ class TestGradeProjectorSystem:
     ) -> None:
         """Test that confidence scores are based on entropy of probability distributions."""
         # Arrange
-        grade_projector = GradeProjector()
+        grade_projector = _create_test_projector()
         correlation_id = uuid4()
 
         rankings = [
@@ -506,7 +534,6 @@ class TestGradeProjectorSystem:
 
             # Act
             result = await grade_projector.calculate_projections(
-                session=mock_database_session,
                 rankings=rankings,
                 cj_batch_id=1,
                 assignment_id="assignment_789",
@@ -551,7 +578,7 @@ class TestGradeProjectorSystem:
     ) -> None:
         """Test that grade probability distributions always sum to 1.0."""
         # Arrange
-        grade_projector = GradeProjector()
+        grade_projector = _create_test_projector()
         correlation_id = uuid4()
 
         with patch.object(
@@ -561,7 +588,6 @@ class TestGradeProjectorSystem:
 
             # Act
             result = await grade_projector.calculate_projections(
-                session=mock_database_session,
                 rankings=sample_rankings_with_anchors,
                 cj_batch_id=1,
                 assignment_id="assignment_789",
@@ -594,7 +620,7 @@ class TestGradeProjectorSystem:
     ) -> None:
         """Test that grade boundaries are monotonically decreasing (A > B > C > D > F)."""
         # Arrange
-        grade_projector = GradeProjector()
+        grade_projector = _create_test_projector()
         correlation_id = uuid4()
 
         with patch.object(
@@ -604,7 +630,6 @@ class TestGradeProjectorSystem:
 
             # Act
             result = await grade_projector.calculate_projections(
-                session=mock_database_session,
                 rankings=sample_rankings_with_anchors,
                 cj_batch_id=1,
                 assignment_id="assignment_789",
@@ -641,7 +666,7 @@ class TestGradeProjectorSystem:
     ) -> None:
         """Test that standard errors are non-negative and within reasonable bounds."""
         # Arrange
-        grade_projector = GradeProjector()
+        grade_projector = _create_test_projector()
         correlation_id = uuid4()
 
         with patch.object(
@@ -651,7 +676,6 @@ class TestGradeProjectorSystem:
 
             # Act
             result = await grade_projector.calculate_projections(
-                session=mock_database_session,
                 rankings=sample_rankings_with_anchors,
                 cj_batch_id=1,
                 assignment_id="assignment_789",
@@ -677,7 +701,7 @@ class TestGradeProjectorSystem:
     ) -> None:
         """Test that system handles single anchor gracefully (no calibration possible)."""
         # Arrange
-        grade_projector = GradeProjector()
+        grade_projector = _create_test_projector()
         correlation_id = uuid4()
 
         rankings = [
@@ -705,7 +729,6 @@ class TestGradeProjectorSystem:
 
             # Act
             result = await grade_projector.calculate_projections(
-                session=mock_database_session,
                 rankings=rankings,
                 cj_batch_id=1,
                 assignment_id="assignment_789",
@@ -727,7 +750,7 @@ class TestGradeProjectorSystem:
     ) -> None:
         """Test handling of extreme Bradley-Terry scores (near 0 or 1)."""
         # Arrange
-        grade_projector = GradeProjector()
+        grade_projector = _create_test_projector()
         correlation_id = uuid4()
 
         rankings = [
@@ -772,7 +795,6 @@ class TestGradeProjectorSystem:
 
             # Act
             result = await grade_projector.calculate_projections(
-                session=mock_database_session,
                 rankings=rankings,
                 cj_batch_id=1,
                 assignment_id="assignment_789",
@@ -821,7 +843,7 @@ class TestGradeProjectorSystem:
     ) -> None:
         """Test that anchors missing grade metadata are handled gracefully."""
         # Arrange
-        grade_projector = GradeProjector()
+        grade_projector = _create_test_projector()
         correlation_id = uuid4()
 
         # Rankings with anchors missing grade information
@@ -851,7 +873,6 @@ class TestGradeProjectorSystem:
 
             # Act
             result = await grade_projector.calculate_projections(
-                session=mock_database_session,
                 rankings=sample_rankings,
                 cj_batch_id=1,
                 assignment_id="assignment_789",
@@ -873,7 +894,7 @@ class TestGradeProjectorSystem:
     ) -> None:
         """Integration test with realistic Bradley-Terry scores from Choix algorithm."""
         # Arrange
-        grade_projector = GradeProjector()
+        grade_projector = _create_test_projector()
         correlation_id = uuid4()
 
         # Realistic rankings from a CJ session with 10 essays (3 anchors, 7 students)
@@ -977,7 +998,6 @@ class TestGradeProjectorSystem:
 
             # Act
             result = await grade_projector.calculate_projections(
-                session=mock_database_session,
                 rankings=rankings,
                 cj_batch_id=1,
                 assignment_id="assignment_789",

@@ -35,6 +35,7 @@ from services.cj_assessment_service.cj_core_logic.error_categorization import (
     categorize_processing_error,
     create_publishing_error_detail,
 )
+from services.cj_assessment_service.cj_core_logic.grade_projector import GradeProjector
 from services.cj_assessment_service.cj_core_logic.request_transformer import (
     transform_cj_assessment_request,
 )
@@ -44,10 +45,15 @@ from services.cj_assessment_service.cj_core_logic.workflow_orchestrator import (
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.metrics import get_business_metrics
 from services.cj_assessment_service.protocols import (
+    AnchorRepositoryProtocol,
+    AssessmentInstructionRepositoryProtocol,
+    CJBatchRepositoryProtocol,
+    CJComparisonRepositoryProtocol,
+    CJEssayRepositoryProtocol,
     CJEventPublisherProtocol,
-    CJRepositoryProtocol,
     ContentClientProtocol,
     LLMInteractionProtocol,
+    SessionProviderProtocol,
 )
 
 logger = create_service_logger("cj_assessment.cj_request_handler")
@@ -56,11 +62,17 @@ logger = create_service_logger("cj_assessment.cj_request_handler")
 async def handle_cj_assessment_request(
     msg: ConsumerRecord,
     envelope: EventEnvelope[ELS_CJAssessmentRequestV1],
-    database: CJRepositoryProtocol,
+    session_provider: SessionProviderProtocol,
+    batch_repository: CJBatchRepositoryProtocol,
+    essay_repository: CJEssayRepositoryProtocol,
+    instruction_repository: AssessmentInstructionRepositoryProtocol,
+    anchor_repository: AnchorRepositoryProtocol,
+    comparison_repository: CJComparisonRepositoryProtocol,
     content_client: ContentClientProtocol,
     event_publisher: CJEventPublisherProtocol,
     llm_interaction: LLMInteractionProtocol,
     settings: Settings,
+    grade_projector: GradeProjector,
     tracer: "Tracer | None" = None,
 ) -> bool:
     """Handle CJ assessment request message from ELS.
@@ -68,11 +80,17 @@ async def handle_cj_assessment_request(
     Args:
         msg: Kafka consumer record (for logging)
         envelope: Parsed event envelope with CJ assessment request
-        database: Database access protocol
+        session_provider: Session provider for database transactions
+        batch_repository: Batch repository for batch-level operations
+        essay_repository: Essay repository for essay operations
+        instruction_repository: Instruction repository for assessment instructions
+        anchor_repository: Anchor repository for anchor essay management
+        comparison_repository: Comparison repository for comparison pair operations
         content_client: Content client for fetching prompts/rubrics
         event_publisher: Event publisher for success/failure events
         llm_interaction: LLM interaction protocol
         settings: Application settings
+        grade_projector: Grade projector for grade predictions
         tracer: Optional OpenTelemetry tracer
 
     Returns:
@@ -133,7 +151,8 @@ async def handle_cj_assessment_request(
             judge_rubric_storage_id,
             judge_rubric_text,
         ) = await hydrate_judge_rubric_context(
-            database=database,
+            session_provider=session_provider,
+            instruction_repository=instruction_repository,
             content_client=content_client,
             assignment_id=request_event_data.assignment_id,
             correlation_id=envelope.correlation_id,
@@ -205,11 +224,17 @@ async def handle_cj_assessment_request(
         workflow_result = await run_cj_assessment_workflow(
             request_data=converted_request_data,
             correlation_id=correlation_id,
-            database=database,
+            session_provider=session_provider,
+            batch_repository=batch_repository,
+            essay_repository=essay_repository,
+            instruction_repository=instruction_repository,
+            anchor_repository=anchor_repository,
+            comparison_repository=comparison_repository,
             content_client=content_client,
             llm_interaction=llm_interaction,
             event_publisher=event_publisher,
             settings=settings,
+            grade_projector=grade_projector,
         )
 
         # ALL workflows are async - comparisons submitted, results come via callbacks

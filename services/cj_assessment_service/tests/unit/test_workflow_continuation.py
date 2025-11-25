@@ -7,11 +7,14 @@ from __future__ import annotations
 
 import json
 from contextlib import asynccontextmanager
-from typing import Any, AsyncIterator
+from datetime import datetime
+from typing import Any, AsyncContextManager, AsyncGenerator, cast
 from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
 
 import pytest
+from common_core.status_enums import CJBatchStateEnum as CoreCJBatchStateEnum
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.cj_assessment_service.cj_core_logic import workflow_continuation as wc
 from services.cj_assessment_service.config import Settings
@@ -20,9 +23,14 @@ from services.cj_assessment_service.models_db import (
     AssessmentInstruction,
     CJBatchState,
     CJBatchUpload,
+    ComparisonPair,
 )
-from services.cj_assessment_service.protocols import CJRepositoryProtocol
-from services.cj_assessment_service.tests.unit.instruction_store import AssessmentInstructionStore
+from services.cj_assessment_service.protocols import (
+    AssessmentInstructionRepositoryProtocol,
+    CJComparisonRepositoryProtocol,
+    SessionProviderProtocol,
+)
+from services.cj_assessment_service.tests.unit.test_mocks import AssessmentInstructionStore
 
 
 class _FakeSession:
@@ -51,14 +59,15 @@ class _FakeSession:
 
 
 @asynccontextmanager
-async def _session_ctx(session: _FakeSession) -> AsyncIterator[_FakeSession]:
-    yield session
+async def _session_ctx(session: _FakeSession) -> AsyncGenerator[AsyncSession, None]:
+    yield cast(AsyncSession, session)
 
 
-class _Repo(CJRepositoryProtocol):
-    def __init__(self, session: _FakeSession) -> None:
+class _Repo:
+    def __init__(self, session: _FakeSession, batch_state: CJBatchState | None = None) -> None:
         self._session = session
         self._instruction_store = AssessmentInstructionStore()
+        self._batch_state = batch_state
 
     def session(self) -> Any:
         return _session_ctx(self._session)
@@ -97,6 +106,11 @@ class _Repo(CJRepositoryProtocol):
     async def get_comparison_pair_by_essays(self, *args: Any, **kwargs: Any) -> Any | None:
         return None
 
+    async def get_comparison_pair_by_correlation_id(
+        self, *args: Any, **kwargs: Any
+    ) -> ComparisonPair | None:
+        return None
+
     async def store_comparison_results(self, *args: Any, **kwargs: Any) -> None:
         return None
 
@@ -108,6 +122,11 @@ class _Repo(CJRepositoryProtocol):
 
     async def get_final_cj_rankings(self, *args: Any, **kwargs: Any) -> list[dict[str, Any]]:
         return []
+
+    async def get_batch_state(
+        self, session: Any, cj_batch_id: int, *, for_update: bool = False
+    ) -> CJBatchState | None:
+        return self._batch_state
 
     async def upsert_assessment_instruction(
         self,
@@ -167,6 +186,48 @@ class _Repo(CJRepositoryProtocol):
         """Stub implementation for test mocks."""
         return 1  # Return a mock anchor ID
 
+    async def get_stuck_batches(
+        self,
+        session: Any,
+        states: list[CoreCJBatchStateEnum],
+        stuck_threshold: datetime,
+    ) -> list[CJBatchState]:
+        """Get batches stuck in specified states beyond threshold."""
+        return []
+
+    async def get_batches_ready_for_completion(
+        self,
+        session: Any,
+    ) -> list[CJBatchState]:
+        """Get batches ready for final completion."""
+        return []
+
+    async def get_batch_state_for_update(
+        self,
+        session: Any,
+        batch_id: int,
+        for_update: bool = False,
+    ) -> CJBatchState | None:
+        """Get batch state with optional row locking."""
+        return None
+
+    async def update_batch_state(
+        self,
+        session: Any,
+        batch_id: int,
+        state: CoreCJBatchStateEnum,
+    ) -> None:
+        """Update batch state."""
+        pass
+
+
+class _SessionProvider(SessionProviderProtocol):
+    def __init__(self, session: _FakeSession) -> None:
+        self._session = session
+
+    def session(self) -> AsyncContextManager[AsyncSession]:
+        return _session_ctx(self._session)
+
 
 def _make_upload(expected_count: int) -> CJBatchUpload:
     return CJBatchUpload(
@@ -180,9 +241,8 @@ def _make_upload(expected_count: int) -> CJBatchUpload:
 
 
 @pytest.mark.asyncio
-async def test_check_continuation_true_when_all_callbacks_arrived(monkeypatch: Any) -> None:
+async def test_check_continuation_true_when_all_callbacks_arrived() -> None:
     session = _FakeSession(completed_count=10)
-    repo = _Repo(session)
 
     batch_state = CJBatchState()
     batch_state.batch_id = 1
@@ -190,24 +250,22 @@ async def test_check_continuation_true_when_all_callbacks_arrived(monkeypatch: A
     batch_state.completed_comparisons = 3
     batch_state.failed_comparisons = 2
 
-    async def _fake_get_batch_state(
-        _s: Any, _bid: int, _cid: Any, _for_update: bool = False
-    ) -> Any:
-        return batch_state
+    repo = _Repo(session, batch_state=batch_state)
 
-    monkeypatch.setattr(wc, "get_batch_state", _fake_get_batch_state)
-
+    session_provider = _SessionProvider(session)
     should_continue = await wc.check_workflow_continuation(
-        batch_id=1, database=repo, correlation_id=uuid4()
+        batch_id=1,
+        session_provider=session_provider,
+        batch_repository=repo,
+        correlation_id=uuid4(),
     )
 
     assert should_continue is True
 
 
 @pytest.mark.asyncio
-async def test_check_continuation_false_when_pending(monkeypatch: Any) -> None:
+async def test_check_continuation_false_when_pending() -> None:
     session = _FakeSession(completed_count=3)
-    repo = _Repo(session)
 
     batch_state = CJBatchState()
     batch_state.batch_id = 2
@@ -215,24 +273,22 @@ async def test_check_continuation_false_when_pending(monkeypatch: Any) -> None:
     batch_state.completed_comparisons = 4
     batch_state.failed_comparisons = 1
 
-    async def _fake_get_batch_state(
-        _s: Any, _bid: int, _cid: Any, _for_update: bool = False
-    ) -> Any:
-        return batch_state
+    repo = _Repo(session, batch_state=batch_state)
 
-    monkeypatch.setattr(wc, "get_batch_state", _fake_get_batch_state)
-
+    session_provider = _SessionProvider(session)
     should_continue = await wc.check_workflow_continuation(
-        batch_id=2, database=repo, correlation_id=uuid4()
+        batch_id=2,
+        session_provider=session_provider,
+        batch_repository=repo,
+        correlation_id=uuid4(),
     )
 
     assert should_continue is False
 
 
 @pytest.mark.asyncio
-async def test_check_continuation_false_when_nothing_submitted(monkeypatch: Any) -> None:
+async def test_check_continuation_false_when_nothing_submitted() -> None:
     session = _FakeSession(completed_count=0)
-    repo = _Repo(session)
 
     batch_state = CJBatchState()
     batch_state.batch_id = 3
@@ -240,15 +296,14 @@ async def test_check_continuation_false_when_nothing_submitted(monkeypatch: Any)
     batch_state.completed_comparisons = 0
     batch_state.failed_comparisons = 0
 
-    async def _fake_get_batch_state(
-        _s: Any, _bid: int, _cid: Any, _for_update: bool = False
-    ) -> Any:
-        return batch_state
+    repo = _Repo(session, batch_state=batch_state)
 
-    monkeypatch.setattr(wc, "get_batch_state", _fake_get_batch_state)
-
+    session_provider = _SessionProvider(session)
     should_continue = await wc.check_workflow_continuation(
-        batch_id=3, database=repo, correlation_id=uuid4()
+        batch_id=3,
+        session_provider=session_provider,
+        batch_repository=repo,
+        correlation_id=uuid4(),
     )
 
     assert should_continue is False
@@ -294,7 +349,6 @@ async def test_trigger_continuation_finalizes_when_callbacks_hit_cap(monkeypatch
     settings.MIN_COMPARISONS_FOR_STABILITY_CHECK = 5
     settings.SCORE_STABILITY_THRESHOLD = 0.05
 
-    repo = _Repo(_FakeSession(completed_count=0))
     event_publisher = AsyncMock()
     content_client = AsyncMock()
     llm_interaction = AsyncMock()
@@ -312,16 +366,10 @@ async def test_trigger_continuation_finalizes_when_callbacks_hit_cap(monkeypatch
     # Provide essay count for nC2 = 6
     batch_state.batch_upload = _make_upload(expected_count=4)
 
-    async def fake_get_batch_state(*_args: Any, **_kwargs: Any) -> Any:
-        return batch_state
-
-    monkeypatch.setattr(wc, "get_batch_state", fake_get_batch_state)
-
     essays = [
         Mock(els_essay_id=str(i), assessment_input_text=f"essay-{i}", current_bt_score=0.0)
         for i in range(4)
     ]
-    monkeypatch.setattr(repo, "get_essays_for_cj_batch", AsyncMock(return_value=essays))
 
     monkeypatch.setattr(
         wc.scoring_ranking,
@@ -337,6 +385,7 @@ async def test_trigger_continuation_finalizes_when_callbacks_hit_cap(monkeypatch
 
     finalize_called = AsyncMock()
 
+    # Mock BatchFinalizer (grade projector is passed explicitly in call)
     class _Finalizer:
         def __init__(self, *_args: Any, **_kwargs: Any) -> None:
             pass
@@ -346,14 +395,32 @@ async def test_trigger_continuation_finalizes_when_callbacks_hit_cap(monkeypatch
 
     monkeypatch.setattr(wc, "BatchFinalizer", _Finalizer)
 
+    @asynccontextmanager
+    async def mock_session_ctx() -> AsyncGenerator[AsyncMock, None]:
+        yield AsyncMock()
+
+    mock_session_provider = AsyncMock()
+    mock_session_provider.session = mock_session_ctx
+    mock_batch_repository = AsyncMock()
+    mock_batch_repository.get_batch_state = AsyncMock(return_value=batch_state)
+    mock_essay_repository = AsyncMock()
+    mock_essay_repository.get_essays_for_cj_batch = AsyncMock(return_value=essays)
+
+    mock_grade_projector = AsyncMock()
+
     await wc.trigger_existing_workflow_continuation(
         batch_id=9,
-        database=repo,
+        session_provider=mock_session_provider,
+        batch_repository=mock_batch_repository,
+        comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
+        essay_repository=mock_essay_repository,
+        instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
         event_publisher=event_publisher,
         settings=settings,
         content_client=content_client,
         correlation_id=uuid4(),
         llm_interaction=llm_interaction,
+        grade_projector=mock_grade_projector,
     )
 
     finalize_called.assert_awaited_once()
@@ -370,7 +437,6 @@ async def test_trigger_continuation_metadata_serializable_without_previous_score
     settings.MIN_COMPARISONS_FOR_STABILITY_CHECK = 5
     settings.SCORE_STABILITY_THRESHOLD = 0.05
 
-    repo = _Repo(_FakeSession(completed_count=0))
     event_publisher = AsyncMock()
     content_client = AsyncMock()
     llm_interaction = AsyncMock()
@@ -388,16 +454,10 @@ async def test_trigger_continuation_metadata_serializable_without_previous_score
     }
     batch_state.batch_upload = _make_upload(expected_count=2)
 
-    async def fake_get_batch_state(*_args: Any, **_kwargs: Any) -> Any:
-        return batch_state
-
-    monkeypatch.setattr(wc, "get_batch_state", fake_get_batch_state)
-
     essays = [
         Mock(els_essay_id=str(i), assessment_input_text=f"essay-{i}", current_bt_score=0.0)
         for i in range(2)
     ]
-    monkeypatch.setattr(repo, "get_essays_for_cj_batch", AsyncMock(return_value=essays))
 
     current_scores = {"essay-1": 0.2, "essay-2": -0.2}
     monkeypatch.setattr(
@@ -410,6 +470,7 @@ async def test_trigger_continuation_metadata_serializable_without_previous_score
 
     finalize_called = AsyncMock()
 
+    # Mock BatchFinalizer (grade projector passed explicitly)
     class _Finalizer:
         def __init__(self, *_args: Any, **_kwargs: Any) -> None:
             pass
@@ -419,14 +480,32 @@ async def test_trigger_continuation_metadata_serializable_without_previous_score
 
     monkeypatch.setattr(wc, "BatchFinalizer", _Finalizer)
 
+    @asynccontextmanager
+    async def mock_session_ctx() -> AsyncGenerator[AsyncMock, None]:
+        yield AsyncMock()
+
+    mock_session_provider = AsyncMock()
+    mock_session_provider.session = mock_session_ctx
+    mock_batch_repository = AsyncMock()
+    mock_batch_repository.get_batch_state = AsyncMock(return_value=batch_state)
+    mock_essay_repository = AsyncMock()
+    mock_essay_repository.get_essays_for_cj_batch = AsyncMock(return_value=essays)
+
+    mock_grade_projector = AsyncMock()
+
     await wc.trigger_existing_workflow_continuation(
         batch_id=11,
-        database=repo,
+        session_provider=mock_session_provider,
+        batch_repository=mock_batch_repository,
+        comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
+        essay_repository=mock_essay_repository,
+        instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
         event_publisher=event_publisher,
         settings=settings,
         content_client=content_client,
         correlation_id=uuid4(),
         llm_interaction=llm_interaction,
+        grade_projector=mock_grade_projector,
     )
 
     merge_metadata.assert_awaited_once()
@@ -445,7 +524,6 @@ async def test_trigger_continuation_requests_more_when_not_finalized(monkeypatch
     settings.MIN_COMPARISONS_FOR_STABILITY_CHECK = 5
     settings.SCORE_STABILITY_THRESHOLD = 0.05
 
-    repo = _Repo(_FakeSession(completed_count=0))
     event_publisher = AsyncMock()
     content_client = AsyncMock()
     llm_interaction = AsyncMock()
@@ -466,16 +544,10 @@ async def test_trigger_continuation_requests_more_when_not_finalized(monkeypatch
     }
     batch_state.batch_upload = _make_upload(expected_count=5)
 
-    async def fake_get_batch_state(*_args: Any, **_kwargs: Any) -> Any:
-        return batch_state
-
-    monkeypatch.setattr(wc, "get_batch_state", fake_get_batch_state)
-
     essays = [
         Mock(els_essay_id=str(i), assessment_input_text=f"essay-{i}", current_bt_score=0.0)
         for i in range(5)
     ]
-    monkeypatch.setattr(repo, "get_essays_for_cj_batch", AsyncMock(return_value=essays))
 
     monkeypatch.setattr(
         wc.scoring_ranking,
@@ -498,6 +570,7 @@ async def test_trigger_continuation_requests_more_when_not_finalized(monkeypatch
 
     finalize_called = AsyncMock()
 
+    # Mock BatchFinalizer (grade projector passed explicitly)
     class _Finalizer:
         def __init__(self, *_args: Any, **_kwargs: Any) -> None:
             pass
@@ -507,14 +580,32 @@ async def test_trigger_continuation_requests_more_when_not_finalized(monkeypatch
 
     monkeypatch.setattr(wc, "BatchFinalizer", _Finalizer)
 
+    @asynccontextmanager
+    async def mock_session_ctx() -> AsyncGenerator[AsyncMock, None]:
+        yield AsyncMock()
+
+    mock_session_provider = AsyncMock()
+    mock_session_provider.session = mock_session_ctx
+    mock_batch_repository = AsyncMock()
+    mock_batch_repository.get_batch_state = AsyncMock(return_value=batch_state)
+    mock_essay_repository = AsyncMock()
+    mock_essay_repository.get_essays_for_cj_batch = AsyncMock(return_value=essays)
+
+    mock_grade_projector = AsyncMock()
+
     await wc.trigger_existing_workflow_continuation(
         batch_id=10,
-        database=repo,
+        session_provider=mock_session_provider,
+        batch_repository=mock_batch_repository,
+        comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
+        essay_repository=mock_essay_repository,
+        instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
         event_publisher=event_publisher,
         settings=settings,
         content_client=content_client,
         correlation_id=uuid4(),
         llm_interaction=llm_interaction,
+        grade_projector=mock_grade_projector,
     )
 
     request_additional.assert_awaited_once()

@@ -51,6 +51,7 @@ class TestFunctionName:
 - **MUST** use `@pytest.mark.parametrize` for comprehensive test coverage
 - **MUST** include edge cases, boundary conditions, and realistic scenarios
 - **MUST** test Swedish characters and locale-specific scenarios *where applicable*
+- **SHOULD** complement parametrized examples with property-based testing (e.g. Hypothesis or equivalent) for pure functions and algorithmic domains (scoring, batching, retry pools) where invariants can be expressed succinctly.
 
 ### 3.2. Behavioral Testing Requirements
 - **MUST** test actual behavior and side effects
@@ -66,6 +67,11 @@ class TestFunctionName:
   - **Financial Services**: Currency precision, decimal handling
   - **File Services**: Path separators, encoding detection
   - **User Services**: Email formats, validation patterns
+
+### 3.4. Domain Test Data Builders
+- **SHOULD** centralize domain-specific test data creation in small builder helpers per bounded context (for example, comparison pair / batch state builders in CJ Assessment tests).
+- **SHOULD** reuse shared builders across test files instead of duplicating inline dicts or ad-hoc objects.
+- **PATTERN**: Keep builders thin and explicit (no hidden behavior); prefer functions or lightweight factory classes in dedicated test helper modules.
 
 ## 4. Quality Assurance Protocol
 
@@ -111,35 +117,10 @@ async def test_service_method(self):
 - **MUST** use shared helpers for JWT token creation in unit tests
 - **FORBIDDEN**: Local JWT encoding or helper duplication
 
-**Common patterns**:
-```python
-from huleedu_service_libs.testing.jwt_helpers import build_jwt_headers, create_jwt
-
-# Standard user token (HTTP integration tests)
-headers = build_jwt_headers(settings, subject="user-123")
-response = await client.post("/endpoint", headers=headers, json=data)
-
-# Admin token with roles
-headers = build_jwt_headers(settings, subject="admin", roles=["admin"])
-
-# Expired token (for expiry testing)
-headers = build_jwt_headers(settings, subject="user-123", expires_in=timedelta(hours=-1))
-
-# Missing claim (for validation testing)
-headers = build_jwt_headers(settings, subject="user-123", omit_claims=["exp"])
-
-# Custom claims
-headers = build_jwt_headers(settings, extra_claims={"org_id": "org-123"})
-
-# Raw token for validator testing (non-HTTP)
-token = create_jwt(
-    secret=settings.JWT_SECRET_KEY.get_secret_value(),
-    payload={"sub": "user-123", "exp": timestamp, "aud": "...", "iss": "..."},
-    algorithm=settings.JWT_ALGORITHM,
-)
-```
-
-**For functional/integration tests**: Use `AuthTestManager` from `tests.utils.auth_manager` when you need full user lifecycle management.
+### 6.4. Test Fixture Design
+- **SHOULD** keep fixtures small and focused on a single concern (e.g. one fixture for `MockSession`, another for repository wiring).
+- **SHOULD** place reusable cross-file fixtures and helpers in dedicated test helper modules rather than redefining them per file.
+- **MUST NOT** create deeply nested fixture chains that obscure test intent unless there is a strong reuse benefit.
 
 ## 7. Anti-Patterns to Avoid
 
@@ -245,18 +226,6 @@ result = await _operation_impl(
 ```
 
 **DO NOT** use `@patch` for protocol dependencies
-
-## 10. Session Management
-
-### 10.1. Todo List Usage
-- **MUST** use TodoWrite tool to track test creation progress
-- **MUST** mark tasks completed immediately upon 100% pass rate
-- **MUST** update test count targets as progress is made
-
-### 10.2. Incremental Validation
-- **MUST** validate each test file independently
-- **MUST** ensure no regression in existing tests
-- **MUST** maintain cumulative test count accuracy
 
 ---
 **This methodology ensures reproducible, high-quality test creation following established HuleEdu architectural patterns.**

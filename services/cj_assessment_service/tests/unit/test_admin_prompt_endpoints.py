@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from datetime import datetime
 from typing import Any, AsyncContextManager, AsyncIterator, cast
+from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
 
 import pytest
+from common_core.status_enums import CJBatchStateEnum
 from dishka import Provider, Scope, make_async_container, provide
 from huleedu_service_libs.error_handling.correlation import CorrelationContext
 from huleedu_service_libs.error_handling.quart import register_error_handlers
@@ -19,11 +22,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.cj_assessment_service.api.admin import student_prompts_bp
 from services.cj_assessment_service.config import Settings
-from services.cj_assessment_service.protocols import CJRepositoryProtocol, ContentClientProtocol
-from services.cj_assessment_service.tests.unit.instruction_store import AssessmentInstructionStore
+from services.cj_assessment_service.models_db import CJBatchState, ComparisonPair
+from services.cj_assessment_service.protocols import (
+    AssessmentInstructionRepositoryProtocol,
+    ContentClientProtocol,
+    SessionProviderProtocol,
+)
+from services.cj_assessment_service.tests.unit.test_mocks import AssessmentInstructionStore
 
 
-class AdminRepositoryMock(CJRepositoryProtocol):
+class AdminRepositoryMock(AssessmentInstructionRepositoryProtocol, SessionProviderProtocol):
     """In-memory repository mock for admin tests."""
 
     def __init__(self) -> None:
@@ -33,7 +41,11 @@ class AdminRepositoryMock(CJRepositoryProtocol):
     def session(self) -> AsyncContextManager[AsyncSession]:
         @asynccontextmanager
         async def _session() -> AsyncIterator[AsyncSession]:
-            yield cast(AsyncSession, None)
+            session = AsyncMock(spec=AsyncSession)
+            session.commit = AsyncMock()
+            session.rollback = AsyncMock()
+            session.flush = AsyncMock()
+            yield cast(AsyncSession, session)
 
         return _session()
 
@@ -99,6 +111,16 @@ class AdminRepositoryMock(CJRepositoryProtocol):
         self, session: AsyncSession, assignment_id: str, grade_scale: str | None = None
     ) -> list[Any]:
         raise NotImplementedError("Not needed for admin prompt tests")
+
+    async def get_batch_state(
+        self, session: AsyncSession, cj_batch_id: int, *, for_update: bool = False
+    ) -> CJBatchState | None:
+        return None
+
+    async def get_comparison_pair_by_correlation_id(
+        self, session: AsyncSession, request_correlation_id: UUID
+    ) -> ComparisonPair | None:
+        return None
 
     async def store_grade_projections(self, session: AsyncSession, projections: list[Any]) -> None:
         raise NotImplementedError("Not needed for admin prompt tests")
@@ -169,6 +191,40 @@ class AdminRepositoryMock(CJRepositoryProtocol):
     ) -> int:
         """Stub implementation for test mocks."""
         return 1  # Return a mock anchor ID
+
+    async def get_stuck_batches(
+        self,
+        session: AsyncSession,
+        states: list[CJBatchStateEnum],
+        stuck_threshold: datetime,
+    ) -> list[Any]:
+        """Get batches stuck in specified states beyond threshold."""
+        return []
+
+    async def get_batches_ready_for_completion(
+        self,
+        session: AsyncSession,
+    ) -> list[Any]:
+        """Get batches ready for final completion."""
+        return []
+
+    async def get_batch_state_for_update(
+        self,
+        session: AsyncSession,
+        batch_id: int,
+        for_update: bool = False,
+    ) -> Any | None:
+        """Get batch state with optional row locking."""
+        return None
+
+    async def update_batch_state(
+        self,
+        session: AsyncSession,
+        batch_id: int,
+        state: CJBatchStateEnum,
+    ) -> None:
+        """Update batch state."""
+        pass
 
 
 class ContentClientMock(ContentClientProtocol):
@@ -252,7 +308,11 @@ def admin_app(
 
     class TestProvider(Provider):
         @provide(scope=Scope.REQUEST)
-        def provide_repository(self) -> CJRepositoryProtocol:
+        def provide_session_provider(self) -> SessionProviderProtocol:
+            return admin_repo
+
+        @provide(scope=Scope.REQUEST)
+        def provide_instruction_repository(self) -> AssessmentInstructionRepositoryProtocol:
             return admin_repo
 
         @provide(scope=Scope.REQUEST)

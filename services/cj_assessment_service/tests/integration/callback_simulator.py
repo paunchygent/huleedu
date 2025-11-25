@@ -26,12 +26,17 @@ from services.cj_assessment_service.models_api import ComparisonTask
 from services.cj_assessment_service.models_db import ComparisonPair
 
 if TYPE_CHECKING:
+    from services.cj_assessment_service.cj_core_logic.grade_projector import GradeProjector
     from services.cj_assessment_service.config import Settings
     from services.cj_assessment_service.models_api import ComparisonResult
     from services.cj_assessment_service.protocols import (
+        AssessmentInstructionRepositoryProtocol,
+        CJBatchRepositoryProtocol,
+        CJComparisonRepositoryProtocol,
+        CJEssayRepositoryProtocol,
         CJEventPublisherProtocol,
-        CJRepositoryProtocol,
         ContentClientProtocol,
+        SessionProviderProtocol,
     )
 
 logger = create_service_logger("cj_assessment_service.test.callback_simulator")
@@ -48,11 +53,16 @@ class CallbackSimulator:
     async def simulate_callbacks_from_mock_results(
         self,
         mock_llm_interaction: AsyncMock,
-        database: CJRepositoryProtocol,
         event_publisher: CJEventPublisherProtocol,
         settings: Settings,
         content_client: ContentClientProtocol,
         correlation_id: UUID,
+        session_provider: SessionProviderProtocol,
+        batch_repository: CJBatchRepositoryProtocol,
+        essay_repository: CJEssayRepositoryProtocol,
+        comparison_repository: CJComparisonRepositoryProtocol,
+        instruction_repository: AssessmentInstructionRepositoryProtocol,
+        grade_projector: "GradeProjector",
         cj_batch_id: int | None = None,
     ) -> int:
         """Process mock LLM results as if they were callbacks.
@@ -65,11 +75,15 @@ class CallbackSimulator:
 
         Args:
             mock_llm_interaction: Mock LLM interaction with comparison results
-            database: Database repository for accessing comparison pairs
             event_publisher: Event publisher for completion events
             settings: Application settings
             content_client: Content client for fetching content if needed
             correlation_id: Original request correlation ID
+            session_provider: Session provider for database transactions
+            batch_repository: Repository for batch operations
+            essay_repository: Repository for essay operations
+            comparison_repository: Repository for comparison operations
+            instruction_repository: Repository for instruction metadata
             cj_batch_id: Optional CJ batch ID (will be retrieved if not provided)
 
         Returns:
@@ -140,21 +154,21 @@ class CallbackSimulator:
 
         # Get CJ batch ID if not provided
         if cj_batch_id is None:
-            cj_batch_id = await self._get_batch_id_from_database(database)
+            cj_batch_id = await self._get_batch_id_from_session_provider(session_provider)
             if cj_batch_id is None:
                 logger.error("No CJ batch found in database")
                 return 0
 
         # Create ComparisonPair records (simulating what LLM Provider Service would do)
         await self._create_comparison_pairs_for_tasks(
-            database=database,
+            session_provider=session_provider,
             comparison_tasks=comparison_tasks,
             cj_batch_id=cj_batch_id,
         )
 
         # Find correlation IDs from database for these comparisons
         comparison_to_correlation = await self._map_comparisons_to_correlations(
-            database=database,
+            session_provider=session_provider,
             comparison_results=mock_results,
         )
 
@@ -180,11 +194,16 @@ class CallbackSimulator:
             await continue_cj_assessment_workflow(
                 comparison_result=callback_event,
                 correlation_id=correlation_id,
-                database=database,
+                session_provider=session_provider,
+                batch_repository=batch_repository,
+                essay_repository=essay_repository,
+                comparison_repository=comparison_repository,
                 event_publisher=event_publisher,
                 settings=settings,
                 content_client=content_client,
                 llm_interaction=mock_llm_interaction,
+                instruction_repository=instruction_repository,
+                grade_projector=grade_projector,
                 retry_processor=None,  # Not needed for successful callbacks
             )
 
@@ -206,7 +225,7 @@ class CallbackSimulator:
 
     async def _map_comparisons_to_correlations(
         self,
-        database: CJRepositoryProtocol,
+        session_provider: SessionProviderProtocol,
         comparison_results: list[ComparisonResult],
     ) -> dict[tuple[str, str], UUID]:
         """Map comparison pairs to their correlation IDs from the database.
@@ -215,7 +234,7 @@ class CallbackSimulator:
         simulating what would happen in production when the LLM provider returns request IDs.
 
         Args:
-            database: Database repository
+            session_provider: Session provider for database access
             comparison_results: List of comparison results from mock
 
         Returns:
@@ -223,7 +242,7 @@ class CallbackSimulator:
         """
         mapping = {}
 
-        async with database.session() as session:
+        async with session_provider.session() as session:
             # First, try to get pairs that already have correlation IDs
             stmt = select(ComparisonPair).where(
                 ComparisonPair.winner.is_(None),
@@ -245,8 +264,6 @@ class CallbackSimulator:
                 logger.debug(f"Found {len(pairs)} pending comparison pairs without correlation IDs")
 
                 # Assign correlation IDs to simulate what happens in production
-                from uuid import uuid4
-
                 for pair in pairs:
                     if pair.request_correlation_id is None:
                         pair.request_correlation_id = uuid4()
@@ -272,19 +289,19 @@ class CallbackSimulator:
 
         return mapping
 
-    async def _get_batch_id_from_database(
+    async def _get_batch_id_from_session_provider(
         self,
-        database: CJRepositoryProtocol,
+        session_provider: SessionProviderProtocol,
     ) -> int | None:
-        """Get the most recent CJ batch ID from the database.
+        """Get the most recent CJ batch ID using the session provider.
 
         Args:
-            database: Database repository
+            session_provider: Session provider for database access
 
         Returns:
             CJ batch ID or None if not found
         """
-        async with database.session() as session:
+        async with session_provider.session() as session:
             from sqlalchemy import desc, select
 
             from services.cj_assessment_service.models_db import CJBatchUpload
@@ -300,7 +317,7 @@ class CallbackSimulator:
 
     async def _create_comparison_pairs_for_tasks(
         self,
-        database: CJRepositoryProtocol,
+        session_provider: SessionProviderProtocol,
         comparison_tasks: list[Any],
         cj_batch_id: int,
     ) -> None:
@@ -310,13 +327,13 @@ class CallbackSimulator:
         In production, the LLM Provider Service creates tracking records with correlation IDs.
 
         Args:
-            database: Database repository
+            session_provider: Session provider for database access
             comparison_tasks: List of comparison tasks that were submitted
             cj_batch_id: CJ batch ID
         """
         from datetime import UTC, datetime
 
-        async with database.session() as session:
+        async with session_provider.session() as session:
             for task in comparison_tasks:
                 # Check if pair already exists
                 stmt = select(ComparisonPair).where(

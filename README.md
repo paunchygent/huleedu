@@ -172,7 +172,7 @@ A hybrid service (Kafka consumer + publisher with HTTP API on port 4003) that ag
 
 ### API Gateway Service
 
-A FastAPI-based gateway service (port 4001) that serves as the unified entry point for external clients (e.g., a Svelte frontend or third-party applications).
+A FastAPI-based gateway service (port 4001) that serves as the unified entry point for external clients (e.g., a Vue 3 + Vite frontend or third-party applications).
 
 **Core Responsibilities:**
 

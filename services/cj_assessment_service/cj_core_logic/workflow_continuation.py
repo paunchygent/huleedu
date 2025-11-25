@@ -14,15 +14,19 @@ from huleedu_service_libs.logging_utils import create_service_logger
 from services.cj_assessment_service.cj_core_logic import comparison_processing, scoring_ranking
 from services.cj_assessment_service.cj_core_logic.batch_finalizer import BatchFinalizer
 from services.cj_assessment_service.cj_core_logic.batch_submission import (
-    get_batch_state,
     merge_batch_processing_metadata,
 )
+from services.cj_assessment_service.cj_core_logic.grade_projector import GradeProjector
 from services.cj_assessment_service.models_api import EssayForComparison
 from services.cj_assessment_service.protocols import (
+    AssessmentInstructionRepositoryProtocol,
+    CJBatchRepositoryProtocol,
+    CJComparisonRepositoryProtocol,
+    CJEssayRepositoryProtocol,
     CJEventPublisherProtocol,
-    CJRepositoryProtocol,
     ContentClientProtocol,
     LLMInteractionProtocol,
+    SessionProviderProtocol,
 )
 
 if TYPE_CHECKING:
@@ -36,12 +40,13 @@ logger = create_service_logger("cj_assessment_service.workflow_continuation")
 
 async def check_workflow_continuation(
     batch_id: int,
-    database: CJRepositoryProtocol,
+    session_provider: SessionProviderProtocol,
+    batch_repository: CJBatchRepositoryProtocol,
     correlation_id: UUID,
 ) -> bool:
     """Return True only when all submitted callbacks for the batch have arrived."""
-    async with database.session() as session:
-        batch_state = await get_batch_state(session, batch_id, correlation_id)
+    async with session_provider.session() as session:
+        batch_state = await batch_repository.get_batch_state(session, batch_id)
         if not batch_state:
             logger.warning(
                 "Batch state not found for batch",
@@ -105,25 +110,45 @@ def _extract_previous_scores(metadata: dict[str, Any] | None) -> dict[str, float
 
 async def trigger_existing_workflow_continuation(
     batch_id: int,
-    database: CJRepositoryProtocol,
+    session_provider: SessionProviderProtocol,
+    batch_repository: CJBatchRepositoryProtocol,
+    comparison_repository: CJComparisonRepositoryProtocol,
+    essay_repository: CJEssayRepositoryProtocol,
+    instruction_repository: AssessmentInstructionRepositoryProtocol,
     event_publisher: CJEventPublisherProtocol,
     settings: "Settings",
     content_client: ContentClientProtocol,
     correlation_id: UUID,
     llm_interaction: LLMInteractionProtocol,
     retry_processor: "BatchRetryProcessor | None" = None,
+    grade_projector: GradeProjector | None = None,
 ) -> None:
     """Continue workflow after callback if conditions allow.
 
     - Applies fairness retry if near completion and retry processor provided
     - Checks completion thresholds and triggers finalization via BatchFinalizer
+
+    Args:
+        batch_id: The CJ batch identifier
+        session_provider: Session provider for database transactions
+        batch_repository: Batch repository for batch operations
+        comparison_repository: Comparison repository for comparison operations
+        essay_repository: Essay repository for essay operations
+        instruction_repository: Instruction repository for assessment instructions
+        database: CJ repository protocol (deprecated, kept for compatibility)
+        event_publisher: Event publisher protocol
+        settings: Application settings
+        content_client: Content client protocol
+        correlation_id: Request correlation ID
+        llm_interaction: LLM interaction protocol
+        retry_processor: Optional retry processor for failed comparison handling
     """
     log_extra = {"correlation_id": str(correlation_id), "batch_id": batch_id}
     logger.info("Triggering workflow continuation", extra=log_extra)
     _ = retry_processor  # reserved for future retry-aware continuation paths
 
-    async with database.session() as session:
-        batch_state = await get_batch_state(session, batch_id, correlation_id)
+    async with session_provider.session() as session:
+        batch_state = await batch_repository.get_batch_state(session, batch_id)
         if not batch_state:
             logger.error("Batch state not found", extra=log_extra)
             return
@@ -165,7 +190,9 @@ async def trigger_existing_workflow_continuation(
         denominator = batch_state.completion_denominator()
         callbacks_reached_cap = denominator > 0 and callbacks_received >= denominator
 
-        essays = await database.get_essays_for_cj_batch(session=session, cj_batch_id=batch_id)
+        essays = await essay_repository.get_essays_for_cj_batch(
+            session=session, cj_batch_id=batch_id
+        )
         essays_for_api = [
             EssayForComparison(
                 id=essay.els_essay_id,
@@ -184,7 +211,9 @@ async def trigger_existing_workflow_continuation(
             current_scores = await scoring_ranking.record_comparisons_and_update_scores(
                 all_essays=essays_for_api,
                 comparison_results=[],
-                db_session=session,
+                session_provider=session_provider,
+                comparison_repository=comparison_repository,
+                essay_repository=essay_repository,
                 cj_batch_id=batch_id,
                 correlation_id=correlation_id,
             )
@@ -200,7 +229,7 @@ async def trigger_existing_workflow_continuation(
                 ) and max_score_change <= getattr(settings, "SCORE_STABILITY_THRESHOLD", 0.05)
 
             await merge_batch_processing_metadata(
-                session=session,
+                session_provider=session_provider,
                 cj_batch_id=batch_id,
                 metadata_updates={
                     "bt_scores": current_scores,
@@ -236,16 +265,24 @@ async def trigger_existing_workflow_continuation(
 
         if should_finalize:
             logger.info("Finalizing batch after stability/budget evaluation", extra=log_extra)
+            if grade_projector is None:
+                raise ValueError(
+                    "grade_projector is required for finalization. "
+                    "Please inject a GradeProjector instance via DI."
+                )
             finalizer = BatchFinalizer(
-                database=database,
+                session_provider=session_provider,
+                batch_repository=batch_repository,
+                comparison_repository=comparison_repository,
+                essay_repository=essay_repository,
                 event_publisher=event_publisher,
                 content_client=content_client,
                 settings=settings,
+                grade_projector=grade_projector,
             )
             await finalizer.finalize_scoring(
                 batch_id=batch_id,
                 correlation_id=correlation_id,
-                session=session,
                 log_extra=log_extra,
             )
             return
@@ -253,7 +290,11 @@ async def trigger_existing_workflow_continuation(
         if pairs_remaining > 0:
             submitted = await comparison_processing.request_additional_comparisons_for_batch(
                 cj_batch_id=batch_id,
-                database=database,
+                session_provider=session_provider,
+                batch_repository=batch_repository,
+                essay_repository=essay_repository,
+                comparison_repository=comparison_repository,
+                instruction_repository=instruction_repository,
                 llm_interaction=llm_interaction,
                 settings=settings,
                 correlation_id=correlation_id,

@@ -3,7 +3,8 @@
 Tests cover:
 - OpenAIModelChecker initialization
 - check_latest_models() with mocked AsyncOpenAI client
-- Model filtering logic (GPT-4+, O1+, O3+ included, GPT-3.5 excluded)
+- Model filtering logic (GPT-5, GPT-4.1, GPT-4o families included; GPT-3.5,
+  unsupported GPT-4 variants, and O1/O3 reasoning models excluded)
 - compare_with_manifest() comparison logic
 - Error handling and logging
 """
@@ -112,7 +113,7 @@ class TestCheckLatestModels:
                 owned_by="openai",
             ),
             Model(
-                id="gpt-4-turbo",
+                id="gpt-4o-mini-2025-08-07",
                 object="model",
                 created=1700000001,
                 owned_by="openai",
@@ -130,13 +131,14 @@ class TestCheckLatestModels:
         checker = OpenAIModelChecker(client=mock_client, logger=logger, settings=settings)
         models = await checker.check_latest_models()
 
-        # Should only include GPT-4 model
-        assert len(models) == 1
-        assert models[0].model_id == "gpt-4-turbo"
+        model_ids = {m.model_id for m in models}
+        # GPT-3.5 should be excluded, allowed GPT-4o family model should be included
+        assert "gpt-3.5-turbo" not in model_ids
+        assert "gpt-4o-mini-2025-08-07" in model_ids
 
     @pytest.mark.asyncio
     async def test_includes_gpt_4_models(self, mocker: Mock, settings: Settings) -> None:
-        """Should include all GPT-4 models."""
+        """Should include allowed GPT-4 families (4.1 and 4o) and exclude others."""
         mock_client = Mock()
         mock_models = [
             Model(
@@ -146,9 +148,15 @@ class TestCheckLatestModels:
                 owned_by="openai",
             ),
             Model(
-                id="gpt-4-vision-preview",
+                id="gpt-4o-mini-2025-08-07",
                 object="model",
                 created=1700000001,
+                owned_by="openai",
+            ),
+            Model(
+                id="gpt-4.1-mini-2025-04-14",
+                object="model",
+                created=1700000002,
                 owned_by="openai",
             ),
         ]
@@ -163,11 +171,11 @@ class TestCheckLatestModels:
         checker = OpenAIModelChecker(client=mock_client, logger=logger, settings=settings)
         models = await checker.check_latest_models()
 
-        # Should include both GPT-4 models
-        assert len(models) == 2
         model_ids = {m.model_id for m in models}
-        assert "gpt-4-turbo" in model_ids
-        assert "gpt-4-vision-preview" in model_ids
+        # Only the gpt-4.1 and gpt-4o families should be included
+        assert "gpt-4o-mini-2025-08-07" in model_ids
+        assert "gpt-4.1-mini-2025-04-14" in model_ids
+        assert "gpt-4-turbo" not in model_ids
 
     @pytest.mark.asyncio
     async def test_includes_gpt_5_models(self, mocker: Mock, settings: Settings) -> None:
@@ -194,7 +202,7 @@ class TestCheckLatestModels:
 
     @pytest.mark.asyncio
     async def test_includes_o1_and_o3_models(self, mocker: Mock, settings: Settings) -> None:
-        """Should include O1 and O3 reasoning models."""
+        """Should exclude O1 and O3 reasoning models."""
         mock_client = Mock()
         mock_models = [
             Model(
@@ -221,10 +229,8 @@ class TestCheckLatestModels:
         checker = OpenAIModelChecker(client=mock_client, logger=logger, settings=settings)
         models = await checker.check_latest_models()
 
-        assert len(models) == 2
-        model_ids = {m.model_id for m in models}
-        assert "o1-preview" in model_ids
-        assert "o3-mini" in model_ids
+        # Both O1/O3 models should now be excluded
+        assert models == []
 
     @pytest.mark.asyncio
     async def test_handles_api_error_gracefully(self, mocker: Mock, settings: Settings) -> None:

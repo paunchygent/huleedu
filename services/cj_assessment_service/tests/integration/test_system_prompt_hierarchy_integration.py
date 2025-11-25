@@ -15,6 +15,7 @@ Tests use:
 
 import uuid
 from typing import TYPE_CHECKING, Any
+from unittest.mock import AsyncMock
 
 import pytest
 from aioresponses import aioresponses
@@ -31,10 +32,14 @@ from services.cj_assessment_service.models_api import (
     EssayToProcess,
 )
 from services.cj_assessment_service.protocols import (
+    AssessmentInstructionRepositoryProtocol,
+    CJBatchRepositoryProtocol,
+    CJComparisonRepositoryProtocol,
+    CJEssayRepositoryProtocol,
     CJEventPublisherProtocol,
-    CJRepositoryProtocol,
     ContentClientProtocol,
     LLMInteractionProtocol,
+    SessionProviderProtocol,
 )
 
 pytest_plugins = [
@@ -55,7 +60,9 @@ class TestSystemPromptHierarchyIntegration:
 
     async def test_event_level_override_captured_in_http_request(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_session_provider: SessionProviderProtocol,
+        postgres_batch_repository: CJBatchRepositoryProtocol,
+        postgres_essay_repository: CJEssayRepositoryProtocol,
         real_llm_interaction: tuple[LLMInteractionProtocol, aioresponses],
         mock_content_client: ContentClientProtocol,
         mock_event_publisher: CJEventPublisherProtocol,
@@ -78,9 +85,9 @@ class TestSystemPromptHierarchyIntegration:
         # Arrange: Create batch with custom system prompt override
         custom_prompt = "CUSTOM EVENT-LEVEL SYSTEM PROMPT - HIGHEST PRIORITY TEST"
 
-        async with postgres_repository.session() as session:
+        async with postgres_session_provider.session() as session:
             # Create real batch in database
-            batch = await postgres_repository.create_new_cj_batch(
+            batch = await postgres_batch_repository.create_new_cj_batch(
                 session=session,
                 bos_batch_id=str(uuid.uuid4()),
                 event_correlation_id=str(uuid.uuid4()),
@@ -107,9 +114,9 @@ class TestSystemPromptHierarchyIntegration:
         ]
 
         # Persist essays to database (required before creating comparison pairs)
-        async with postgres_repository.session() as session:
+        async with postgres_session_provider.session() as session:
             for essay in essays:
-                await postgres_repository.create_or_update_cj_processed_essay(
+                await postgres_essay_repository.create_or_update_cj_processed_essay(
                     session=session,
                     cj_batch_id=cj_batch_id,
                     els_essay_id=essay.id,
@@ -137,8 +144,11 @@ class TestSystemPromptHierarchyIntegration:
         await submit_comparisons_for_async_processing(
             essays_for_api_model=essays,
             cj_batch_id=cj_batch_id,
+            session_provider=postgres_session_provider,
+            batch_repository=postgres_batch_repository,
+            comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
+            instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
             request_data=request_data,
-            database=postgres_repository,
             llm_interaction=llm_interaction,
             settings=test_settings,
             correlation_id=uuid.uuid4(),
@@ -161,7 +171,9 @@ class TestSystemPromptHierarchyIntegration:
 
     async def test_cj_default_system_prompt_when_no_override(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_session_provider: SessionProviderProtocol,
+        postgres_batch_repository: CJBatchRepositoryProtocol,
+        postgres_essay_repository: CJEssayRepositoryProtocol,
         real_llm_interaction: tuple[LLMInteractionProtocol, aioresponses],
         mock_content_client: ContentClientProtocol,
         mock_event_publisher: CJEventPublisherProtocol,
@@ -182,8 +194,8 @@ class TestSystemPromptHierarchyIntegration:
         llm_interaction, http_mocker = real_llm_interaction
 
         # Arrange: Create batch without override
-        async with postgres_repository.session() as session:
-            batch = await postgres_repository.create_new_cj_batch(
+        async with postgres_session_provider.session() as session:
+            batch = await postgres_batch_repository.create_new_cj_batch(
                 session=session,
                 bos_batch_id=str(uuid.uuid4()),
                 event_correlation_id=str(uuid.uuid4()),
@@ -209,9 +221,9 @@ class TestSystemPromptHierarchyIntegration:
         ]
 
         # Persist essays to database (required before creating comparison pairs)
-        async with postgres_repository.session() as session:
+        async with postgres_session_provider.session() as session:
             for essay in essays:
-                await postgres_repository.create_or_update_cj_processed_essay(
+                await postgres_essay_repository.create_or_update_cj_processed_essay(
                     session=session,
                     cj_batch_id=cj_batch_id,
                     els_essay_id=essay.id,
@@ -237,8 +249,11 @@ class TestSystemPromptHierarchyIntegration:
         await submit_comparisons_for_async_processing(
             essays_for_api_model=essays,
             cj_batch_id=cj_batch_id,
+            session_provider=postgres_session_provider,
+            batch_repository=postgres_batch_repository,
+            comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
+            instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
             request_data=request_data,
-            database=postgres_repository,
             llm_interaction=llm_interaction,
             settings=test_settings,
             correlation_id=uuid.uuid4(),
@@ -261,7 +276,9 @@ class TestSystemPromptHierarchyIntegration:
 
     async def test_none_override_falls_back_to_cj_default(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_session_provider: SessionProviderProtocol,
+        postgres_batch_repository: CJBatchRepositoryProtocol,
+        postgres_essay_repository: CJEssayRepositoryProtocol,
         real_llm_interaction: tuple[LLMInteractionProtocol, aioresponses],
         mock_content_client: ContentClientProtocol,
         mock_event_publisher: CJEventPublisherProtocol,
@@ -281,8 +298,8 @@ class TestSystemPromptHierarchyIntegration:
         llm_interaction, http_mocker = real_llm_interaction
 
         # Arrange
-        async with postgres_repository.session() as session:
-            batch = await postgres_repository.create_new_cj_batch(
+        async with postgres_session_provider.session() as session:
+            batch = await postgres_batch_repository.create_new_cj_batch(
                 session=session,
                 bos_batch_id=str(uuid.uuid4()),
                 event_correlation_id=str(uuid.uuid4()),
@@ -308,9 +325,9 @@ class TestSystemPromptHierarchyIntegration:
         ]
 
         # Persist essays to database (required before creating comparison pairs)
-        async with postgres_repository.session() as session:
+        async with postgres_session_provider.session() as session:
             for essay in essays:
-                await postgres_repository.create_or_update_cj_processed_essay(
+                await postgres_essay_repository.create_or_update_cj_processed_essay(
                     session=session,
                     cj_batch_id=cj_batch_id,
                     els_essay_id=essay.id,
@@ -340,8 +357,11 @@ class TestSystemPromptHierarchyIntegration:
         await submit_comparisons_for_async_processing(
             essays_for_api_model=essays,
             cj_batch_id=cj_batch_id,
+            session_provider=postgres_session_provider,
+            batch_repository=postgres_batch_repository,
+            comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
+            instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
             request_data=request_data,
-            database=postgres_repository,
             llm_interaction=llm_interaction,
             settings=test_settings,
             correlation_id=uuid.uuid4(),
@@ -362,7 +382,9 @@ class TestSystemPromptHierarchyIntegration:
 
     async def test_system_prompt_header_structure_coherence(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_session_provider: SessionProviderProtocol,
+        postgres_batch_repository: CJBatchRepositoryProtocol,
+        postgres_essay_repository: CJEssayRepositoryProtocol,
         real_llm_interaction: tuple[LLMInteractionProtocol, aioresponses],
         mock_content_client: ContentClientProtocol,
         mock_event_publisher: CJEventPublisherProtocol,
@@ -382,8 +404,8 @@ class TestSystemPromptHierarchyIntegration:
         llm_interaction, http_mocker = real_llm_interaction
 
         # Arrange
-        async with postgres_repository.session() as session:
-            batch = await postgres_repository.create_new_cj_batch(
+        async with postgres_session_provider.session() as session:
+            batch = await postgres_batch_repository.create_new_cj_batch(
                 session=session,
                 bos_batch_id=str(uuid.uuid4()),
                 event_correlation_id=str(uuid.uuid4()),
@@ -409,9 +431,9 @@ class TestSystemPromptHierarchyIntegration:
         ]
 
         # Persist essays to database (required before creating comparison pairs)
-        async with postgres_repository.session() as session:
+        async with postgres_session_provider.session() as session:
             for essay in essays:
-                await postgres_repository.create_or_update_cj_processed_essay(
+                await postgres_essay_repository.create_or_update_cj_processed_essay(
                     session=session,
                     cj_batch_id=cj_batch_id,
                     els_essay_id=essay.id,
@@ -436,8 +458,11 @@ class TestSystemPromptHierarchyIntegration:
         await submit_comparisons_for_async_processing(
             essays_for_api_model=essays,
             cj_batch_id=cj_batch_id,
+            session_provider=postgres_session_provider,
+            batch_repository=postgres_batch_repository,
+            comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
+            instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
             request_data=request_data,
-            database=postgres_repository,
             llm_interaction=llm_interaction,
             settings=test_settings,
             correlation_id=uuid.uuid4(),

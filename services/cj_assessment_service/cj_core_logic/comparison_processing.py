@@ -9,11 +9,9 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from common_core.config_enums import LLMBatchingMode
 from common_core.events.cj_assessment_events import LLMConfigOverrides
 from huleedu_service_libs.logging_utils import create_service_logger
 from pydantic import BaseModel, Field
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.cj_assessment_service.cj_core_logic import pair_generation, scoring_ranking
 from services.cj_assessment_service.cj_core_logic.batch_config import BatchConfigOverrides
@@ -21,13 +19,16 @@ from services.cj_assessment_service.cj_core_logic.batch_processor import BatchPr
 from services.cj_assessment_service.cj_core_logic.batch_submission import (
     merge_batch_processing_metadata,
 )
-from services.cj_assessment_service.cj_core_logic.llm_batching import (
-    build_llm_metadata_context,
-    resolve_effective_llm_batching_mode,
+from services.cj_assessment_service.cj_core_logic.comparison_batch_orchestrator import (
+    ComparisonBatchOrchestrator,
+)
+from services.cj_assessment_service.cj_core_logic.comparison_request_normalizer import (
+    ComparisonRequestNormalizer,
+)
+from services.cj_assessment_service.cj_core_logic.llm_batching_service import (
+    BatchingModeService,
 )
 from services.cj_assessment_service.config import Settings
-from services.cj_assessment_service.enums_db import CJBatchStatusEnum
-from services.cj_assessment_service.metrics import get_business_metrics
 from services.cj_assessment_service.models_api import (
     CJAssessmentRequestData,
     ComparisonTask,
@@ -35,8 +36,12 @@ from services.cj_assessment_service.models_api import (
     OriginalCJRequestMetadata,
 )
 from services.cj_assessment_service.protocols import (
-    CJRepositoryProtocol,
+    AssessmentInstructionRepositoryProtocol,
+    CJBatchRepositoryProtocol,
+    CJComparisonRepositoryProtocol,
+    CJEssayRepositoryProtocol,
     LLMInteractionProtocol,
+    SessionProviderProtocol,
 )
 
 logger = create_service_logger("cj_assessment_service.comparison_processing")
@@ -57,319 +62,75 @@ class ComparisonIterationResult(BaseModel):
     )
 
 
-def is_iterative_batching_online(settings: Settings) -> bool:
-    """Determine if the stability-driven batching loop is active for this environment."""
-
-    return (
-        getattr(settings, "ENABLE_ITERATIVE_BATCHING_LOOP", False)
-        and getattr(settings, "MAX_ITERATIONS", 1) > 1
-        and getattr(settings, "MIN_COMPARISONS_FOR_STABILITY_CHECK", 0) > 0
-        and getattr(settings, "COMPARISONS_PER_STABILITY_CHECK_ITERATION", 0) > 1
-        and settings.LLM_BATCHING_MODE is not LLMBatchingMode.PER_REQUEST
-    )
-
-
-async def _get_current_iteration(session: AsyncSession, cj_batch_id: int) -> int | None:
-    """Fetch the current iteration counter for a CJ batch."""
-
-    from services.cj_assessment_service.models_db import CJBatchState
-
-    batch_state = await session.get(CJBatchState, cj_batch_id)
-    return batch_state.current_iteration if batch_state else None
-
-
-def _build_iteration_metadata_context(
-    settings: Settings,
-    *,
-    current_iteration: int | None,
-) -> dict[str, Any] | None:
-    """Return additive metadata for downstream LLM requests when iteration loop is online."""
-
-    if not (settings.ENABLE_LLM_BATCHING_METADATA_HINTS and is_iterative_batching_online(settings)):
-        return None
-
-    iteration_value = current_iteration if current_iteration is not None else 0
-    return {"comparison_iteration": iteration_value}
-
-
-async def _persist_llm_overrides_if_present(
-    session: AsyncSession,
-    cj_batch_id: int,
-    llm_config_overrides: Any | None,
-    correlation_id: UUID,
-) -> None:
-    """Store caller-supplied LLM overrides in the batch metadata."""
-
-    if not llm_config_overrides:
-        return
-
-    overrides_payload = llm_config_overrides.model_dump(exclude_none=True)
-    if not overrides_payload:
-        return
-
-    await merge_batch_processing_metadata(
-        session=session,
-        cj_batch_id=cj_batch_id,
-        metadata_updates={"llm_overrides": overrides_payload},
-        correlation_id=correlation_id,
-    )
-
-
-def _resolve_requested_max_pairs(settings: Settings, request_data: CJAssessmentRequestData) -> int:
-    """Determine the effective comparison budget for this batch."""
-
-    configured_cap = settings.MAX_PAIRWISE_COMPARISONS
-    override_value = request_data.max_comparisons_override
-
-    try:
-        override_int = int(override_value) if override_value is not None else None
-    except (TypeError, ValueError):
-        override_int = None
-
-    if override_int and override_int > 0:
-        return min(configured_cap, override_int) if configured_cap else override_int
-
-    return configured_cap
-
-
-def _build_budget_metadata(
-    *,
-    max_pairs_cap: int,
-    source: str,
-    batch_config_overrides: BatchConfigOverrides | None,
-) -> dict[str, Any]:
-    metadata: dict[str, Any] = {
-        "comparison_budget": {
-            "max_pairs_requested": max_pairs_cap,
-            "source": source,
-        }
-    }
-    if batch_config_overrides:
-        metadata["config_overrides"] = batch_config_overrides.model_dump(exclude_none=True)
-    return metadata
-
-
-def _record_llm_batching_metrics(
-    effective_mode: LLMBatchingMode,
-    request_count: int,
-    *,
-    request_type: str | None,
-) -> None:
-    try:
-        business_metrics = get_business_metrics()
-    except Exception:  # pragma: no cover - defensive
-        logger.debug("Unable to retrieve business metrics for batching counters", exc_info=True)
-        return
-
-    requests_metric = business_metrics.get("cj_llm_requests_total")
-    batches_metric = business_metrics.get("cj_llm_batches_started_total")
-
-    if requests_metric and request_count > 0:
-        try:
-            requests_metric.labels(batching_mode=effective_mode.value).inc(request_count)
-        except Exception:  # pragma: no cover - defensive
-            logger.debug("Unable to increment cj_llm_requests_total metric", exc_info=True)
-
-    if request_type == "cj_comparison" and batches_metric:
-        try:
-            batches_metric.labels(batching_mode=effective_mode.value).inc()
-        except Exception:  # pragma: no cover - defensive
-            logger.debug("Unable to increment cj_llm_batches_started_total metric", exc_info=True)
-
-
 async def submit_comparisons_for_async_processing(
     essays_for_api_model: list[EssayForComparison],
     cj_batch_id: int,
-    database: CJRepositoryProtocol,
+    session_provider: SessionProviderProtocol,
+    batch_repository: CJBatchRepositoryProtocol,
+    comparison_repository: CJComparisonRepositoryProtocol,
+    instruction_repository: AssessmentInstructionRepositoryProtocol,
     llm_interaction: LLMInteractionProtocol,
     request_data: CJAssessmentRequestData,
     settings: Settings,
     correlation_id: UUID,
     log_extra: dict[str, Any],
 ) -> bool:
-    """Submit essay comparisons for async LLM processing.
-
-    This function submits all comparison tasks and transitions the batch to
-    WAITING_CALLBACKS state. ALL LLM processing is async - results arrive via
-    Kafka callbacks which trigger scoring and completion.
+    """Submit initial comparison batch for async LLM processing.
 
     Args:
-        essays_for_api_model: List of essays prepared for comparison
-        cj_batch_id: The CJ batch ID
-        database: Database access protocol implementation
-        llm_interaction: LLM interaction protocol implementation
-        request_data: Original request data containing LLM config overrides
+        essays_for_api_model: Essays prepared for comparison
+        cj_batch_id: The CJ batch identifier
+        session_provider: Session provider for database transactions
+        batch_repository: Repository for batch operations
+        comparison_repository: Repository for comparison pair operations
+        instruction_repository: Repository for assessment instruction operations
+        llm_interaction: LLM interaction protocol
+        request_data: CJ assessment request data
         settings: Application settings
         correlation_id: Request correlation ID
-        log_extra: Logging context data
+        log_extra: Logging context
+
+    Returns:
+        True if submission successful, False otherwise
     """
-    # Extract LLM config overrides from request data
-    llm_config_overrides = request_data.llm_config_overrides
-    model_override = None
-    temperature_override = None
-    max_tokens_override = None
-    provider_override = None
-    # Use CJ's canonical system prompt as default (can be overridden by event)
-    system_prompt_override = settings.SYSTEM_PROMPT
-
-    if llm_config_overrides:
-        model_override = llm_config_overrides.model_override
-        temperature_override = llm_config_overrides.temperature_override
-        max_tokens_override = llm_config_overrides.max_tokens_override
-        provider_override = llm_config_overrides.provider_override
-        # Only override system prompt if explicitly provided (not None)
-        if llm_config_overrides.system_prompt_override is not None:
-            system_prompt_override = llm_config_overrides.system_prompt_override
-
-        logger.info(
-            f"Using LLM overrides - model: {model_override}, "
-            f"temperature: {temperature_override}, max_tokens: {max_tokens_override}",
-            extra=log_extra,
-        )
-
-    batch_config_overrides = None
-    if request_data.batch_config_overrides is not None:
-        batch_config_overrides = BatchConfigOverrides(**request_data.batch_config_overrides)
-
-    effective_batching_mode = resolve_effective_llm_batching_mode(
+    batching_service = BatchingModeService(settings)
+    orchestrator = ComparisonBatchOrchestrator(
+        batch_repository=batch_repository,
+        session_provider=session_provider,
+        comparison_repository=comparison_repository,
+        instruction_repository=instruction_repository,
+        llm_interaction=llm_interaction,
         settings=settings,
-        batch_config_overrides=batch_config_overrides,
-        provider_override=provider_override,
+        batching_service=batching_service,
+        request_normalizer=ComparisonRequestNormalizer(settings),
     )
 
-    max_pairs_cap = _resolve_requested_max_pairs(settings, request_data)
-    budget_source = (
-        "runner_override" if request_data.max_comparisons_override else "service_default"
+    return await orchestrator.submit_initial_batch(
+        essays_for_api_model=essays_for_api_model,
+        cj_batch_id=cj_batch_id,
+        request_data=request_data,
+        correlation_id=correlation_id,
+        log_extra=log_extra,
     )
-
-    log_extra_with_mode = {
-        **log_extra,
-        "effective_llm_batching_mode": effective_batching_mode.value,
-    }
-
-    logger.info(
-        "Resolved comparison budget",
-        extra={
-            **log_extra_with_mode,
-            "comparison_budget": max_pairs_cap,
-            "comparison_budget_source": budget_source,
-        },
-    )
-
-    # Generate initial comparison tasks
-    async with database.session() as session:
-        # Update batch status to indicate comparison processing has started
-        await database.update_cj_batch_status(
-            session=session,
-            cj_batch_id=cj_batch_id,
-            status=CJBatchStatusEnum.PERFORMING_COMPARISONS,
-        )
-
-        metadata_updates = _build_budget_metadata(
-            max_pairs_cap=max_pairs_cap,
-            source=budget_source,
-            batch_config_overrides=batch_config_overrides,
-        )
-        await merge_batch_processing_metadata(
-            session=session,
-            cj_batch_id=cj_batch_id,
-            metadata_updates=metadata_updates,
-            correlation_id=correlation_id,
-        )
-
-        # Generate comparison tasks for the batch
-        comparison_tasks = await pair_generation.generate_comparison_tasks(
-            essays_for_comparison=essays_for_api_model,
-            db_session=session,
-            cj_batch_id=cj_batch_id,
-            existing_pairs_threshold=settings.COMPARISONS_PER_STABILITY_CHECK_ITERATION,
-            max_pairwise_comparisons=max_pairs_cap,
-            correlation_id=correlation_id,
-            randomization_seed=settings.PAIR_GENERATION_SEED,
-        )
-
-        if not comparison_tasks:
-            logger.warning(
-                f"No comparison tasks generated for batch {cj_batch_id}",
-                extra=log_extra_with_mode,
-            )
-            return False
-
-        _record_llm_batching_metrics(
-            effective_mode=effective_batching_mode,
-            request_count=len(comparison_tasks),
-            request_type=request_data.cj_request_type,
-        )
-
-        # Create batch processor and submit all comparisons
-        batch_processor = BatchProcessor(
-            database=database,
-            llm_interaction=llm_interaction,
-            settings=settings,
-        )
-
-        current_iteration = await _get_current_iteration(session, cj_batch_id)
-        iteration_metadata_context = _build_iteration_metadata_context(
-            settings, current_iteration=current_iteration
-        )
-
-        metadata_context = build_llm_metadata_context(
-            cj_batch_id=cj_batch_id,
-            cj_source=request_data.cj_source,
-            cj_request_type=request_data.cj_request_type,
-            settings=settings,
-            effective_mode=effective_batching_mode,
-            iteration_metadata_context=iteration_metadata_context,
-        )
-
-        await _persist_llm_overrides_if_present(
-            session=session,
-            cj_batch_id=cj_batch_id,
-            llm_config_overrides=llm_config_overrides,
-            correlation_id=correlation_id,
-        )
-
-        # Submit batch for async processing - this will set state to WAITING_CALLBACKS
-        submission_result = await batch_processor.submit_comparison_batch(
-            cj_batch_id=cj_batch_id,
-            comparison_tasks=comparison_tasks,
-            correlation_id=correlation_id,
-            config_overrides=batch_config_overrides,
-            model_override=model_override,
-            temperature_override=temperature_override,
-            max_tokens_override=max_tokens_override,
-            system_prompt_override=system_prompt_override,
-            provider_override=provider_override,
-            metadata_context=metadata_context,
-        )
-
-        logger.info(
-            f"Submitted {submission_result.total_submitted} comparisons for async processing",
-            extra={
-                **(
-                    {**log_extra_with_mode, "current_iteration": current_iteration}
-                    if current_iteration is not None
-                    else log_extra_with_mode
-                ),
-                "cj_batch_id": cj_batch_id,
-                "total_submitted": submission_result.total_submitted,
-                "all_submitted": submission_result.all_submitted,
-            },
-        )
-
-        # Workflow pauses here - batch is now in WAITING_CALLBACKS state
-        # Callbacks will handle scoring and additional iterations if needed
-        return True
 
 
 async def _load_essays_for_batch(
-    database: CJRepositoryProtocol,
+    session_provider: SessionProviderProtocol,
+    essay_repository: CJEssayRepositoryProtocol,
     cj_batch_id: int,
 ) -> list[EssayForComparison]:
-    """Load prepared essays (students + anchors) from the database."""
+    """Load prepared essays (students + anchors) from the database.
 
-    async with database.session() as session:
-        processed_essays = await database.get_essays_for_cj_batch(
+    Args:
+        session_provider: Session provider for database transactions
+        essay_repository: Essay repository for essay operations
+        cj_batch_id: The CJ batch identifier
+
+    Returns:
+        List of essays prepared for comparison with current BT scores
+    """
+    async with session_provider.session() as session:
+        processed_essays = await essay_repository.get_essays_for_cj_batch(
             session=session, cj_batch_id=cj_batch_id
         )
 
@@ -389,7 +150,11 @@ async def _load_essays_for_batch(
 async def request_additional_comparisons_for_batch(
     *,
     cj_batch_id: int,
-    database: CJRepositoryProtocol,
+    session_provider: SessionProviderProtocol,
+    batch_repository: CJBatchRepositoryProtocol,
+    essay_repository: CJEssayRepositoryProtocol,
+    comparison_repository: CJComparisonRepositoryProtocol,
+    instruction_repository: AssessmentInstructionRepositoryProtocol,
     llm_interaction: LLMInteractionProtocol,
     settings: Settings,
     correlation_id: UUID,
@@ -398,9 +163,31 @@ async def request_additional_comparisons_for_batch(
     config_overrides_payload: dict[str, Any] | None,
     original_request_payload: dict[str, Any] | None,
 ) -> bool:
-    """Enqueue another comparison iteration using stored essays."""
+    """Enqueue another comparison iteration using stored essays.
 
-    essays_for_api_model = await _load_essays_for_batch(database=database, cj_batch_id=cj_batch_id)
+    Args:
+        cj_batch_id: The CJ batch identifier
+        session_provider: Session provider for database transactions
+        batch_repository: Batch repository for batch operations
+        essay_repository: Essay repository for essay operations
+        comparison_repository: Repository for comparison pair operations
+        instruction_repository: Repository for assessment instruction operations
+        llm_interaction: LLM interaction protocol
+        settings: Application settings
+        correlation_id: Request correlation ID
+        log_extra: Logging context
+        llm_overrides_payload: LLM config overrides payload
+        config_overrides_payload: Batch config overrides payload
+        original_request_payload: Original request metadata payload
+
+    Returns:
+        True if submission successful, False otherwise
+    """
+    essays_for_api_model = await _load_essays_for_batch(
+        session_provider=session_provider,
+        essay_repository=essay_repository,
+        cj_batch_id=cj_batch_id,
+    )
 
     if not essays_for_api_model:
         logger.warning(
@@ -410,8 +197,8 @@ async def request_additional_comparisons_for_batch(
         return False
 
     # Fetch batch metadata to build request_data
-    async with database.session() as session:
-        batch = await database.get_cj_batch_upload(session, cj_batch_id)
+    async with session_provider.session() as session:
+        batch = await batch_repository.get_cj_batch_upload(session, cj_batch_id)
         if not batch:
             logger.error(
                 "CJ batch not found for continuation",
@@ -509,7 +296,10 @@ async def request_additional_comparisons_for_batch(
     return await submit_comparisons_for_async_processing(
         essays_for_api_model=essays_for_api_model,
         cj_batch_id=cj_batch_id,
-        database=database,
+        session_provider=session_provider,
+        batch_repository=batch_repository,
+        comparison_repository=comparison_repository,
+        instruction_repository=instruction_repository,
         llm_interaction=llm_interaction,
         request_data=request_data,
         settings=settings,
@@ -521,9 +311,11 @@ async def request_additional_comparisons_for_batch(
 async def _process_comparison_iteration(
     essays_for_api_model: list[EssayForComparison],
     cj_batch_id: int,
-    session: AsyncSession,
+    session_provider: SessionProviderProtocol,
+    batch_repository: CJBatchRepositoryProtocol,
+    comparison_repository: CJComparisonRepositoryProtocol,
+    instruction_repository: AssessmentInstructionRepositoryProtocol,
     llm_interaction: LLMInteractionProtocol,
-    database: CJRepositoryProtocol,
     request_data: CJAssessmentRequestData,
     settings: Settings,
     model_override: str | None,
@@ -556,7 +348,9 @@ async def _process_comparison_iteration(
     generate_comparison_tasks_coro = pair_generation.generate_comparison_tasks
     comparison_tasks_for_llm: list[ComparisonTask] = await generate_comparison_tasks_coro(
         essays_for_comparison=essays_for_api_model,
-        db_session=session,
+        session_provider=session_provider,
+        comparison_repository=comparison_repository,
+        instruction_repository=instruction_repository,
         cj_batch_id=cj_batch_id,
         existing_pairs_threshold=settings.COMPARISONS_PER_STABILITY_CHECK_ITERATION,
         max_pairwise_comparisons=settings.MAX_PAIRWISE_COMPARISONS,
@@ -567,28 +361,16 @@ async def _process_comparison_iteration(
     if not comparison_tasks_for_llm:
         return None
 
-    # Extract batch config overrides and LLM overrides to determine effective batching mode
-    batch_config_overrides = None
-    if request_data.batch_config_overrides is not None:
-        batch_config_overrides = BatchConfigOverrides(**request_data.batch_config_overrides)
+    batching_service = BatchingModeService(settings)
+    request_normalizer = ComparisonRequestNormalizer(settings)
+    normalized = request_normalizer.normalize(request_data)
 
-    llm_config_overrides = request_data.llm_config_overrides
-    # Use CJ's canonical system prompt as default (can be overridden by event)
-    system_prompt_override = settings.SYSTEM_PROMPT
-    provider_override = None
-    if llm_config_overrides:
-        # Only override system prompt if explicitly provided (not None)
-        if llm_config_overrides.system_prompt_override is not None:
-            system_prompt_override = llm_config_overrides.system_prompt_override
-        provider_override = llm_config_overrides.provider_override
-
-    effective_batching_mode = resolve_effective_llm_batching_mode(
-        settings=settings,
-        batch_config_overrides=batch_config_overrides,
-        provider_override=provider_override,
+    effective_batching_mode = batching_service.resolve_effective_mode(
+        batch_config_overrides=normalized.batch_config_overrides,
+        provider_override=normalized.provider_override,
     )
 
-    _record_llm_batching_metrics(
+    batching_service.record_metrics(
         effective_mode=effective_batching_mode,
         request_count=len(comparison_tasks_for_llm),
         request_type=request_data.cj_request_type,
@@ -596,28 +378,32 @@ async def _process_comparison_iteration(
 
     # Create batch processor and submit batch for async processing
     batch_processor = BatchProcessor(
-        database=database,
+        session_provider=session_provider,
         llm_interaction=llm_interaction,
         settings=settings,
+        batch_repository=batch_repository,
     )
 
-    iteration_metadata_context = _build_iteration_metadata_context(
-        settings, current_iteration=current_iteration
+    iteration_metadata_context = batching_service.build_iteration_metadata_context(
+        current_iteration=current_iteration
     )
 
-    metadata_context = build_llm_metadata_context(
+    metadata_context = batching_service.build_metadata_context(
         cj_batch_id=cj_batch_id,
-        cj_source=request_data.cj_source,
-        cj_request_type=request_data.cj_request_type,
-        settings=settings,
+        cj_source=request_data.cj_source or "",
+        cj_request_type=request_data.cj_request_type or "",
         effective_mode=effective_batching_mode,
         iteration_metadata_context=iteration_metadata_context,
     )
 
-    await _persist_llm_overrides_if_present(
-        session=session,
+    await merge_batch_processing_metadata(
+        session_provider=session_provider,
         cj_batch_id=cj_batch_id,
-        llm_config_overrides=llm_config_overrides,
+        metadata_updates={
+            "llm_overrides": normalized.llm_config_overrides.model_dump(exclude_none=True)
+        }
+        if normalized.llm_config_overrides
+        else {},
         correlation_id=correlation_id,
     )
 
@@ -626,12 +412,12 @@ async def _process_comparison_iteration(
         cj_batch_id=cj_batch_id,
         comparison_tasks=comparison_tasks_for_llm,
         correlation_id=correlation_id,
-        config_overrides=batch_config_overrides,
+        config_overrides=normalized.batch_config_overrides,
         model_override=model_override,
         temperature_override=temperature_override,
         max_tokens_override=max_tokens_override,
-        system_prompt_override=system_prompt_override,
-        provider_override=provider_override,
+        system_prompt_override=normalized.system_prompt_override,
+        provider_override=normalized.provider_override,
         metadata_context=metadata_context,
     )
 
@@ -693,3 +479,26 @@ def _check_iteration_stability(
             return True
 
     return False
+
+
+def _resolve_requested_max_pairs(settings: Settings, request_data: CJAssessmentRequestData) -> int:
+    """Compatibility wrapper delegating to the comparison request normalizer."""
+
+    return ComparisonRequestNormalizer(settings).normalize(request_data).max_pairs_cap
+
+
+def _build_budget_metadata(
+    *,
+    max_pairs_cap: int,
+    source: str,
+    batch_config_overrides: BatchConfigOverrides | None,
+) -> dict[str, Any]:
+    metadata: dict[str, Any] = {
+        "comparison_budget": {
+            "max_pairs_requested": max_pairs_cap,
+            "source": source,
+        }
+    }
+    if batch_config_overrides:
+        metadata["config_overrides"] = batch_config_overrides.model_dump(exclude_none=True)
+    return metadata

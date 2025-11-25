@@ -6,15 +6,34 @@ enabling clean architecture and testability.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, AsyncContextManager, Awaitable, Callable, Protocol, TypeVar
+from datetime import datetime
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    AsyncContextManager,
+    Awaitable,
+    Callable,
+    Protocol,
+    TypeVar,
+)
 from uuid import UUID
 
 from common_core import LLMProviderType
+from common_core.status_enums import CJBatchStateEnum
 from sqlalchemy.ext.asyncio import AsyncSession
 
 if TYPE_CHECKING:
     from services.cj_assessment_service.cj_core_logic.batch_submission import BatchSubmissionResult
-    from services.cj_assessment_service.models_api import CJAssessmentRequestData
+    from services.cj_assessment_service.models_api import CJAssessmentRequestData, ComparisonResult
+    from services.cj_assessment_service.models_db import (
+        AnchorEssayReference,
+        AssessmentInstruction,
+        CJBatchState,
+        CJBatchUpload,
+        ComparisonPair,
+        GradeProjection,
+        ProcessedEssay,
+    )
 
 T = TypeVar("T")
 
@@ -111,115 +130,16 @@ class LLMProviderProtocol(Protocol):
         ...
 
 
-class CJRepositoryProtocol(Protocol):
-    """Protocol for all database interactions specific to CJ assessment."""
+class SessionProviderProtocol(Protocol):
+    """Protocol for providing AsyncSession contexts for CJ database access."""
 
     def session(self) -> AsyncContextManager[AsyncSession]:
         """Provide async database session context manager."""
         ...  # pragma: no cover
 
-    async def get_assessment_instruction(
-        self,
-        session: AsyncSession,
-        assignment_id: str | None,
-        course_id: str | None,
-    ) -> Any | None:  # AssessmentInstruction | None
-        """Get assessment instruction by assignment or course ID."""
-        ...
 
-    async def get_assignment_context(
-        self,
-        session: AsyncSession,
-        assignment_id: str,
-    ) -> dict[str, Any] | None:
-        """Fetch assignment-level metadata including instructions and grade scale."""
-        ...
-
-    async def upsert_assessment_instruction(
-        self,
-        session: AsyncSession,
-        *,
-        assignment_id: str | None,
-        course_id: str | None,
-        instructions_text: str,
-        grade_scale: str,
-        student_prompt_storage_id: str | None = None,
-        judge_rubric_storage_id: str | None = None,
-    ) -> Any:  # AssessmentInstruction
-        """Create or update assignment-scoped assessment configuration.
-
-        `student_prompt_storage_id` and `judge_rubric_storage_id` enable admin prompt
-        management (Content Service references, not prompt text). None on update
-        preserves existing reference.
-
-        Raises ValueError if scope invalid (both/neither assignment_id/course_id).
-        """
-        ...
-
-    async def list_assessment_instructions(
-        self,
-        session: AsyncSession,
-        *,
-        limit: int,
-        offset: int,
-        grade_scale: str | None = None,
-    ) -> tuple[list[Any], int]:  # list[AssessmentInstruction], total_count
-        """List assessment instructions with pagination support."""
-        ...
-
-    async def delete_assessment_instruction(
-        self,
-        session: AsyncSession,
-        *,
-        assignment_id: str | None,
-        course_id: str | None,
-    ) -> bool:
-        """Delete assessment instructions scoped to assignment or course."""
-        ...
-
-    async def get_cj_batch_upload(
-        self,
-        session: AsyncSession,
-        cj_batch_id: int,
-    ) -> Any | None:  # CJBatchUpload | None
-        """Get CJ batch upload by ID."""
-        ...
-
-    async def upsert_anchor_reference(
-        self,
-        session: AsyncSession,
-        *,
-        assignment_id: str,
-        anchor_label: str,
-        grade: str,
-        grade_scale: str,
-        text_storage_id: str,
-    ) -> int:
-        """Create or update anchor for (assignment_id, anchor_label, grade_scale).
-
-        Implementations MUST rely on the database-level uniqueness guarantee on
-        ``(assignment_id, anchor_label, grade_scale)`` so that repeated registrations
-        for the same triple are idempotent and always return the same anchor ID
-        while updating ``text_storage_id`` (and grade) to the latest values.
-        """
-        ...
-
-    async def get_anchor_essay_references(
-        self,
-        session: AsyncSession,
-        assignment_id: str,
-        grade_scale: str | None = None,
-    ) -> list[Any]:  # list[AnchorEssayReference]
-        """Get anchor essay references for an assignment and optional grade scale."""
-        ...
-
-    async def store_grade_projections(
-        self,
-        session: AsyncSession,
-        projections: list[Any],  # list[GradeProjection]
-    ) -> None:
-        """Store grade projections in database."""
-        ...
+class CJBatchRepositoryProtocol(Protocol):
+    """Batch aggregate persistence operations (state + uploads)."""
 
     async def create_new_cj_batch(
         self,
@@ -232,9 +152,56 @@ class CJRepositoryProtocol(Protocol):
         expected_essay_count: int,
         user_id: str | None = None,
         org_id: str | None = None,
-    ) -> Any:  # CJBatchUpload
-        """Create a new CJ batch record."""
-        ...
+    ) -> "CJBatchUpload": ...
+
+    async def get_cj_batch_upload(
+        self,
+        session: AsyncSession,
+        cj_batch_id: int,
+    ) -> "CJBatchUpload | None": ...
+
+    async def get_batch_state(
+        self,
+        session: AsyncSession,
+        batch_id: int,
+    ) -> "CJBatchState | None": ...
+
+    async def update_cj_batch_status(
+        self,
+        session: AsyncSession,
+        cj_batch_id: int,
+        status: Any,
+    ) -> None: ...
+
+    async def get_stuck_batches(
+        self,
+        session: AsyncSession,
+        states: list[CJBatchStateEnum],
+        stuck_threshold: datetime,
+    ) -> list["CJBatchState"]: ...
+
+    async def get_batches_ready_for_completion(
+        self,
+        session: AsyncSession,
+    ) -> list["CJBatchState"]: ...
+
+    async def get_batch_state_for_update(
+        self,
+        session: AsyncSession,
+        batch_id: int,
+        for_update: bool = False,
+    ) -> "CJBatchState | None": ...
+
+    async def update_batch_state(
+        self,
+        session: AsyncSession,
+        batch_id: int,
+        state: CJBatchStateEnum,
+    ) -> None: ...
+
+
+class CJEssayRepositoryProtocol(Protocol):
+    """Processed essay aggregate persistence operations."""
 
     async def create_or_update_cj_processed_essay(
         self,
@@ -244,17 +211,30 @@ class CJRepositoryProtocol(Protocol):
         text_storage_id: str,
         assessment_input_text: str,
         processing_metadata: dict | None = None,
-    ) -> Any:  # CJ_ProcessedEssay
-        """Create or update a processed essay record."""
-        ...
+    ) -> "ProcessedEssay": ...
 
     async def get_essays_for_cj_batch(
         self,
         session: AsyncSession,
         cj_batch_id: int,
-    ) -> list[Any]:  # List[CJ_ProcessedEssay]
-        """Get all essays for a CJ batch."""
-        ...
+    ) -> list["ProcessedEssay"]: ...
+
+    async def update_essay_scores_in_batch(
+        self,
+        session: AsyncSession,
+        cj_batch_id: int,
+        scores: dict[str, float],
+    ) -> None: ...
+
+    async def get_final_cj_rankings(
+        self,
+        session: AsyncSession,
+        cj_batch_id: int,
+    ) -> list[dict[str, Any]]: ...
+
+
+class CJComparisonRepositoryProtocol(Protocol):
+    """Comparison pair persistence and retrieval operations."""
 
     async def get_comparison_pair_by_essays(
         self,
@@ -262,48 +242,110 @@ class CJRepositoryProtocol(Protocol):
         cj_batch_id: int,
         essay_a_els_id: str,
         essay_b_els_id: str,
-    ) -> Any | None:  # Optional[CJ_ComparisonPair]
-        """Check if comparison pair already exists."""
-        ...
+    ) -> "ComparisonPair | None": ...
+
+    async def get_comparison_pair_by_correlation_id(
+        self,
+        session: AsyncSession,
+        correlation_id: UUID,
+    ) -> "ComparisonPair | None": ...
 
     async def store_comparison_results(
         self,
         session: AsyncSession,
-        results: list[Any],
+        results: list["ComparisonResult"],
         cj_batch_id: int,
-    ) -> None:
-        """Store comparison results to database."""
-        ...
+    ) -> None: ...
 
-    async def update_essay_scores_in_batch(
+    async def get_comparison_pairs_for_batch(
         self,
         session: AsyncSession,
-        cj_batch_id: int,
-        scores: dict[str, float],
-    ) -> None:
-        """Update essay Bradley-Terry scores."""
-        ...
+        batch_id: int,
+    ) -> list[tuple[str, str]]: ...
 
-    async def update_cj_batch_status(
+    async def get_valid_comparisons_for_batch(
         self,
         session: AsyncSession,
-        cj_batch_id: int,
-        status: Any,
-    ) -> None:
-        """Update CJ batch status."""
-        ...
+        batch_id: int,
+    ) -> list["ComparisonPair"]: ...
 
-    async def get_final_cj_rankings(
+
+class AssessmentInstructionRepositoryProtocol(Protocol):
+    """Assessment instruction persistence operations."""
+
+    async def get_assessment_instruction(
         self,
         session: AsyncSession,
-        cj_batch_id: int,
-    ) -> list[dict[str, Any]]:
-        """Get final rankings for a CJ batch."""
-        ...
+        assignment_id: str | None,
+        course_id: str | None,
+    ) -> "AssessmentInstruction | None": ...
 
-    async def initialize_db_schema(self) -> None:
-        """Initialize database schema (create tables)."""
-        ...
+    async def get_assignment_context(
+        self,
+        session: AsyncSession,
+        assignment_id: str,
+    ) -> dict[str, Any] | None: ...
+
+    async def upsert_assessment_instruction(
+        self,
+        session: AsyncSession,
+        *,
+        assignment_id: str | None,
+        course_id: str | None,
+        instructions_text: str,
+        grade_scale: str,
+        student_prompt_storage_id: str | None = None,
+        judge_rubric_storage_id: str | None = None,
+    ) -> "AssessmentInstruction": ...
+
+    async def list_assessment_instructions(
+        self,
+        session: AsyncSession,
+        *,
+        limit: int,
+        offset: int,
+        grade_scale: str | None = None,
+    ) -> tuple[list["AssessmentInstruction"], int]: ...
+
+    async def delete_assessment_instruction(
+        self,
+        session: AsyncSession,
+        *,
+        assignment_id: str | None,
+        course_id: str | None,
+    ) -> bool: ...
+
+
+class AnchorRepositoryProtocol(Protocol):
+    """Anchor essay reference persistence operations."""
+
+    async def upsert_anchor_reference(
+        self,
+        session: AsyncSession,
+        *,
+        assignment_id: str,
+        anchor_label: str,
+        grade: str,
+        grade_scale: str,
+        text_storage_id: str,
+    ) -> int: ...
+
+    async def get_anchor_essay_references(
+        self,
+        session: AsyncSession,
+        assignment_id: str,
+        grade_scale: str | None = None,
+    ) -> list["AnchorEssayReference"]: ...
+
+
+class GradeProjectionRepositoryProtocol(Protocol):
+    """Grade projection persistence operations."""
+
+    async def store_grade_projections(
+        self,
+        session: AsyncSession,
+        projections: list["GradeProjection"],
+    ) -> None: ...
 
 
 class CJEventPublisherProtocol(Protocol):

@@ -34,7 +34,7 @@
 **Test Cases**:
 - Test ANCHOR_ prefix detection
 - Test mixed student/anchor rankings separation
-- Test case sensitivity (ANCHOR_ vs anchor_)
+- Test case sensitivity (ANCHOR_vs anchor_)
 - Test edge cases (empty IDs, null values)
 - Test synthetic ID format (ANCHOR_123_uuid)
 - Test filtering preserves all student essays
@@ -166,10 +166,16 @@ For each test file:
 ## Dependencies to Mock
 
 ### Protocols to Mock:
-- CJEventPublisherProtocol
-- CJRepositoryProtocol
-- ContentClientProtocol
-- LLMInteractionProtocol
+- CJEventPublisherProtocol - Kafka event publishing
+- SessionProviderProtocol - Database session management
+- CJBatchRepositoryProtocol - Batch aggregate operations
+- CJEssayRepositoryProtocol - Essay aggregate operations
+- CJComparisonRepositoryProtocol - Comparison pair operations
+- AnchorRepositoryProtocol - Anchor essay reference operations
+- AssessmentInstructionRepositoryProtocol - Assessment instruction operations
+- GradeProjectionRepositoryProtocol - Grade projection operations
+- ContentClientProtocol - External content service
+- LLMInteractionProtocol - External LLM providers
 
 ### External Services:
 - Kafka (via EventEnvelope)

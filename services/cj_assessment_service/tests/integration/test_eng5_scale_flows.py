@@ -23,6 +23,9 @@ from common_core import EssayComparisonWinner
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from services.cj_assessment_service.cj_core_logic.grade_projection.context_service import (
+    ProjectionContextService,
+)
 from services.cj_assessment_service.cj_core_logic.grade_projector import GradeProjector
 from services.cj_assessment_service.cj_core_logic.scoring_ranking import (
     record_comparisons_and_update_scores,
@@ -41,12 +44,29 @@ from services.cj_assessment_service.models_db import (
     GradeProjection,
     ProcessedEssay,
 )
-from services.cj_assessment_service.protocols import CJRepositoryProtocol
+from services.cj_assessment_service.tests.fixtures.database_fixtures import PostgresDataAccess
 
 
 @pytest.mark.integration
 class TestENG5ScaleFlows:
     """Test ENG5 legacy vs national scale integration."""
+
+    def _make_grade_projector(
+        self,
+        session_provider: Any,
+        instruction_repository: Any,
+        anchor_repository: Any,
+    ) -> GradeProjector:
+        """Construct a GradeProjector wired to the real DB for integration tests."""
+        context_service = ProjectionContextService(
+            session_provider=session_provider,
+            instruction_repository=instruction_repository,
+            anchor_repository=anchor_repository,
+        )
+        return GradeProjector(
+            session_provider=session_provider,
+            context_service=context_service,
+        )
 
     async def _create_instruction_and_anchors(
         self,
@@ -83,11 +103,14 @@ class TestENG5ScaleFlows:
             session.add(anchor_ref)
 
         await session.flush()
+        # Commit so that subsequent sessions (e.g. ProjectionContextService via
+        # SessionProviderProtocol) can see these instructions and anchors.
+        await session.commit()
 
     async def _create_batch_with_essays(
         self,
-        repository: CJRepositoryProtocol,
-        session: AsyncSession,
+        repository: PostgresDataAccess,
+        session_provider: Any,
         batch_id: str,
         assignment_id: str,
         student_count: int,
@@ -98,7 +121,7 @@ class TestENG5ScaleFlows:
 
         Args:
             repository: CJ repository for database operations
-            session: Database session
+            session_provider: Session provider for database transactions
             batch_id: Batch identifier
             assignment_id: Assignment identifier
             student_count: Number of student essays to create
@@ -108,56 +131,57 @@ class TestENG5ScaleFlows:
         Returns:
             Tuple of (cj_batch_id, student_essays, anchor_essays)
         """
-        # Create batch
-        cj_batch = await repository.create_new_cj_batch(
-            session=session,
-            bos_batch_id=batch_id,
-            event_correlation_id=str(uuid4()),
-            language="en",
-            course_code="ENG5",
-            initial_status=CJBatchStatusEnum.PENDING,
-            expected_essay_count=student_count + len(anchor_grades),
-        )
-        cj_batch.processing_metadata = {"student_prompt_text": "Write an argumentative essay"}
-        cj_batch.assignment_id = assignment_id
-        await session.flush()
-
-        # Create student essays
-        student_essays = []
-        for i in range(student_count):
-            essay_id = f"student_{batch_id}_{i:03d}"
-            await repository.create_or_update_cj_processed_essay(
+        async with session_provider.session() as session:
+            # Create batch
+            cj_batch = await repository.create_new_cj_batch(
                 session=session,
-                cj_batch_id=cj_batch.id,
-                els_essay_id=essay_id,
-                text_storage_id=f"student_storage_{batch_id}_{i:03d}",
-                assessment_input_text=f"Student essay content {i}",
+                bos_batch_id=batch_id,
+                event_correlation_id=str(uuid4()),
+                language="en",
+                course_code="ENG5",
+                initial_status=CJBatchStatusEnum.PENDING,
+                expected_essay_count=student_count + len(anchor_grades),
             )
-            student_essays.append({"els_essay_id": essay_id, "is_anchor": False})
+            cj_batch.processing_metadata = {"student_prompt_text": "Write an argumentative essay"}
+            cj_batch.assignment_id = assignment_id
+            await session.flush()
 
-        # Create anchor essays
-        anchor_essays = []
-        for idx, grade in enumerate(anchor_grades):
-            essay_id = f"anchor_{grade_scale}_{grade}_{idx:02d}"
-            essay = await repository.create_or_update_cj_processed_essay(
-                session=session,
-                cj_batch_id=cj_batch.id,
-                els_essay_id=essay_id,
-                text_storage_id=f"anchor_storage_{grade_scale}_{grade}_{idx}",
-                assessment_input_text=f"Anchor essay for grade {grade}",
-                processing_metadata={"anchor_grade": grade},
-            )
-            essay.is_anchor = True
-            anchor_essays.append(
-                {
-                    "els_essay_id": essay_id,
-                    "is_anchor": True,
-                    "anchor_grade": grade,
-                }
-            )
+            # Create student essays
+            student_essays: list[dict[str, Any]] = []
+            for i in range(student_count):
+                essay_id = f"student_{batch_id}_{i:03d}"
+                await repository.create_or_update_cj_processed_essay(
+                    session=session,
+                    cj_batch_id=cj_batch.id,
+                    els_essay_id=essay_id,
+                    text_storage_id=f"student_storage_{batch_id}_{i:03d}",
+                    assessment_input_text=f"Student essay content {i}",
+                )
+                student_essays.append({"els_essay_id": essay_id, "is_anchor": False})
 
-        await session.flush()
-        return cj_batch.id, student_essays, anchor_essays
+            # Create anchor essays
+            anchor_essays: list[dict[str, Any]] = []
+            for idx, grade in enumerate(anchor_grades):
+                essay_id = f"anchor_{grade_scale}_{grade}_{idx:02d}"
+                essay = await repository.create_or_update_cj_processed_essay(
+                    session=session,
+                    cj_batch_id=cj_batch.id,
+                    els_essay_id=essay_id,
+                    text_storage_id=f"anchor_storage_{grade_scale}_{grade}_{idx}",
+                    assessment_input_text=f"Anchor essay for grade {grade}",
+                    processing_metadata={"anchor_grade": grade},
+                )
+                essay.is_anchor = True
+                anchor_essays.append(
+                    {
+                        "els_essay_id": essay_id,
+                        "is_anchor": True,
+                        "anchor_grade": grade,
+                    }
+                )
+
+            await session.commit()
+            return cj_batch.id, student_essays, anchor_essays
 
     def _generate_comparison_results(
         self,
@@ -230,8 +254,13 @@ class TestENG5ScaleFlows:
 
     async def test_legacy_scale_grade_projections(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_repository: PostgresDataAccess,
         postgres_session: AsyncSession,
+        postgres_session_provider: Any,
+        postgres_comparison_repository: Any,
+        postgres_essay_repository: Any,
+        postgres_instruction_repository: Any,
+        postgres_anchor_repository: Any,
         mock_content_client: AsyncMock,
         test_settings: Settings,
     ) -> None:
@@ -247,10 +276,10 @@ class TestENG5ScaleFlows:
             postgres_session, assignment_id, grade_scale, anchor_grades
         )
 
-        # Create batch with essays
+        # Create batch with essays (committed via session provider)
         cj_batch_id, student_essays, anchor_essays = await self._create_batch_with_essays(
             postgres_repository,
-            postgres_session,
+            postgres_session_provider,
             batch_id,
             assignment_id,
             student_count=10,
@@ -288,7 +317,9 @@ class TestENG5ScaleFlows:
         await record_comparisons_and_update_scores(
             all_essays=essay_objects,
             comparison_results=comparison_results,
-            db_session=postgres_session,
+            session_provider=postgres_session_provider,
+            comparison_repository=postgres_comparison_repository,
+            essay_repository=postgres_essay_repository,
             cj_batch_id=cj_batch_id,
             correlation_id=correlation_id,
         )
@@ -322,9 +353,12 @@ class TestENG5ScaleFlows:
         mock_content_client.fetch_content.side_effect = lambda cid, corr: f"Content {cid}"
 
         # Calculate grade projections
-        grade_projector = GradeProjector()
+        grade_projector = self._make_grade_projector(
+            session_provider=postgres_session_provider,
+            instruction_repository=postgres_instruction_repository,
+            anchor_repository=postgres_anchor_repository,
+        )
         projection_summary = await grade_projector.calculate_projections(
-            session=postgres_session,
             rankings=rankings,
             cj_batch_id=cj_batch_id,
             assignment_id=assignment_id,
@@ -369,8 +403,13 @@ class TestENG5ScaleFlows:
 
     async def test_national_scale_grade_projections(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_repository: PostgresDataAccess,
         postgres_session: AsyncSession,
+        postgres_session_provider: Any,
+        postgres_comparison_repository: Any,
+        postgres_essay_repository: Any,
+        postgres_instruction_repository: Any,
+        postgres_anchor_repository: Any,
         mock_content_client: AsyncMock,
         test_settings: Settings,
     ) -> None:
@@ -386,10 +425,10 @@ class TestENG5ScaleFlows:
             postgres_session, assignment_id, grade_scale, anchor_grades
         )
 
-        # Create batch with essays
+        # Create batch with essays (committed via session provider)
         cj_batch_id, student_essays, anchor_essays = await self._create_batch_with_essays(
             postgres_repository,
-            postgres_session,
+            postgres_session_provider,
             batch_id,
             assignment_id,
             student_count=10,
@@ -427,7 +466,9 @@ class TestENG5ScaleFlows:
         await record_comparisons_and_update_scores(
             all_essays=essay_objects,
             comparison_results=comparison_results,
-            db_session=postgres_session,
+            session_provider=postgres_session_provider,
+            comparison_repository=postgres_comparison_repository,
+            essay_repository=postgres_essay_repository,
             cj_batch_id=cj_batch_id,
             correlation_id=correlation_id,
         )
@@ -461,9 +502,12 @@ class TestENG5ScaleFlows:
         mock_content_client.fetch_content.side_effect = lambda cid, corr: f"Content {cid}"
 
         # Calculate grade projections
-        grade_projector = GradeProjector()
+        grade_projector = self._make_grade_projector(
+            session_provider=postgres_session_provider,
+            instruction_repository=postgres_instruction_repository,
+            anchor_repository=postgres_anchor_repository,
+        )
         projection_summary = await grade_projector.calculate_projections(
-            session=postgres_session,
             rankings=rankings,
             cj_batch_id=cj_batch_id,
             assignment_id=assignment_id,
@@ -509,7 +553,7 @@ class TestENG5ScaleFlows:
 
     async def test_scale_isolation_anchors_not_mixed(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_repository: PostgresDataAccess,
         postgres_session: AsyncSession,
         mock_content_client: AsyncMock,
         test_settings: Settings,
@@ -537,12 +581,8 @@ class TestENG5ScaleFlows:
 
         await postgres_session.flush()
 
-        # Query anchors for legacy assignment
-        from services.cj_assessment_service.implementations.db_access_impl import (
-            get_anchor_essay_references,
-        )
-
-        legacy_anchors = await get_anchor_essay_references(
+        # Query anchors for legacy assignment via per-aggregate repository
+        legacy_anchors = await postgres_repository.get_anchor_essay_references(
             postgres_session,
             assignment_id=legacy_assignment_id,
             grade_scale=legacy_scale,
@@ -561,7 +601,7 @@ class TestENG5ScaleFlows:
             )
 
         # Query anchors for national assignment
-        national_anchors = await get_anchor_essay_references(
+        national_anchors = await postgres_repository.get_anchor_essay_references(
             postgres_session,
             assignment_id=national_assignment_id,
             grade_scale=national_scale,

@@ -29,8 +29,12 @@ from services.cj_assessment_service.models_api import (
 )
 from services.cj_assessment_service.models_db import CJBatchUpload
 from services.cj_assessment_service.protocols import (
-    CJRepositoryProtocol,
+    AnchorRepositoryProtocol,
+    AssessmentInstructionRepositoryProtocol,
+    CJBatchRepositoryProtocol,
+    CJEssayRepositoryProtocol,
     ContentClientProtocol,
+    SessionProviderProtocol,
 )
 
 logger = create_service_logger("cj_assessment_service.batch_preparation")
@@ -39,7 +43,9 @@ logger = create_service_logger("cj_assessment_service.batch_preparation")
 async def create_cj_batch(
     request_data: CJAssessmentRequestData,
     correlation_id: UUID,
-    database: CJRepositoryProtocol,
+    session_provider: SessionProviderProtocol,
+    batch_repository: CJBatchRepositoryProtocol,
+    instruction_repository: AssessmentInstructionRepositoryProtocol,
     content_client: ContentClientProtocol,
     log_extra: dict[str, Any],
 ) -> int:
@@ -48,7 +54,10 @@ async def create_cj_batch(
     Args:
         request_data: The CJ assessment request data from ELS
         correlation_id: Optional correlation ID for event tracing
-        database: Database access protocol implementation
+        session_provider: Session provider for database transactions
+        batch_repository: Batch repository for batch operations
+        instruction_repository: Instruction repository for assessment instructions
+        content_client: Content client protocol implementation
         log_extra: Logging context data
 
     Returns:
@@ -57,31 +66,36 @@ async def create_cj_batch(
     Raises:
         ValueError: If required fields are missing
     """
-    async with database.session() as session:
-        # Prepare shared metrics instances once per batch creation
-        business_metrics = get_business_metrics()
-        prompt_success_metric = business_metrics.get("prompt_fetch_success")
-        prompt_failure_metric = business_metrics.get("prompt_fetch_failures")
+    # Prepare shared metrics instances once per batch creation
+    business_metrics = get_business_metrics()
+    prompt_success_metric = business_metrics.get("prompt_fetch_success")
+    prompt_failure_metric = business_metrics.get("prompt_fetch_failures")
 
-        # Extract data from request
-        bos_batch_id = request_data.bos_batch_id
-        language = request_data.language
-        course_code = request_data.course_code
-        essays_to_process = request_data.essays_to_process
-        assignment_id = request_data.assignment_id  # For anchor essay lookup
-        prompt_storage_id = request_data.student_prompt_storage_id
-        prompt_text = request_data.student_prompt_text
-        judge_rubric_storage_id = request_data.judge_rubric_storage_id
-        judge_rubric_text = request_data.judge_rubric_text
-        # Identity fields for credit attribution (Phase 3: Entitlements integration)
-        user_id = request_data.user_id
-        org_id = request_data.org_id
+    # Extract data from request
+    bos_batch_id = request_data.bos_batch_id
+    language = request_data.language
+    course_code = request_data.course_code
+    essays_to_process = request_data.essays_to_process
+    assignment_id = request_data.assignment_id  # For anchor essay lookup
+    prompt_storage_id = request_data.student_prompt_storage_id
+    prompt_text = request_data.student_prompt_text
+    judge_rubric_storage_id = request_data.judge_rubric_storage_id
+    judge_rubric_text = request_data.judge_rubric_text
+    # Identity fields for credit attribution (Phase 3: Entitlements integration)
+    user_id = request_data.user_id
+    org_id = request_data.org_id
 
-        if not bos_batch_id or not essays_to_process:
-            raise ValueError("Missing required fields: bos_batch_id or essays_to_process")
+    if not bos_batch_id or not essays_to_process:
+        raise ValueError("Missing required fields: bos_batch_id or essays_to_process")
 
+    # These payloads are computed inside the session block but applied after commit
+    instruction = None
+    typed_metadata: dict[str, Any] | None = None
+    original_request_payload: dict[str, Any] | None = None
+
+    async with session_provider.session() as session:
         # Create CJ batch record
-        cj_batch = await database.create_new_cj_batch(
+        cj_batch = await batch_repository.create_new_cj_batch(
             session=session,
             bos_batch_id=bos_batch_id,
             event_correlation_id=str(correlation_id),
@@ -93,9 +107,8 @@ async def create_cj_batch(
             org_id=org_id,
         )
 
-        instruction = None
         if assignment_id and (not prompt_storage_id or not judge_rubric_storage_id):
-            instruction = await database.get_assessment_instruction(
+            instruction = await instruction_repository.get_assessment_instruction(
                 session, assignment_id=assignment_id, course_id=None
             )
 
@@ -207,42 +220,49 @@ async def create_cj_batch(
             org_id=request_data.org_id,
         ).model_dump(exclude_none=True)
 
-        metadata_updates: dict[str, Any] = {}
-        if typed_metadata:
-            metadata_updates.update(typed_metadata)
-        if original_request_payload:
-            metadata_updates["original_request"] = original_request_payload
-
-        if metadata_updates:
-            await merge_batch_upload_metadata(
-                session=session,
-                cj_batch_id=cj_batch.id,
-                metadata_updates=metadata_updates,
-                correlation_id=correlation_id,
-            )
-
-        if original_request_payload:
-            await merge_batch_processing_metadata(
-                session=session,
-                cj_batch_id=cj_batch.id,
-                metadata_updates={"original_request": original_request_payload},
-                correlation_id=correlation_id,
-            )
-
         # Store assignment_id if provided
         if assignment_id:
             cj_batch.assignment_id = assignment_id
             await session.flush()
-        cj_batch_id: int = cj_batch.id
 
-        logger.info(f"Created internal CJ batch {cj_batch_id}", extra=log_extra)
-        return cj_batch_id
+        cj_batch_id: int = cj_batch.id
+        await session.commit()
+
+    # Apply metadata updates in separate, short-lived sessions after the batch exists
+    metadata_updates: dict[str, Any] = {}
+    if typed_metadata:
+        metadata_updates.update(typed_metadata)
+    if original_request_payload:
+        metadata_updates["original_request"] = original_request_payload
+
+    if metadata_updates:
+        await merge_batch_upload_metadata(
+            session_provider=session_provider,
+            cj_batch_id=cj_batch_id,
+            metadata_updates=metadata_updates,
+            correlation_id=correlation_id,
+        )
+
+    if original_request_payload:
+        await merge_batch_processing_metadata(
+            session_provider=session_provider,
+            cj_batch_id=cj_batch_id,
+            metadata_updates={"original_request": original_request_payload},
+            correlation_id=correlation_id,
+        )
+
+    logger.info(f"Created internal CJ batch {cj_batch_id}", extra=log_extra)
+    return cj_batch_id
 
 
 async def prepare_essays_for_assessment(
     request_data: CJAssessmentRequestData,
     cj_batch_id: int,
-    database: CJRepositoryProtocol,
+    session_provider: SessionProviderProtocol,
+    batch_repository: CJBatchRepositoryProtocol,
+    essay_repository: CJEssayRepositoryProtocol,
+    instruction_repository: AssessmentInstructionRepositoryProtocol,
+    anchor_repository: AnchorRepositoryProtocol,
     content_client: ContentClientProtocol,
     correlation_id: UUID,
     log_extra: dict[str, Any],
@@ -252,7 +272,11 @@ async def prepare_essays_for_assessment(
     Args:
         request_data: The CJ assessment request data from ELS
         cj_batch_id: The CJ batch ID to associate essays with
-        database: Database access protocol implementation
+        session_provider: Session provider for database transactions
+        batch_repository: Batch repository for batch operations
+        essay_repository: Essay repository for essay operations
+        instruction_repository: Instruction repository for assessment instructions
+        anchor_repository: Anchor repository for anchor essay management
         content_client: Content client protocol implementation
         correlation_id: Request correlation ID for tracing
         log_extra: Logging context data
@@ -260,8 +284,12 @@ async def prepare_essays_for_assessment(
     Returns:
         List of essays prepared for comparison
     """
-    async with database.session() as session:
-        await database.update_cj_batch_status(
+    # Collect metadata updates to apply after essays have been persisted
+    student_metadata_updates: list[tuple[str, dict[str, Any]]] = []
+    anchor_metadata_updates: list[tuple[str, dict[str, Any]]] = []
+
+    async with session_provider.session() as session:
+        await batch_repository.update_cj_batch_status(
             session=session,
             cj_batch_id=cj_batch_id,
             status=CJBatchStatusEnum.FETCHING_CONTENT,
@@ -285,7 +313,7 @@ async def prepare_essays_for_assessment(
                 assessment_input_text = content
 
                 # Store essay for CJ processing (mark as student essay)
-                cj_processed_essay = await database.create_or_update_cj_processed_essay(
+                cj_processed_essay = await essay_repository.create_or_update_cj_processed_essay(
                     session=session,
                     cj_batch_id=cj_batch_id,
                     els_essay_id=els_essay_id,
@@ -295,12 +323,7 @@ async def prepare_essays_for_assessment(
 
                 student_metadata = CJEessayMetadata(is_anchor=False).model_dump(exclude_none=True)
                 if student_metadata:
-                    await merge_essay_processing_metadata(
-                        session=session,
-                        els_essay_id=els_essay_id,
-                        metadata_updates=student_metadata,
-                        correlation_id=correlation_id,
-                    )
+                    student_metadata_updates.append((els_essay_id, student_metadata))
 
                 # Create EssayForComparison for the comparison loop
                 essay_for_api = EssayForComparison(
@@ -333,29 +356,67 @@ async def prepare_essays_for_assessment(
                 # Continue with other essays rather than failing entire batch
 
         # Add anchor essays if assignment_id present
-        cj_batch = await database.get_cj_batch_upload(session, cj_batch_id)
+        cj_batch = await batch_repository.get_cj_batch_upload(session, cj_batch_id)
         if cj_batch and cj_batch.assignment_id:
             anchors = await _fetch_and_add_anchors(
-                session, cj_batch, content_client, database, correlation_id
+                session_provider,
+                session,
+                cj_batch,
+                content_client,
+                instruction_repository,
+                anchor_repository,
+                essay_repository,
+                correlation_id,
+                metadata_accumulator=anchor_metadata_updates,
             )
             essays_for_api_model.extend(anchors)
+
+        # Persist all prepared essays before any cross-session operations use them
+        await session.commit()
 
         logger.info(
             f"Prepared {len(essays_for_api_model)} essays for CJ assessment",
             extra=log_extra,
         )
 
-        return essays_for_api_model
+    # Apply per-essay metadata updates using fresh sessions
+    for essay_id, metadata in student_metadata_updates + anchor_metadata_updates:
+        await merge_essay_processing_metadata(
+            session_provider=session_provider,
+            els_essay_id=essay_id,
+            metadata_updates=metadata,
+            correlation_id=correlation_id,
+        )
+
+    return essays_for_api_model
 
 
 async def _fetch_and_add_anchors(
+    session_provider: SessionProviderProtocol,
     session: AsyncSession,
     batch_upload: CJBatchUpload,
     content_client: ContentClientProtocol,
-    database: CJRepositoryProtocol,
+    instruction_repository: AssessmentInstructionRepositoryProtocol,
+    anchor_repository: AnchorRepositoryProtocol,
+    essay_repository: CJEssayRepositoryProtocol,
     correlation_id: UUID,
+    metadata_accumulator: list[tuple[str, dict[str, Any]]] | None = None,
 ) -> list[EssayForComparison]:
-    """Fetch anchor essays and add to comparison pool."""
+    """Fetch anchor essays and add to comparison pool.
+
+    Args:
+        session_provider: Session provider for metadata merge helpers
+        session: Active database session
+        batch_upload: The batch upload record
+        content_client: Content client protocol implementation
+        instruction_repository: Instruction repository for assessment instructions
+        anchor_repository: Anchor repository for anchor essay management
+        essay_repository: Essay repository for essay operations
+        correlation_id: Request correlation ID for tracing
+
+    Returns:
+        List of anchor essays prepared for comparison
+    """
     anchors: list[EssayForComparison] = []
 
     # Ensure assignment_id is not None (checked by caller)
@@ -363,7 +424,7 @@ async def _fetch_and_add_anchors(
         return anchors
 
     # Resolve assignment metadata to determine active grade scale
-    assignment_context = await database.get_assignment_context(
+    assignment_context = await instruction_repository.get_assignment_context(
         session=session,
         assignment_id=batch_upload.assignment_id,
     )
@@ -381,7 +442,7 @@ async def _fetch_and_add_anchors(
     grade_scale = assignment_context.get("grade_scale", "swedish_8_anchor")
 
     # Get anchor references for this assignment
-    anchor_refs = await database.get_anchor_essay_references(
+    anchor_refs = await anchor_repository.get_anchor_essay_references(
         session,
         batch_upload.assignment_id,
         grade_scale=grade_scale,
@@ -396,7 +457,7 @@ async def _fetch_and_add_anchors(
             content = await content_client.fetch_content(ref.text_storage_id, correlation_id)
 
             # Store with metadata
-            await database.create_or_update_cj_processed_essay(
+            await essay_repository.create_or_update_cj_processed_essay(
                 session=session,
                 cj_batch_id=batch_upload.id,
                 els_essay_id=synthetic_id,
@@ -416,12 +477,15 @@ async def _fetch_and_add_anchors(
             ).model_dump(exclude_none=True)
 
             if anchor_meta:
-                await merge_essay_processing_metadata(
-                    session=session,
-                    els_essay_id=synthetic_id,
-                    metadata_updates=anchor_meta,
-                    correlation_id=correlation_id,
-                )
+                if metadata_accumulator is not None:
+                    metadata_accumulator.append((synthetic_id, anchor_meta))
+                else:
+                    await merge_essay_processing_metadata(
+                        session_provider=session_provider,
+                        els_essay_id=synthetic_id,
+                        metadata_updates=anchor_meta,
+                        correlation_id=correlation_id,
+                    )
 
             # Create API model
             anchor_for_api = EssayForComparison(

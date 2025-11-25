@@ -228,7 +228,7 @@ class TestCheckLatestModels:
 
     @pytest.mark.asyncio
     async def test_includes_all_claude_3_models(self, mocker: Mock, settings: Settings) -> None:
-        """Should include all Anthropic Claude 3.x models."""
+        """Should include Anthropic Claude 4.5 tier models and exclude Claude 3.x."""
         mock_session = Mock()
         mock_response = AsyncMock()
         mock_response.status = 200
@@ -268,10 +268,10 @@ class TestCheckLatestModels:
         )
         models = await checker.check_latest_models()
 
-        # Should include all 3 Claude 3.x models
-        assert len(models) == 3
         model_ids = {m.model_id for m in models}
-        assert "anthropic/claude-3-opus-20240229" in model_ids
+        # Claude 3.x model should be excluded
+        assert "anthropic/claude-3-opus-20240229" not in model_ids
+        # Claude 4.5 tier models should be included
         assert "anthropic/claude-sonnet-4-5-20250929" in model_ids
         assert "anthropic/claude-haiku-4-5-20251001" in model_ids
 

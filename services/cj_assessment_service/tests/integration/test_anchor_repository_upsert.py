@@ -1,6 +1,6 @@
 """Integration tests for repository-level anchor upsert behavior.
 
-Validates that PostgreSQLCJRepositoryImpl.upsert_anchor_reference uses
+Validates that PostgreSQLAnchorRepository.upsert_anchor_reference uses
 INSERT .. ON CONFLICT DO UPDATE semantics keyed on
 (assignment_id, anchor_label, grade_scale), allowing multiple anchors with
 the same grade but different labels while returning the anchor ID via
@@ -14,13 +14,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.cj_assessment_service.models_db import AnchorEssayReference
-from services.cj_assessment_service.protocols import CJRepositoryProtocol
+from services.cj_assessment_service.tests.fixtures.database_fixtures import PostgresDataAccess
 
 
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_upsert_anchor_reference_idempotent_and_updates_storage_id(
-    postgres_repository: CJRepositoryProtocol,
+    postgres_data_access: PostgresDataAccess,
 ) -> None:
     """Upserting the same assignment/grade/scale reuses ID and updates storage.
 
@@ -29,11 +29,11 @@ async def test_upsert_anchor_reference_idempotent_and_updates_storage_id(
     logic behaves as expected.
     """
 
-    async with postgres_repository.session() as session:  # type: ignore[attr-defined]
+    async with postgres_data_access.session() as session:
         assert isinstance(session, AsyncSession)
 
         # First upsert creates a new anchor for this (assignment_id, anchor_label, scale)
-        anchor_id_first = await postgres_repository.upsert_anchor_reference(
+        anchor_id_first = await postgres_data_access.upsert_anchor_reference(
             session,
             assignment_id="repo-upsert-assignment-1",
             anchor_label="A1",
@@ -43,7 +43,7 @@ async def test_upsert_anchor_reference_idempotent_and_updates_storage_id(
         )
 
         # Second upsert with same triple but different storage_id should reuse ID
-        anchor_id_second = await postgres_repository.upsert_anchor_reference(
+        anchor_id_second = await postgres_data_access.upsert_anchor_reference(
             session,
             assignment_id="repo-upsert-assignment-1",
             anchor_label="A1",
@@ -71,14 +71,14 @@ async def test_upsert_anchor_reference_idempotent_and_updates_storage_id(
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_multiple_anchor_labels_can_share_the_same_grade(
-    postgres_repository: CJRepositoryProtocol,
+    postgres_data_access: PostgresDataAccess,
 ) -> None:
     """Different anchor labels with the same grade co-exist for an assignment."""
 
-    async with postgres_repository.session() as session:  # type: ignore[attr-defined]
+    async with postgres_data_access.session() as session:
         assert isinstance(session, AsyncSession)
 
-        anchor_a = await postgres_repository.upsert_anchor_reference(
+        anchor_a = await postgres_data_access.upsert_anchor_reference(
             session,
             assignment_id="repo-upsert-assignment-2",
             anchor_label="Anchor-A",
@@ -87,7 +87,7 @@ async def test_multiple_anchor_labels_can_share_the_same_grade(
             text_storage_id="storage-anchor-a",
         )
 
-        anchor_b = await postgres_repository.upsert_anchor_reference(
+        anchor_b = await postgres_data_access.upsert_anchor_reference(
             session,
             assignment_id="repo-upsert-assignment-2",
             anchor_label="Anchor-B",

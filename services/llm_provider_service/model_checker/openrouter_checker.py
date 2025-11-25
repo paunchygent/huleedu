@@ -290,7 +290,7 @@ class OpenRouterModelChecker:
         """Determine if a discovered model should be included in results.
 
         Filters out legacy models that are no longer relevant for comparison.
-        Only include Anthropic models routed through OpenRouter.
+        Only include Anthropic Claude 4.5 tier models routed through OpenRouter.
 
         Args:
             model: Discovered model to evaluate
@@ -298,13 +298,14 @@ class OpenRouterModelChecker:
         Returns:
             True if model should be included
         """
-        # Only include Anthropic models (our focus for OpenRouter)
+        # Only include Anthropic Claude 4.5 tier models routed through OpenRouter
         model_id_lower = model.model_id.lower()
 
-        # Include Anthropic Claude models
-        if "anthropic" in model_id_lower and "claude" in model_id_lower:
-            # Only Claude 3+ models
-            if any(x in model_id_lower for x in ["claude-3", "claude-4"]):
-                return True
+        # Require explicit Anthropic Claude prefix
+        if not model_id_lower.startswith("anthropic/claude-"):
+            return False
 
-        return False
+        # Check that the Anthropic portion encodes 4.5
+        # Example: anthropic/claude-haiku-4-5-20251001
+        _, anthropic_part = model_id_lower.split("/", 1)
+        return "-4-5-" in anthropic_part

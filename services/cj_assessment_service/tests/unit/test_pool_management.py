@@ -3,15 +3,13 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock, MagicMock
+from typing import TYPE_CHECKING, Any
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
 
 if TYPE_CHECKING:
-    from unittest.mock import AsyncMock
-
     from services.cj_assessment_service.cj_core_logic.batch_pool_manager import BatchPoolManager
     from services.cj_assessment_service.models_api import (
         ComparisonTask,
@@ -38,27 +36,36 @@ class TestFailedComparisonPoolAdd:
     async def test_add_to_failed_pool_success(
         self,
         batch_pool_manager: BatchPoolManager,
-        mock_database: AsyncMock,
         sample_comparison_task: ComparisonTask,
         sample_batch_state: CJBatchState,
+        mock_batch_repo: AsyncMock,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """Test successfully adding comparison to failed pool."""
+        """Test successfully adding comparison to failed pool.
+
+        This test verifies that add_to_failed_pool successfully completes when
+        the batch state exists. We configure the batch repository mock to return
+        a valid batch_state and verify the operation completes without error.
+        """
         # Arrange
         cj_batch_id = 123
         correlation_id = uuid4()
         failure_reason = "timeout"
 
-        # Mock database session with proper query responses
-        mock_session = AsyncMock()
-        mock_database.session.return_value.__aenter__.return_value = mock_session
+        # Track if append_to_failed_pool_atomic was called
+        append_called = False
 
-        # Mock the execute method to return batch state when queried
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none = MagicMock(return_value=sample_batch_state)
-        mock_session.execute = AsyncMock(return_value=mock_result)
+        mock_batch_repo.get_batch_state_for_update.return_value = sample_batch_state
 
-        # Mock commit for the atomic update
-        mock_session.commit = AsyncMock(return_value=None)
+        # Mock append_to_failed_pool_atomic to track calls
+        async def mock_append(*_args: Any, **_kwargs: Any) -> None:
+            nonlocal append_called
+            append_called = True
+
+        # Patch atomic append to avoid DB writes while tracking invocation
+        from services.cj_assessment_service.cj_core_logic import batch_submission
+
+        monkeypatch.setattr(batch_submission, "append_to_failed_pool_atomic", mock_append)
 
         # Act
         await batch_pool_manager.add_to_failed_pool(
@@ -68,55 +75,36 @@ class TestFailedComparisonPoolAdd:
             correlation_id=correlation_id,
         )
 
-        # Assert - Verify database interactions through the mock
-        # Should have executed at least 2 queries: one for get_batch_state, one for atomic update
-        assert mock_session.execute.call_count >= 2
-
-        # Verify commit was called for the atomic operation
-        mock_session.commit.assert_called()
-
-        # Verify the SQL update contained the expected batch_id
-        update_call = None
-        for call in mock_session.execute.call_args_list:
-            if call.args and hasattr(call.args[0], "text"):
-                # This is the SQL text update call
-                update_call = call
-                break
-
-        if update_call:
-            # Verify the batch_id was passed to the SQL update
-            assert (
-                update_call.kwargs.get("batch_id") == cj_batch_id
-                or (update_call.args[1] if len(update_call.args) > 1 else {}).get("batch_id")
-                == cj_batch_id
-            )
+        # Assert - Verify the atomic append was called
+        assert append_called, "append_to_failed_pool_atomic should have been called"
+        mock_batch_repo.get_batch_state_for_update.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_add_to_failed_pool_no_batch_state(
         self,
         batch_pool_manager: BatchPoolManager,
-        mock_database: AsyncMock,
         sample_comparison_task: ComparisonTask,
+        mock_batch_repo: AsyncMock,
     ) -> None:
-        """Test adding to failed pool when batch state not found."""
+        """Test adding to failed pool when batch state not found.
+
+        This test verifies that add_to_failed_pool raises a HuleEduError when
+        the batch state is not found. We configure the batch repository to
+        return None to simulate a missing batch.
+        """
         # Arrange
         cj_batch_id = 123
         correlation_id = uuid4()
         failure_reason = "timeout"
 
-        # Mock database session to return None for batch state query
-        mock_session = AsyncMock()
-        mock_database.session.return_value.__aenter__.return_value = mock_session
-
-        # Mock the execute method to return None when batch state is queried
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none = MagicMock(return_value=None)  # No batch state found
-        mock_session.execute = AsyncMock(return_value=mock_result)
+        # Batch state missing
+        mock_batch_repo.get_batch_state_for_update.return_value = None
 
         # Act & Assert
         from huleedu_service_libs.error_handling import HuleEduError
 
-        with pytest.raises(HuleEduError, match="batch_state with ID"):
+        # The error is wrapped in a PROCESSING_ERROR that contains the RESOURCE_NOT_FOUND message
+        with pytest.raises(HuleEduError, match=r"batch_state with ID.*not found"):
             await batch_pool_manager.add_to_failed_pool(
                 cj_batch_id=cj_batch_id,
                 comparison_task=sample_comparison_task,

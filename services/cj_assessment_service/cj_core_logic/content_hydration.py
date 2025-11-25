@@ -17,8 +17,9 @@ from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.cj_assessment_service.models_api import PromptHydrationFailure
 from services.cj_assessment_service.protocols import (
-    CJRepositoryProtocol,
+    AssessmentInstructionRepositoryProtocol,
     ContentClientProtocol,
+    SessionProviderProtocol,
 )
 
 logger = create_service_logger("cj_assessment.content_hydration")
@@ -158,7 +159,8 @@ async def hydrate_prompt_text(
 
 async def hydrate_judge_rubric_context(
     *,
-    database: CJRepositoryProtocol,
+    session_provider: SessionProviderProtocol,
+    instruction_repository: AssessmentInstructionRepositoryProtocol,
     content_client: ContentClientProtocol,
     assignment_id: str | None,
     correlation_id: UUID,
@@ -171,8 +173,8 @@ async def hydrate_judge_rubric_context(
         return None, None
 
     try:
-        async with database.session() as session:
-            instruction = await database.get_assessment_instruction(
+        async with session_provider.session() as session:
+            instruction = await instruction_repository.get_assessment_instruction(
                 session,
                 assignment_id=assignment_id,
                 course_id=None,

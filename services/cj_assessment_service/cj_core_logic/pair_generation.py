@@ -16,6 +16,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from services.cj_assessment_service.cj_core_logic.prompt_templates import PromptTemplateBuilder
 from services.cj_assessment_service.models_api import ComparisonTask, EssayForComparison
 from services.cj_assessment_service.models_db import ComparisonPair as CJ_ComparisonPair
+from services.cj_assessment_service.protocols import (
+    AssessmentInstructionRepositoryProtocol,
+    CJComparisonRepositoryProtocol,
+    SessionProviderProtocol,
+)
 
 _LEGACY_PROMPT_PATTERNS = (
     "you are an impartial comparative judgement assessor",
@@ -29,7 +34,9 @@ logger = create_service_logger("cj_assessment_service.pair_generation")
 
 async def generate_comparison_tasks(
     essays_for_comparison: list[EssayForComparison],
-    db_session: AsyncSession,
+    session_provider: SessionProviderProtocol,
+    comparison_repository: CJComparisonRepositoryProtocol,
+    instruction_repository: AssessmentInstructionRepositoryProtocol,
     cj_batch_id: int,
     existing_pairs_threshold: int,
     max_pairwise_comparisons: int | None = None,
@@ -40,9 +47,14 @@ async def generate_comparison_tasks(
 
     Args:
         essays_for_comparison: List of essays to compare (with string IDs)
-        db_session: Database session for checking existing comparisons
+        session_provider: Session provider for database access
+        comparison_repository: Repository for comparison pair operations
+        instruction_repository: Repository for assessment instruction operations
         cj_batch_id: Internal CJ batch ID for this comparison batch
         existing_pairs_threshold: Maximum existing pairs before skipping generation
+        max_pairwise_comparisons: Optional global cap on total comparison pairs
+        correlation_id: Correlation ID for observability
+        randomization_seed: Seed for randomizing essay positions in pairs
 
     Returns:
         List of comparison tasks ready for LLM processing
@@ -60,95 +72,96 @@ async def generate_comparison_tasks(
         },
     )
 
-    # Fetch assessment context (instructions and student prompt) from batch metadata
-    assessment_context = await _fetch_assessment_context(db_session, cj_batch_id)
+    async with session_provider.session() as session:
+        # Fetch assessment context (instructions and student prompt) from batch metadata
+        assessment_context = await _fetch_assessment_context(session, cj_batch_id)
 
-    # Get existing comparison pairs to avoid duplicates
-    existing_comparison_ids = await _fetch_existing_comparison_ids(db_session, cj_batch_id)
+        # Get existing comparison pairs to avoid duplicates
+        existing_comparison_ids = await _fetch_existing_comparison_ids(session, cj_batch_id)
 
-    existing_count = len(existing_comparison_ids)
-    logger.debug(f"Found {existing_count} existing comparison pairs")
+        existing_count = len(existing_comparison_ids)
+        logger.debug(f"Found {existing_count} existing comparison pairs")
 
-    # Enforce optional global cap on total comparison pairs for this batch
-    if max_pairwise_comparisons is not None and existing_count >= max_pairwise_comparisons:
-        logger.warning(
-            "Global comparison cap reached; no new pairs will be generated",
-            extra={
-                "cj_batch_id": cj_batch_id,
-                "existing_pairs": existing_count,
-                "max_pairwise_comparisons": max_pairwise_comparisons,
-                "correlation_id": str(correlation_id) if correlation_id else None,
-            },
+        # Enforce optional global cap on total comparison pairs for this batch
+        if max_pairwise_comparisons is not None and existing_count >= max_pairwise_comparisons:
+            logger.warning(
+                "Global comparison cap reached; no new pairs will be generated",
+                extra={
+                    "cj_batch_id": cj_batch_id,
+                    "existing_pairs": existing_count,
+                    "max_pairwise_comparisons": max_pairwise_comparisons,
+                    "correlation_id": str(correlation_id) if correlation_id else None,
+                },
+            )
+            return []
+
+        # Respect remaining budget under global cap when deciding how many new pairs
+        remaining_budget = (
+            max_pairwise_comparisons - existing_count
+            if max_pairwise_comparisons is not None
+            else existing_pairs_threshold
         )
-        return []
+        effective_threshold = min(existing_pairs_threshold, remaining_budget)
 
-    # Respect remaining budget under global cap when deciding how many new pairs
-    remaining_budget = (
-        max_pairwise_comparisons - existing_count
-        if max_pairwise_comparisons is not None
-        else existing_pairs_threshold
-    )
-    effective_threshold = min(existing_pairs_threshold, remaining_budget)
+        comparison_tasks = []
+        new_pairs_count = 0
+        randomizer = _build_pair_randomizer(randomization_seed)
 
-    comparison_tasks = []
-    new_pairs_count = 0
-    randomizer = _build_pair_randomizer(randomization_seed)
+        # Generate all possible pairs
+        for i in range(len(essays_for_comparison)):
+            for j in range(i + 1, len(essays_for_comparison)):
+                essay_a = essays_for_comparison[i]
+                essay_b = essays_for_comparison[j]
 
-    # Generate all possible pairs
-    for i in range(len(essays_for_comparison)):
-        for j in range(i + 1, len(essays_for_comparison)):
-            essay_a = essays_for_comparison[i]
-            essay_b = essays_for_comparison[j]
+                # Create normalized pair ID (sorted to handle bidirectional pairs)
+                current_pair_ids = tuple(sorted((essay_a.id, essay_b.id)))
 
-            # Create normalized pair ID (sorted to handle bidirectional pairs)
-            current_pair_ids = tuple(sorted((essay_a.id, essay_b.id)))
+                # Skip if this pair already exists
+                if current_pair_ids in existing_comparison_ids:
+                    logger.debug(f"Skipping existing pair: {essay_a.id} vs {essay_b.id}")
+                    continue
 
-            # Skip if this pair already exists
-            if current_pair_ids in existing_comparison_ids:
-                logger.debug(f"Skipping existing pair: {essay_a.id} vs {essay_b.id}")
-                continue
+                # Stop if we've generated too many new pairs in this round
+                if new_pairs_count >= effective_threshold:
+                    logger.info(
+                        f"Reached new pairs threshold ({effective_threshold}), "
+                        f"stopping pair generation",
+                    )
+                    break
 
-            # Stop if we've generated too many new pairs in this round
-            if new_pairs_count >= effective_threshold:
-                logger.info(
-                    f"Reached new pairs threshold ({effective_threshold}), "
-                    f"stopping pair generation",
+                if _should_swap_positions(randomizer):
+                    essay_a, essay_b = essay_b, essay_a
+
+                prompt_blocks = PromptTemplateBuilder.assemble_full_prompt(
+                    assessment_context=assessment_context,
+                    essay_a=essay_a,
+                    essay_b=essay_b,
                 )
+                prompt_text = PromptTemplateBuilder.render_prompt_text(prompt_blocks)
+
+                task = ComparisonTask(
+                    essay_a=essay_a,
+                    essay_b=essay_b,
+                    prompt=prompt_text,
+                    prompt_blocks=prompt_blocks,
+                )
+
+                comparison_tasks.append(task)
+                new_pairs_count += 1
+
+            # Break outer loop if threshold reached
+            if new_pairs_count >= effective_threshold:
                 break
 
-            if _should_swap_positions(randomizer):
-                essay_a, essay_b = essay_b, essay_a
-
-            prompt_blocks = PromptTemplateBuilder.assemble_full_prompt(
-                assessment_context=assessment_context,
-                essay_a=essay_a,
-                essay_b=essay_b,
-            )
-            prompt_text = PromptTemplateBuilder.render_prompt_text(prompt_blocks)
-
-            task = ComparisonTask(
-                essay_a=essay_a,
-                essay_b=essay_b,
-                prompt=prompt_text,
-                prompt_blocks=prompt_blocks,
-            )
-
-            comparison_tasks.append(task)
-            new_pairs_count += 1
-
-        # Break outer loop if threshold reached
-        if new_pairs_count >= effective_threshold:
-            break
-
-    logger.info(
-        f"Generated {len(comparison_tasks)} new comparison tasks",
-        extra={
-            "correlation_id": correlation_id,
-            "cj_batch_id": cj_batch_id,
-            "task_count": len(comparison_tasks),
-        },
-    )
-    return comparison_tasks
+        logger.info(
+            f"Generated {len(comparison_tasks)} new comparison tasks",
+            extra={
+                "correlation_id": correlation_id,
+                "cj_batch_id": cj_batch_id,
+                "task_count": len(comparison_tasks),
+            },
+        )
+        return comparison_tasks
 
 
 def _build_pair_randomizer(randomization_seed: int | None) -> Random:

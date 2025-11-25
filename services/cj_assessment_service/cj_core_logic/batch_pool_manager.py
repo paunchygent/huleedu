@@ -18,7 +18,10 @@ from services.cj_assessment_service.models_api import (
     FailedComparisonEntry,
     FailedComparisonPool,
 )
-from services.cj_assessment_service.protocols import CJRepositoryProtocol
+from services.cj_assessment_service.protocols import (
+    CJBatchRepositoryProtocol,
+    SessionProviderProtocol,
+)
 
 from .batch_submission import (
     get_batch_state,
@@ -33,16 +36,19 @@ class BatchPoolManager:
 
     def __init__(
         self,
-        database: CJRepositoryProtocol,
+        session_provider: SessionProviderProtocol,
+        batch_repository: CJBatchRepositoryProtocol,
         settings: Settings,
     ) -> None:
         """Initialize batch pool manager.
 
         Args:
-            database: Database access protocol implementation
+            session_provider: Session provider protocol implementation
+            batch_repository: Batch repository for state persistence
             settings: Application settings
         """
-        self.database = database
+        self._session_provider = session_provider
+        self._batch_repository = batch_repository
         self.settings = settings
 
     async def add_to_failed_pool(
@@ -77,63 +83,63 @@ class BatchPoolManager:
         try:
             from .batch_submission import append_to_failed_pool_atomic, get_batch_state
 
-            async with self.database.session() as session:
-                # First check if batch exists
-                batch_state = await get_batch_state(
-                    session=session,
-                    cj_batch_id=cj_batch_id,
+            # First check if batch exists
+            batch_state = await get_batch_state(
+                session_provider=self._session_provider,
+                cj_batch_id=cj_batch_id,
+                correlation_id=correlation_id,
+                batch_repository=self._batch_repository,
+            )
+
+            if not batch_state:
+                from huleedu_service_libs.error_handling import raise_resource_not_found
+
+                raise_resource_not_found(
+                    service="cj_assessment_service",
+                    operation="add_to_failed_pool",
+                    message=f"Batch state not found for batch {cj_batch_id}",
                     correlation_id=correlation_id,
+                    resource_type="batch_state",
+                    resource_id=str(cj_batch_id),
                 )
 
-                if not batch_state:
-                    from huleedu_service_libs.error_handling import raise_resource_not_found
+            # Create new failed comparison entry
+            failed_entry = FailedComparisonEntry(
+                essay_a_id=comparison_task.essay_a.id,
+                essay_b_id=comparison_task.essay_b.id,
+                comparison_task=comparison_task,
+                failure_reason=failure_reason,
+                failed_at=datetime.now(UTC),
+                retry_count=0,
+                original_batch_id=str(cj_batch_id),
+                correlation_id=correlation_id,
+            )
 
-                    raise_resource_not_found(
-                        service="cj_assessment_service",
-                        operation="add_to_failed_pool",
-                        message=f"Batch state not found for batch {cj_batch_id}",
-                        correlation_id=correlation_id,
-                        resource_type="batch_state",
-                        resource_id=str(cj_batch_id),
-                    )
+            # Convert to JSON-serializable dict
+            failed_entry_json = failed_entry.model_dump(mode="json")
 
-                # Create new failed comparison entry
-                failed_entry = FailedComparisonEntry(
-                    essay_a_id=comparison_task.essay_a.id,
-                    essay_b_id=comparison_task.essay_b.id,
-                    comparison_task=comparison_task,
-                    failure_reason=failure_reason,
-                    failed_at=datetime.now(UTC),
-                    retry_count=0,
-                    original_batch_id=str(cj_batch_id),
-                    correlation_id=correlation_id,
-                )
+            # Use atomic JSONB append - no locking needed!
+            await append_to_failed_pool_atomic(
+                session_provider=self._session_provider,
+                cj_batch_id=cj_batch_id,
+                failed_entry_json=failed_entry_json,
+                correlation_id=correlation_id,
+            )
 
-                # Convert to JSON-serializable dict
-                failed_entry_json = failed_entry.model_dump(mode="json")
+            # Record metrics
+            business_metrics = get_business_metrics()
+            failed_comparisons_metric = business_metrics.get("cj_failed_comparisons_total")
 
-                # Use atomic JSONB append - no locking needed!
-                await append_to_failed_pool_atomic(
-                    session=session,
-                    cj_batch_id=cj_batch_id,
-                    failed_entry_json=failed_entry_json,
-                    correlation_id=correlation_id,
-                )
+            if failed_comparisons_metric:
+                failed_comparisons_metric.labels(failure_reason=failure_reason).inc()
 
-                # Record metrics
-                business_metrics = get_business_metrics()
-                failed_comparisons_metric = business_metrics.get("cj_failed_comparisons_total")
-
-                if failed_comparisons_metric:
-                    failed_comparisons_metric.labels(failure_reason=failure_reason).inc()
-
-                logger.info(
-                    "Successfully added comparison to failed pool using atomic operation",
-                    extra={
-                        "correlation_id": str(correlation_id),
-                        "cj_batch_id": cj_batch_id,
-                    },
-                )
+            logger.info(
+                "Successfully added comparison to failed pool using atomic operation",
+                extra={
+                    "correlation_id": str(correlation_id),
+                    "cj_batch_id": cj_batch_id,
+                },
+            )
 
         except Exception as e:
             logger.error(
@@ -178,59 +184,61 @@ class BatchPoolManager:
             return False
 
         try:
-            async with self.database.session() as session:
-                batch_state = await get_batch_state(
-                    session=session, cj_batch_id=cj_batch_id, correlation_id=correlation_id
+            batch_state = await get_batch_state(
+                session_provider=self._session_provider,
+                cj_batch_id=cj_batch_id,
+                correlation_id=correlation_id,
+                batch_repository=self._batch_repository,
+            )
+
+            if not batch_state or not batch_state.processing_metadata:
+                return False
+
+            failed_pool = FailedComparisonPool.model_validate(batch_state.processing_metadata)
+
+            # Check if we have enough failures for retry
+            eligible_failures = [
+                entry
+                for entry in failed_pool.failed_comparison_pool
+                if entry.retry_count < self.settings.MAX_RETRY_ATTEMPTS
+            ]
+
+            if force_retry_all:
+                # At end of batch: process ANY eligible failures for fairness
+                retry_needed = len(eligible_failures) > 0
+                logger.info(
+                    f"End-of-batch retry check for batch {cj_batch_id}: "
+                    f"{len(eligible_failures)} eligible failures remaining, "
+                    f"retry needed for fairness: {retry_needed}",
+                    extra={
+                        "correlation_id": str(correlation_id),
+                        "cj_batch_id": cj_batch_id,
+                        "eligible_failures": len(eligible_failures),
+                        "force_retry_all": force_retry_all,
+                        "retry_needed": retry_needed,
+                    },
+                )
+            else:
+                # During active processing: use threshold for efficiency
+                retry_needed = (
+                    len(eligible_failures) >= self.settings.FAILED_COMPARISON_RETRY_THRESHOLD
+                )
+                logger.info(
+                    f"Threshold-based retry check for batch {cj_batch_id}: "
+                    f"{len(eligible_failures)} eligible failures, "
+                    f"threshold: {self.settings.FAILED_COMPARISON_RETRY_THRESHOLD}, "
+                    f"retry needed: {retry_needed}",
+                    extra={
+                        "correlation_id": str(correlation_id),
+                        "cj_batch_id": cj_batch_id,
+                        "eligible_failures": len(eligible_failures),
+                        "threshold": self.settings.FAILED_COMPARISON_RETRY_THRESHOLD,
+                        "force_retry_all": force_retry_all,
+                        "retry_needed": retry_needed,
+                    },
                 )
 
-                if not batch_state or not batch_state.processing_metadata:
-                    return False
-
-                failed_pool = FailedComparisonPool.model_validate(batch_state.processing_metadata)
-
-                # Check if we have enough failures for retry
-                eligible_failures = [
-                    entry
-                    for entry in failed_pool.failed_comparison_pool
-                    if entry.retry_count < self.settings.MAX_RETRY_ATTEMPTS
-                ]
-
-                if force_retry_all:
-                    # At end of batch: process ANY eligible failures for fairness
-                    retry_needed = len(eligible_failures) > 0
-                    logger.info(
-                        f"End-of-batch retry check for batch {cj_batch_id}: "
-                        f"{len(eligible_failures)} eligible failures remaining, "
-                        f"retry needed for fairness: {retry_needed}",
-                        extra={
-                            "correlation_id": str(correlation_id),
-                            "cj_batch_id": cj_batch_id,
-                            "eligible_failures": len(eligible_failures),
-                            "force_retry_all": force_retry_all,
-                            "retry_needed": retry_needed,
-                        },
-                    )
-                else:
-                    # During active processing: use threshold for efficiency
-                    retry_needed = (
-                        len(eligible_failures) >= self.settings.FAILED_COMPARISON_RETRY_THRESHOLD
-                    )
-                    logger.info(
-                        f"Threshold-based retry check for batch {cj_batch_id}: "
-                        f"{len(eligible_failures)} eligible failures, "
-                        f"threshold: {self.settings.FAILED_COMPARISON_RETRY_THRESHOLD}, "
-                        f"retry needed: {retry_needed}",
-                        extra={
-                            "correlation_id": str(correlation_id),
-                            "cj_batch_id": cj_batch_id,
-                            "eligible_failures": len(eligible_failures),
-                            "threshold": self.settings.FAILED_COMPARISON_RETRY_THRESHOLD,
-                            "force_retry_all": force_retry_all,
-                            "retry_needed": retry_needed,
-                        },
-                    )
-
-                return retry_needed
+            return retry_needed
 
         except Exception as e:
             logger.error(
@@ -272,116 +280,118 @@ class BatchPoolManager:
             HuleEduError: On database operation failure
         """
         try:
-            async with self.database.session() as session:
-                batch_state = await get_batch_state(
-                    session=session, cj_batch_id=cj_batch_id, correlation_id=correlation_id
-                )
+            batch_state = await get_batch_state(
+                session_provider=self._session_provider,
+                cj_batch_id=cj_batch_id,
+                correlation_id=correlation_id,
+                batch_repository=self._batch_repository,
+            )
 
-                if not batch_state or not batch_state.processing_metadata:
-                    return None
+            if not batch_state or not batch_state.processing_metadata:
+                return None
 
-                failed_pool = FailedComparisonPool.model_validate(batch_state.processing_metadata)
+            failed_pool = FailedComparisonPool.model_validate(batch_state.processing_metadata)
 
-                # Get eligible failures for retry
-                eligible_failures = [
-                    entry
-                    for entry in failed_pool.failed_comparison_pool
-                    if entry.retry_count < self.settings.MAX_RETRY_ATTEMPTS
-                ]
+            # Get eligible failures for retry
+            eligible_failures = [
+                entry
+                for entry in failed_pool.failed_comparison_pool
+                if entry.retry_count < self.settings.MAX_RETRY_ATTEMPTS
+            ]
 
-                if (
-                    not force_retry_all
-                    and len(eligible_failures) < self.settings.FAILED_COMPARISON_RETRY_THRESHOLD
-                ):
-                    return None
+            if (
+                not force_retry_all
+                and len(eligible_failures) < self.settings.FAILED_COMPARISON_RETRY_THRESHOLD
+            ):
+                return None
 
-                # If force_retry_all=True, process any eligible failures regardless of threshold
-                if force_retry_all and len(eligible_failures) == 0:
-                    return None
+            # If force_retry_all=True, process any eligible failures regardless of threshold
+            if force_retry_all and len(eligible_failures) == 0:
+                return None
 
-                # Select batch for retry (up to retry batch size)
-                retry_batch_size = min(self.settings.RETRY_BATCH_SIZE, len(eligible_failures))
-                retry_entries = eligible_failures[:retry_batch_size]
+            # Select batch for retry (up to retry batch size)
+            retry_batch_size = min(self.settings.RETRY_BATCH_SIZE, len(eligible_failures))
+            retry_entries = eligible_failures[:retry_batch_size]
 
-                # Create comparison tasks
-                retry_tasks = [entry.comparison_task for entry in retry_entries]
+            # Create comparison tasks
+            retry_tasks = [entry.comparison_task for entry in retry_entries]
 
-                # Update retry counts for selected entries
-                for entry in retry_entries:
-                    entry.retry_count += 1
+            # Update retry counts for selected entries
+            for entry in retry_entries:
+                entry.retry_count += 1
 
-                # Remove entries that have reached max retry attempts
-                remaining_pool = []
-                permanently_failed_count = 0
+            # Remove entries that have reached max retry attempts
+            remaining_pool = []
+            permanently_failed_count = 0
 
-                for entry in failed_pool.failed_comparison_pool:
-                    if entry in retry_entries:
-                        if entry.retry_count < self.settings.MAX_RETRY_ATTEMPTS:
-                            remaining_pool.append(entry)
-                        else:
-                            permanently_failed_count += 1
-                    else:
+            for entry in failed_pool.failed_comparison_pool:
+                if entry in retry_entries:
+                    if entry.retry_count < self.settings.MAX_RETRY_ATTEMPTS:
                         remaining_pool.append(entry)
+                    else:
+                        permanently_failed_count += 1
+                else:
+                    remaining_pool.append(entry)
 
-                # Update pool statistics
-                failed_pool.failed_comparison_pool = remaining_pool
-                failed_pool.pool_statistics.retry_attempts += 1
-                failed_pool.pool_statistics.permanently_failed += permanently_failed_count
-                failed_pool.pool_statistics.last_retry_batch = f"retry_batch_{correlation_id}"
+            # Update pool statistics
+            failed_pool.failed_comparison_pool = remaining_pool
+            failed_pool.pool_statistics.retry_attempts += 1
+            failed_pool.pool_statistics.permanently_failed += permanently_failed_count
+            failed_pool.pool_statistics.last_retry_batch = f"retry_batch_{correlation_id}"
 
-                # Record metrics for permanently failed comparisons
-                if permanently_failed_count > 0:
-                    business_metrics = get_business_metrics()
-                    permanently_failed_metric = business_metrics.get(
-                        "cj_permanently_failed_comparisons_total"
-                    )
-                    pool_size_metric = business_metrics.get("cj_failed_pool_size")
+            # Record metrics for permanently failed comparisons
+            if permanently_failed_count > 0:
+                business_metrics = get_business_metrics()
+                permanently_failed_metric = business_metrics.get(
+                    "cj_permanently_failed_comparisons_total"
+                )
+                pool_size_metric = business_metrics.get("cj_failed_pool_size")
 
-                    if permanently_failed_metric:
-                        permanently_failed_metric.inc(permanently_failed_count)
+                if permanently_failed_metric:
+                    permanently_failed_metric.inc(permanently_failed_count)
 
-                    if pool_size_metric:
-                        pool_size_metric.labels(batch_id=str(cj_batch_id)).set(len(remaining_pool))
+                if pool_size_metric:
+                    pool_size_metric.labels(batch_id=str(cj_batch_id)).set(len(remaining_pool))
 
-                # Update batch state
-                await merge_batch_processing_metadata(
-                    session=session,
-                    cj_batch_id=cj_batch_id,
-                    metadata_updates=failed_pool.model_dump(mode="json"),
-                    correlation_id=correlation_id,
+            # Update batch state
+            await merge_batch_processing_metadata(
+                session_provider=self._session_provider,
+                cj_batch_id=cj_batch_id,
+                metadata_updates=failed_pool.model_dump(mode="json"),
+                correlation_id=correlation_id,
+            )
+
+            if force_retry_all:
+                logger.info(
+                    f"End-of-batch processing: Formed retry batch with {len(retry_tasks)} "
+                    f"remaining failed comparisons to ensure fair Bradley-Terry scoring. "
+                    f"Pool now has {len(remaining_pool)} entries, "
+                    f"{permanently_failed_count} permanently failed",
+                    extra={
+                        "correlation_id": str(correlation_id),
+                        "cj_batch_id": cj_batch_id,
+                        "retry_batch_size": len(retry_tasks),
+                        "remaining_pool_size": len(remaining_pool),
+                        "permanently_failed": permanently_failed_count,
+                        "force_retry_all": force_retry_all,
+                    },
+                )
+            else:
+                logger.info(
+                    f"Threshold-based retry: Formed retry batch with {len(retry_tasks)} tasks. "
+                    f"Pool now has {len(remaining_pool)} entries, "
+                    f"{permanently_failed_count} permanently failed",
+                    extra={
+                        "correlation_id": str(correlation_id),
+                        "cj_batch_id": cj_batch_id,
+                        "retry_batch_size": len(retry_tasks),
+                        "remaining_pool_size": len(remaining_pool),
+                        "permanently_failed": permanently_failed_count,
+                        "force_retry_all": force_retry_all,
+                    },
                 )
 
-                if force_retry_all:
-                    logger.info(
-                        f"End-of-batch processing: Formed retry batch with {len(retry_tasks)} "
-                        f"remaining failed comparisons to ensure fair Bradley-Terry scoring. "
-                        f"Pool now has {len(remaining_pool)} entries, "
-                        f"{permanently_failed_count} permanently failed",
-                        extra={
-                            "correlation_id": str(correlation_id),
-                            "cj_batch_id": cj_batch_id,
-                            "retry_batch_size": len(retry_tasks),
-                            "remaining_pool_size": len(remaining_pool),
-                            "permanently_failed": permanently_failed_count,
-                            "force_retry_all": force_retry_all,
-                        },
-                    )
-                else:
-                    logger.info(
-                        f"Threshold-based retry: Formed retry batch with {len(retry_tasks)} tasks. "
-                        f"Pool now has {len(remaining_pool)} entries, "
-                        f"{permanently_failed_count} permanently failed",
-                        extra={
-                            "correlation_id": str(correlation_id),
-                            "cj_batch_id": cj_batch_id,
-                            "retry_batch_size": len(retry_tasks),
-                            "remaining_pool_size": len(remaining_pool),
-                            "permanently_failed": permanently_failed_count,
-                            "force_retry_all": force_retry_all,
-                        },
-                    )
-
-                return retry_tasks
+            return retry_tasks
 
         except Exception as e:
             logger.error(

@@ -28,4 +28,3 @@ include:
   - docker-compose.infrastructure.yml
   - docker-compose.services.yml
   - observability/docker-compose.observability.yml
-    # Note: cj_assessment_service is a worker service with metrics endpoint only 

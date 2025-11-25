@@ -1,5 +1,7 @@
 # CJ Assessment Service
 
+**Service type**: Integrated HTTP+Kafka service (Quart app with in-process Kafka consumer), not a standalone worker.
+
 ## Overview
 
 The CJ Assessment Service is a microservice dedicated to performing Comparative Judgment (CJ) assessment of essays using Large Language Model (LLM) based pairwise comparisons. The service consumes spellchecked essay texts and produces Bradley-Terry scores and rankings through iterative LLM-driven comparisons.
@@ -23,7 +25,7 @@ The CJ Assessment Service is a microservice dedicated to performing Comparative 
 - **`protocols.py`**: Defines behavioral contracts using `typing.Protocol` for all major dependencies
 - **`implementations/`**: Concrete implementations of all protocols (database, LLM providers, event publishing, content fetching)
 - **`event_processor.py`**: Processes individual Kafka messages, hydrates `student_prompt_ref` via Content Service, records `huleedu_cj_prompt_fetch_failures_total{reason}` on failures, and delegates to core workflow
-- **`worker_main.py`**: Kafka consumer lifecycle management and message processing
+- **`kafka_consumer.py`**: Kafka consumer lifecycle management and message processing, wired via Dishka DI
 - **`app.py`**: Integrated Quart application that exposes health/metrics and starts the Kafka workflow via `before_serving`
 - **`api/health_routes.py`**: Blueprint containing `/healthz` and `/metrics` endpoints
 
@@ -498,12 +500,8 @@ pdm install
 cp .env.example .env
 # Edit .env with your configuration
 
-# Run the complete service (HTTP API + Kafka worker)
-pdm run start_service
-
-# Or run components separately:
-pdm run start_worker      # Kafka worker only
-pdm run start_health_api  # HTTP API only
+# Run the complete service (HTTP API + Kafka worker via Quart)
+pdm run start
 ```
 
 ### Testing
@@ -538,14 +536,8 @@ pdm run ruff check .
 # Type checking
 pdm run mypy .
 
-# Run complete service locally
+# Run complete service locally (HTTP + Kafka)
 pdm run start
-
-# Run only Kafka worker 
-pdm run python worker_main.py
-
-# Run only health API
-pdm run python app.py
 ```
 
 ## Monitoring and Observability

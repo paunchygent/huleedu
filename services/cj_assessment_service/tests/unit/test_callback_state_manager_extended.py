@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
-from typing import Any, AsyncContextManager, AsyncIterator
+from typing import Any, AsyncContextManager, AsyncIterator, cast
 from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
 
@@ -38,12 +38,14 @@ from services.cj_assessment_service.cj_core_logic.callback_state_manager import 
 )
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.models_db import (
-    AssessmentInstruction,
     CJBatchState,
     ComparisonPair,
 )
-from services.cj_assessment_service.protocols import CJRepositoryProtocol
-from services.cj_assessment_service.tests.unit.instruction_store import AssessmentInstructionStore
+from services.cj_assessment_service.protocols import (
+    CJBatchRepositoryProtocol,
+    CJComparisonRepositoryProtocol,
+    SessionProviderProtocol,
+)
 
 
 class MockSession:
@@ -60,26 +62,26 @@ class MockSession:
         self.batch_state = batch_state
         self.raise_on_execute = raise_on_execute
         self.executed_queries: list[Any] = []
+        self.execute = AsyncMock(side_effect=self._execute)
         self.committed = False
+        self.commit = AsyncMock(side_effect=self._mark_committed)
 
-    async def execute(self, stmt: Any) -> MockResult:
+    async def _execute(self, stmt: Any) -> MockResult:
         """Track executed queries and return configured results."""
         self.executed_queries.append(stmt)
 
         if self.raise_on_execute:
             raise self.raise_on_execute
 
-        # Return appropriate result based on query pattern
         stmt_str = str(stmt).lower()
         if "comparison_pairs" in stmt_str:
             return MockResult(self.comparison_pair)
-        elif "batch_states" in stmt_str or "cj_batch_states" in stmt_str:
+        if "batch_states" in stmt_str or "cj_batch_states" in stmt_str:
             return MockResult(self.batch_state)
-        else:
-            return MockResult(None)
+        return MockResult(None)
 
-    async def commit(self) -> None:
-        """Track commit operation."""
+    async def _mark_committed(self) -> None:
+        """Track commit calls for assertions."""
         self.committed = True
 
 
@@ -101,48 +103,35 @@ async def mock_session_context(session: MockSession) -> AsyncIterator[AsyncSessi
     yield session  # type: ignore[misc]
 
 
-class MockRepository(CJRepositoryProtocol):
-    """Protocol-compliant mock repository."""
+class LocalMockSessionProvider(SessionProviderProtocol):
+    """Local mock session provider that wraps test MockSession."""
 
     def __init__(self, session: MockSession):
         """Initialize with mock session."""
         self._session = session
-        self._instruction_store = AssessmentInstructionStore()
 
     def session(self) -> AsyncContextManager[AsyncSession]:
         """Return session context manager."""
         return mock_session_context(self._session)
 
-    # Required protocol methods with minimal implementations
-    async def get_assessment_instruction(
-        self, session: AsyncSession, assignment_id: str | None, course_id: str | None
-    ) -> AssessmentInstruction | None:
-        return self._instruction_store.get(assignment_id=assignment_id, course_id=course_id)
 
-    async def get_cj_batch_upload(self, session: AsyncSession, cj_batch_id: int) -> Any | None:
+class LocalMockBatchRepository(CJBatchRepositoryProtocol):
+    """Local mock batch repository that reads from test MockSession."""
+
+    def __init__(self, session: MockSession):
+        """Initialize with mock session."""
+        self._session = session
+
+    async def get_batch_state(
+        self,
+        session: AsyncSession,
+        batch_id: int,
+    ) -> CJBatchState | None:
+        """Get batch state from mock session."""
+        state = cast(CJBatchState | None, getattr(self._session, "batch_state", None))
+        if state and getattr(state, "batch_id", None) == batch_id:
+            return state
         return None
-
-    async def get_assignment_context(
-        self,
-        session: AsyncSession,
-        assignment_id: str,
-    ) -> dict[str, Any] | None:
-        return {
-            "assignment_id": assignment_id,
-            "instructions_text": "Mock instructions",
-            "grade_scale": "swedish_8_anchor",
-        }
-
-    async def get_anchor_essay_references(
-        self,
-        session: AsyncSession,
-        assignment_id: str,
-        grade_scale: str | None = None,
-    ) -> list[Any]:
-        return []
-
-    async def store_grade_projections(self, session: AsyncSession, projections: list[Any]) -> None:
-        pass
 
     async def create_new_cj_batch(
         self,
@@ -156,104 +145,122 @@ class MockRepository(CJRepositoryProtocol):
         user_id: str | None = None,
         org_id: str | None = None,
     ) -> Any:
+        """Stub implementation."""
         return None
 
-    async def create_or_update_cj_processed_essay(
+    async def get_cj_batch_upload(
         self,
         session: AsyncSession,
         cj_batch_id: int,
-        els_essay_id: str,
-        text_storage_id: str,
-        assessment_input_text: str,
-        processing_metadata: dict | None = None,
-    ) -> Any:
+    ) -> Any | None:
+        """Stub implementation."""
         return None
 
-    async def get_essays_for_cj_batch(self, session: AsyncSession, cj_batch_id: int) -> list[Any]:
+    async def update_cj_batch_status(
+        self,
+        session: AsyncSession,
+        cj_batch_id: int,
+        status: Any,
+    ) -> None:
+        """Stub implementation."""
+        pass
+
+    async def update_batch_state(
+        self,
+        session: AsyncSession,
+        batch_id: int,
+        state: CJBatchStateEnum,
+    ) -> None:
+        """Stub implementation."""
+        pass
+
+    async def get_batch_state_for_update(
+        self,
+        session: AsyncSession,
+        batch_id: int,
+        for_update: bool = False,
+    ) -> CJBatchState | None:
+        """Stub implementation."""
+        return None
+
+    async def update_essay_scores_in_batch(
+        self,
+        _session: AsyncSession,
+        _cj_batch_id: int,
+        _scores: dict[str, float],
+    ) -> None:
+        """Stub implementation."""
+        pass
+
+    async def get_stuck_batches(
+        self,
+        session: AsyncSession,
+        states: list[CJBatchStateEnum],
+        stuck_threshold: datetime,
+    ) -> list[CJBatchState]:
+        """Stub implementation."""
         return []
 
+    async def get_batches_ready_for_completion(
+        self,
+        session: AsyncSession,
+    ) -> list[CJBatchState]:
+        """Stub implementation."""
+        return []
+
+
+class LocalMockComparisonRepository(CJComparisonRepositoryProtocol):
+    """Local mock comparison repository that reads from test MockSession."""
+
+    def __init__(self, session: MockSession):
+        """Initialize with mock session."""
+        self._session = session
+
+    async def get_comparison_pair_by_correlation_id(
+        self,
+        session: AsyncSession,
+        correlation_id: UUID,
+    ) -> ComparisonPair | None:
+        """Get comparison pair from mock session."""
+        pair = cast(ComparisonPair | None, getattr(self._session, "comparison_pair", None))
+        if pair and pair.request_correlation_id == correlation_id:
+            return pair
+        return None
+
     async def get_comparison_pair_by_essays(
-        self, session: AsyncSession, cj_batch_id: int, essay_a_els_id: str, essay_b_els_id: str
-    ) -> Any | None:
+        self,
+        session: AsyncSession,
+        cj_batch_id: int,
+        essay_a_els_id: str,
+        essay_b_els_id: str,
+    ) -> ComparisonPair | None:
+        """Stub implementation."""
         return None
 
     async def store_comparison_results(
-        self, session: AsyncSession, results: list[Any], cj_batch_id: int
-    ) -> None:
-        pass
-
-    async def upsert_assessment_instruction(
         self,
         session: AsyncSession,
-        *,
-        assignment_id: str | None,
-        course_id: str | None,
-        instructions_text: str,
-        grade_scale: str,
-        student_prompt_storage_id: str | None = None,
-        judge_rubric_storage_id: str | None = None,
-    ) -> AssessmentInstruction:
-        return self._instruction_store.upsert(
-            assignment_id=assignment_id,
-            course_id=course_id,
-            instructions_text=instructions_text,
-            grade_scale=grade_scale,
-            student_prompt_storage_id=student_prompt_storage_id,
-            judge_rubric_storage_id=judge_rubric_storage_id,
-        )
-
-    async def list_assessment_instructions(
-        self,
-        session: AsyncSession,
-        *,
-        limit: int,
-        offset: int,
-        grade_scale: str | None = None,
-    ) -> tuple[list[AssessmentInstruction], int]:
-        return self._instruction_store.list(limit=limit, offset=offset, grade_scale=grade_scale)
-
-    async def delete_assessment_instruction(
-        self,
-        session: AsyncSession,
-        *,
-        assignment_id: str | None,
-        course_id: str | None,
-    ) -> bool:
-        return self._instruction_store.delete(
-            assignment_id=assignment_id,
-            course_id=course_id,
-        )
-
-    async def update_essay_scores_in_batch(
-        self, session: AsyncSession, cj_batch_id: int, scores: dict[str, float]
+        results: list[Any],
+        cj_batch_id: int,
     ) -> None:
+        """Stub implementation."""
         pass
 
-    async def update_cj_batch_status(
-        self, session: AsyncSession, cj_batch_id: int, status: Any
-    ) -> None:
-        pass
-
-    async def get_final_cj_rankings(
-        self, session: AsyncSession, cj_batch_id: int
-    ) -> list[dict[str, Any]]:
+    async def get_comparison_pairs_for_batch(
+        self,
+        session: AsyncSession,
+        batch_id: int,
+    ) -> list[tuple[str, str]]:
+        """Stub implementation."""
         return []
 
-    async def initialize_db_schema(self) -> None:
-        pass
-
-    async def upsert_anchor_reference(
+    async def get_valid_comparisons_for_batch(
         self,
         session: AsyncSession,
-        *,
-        assignment_id: str,
-        anchor_label: str,
-        grade: str,
-        grade_scale: str,
-        text_storage_id: str,
-    ) -> int:
-        """Stub implementation for test mocks."""
-        return 1  # Return a mock anchor ID
+        batch_id: int,
+    ) -> list[ComparisonPair]:
+        """Stub implementation."""
+        return []
 
 
 def create_test_comparison_pair(
@@ -344,39 +351,43 @@ class TestBatchCompletionErrorHandling:
     async def test_check_batch_completion_database_error_returns_false(self) -> None:
         """Test that database errors in batch completion check return False safely."""
         # Arrange - Database error scenario
-        session = MockSession(raise_on_execute=Exception("Database connection lost"))
-        repository = MockRepository(session)
+        session = AsyncMock(spec=AsyncSession)
+        batch_repository = AsyncMock(spec=CJBatchRepositoryProtocol)
+        batch_repository.get_batch_state.side_effect = Exception("Database connection lost")
+        session_provider = LocalMockSessionProvider(session)
 
         # Act - Check should handle error gracefully
         result = await check_batch_completion_conditions(
             batch_id=1,
-            database=repository,
-            session=session,  # type: ignore[arg-type]
+            session_provider=session_provider,
+            batch_repository=batch_repository,
             correlation_id=uuid4(),
         )
 
         # Assert - Returns False on error, doesn't propagate exception
         assert result is False
-        assert len(session.executed_queries) == 1
+        batch_repository.get_batch_state.assert_awaited_once_with(session=session, batch_id=1)
 
     @pytest.mark.asyncio
     async def test_check_batch_completion_missing_batch_state_returns_false(self) -> None:
         """Test that missing batch state returns False."""
         # Arrange - No batch state found
-        session = MockSession(batch_state=None)
-        repository = MockRepository(session)
+        session = AsyncMock(spec=AsyncSession)
+        batch_repository = AsyncMock(spec=CJBatchRepositoryProtocol)
+        batch_repository.get_batch_state.return_value = None
+        session_provider = LocalMockSessionProvider(session)
 
         # Act
         result = await check_batch_completion_conditions(
             batch_id=999,
-            database=repository,
-            session=session,  # type: ignore[arg-type]
+            session_provider=session_provider,
+            batch_repository=batch_repository,
             correlation_id=uuid4(),
         )
 
         # Assert - Returns False when batch not found
         assert result is False
-        assert len(session.executed_queries) == 1
+        batch_repository.get_batch_state.assert_awaited_once_with(session=session, batch_id=999)
 
     @pytest.mark.asyncio
     async def test_check_batch_completion_zero_total_comparisons_returns_false(self) -> None:
@@ -386,19 +397,22 @@ class TestBatchCompletionErrorHandling:
             total_comparisons=0,
             completed_comparisons=5,
         )
-        session = MockSession(batch_state=batch_state)
-        repository = MockRepository(session)
+        session = AsyncMock(spec=AsyncSession)
+        batch_repository = AsyncMock(spec=CJBatchRepositoryProtocol)
+        batch_repository.get_batch_state.return_value = batch_state
+        session_provider = LocalMockSessionProvider(session)
 
         # Act
         result = await check_batch_completion_conditions(
             batch_id=1,
-            database=repository,
-            session=session,  # type: ignore[arg-type]
+            session_provider=session_provider,
+            batch_repository=batch_repository,
             correlation_id=uuid4(),
         )
 
         # Assert - Returns False for invalid state
         assert result is False
+        batch_repository.get_batch_state.assert_awaited_once_with(session=session, batch_id=1)
 
 
 class TestUpdateBatchCompletionCounters:
@@ -412,11 +426,14 @@ class TestUpdateBatchCompletionCounters:
             completed_comparisons=4,
             failed_comparisons=1,
         )
-        session = MockSession(batch_state=batch_state)
+        session = AsyncMock(spec=AsyncSession)
+        batch_repository = AsyncMock(spec=CJBatchRepositoryProtocol)
+        batch_repository.get_batch_state.return_value = batch_state
 
         # Act - Update for successful comparison
         await _update_batch_completion_counters(
-            session=session,  # type: ignore[arg-type]
+            session=session,
+            batch_repository=batch_repository,
             batch_id=1,
             is_error=False,
             correlation_id=uuid4(),
@@ -425,6 +442,7 @@ class TestUpdateBatchCompletionCounters:
         # Assert - Completed counter incremented
         assert batch_state.completed_comparisons == 5
         assert batch_state.failed_comparisons == 1
+        batch_repository.get_batch_state.assert_awaited_once_with(session=session, batch_id=1)
 
     @pytest.mark.asyncio
     async def test_update_counters_increments_failed_on_error(self) -> None:
@@ -434,11 +452,14 @@ class TestUpdateBatchCompletionCounters:
             completed_comparisons=4,
             failed_comparisons=1,
         )
-        session = MockSession(batch_state=batch_state)
+        session = AsyncMock(spec=AsyncSession)
+        batch_repository = AsyncMock(spec=CJBatchRepositoryProtocol)
+        batch_repository.get_batch_state.return_value = batch_state
 
         # Act - Update for failed comparison
         await _update_batch_completion_counters(
-            session=session,  # type: ignore[arg-type]
+            session=session,
+            batch_repository=batch_repository,
             batch_id=1,
             is_error=True,
             correlation_id=uuid4(),
@@ -447,6 +468,7 @@ class TestUpdateBatchCompletionCounters:
         # Assert - Failed counter incremented
         assert batch_state.completed_comparisons == 4
         assert batch_state.failed_comparisons == 2
+        batch_repository.get_batch_state.assert_awaited_once_with(session=session, batch_id=1)
 
     @pytest.mark.asyncio
     async def test_update_counters_triggers_partial_scoring_at_threshold(self) -> None:
@@ -457,11 +479,14 @@ class TestUpdateBatchCompletionCounters:
             completed_comparisons=7,
             partial_scoring_triggered=False,
         )
-        session = MockSession(batch_state=batch_state)
+        session = AsyncMock(spec=AsyncSession)
+        batch_repository = AsyncMock(spec=CJBatchRepositoryProtocol)
+        batch_repository.get_batch_state.return_value = batch_state
 
         # Act - Complete one more to hit 80%
         await _update_batch_completion_counters(
-            session=session,  # type: ignore[arg-type]
+            session=session,
+            batch_repository=batch_repository,
             batch_id=1,
             is_error=False,
             correlation_id=uuid4(),
@@ -470,40 +495,45 @@ class TestUpdateBatchCompletionCounters:
         # Assert - Partial scoring triggered
         assert batch_state.completed_comparisons == 8
         assert batch_state.partial_scoring_triggered is True
+        batch_repository.get_batch_state.assert_awaited_once_with(session=session, batch_id=1)
 
     @pytest.mark.asyncio
     async def test_update_counters_handles_missing_batch_gracefully(self) -> None:
         """Test that missing batch state is handled without error."""
         # Arrange - No batch state
-        session = MockSession(batch_state=None)
+        session = AsyncMock(spec=AsyncSession)
+        batch_repository = AsyncMock(spec=CJBatchRepositoryProtocol)
+        batch_repository.get_batch_state.return_value = None
 
         # Act - Should not raise
         await _update_batch_completion_counters(
-            session=session,  # type: ignore[arg-type]
+            session=session,
+            batch_repository=batch_repository,
             batch_id=999,
             is_error=False,
             correlation_id=uuid4(),
         )
 
-        # Assert - Completed without error
-        assert len(session.executed_queries) == 1
+        batch_repository.get_batch_state.assert_awaited_once_with(session=session, batch_id=999)
 
     @pytest.mark.asyncio
     async def test_update_counters_handles_database_error_gracefully(self) -> None:
         """Test that database errors in counter updates don't propagate."""
         # Arrange
-        session = MockSession(raise_on_execute=Exception("Connection lost"))
+        session = AsyncMock(spec=AsyncSession)
+        batch_repository = AsyncMock(spec=CJBatchRepositoryProtocol)
+        batch_repository.get_batch_state.side_effect = Exception("Connection lost")
 
         # Act - Should not raise
         await _update_batch_completion_counters(
-            session=session,  # type: ignore[arg-type]
+            session=session,
+            batch_repository=batch_repository,
             batch_id=1,
             is_error=False,
             correlation_id=uuid4(),
         )
 
-        # Assert - Error was caught
-        assert len(session.executed_queries) == 1
+        batch_repository.get_batch_state.assert_awaited_once_with(session=session, batch_id=1)
 
 
 class TestFailedComparisonPoolManagement:
@@ -640,7 +670,9 @@ class TestUpdateComparisonResultWithPoolManager:
             comparison_pair=comparison_pair,
             batch_state=batch_state,
         )
-        repository = MockRepository(session)
+        session_provider = LocalMockSessionProvider(session)
+        comparison_repository = LocalMockComparisonRepository(session)
+        batch_repository = LocalMockBatchRepository(session)
 
         settings = Settings()
         settings.ENABLE_FAILED_COMPARISON_RETRY = True
@@ -659,7 +691,9 @@ class TestUpdateComparisonResultWithPoolManager:
         # Act
         batch_id = await update_comparison_result(
             comparison_result=comparison_result,
-            database=repository,
+            session_provider=session_provider,
+            comparison_repository=comparison_repository,
+            batch_repository=batch_repository,
             correlation_id=correlation_id,
             settings=settings,
             pool_manager=pool_manager,
@@ -687,13 +721,14 @@ class TestUpdateComparisonResultWithPoolManager:
             comparison_pair=comparison_pair,
             batch_state=batch_state,
         )
-        repository = MockRepository(session)
+        session_provider = LocalMockSessionProvider(session)
+        comparison_repository = LocalMockComparisonRepository(session)
+        batch_repository = LocalMockBatchRepository(session)
 
         settings = Settings()
         settings.ENABLE_FAILED_COMPARISON_RETRY = True
 
         pool_manager = AsyncMock(spec=BatchPoolManager)
-        pool_manager.database = repository
 
         comparison_result = create_test_llm_result(
             correlation_id=correlation_id,
@@ -703,7 +738,9 @@ class TestUpdateComparisonResultWithPoolManager:
         # Act
         batch_id = await update_comparison_result(
             comparison_result=comparison_result,
-            database=repository,
+            session_provider=session_provider,
+            comparison_repository=comparison_repository,
+            batch_repository=batch_repository,
             correlation_id=correlation_id,
             settings=settings,
             pool_manager=pool_manager,

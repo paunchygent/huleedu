@@ -7,6 +7,8 @@ from request data to database operations for credit attribution.
 
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import ANY, AsyncMock, Mock
@@ -21,7 +23,10 @@ from services.cj_assessment_service.cj_core_logic.batch_preparation import creat
 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
 from services.cj_assessment_service.models_api import CJAssessmentRequestData, EssayToProcess
 from services.cj_assessment_service.models_db import CJBatchUpload
-from services.cj_assessment_service.protocols import CJRepositoryProtocol, ContentClientProtocol
+from services.cj_assessment_service.protocols import (
+    ContentClientProtocol,
+    SessionProviderProtocol,
+)
 
 
 class TestIdentityThreadingInBatchCreation:
@@ -30,7 +35,7 @@ class TestIdentityThreadingInBatchCreation:
     @pytest.fixture
     def mock_database(self) -> AsyncMock:
         """Create mock database protocol with identity field support."""
-        mock_db = AsyncMock(spec=CJRepositoryProtocol)
+        mock_db = AsyncMock()
         mock_session = AsyncMock(spec=AsyncSession)
         mock_batch = Mock(spec=CJBatchUpload)
         mock_batch.id = 12345
@@ -54,6 +59,34 @@ class TestIdentityThreadingInBatchCreation:
         """Create mock content client protocol."""
         return AsyncMock(spec=ContentClientProtocol)
 
+    @pytest.fixture
+    def mock_session_provider(self, mock_database: AsyncMock) -> AsyncMock:
+        """Create mock session provider that yields mock_database's session."""
+        provider = AsyncMock()
+        # Get the mock session that mock_database.session() would yield
+        mock_session_obj = mock_database.session.return_value.__aenter__.return_value
+
+        @asynccontextmanager
+        async def mock_session() -> AsyncGenerator[AsyncMock, None]:
+            yield mock_session_obj
+
+        provider.session = mock_session
+        return provider
+
+    @pytest.fixture
+    def mock_batch_repository(self, mock_database: AsyncMock) -> AsyncMock:
+        """Create mock batch repository that delegates to mock_database."""
+        mock_repo = AsyncMock()
+        mock_repo.create_new_cj_batch = mock_database.create_new_cj_batch
+        return mock_repo
+
+    @pytest.fixture
+    def mock_instruction_repository(self, mock_database: AsyncMock) -> AsyncMock:
+        """Create mock instruction repository that delegates to mock_database."""
+        mock_repo = AsyncMock()
+        mock_repo.get_assessment_instruction = mock_database.get_assessment_instruction
+        return mock_repo
+
     @pytest.fixture(autouse=True)
     def patch_metadata_merges(
         self,
@@ -70,7 +103,8 @@ class TestIdentityThreadingInBatchCreation:
         captured_state: list[dict[str, Any]] = []
 
         async def fake_merge_batch_upload_metadata(
-            session: AsyncSession,
+            *,
+            session_provider: SessionProviderProtocol,
             cj_batch_id: int,
             metadata_updates: dict[str, Any],
             correlation_id: Any,
@@ -81,7 +115,8 @@ class TestIdentityThreadingInBatchCreation:
             target.processing_metadata = {**existing, **metadata_updates}
 
         async def fake_merge_batch_processing_metadata(
-            session: AsyncSession,
+            *,
+            session_provider: SessionProviderProtocol,
             cj_batch_id: int,
             metadata_updates: dict[str, Any],
             correlation_id: Any,
@@ -173,6 +208,9 @@ class TestIdentityThreadingInBatchCreation:
     async def test_identity_extraction_and_database_storage(
         self,
         mock_database: AsyncMock,
+        mock_session_provider: AsyncMock,
+        mock_batch_repository: AsyncMock,
+        mock_instruction_repository: AsyncMock,
         base_request_data: dict[str, Any],
         mock_content_client: AsyncMock,
         user_id: str,
@@ -217,7 +255,9 @@ class TestIdentityThreadingInBatchCreation:
         cj_batch_id = await create_cj_batch(
             request_data=request_data,
             correlation_id=correlation_id,
-            database=mock_database,
+            session_provider=mock_session_provider,
+            batch_repository=mock_batch_repository,
+            instruction_repository=mock_instruction_repository,
             content_client=mock_content_client,
             log_extra=log_extra,
         )
@@ -276,6 +316,9 @@ class TestIdentityThreadingInBatchCreation:
     async def test_missing_user_id_validation(
         self,
         mock_database: AsyncMock,
+        mock_session_provider: AsyncMock,
+        mock_batch_repository: AsyncMock,
+        mock_instruction_repository: AsyncMock,
         base_request_data: dict[str, Any],
         mock_content_client: AsyncMock,
     ) -> None:
@@ -306,7 +349,9 @@ class TestIdentityThreadingInBatchCreation:
         cj_batch_id = await create_cj_batch(
             request_data=request_data,
             correlation_id=correlation_id,
-            database=mock_database,
+            session_provider=mock_session_provider,
+            batch_repository=mock_batch_repository,
+            instruction_repository=mock_instruction_repository,
             content_client=mock_content_client,
             log_extra=log_extra,
         )
@@ -321,6 +366,9 @@ class TestIdentityThreadingInBatchCreation:
     async def test_missing_required_fields_with_identity_fields_present(
         self,
         mock_database: AsyncMock,
+        mock_session_provider: AsyncMock,
+        mock_batch_repository: AsyncMock,
+        mock_instruction_repository: AsyncMock,
         mock_content_client: AsyncMock,
     ) -> None:
         """Test ValueError when bos_batch_id missing but identity fields present."""
@@ -344,7 +392,9 @@ class TestIdentityThreadingInBatchCreation:
                     org_id="org-456",
                 ),
                 correlation_id=correlation_id,
-                database=mock_database,
+                session_provider=mock_session_provider,
+                batch_repository=mock_batch_repository,
+                instruction_repository=mock_instruction_repository,
                 content_client=mock_content_client,
                 log_extra={},
             )
@@ -356,6 +406,9 @@ class TestIdentityThreadingInBatchCreation:
     async def test_create_cj_batch_hydrates_prompt_with_fallback(
         self,
         mock_database: AsyncMock,
+        mock_session_provider: AsyncMock,
+        mock_batch_repository: AsyncMock,
+        mock_instruction_repository: AsyncMock,
         mock_content_client: AsyncMock,
         monkeypatch: pytest.MonkeyPatch,
         base_request_data: dict[str, Any],
@@ -397,7 +450,9 @@ class TestIdentityThreadingInBatchCreation:
         cj_batch_id = await create_cj_batch(
             request_data=request_data,
             correlation_id=uuid4(),
-            database=mock_database,
+            session_provider=mock_session_provider,
+            batch_repository=mock_batch_repository,
+            instruction_repository=mock_instruction_repository,
             content_client=mock_content_client,
             log_extra={},
         )
@@ -416,6 +471,9 @@ class TestIdentityThreadingInBatchCreation:
     async def test_create_cj_batch_records_metric_on_fallback_failure(
         self,
         mock_database: AsyncMock,
+        mock_session_provider: AsyncMock,
+        mock_batch_repository: AsyncMock,
+        mock_instruction_repository: AsyncMock,
         mock_content_client: AsyncMock,
         monkeypatch: pytest.MonkeyPatch,
         base_request_data: dict[str, Any],
@@ -457,7 +515,9 @@ class TestIdentityThreadingInBatchCreation:
         cj_batch_id = await create_cj_batch(
             request_data=request_data,
             correlation_id=uuid4(),
-            database=mock_database,
+            session_provider=mock_session_provider,
+            batch_repository=mock_batch_repository,
+            instruction_repository=mock_instruction_repository,
             content_client=mock_content_client,
             log_extra={},
         )
@@ -477,6 +537,9 @@ class TestIdentityThreadingInBatchCreation:
     async def test_create_cj_batch_hydrates_judge_rubric_text_when_missing(
         self,
         mock_database: AsyncMock,
+        mock_session_provider: AsyncMock,
+        mock_batch_repository: AsyncMock,
+        mock_instruction_repository: AsyncMock,
         mock_content_client: AsyncMock,
         base_request_data: dict[str, Any],
     ) -> None:
@@ -507,7 +570,9 @@ class TestIdentityThreadingInBatchCreation:
         await create_cj_batch(
             request_data=request_data,
             correlation_id=uuid4(),
-            database=mock_database,
+            session_provider=mock_session_provider,
+            batch_repository=mock_batch_repository,
+            instruction_repository=mock_instruction_repository,
             content_client=mock_content_client,
             log_extra={},
         )
@@ -521,6 +586,9 @@ class TestIdentityThreadingInBatchCreation:
     async def test_identity_field_precedence_over_defaults(
         self,
         mock_database: AsyncMock,
+        mock_session_provider: AsyncMock,
+        mock_batch_repository: AsyncMock,
+        mock_instruction_repository: AsyncMock,
         base_request_data: dict[str, Any],
         mock_content_client: AsyncMock,
     ) -> None:
@@ -550,7 +618,9 @@ class TestIdentityThreadingInBatchCreation:
         await create_cj_batch(
             request_data=request_data,
             correlation_id=uuid4(),
-            database=mock_database,
+            session_provider=mock_session_provider,
+            batch_repository=mock_batch_repository,
+            instruction_repository=mock_instruction_repository,
             content_client=mock_content_client,
             log_extra={},
         )
@@ -581,6 +651,9 @@ class TestIdentityThreadingInBatchCreation:
     async def test_identity_field_edge_cases(
         self,
         mock_database: AsyncMock,
+        mock_session_provider: AsyncMock,
+        mock_batch_repository: AsyncMock,
+        mock_instruction_repository: AsyncMock,
         base_request_data: dict[str, Any],
         mock_content_client: AsyncMock,
         user_id_value: str,
@@ -613,7 +686,9 @@ class TestIdentityThreadingInBatchCreation:
         await create_cj_batch(
             request_data=request_data,
             correlation_id=uuid4(),
-            database=mock_database,
+            session_provider=mock_session_provider,
+            batch_repository=mock_batch_repository,
+            instruction_repository=mock_instruction_repository,
             content_client=mock_content_client,
             log_extra={},
         )
@@ -627,6 +702,9 @@ class TestIdentityThreadingInBatchCreation:
     async def test_assignment_id_storage_with_identity_fields(
         self,
         mock_database: AsyncMock,
+        mock_session_provider: AsyncMock,
+        mock_batch_repository: AsyncMock,
+        mock_instruction_repository: AsyncMock,
         base_request_data: dict[str, Any],
         mock_content_client: AsyncMock,
     ) -> None:
@@ -661,7 +739,9 @@ class TestIdentityThreadingInBatchCreation:
         cj_batch_id = await create_cj_batch(
             request_data=request_data,
             correlation_id=uuid4(),
-            database=mock_database,
+            session_provider=mock_session_provider,
+            batch_repository=mock_batch_repository,
+            instruction_repository=mock_instruction_repository,
             content_client=mock_content_client,
             log_extra={},
         )
@@ -678,6 +758,9 @@ class TestIdentityThreadingInBatchCreation:
     async def test_complete_identity_threading_workflow(
         self,
         mock_database: AsyncMock,
+        mock_session_provider: AsyncMock,
+        mock_batch_repository: AsyncMock,
+        mock_instruction_repository: AsyncMock,
         base_request_data: dict[str, Any],
         mock_content_client: AsyncMock,
     ) -> None:
@@ -708,7 +791,9 @@ class TestIdentityThreadingInBatchCreation:
         cj_batch_id = await create_cj_batch(
             request_data=request_data,
             correlation_id=correlation_id,
-            database=mock_database,
+            session_provider=mock_session_provider,
+            batch_repository=mock_batch_repository,
+            instruction_repository=mock_instruction_repository,
             content_client=mock_content_client,
             log_extra={},
         )
@@ -735,7 +820,7 @@ class TestIdentityFieldDefaultBehavior:
     @pytest.fixture
     def mock_database(self) -> AsyncMock:
         """Create mock database protocol."""
-        mock_db = AsyncMock(spec=CJRepositoryProtocol)
+        mock_db = AsyncMock()
         mock_session = AsyncMock(spec=AsyncSession)
         mock_batch = Mock(spec=CJBatchUpload)
         mock_batch.id = 54321
@@ -751,10 +836,46 @@ class TestIdentityFieldDefaultBehavior:
 
         return mock_db
 
+    @pytest.fixture
+    def mock_content_client(self) -> AsyncMock:
+        """Create mock content client protocol."""
+        return AsyncMock(spec=ContentClientProtocol)
+
+    @pytest.fixture
+    def mock_session_provider(self, mock_database: AsyncMock) -> AsyncMock:
+        """Create mock session provider that yields mock_database's session."""
+        provider = AsyncMock()
+        # Get the mock session that mock_database.session() would yield
+        mock_session_obj = mock_database.session.return_value.__aenter__.return_value
+
+        @asynccontextmanager
+        async def mock_session() -> AsyncGenerator[AsyncMock, None]:
+            yield mock_session_obj
+
+        provider.session = mock_session
+        return provider
+
+    @pytest.fixture
+    def mock_batch_repository(self, mock_database: AsyncMock) -> AsyncMock:
+        """Create mock batch repository that delegates to mock_database."""
+        mock_repo = AsyncMock()
+        mock_repo.create_new_cj_batch = mock_database.create_new_cj_batch
+        return mock_repo
+
+    @pytest.fixture
+    def mock_instruction_repository(self, mock_database: AsyncMock) -> AsyncMock:
+        """Create mock instruction repository that delegates to mock_database."""
+        mock_repo = AsyncMock()
+        mock_repo.get_assessment_instruction = mock_database.get_assessment_instruction
+        return mock_repo
+
     @pytest.mark.asyncio
     async def test_no_identity_fields_in_request_data(
         self,
         mock_database: AsyncMock,
+        mock_session_provider: AsyncMock,
+        mock_batch_repository: AsyncMock,
+        mock_instruction_repository: AsyncMock,
         mock_content_client: AsyncMock,
     ) -> None:
         """Test behavior when no identity fields are present in request_data."""
@@ -774,7 +895,9 @@ class TestIdentityFieldDefaultBehavior:
         cj_batch_id = await create_cj_batch(
             request_data=request_data,
             correlation_id=uuid4(),
-            database=mock_database,
+            session_provider=mock_session_provider,
+            batch_repository=mock_batch_repository,
+            instruction_repository=mock_instruction_repository,
             content_client=mock_content_client,
             log_extra={},
         )
@@ -799,6 +922,9 @@ class TestIdentityFieldDefaultBehavior:
     async def test_partial_identity_field_scenarios(
         self,
         mock_database: AsyncMock,
+        mock_session_provider: AsyncMock,
+        mock_batch_repository: AsyncMock,
+        mock_instruction_repository: AsyncMock,
         mock_content_client: AsyncMock,
         user_id: str | None,
         org_id: str | None,
@@ -821,7 +947,9 @@ class TestIdentityFieldDefaultBehavior:
         cj_batch_id = await create_cj_batch(
             request_data=request_data,
             correlation_id=uuid4(),
-            database=mock_database,
+            session_provider=mock_session_provider,
+            batch_repository=mock_batch_repository,
+            instruction_repository=mock_instruction_repository,
             content_client=mock_content_client,
             log_extra={},
         )

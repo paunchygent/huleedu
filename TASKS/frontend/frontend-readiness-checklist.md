@@ -22,7 +22,7 @@ This checklist outlines the preparatory work needed to optimize the HuleEdu back
 
 ✅ **Strong Foundation**:
 
-- FastAPI-based API Gateway (port 4001) designed for Svelte 5 + Vite integration
+- FastAPI-based API Gateway (port 4001) designed for Vue 3 + Vite integration
 - JWT authentication, rate limiting, CORS configuration
 - WebSocket Service (port 8081) with real-time notifications
 - Comprehensive event contracts in `common_core` with versioned Pydantic models
@@ -46,8 +46,8 @@ This checklist outlines the preparatory work needed to optimize the HuleEdu back
   - Check if FastAPI app has `docs_url="/docs"` and `openapi_url="/openapi.json"`
   - Ensure comprehensive endpoint documentation with response models
   - Add detailed descriptions and examples to API endpoints
-  - [x] Review and update integration documentation/examples for Svelte 5 compatibility
-  - [x] Complete Svelte 5 + Tailwind integration documentation and examples
+  - [x] Review and update integration documentation/examples for Vue 3 + Vite compatibility
+  - [x] Complete Vue 3 + Vite integration documentation and examples
 
 - [x] **Export OpenAPI specification**
 - Generate: `curl http://localhost:4001/openapi.json > Documentation/apis/api-gateway-openapi.json`
@@ -57,7 +57,7 @@ This checklist outlines the preparatory work needed to optimize the HuleEdu back
 - [x] **Generate TypeScript types**
   - Use tools like `openapi-typescript` or `swagger-codegen`
   - Generate client SDK with type-safe API calls
-  - Document integration with Svelte/TypeScript projects
+  - Document integration with Vue 3 + Vite projects
 
 - [x] **Authentication flow documentation**
   - Document JWT token acquisition and refresh patterns
@@ -75,7 +75,7 @@ This checklist outlines the preparatory work needed to optimize the HuleEdu back
 - [x] **WebSocket API documentation**
 - Created comprehensive WebSocket API documentation (`Documentation/apis/WEBSOCKET_API_DOCUMENTATION.md`)
   - Documented connection patterns and authentication flow with JWT tokens
-  - Provided client-side connection examples (JavaScript/TypeScript, Svelte 5 runes, Svelte stores)
+  - Provided client-side connection examples (JavaScript/TypeScript, Vue 3 runes, Vue stores)
   - Documented all 15 notification event types from TeacherNotificationRequestedV1
   - Included error handling, reconnection strategies, and troubleshooting guides
 

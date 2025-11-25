@@ -8,7 +8,8 @@ from __future__ import annotations
 import pytest
 from common_core.config_enums import LLMBatchingMode
 
-from services.cj_assessment_service.cj_core_logic import comparison_processing as cp
+from services.cj_assessment_service.cj_core_logic.llm_batching_service import BatchingModeService
+from services.cj_assessment_service.config import Settings
 
 
 class DummyCounter:
@@ -47,12 +48,14 @@ def test_record_llm_batching_metrics_initial_batch_increments_requests_and_batch
     batches_metric = DummyCounter()
 
     monkeypatch.setattr(
-        cp,
-        "get_business_metrics",
+        "services.cj_assessment_service.cj_core_logic.llm_batching_service.get_business_metrics",
         lambda: _make_business_metrics(requests_metric, batches_metric),
     )
 
-    cp._record_llm_batching_metrics(  # type: ignore[attr-defined]
+    settings = Settings()
+    service = BatchingModeService(settings)
+
+    service.record_metrics(
         effective_mode=LLMBatchingMode.SERIAL_BUNDLE,
         request_count=5,
         request_type="cj_comparison",
@@ -78,12 +81,14 @@ def test_record_llm_batching_metrics_retry_only_increments_requests(
     batches_metric = DummyCounter()
 
     monkeypatch.setattr(
-        cp,
-        "get_business_metrics",
+        "services.cj_assessment_service.cj_core_logic.llm_batching_service.get_business_metrics",
         lambda: _make_business_metrics(requests_metric, batches_metric),
     )
 
-    cp._record_llm_batching_metrics(  # type: ignore[attr-defined]
+    settings = Settings()
+    service = BatchingModeService(settings)
+
+    service.record_metrics(
         effective_mode=LLMBatchingMode.PER_REQUEST,
         request_count=3,
         request_type="cj_retry",

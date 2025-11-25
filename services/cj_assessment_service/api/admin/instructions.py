@@ -22,7 +22,10 @@ from quart import Blueprint, g, request
 from quart_dishka import inject
 
 from services.cj_assessment_service.models_db import AssessmentInstruction
-from services.cj_assessment_service.protocols import CJRepositoryProtocol
+from services.cj_assessment_service.protocols import (
+    AssessmentInstructionRepositoryProtocol,
+    SessionProviderProtocol,
+)
 
 from .common import logger, record_admin_metric, register_admin_auth
 
@@ -47,7 +50,8 @@ def _serialize_instruction(model: AssessmentInstruction) -> AssessmentInstructio
 @instructions_bp.post("/assessment-instructions")
 @inject
 async def upsert_assessment_instruction(  # type: ignore[override]
-    repository: FromDishka[CJRepositoryProtocol],
+    session_provider: FromDishka[SessionProviderProtocol],
+    instruction_repository: FromDishka[AssessmentInstructionRepositoryProtocol],
     corr: FromDishka[CorrelationContext],
 ) -> tuple[dict[str, Any], int]:
     """Create or update assignment-scoped assessment configuration."""
@@ -88,9 +92,9 @@ async def upsert_assessment_instruction(  # type: ignore[override]
             correlation_id=corr.uuid,
         )
 
-    async with repository.session() as session:
+    async with session_provider.session() as session:
         try:
-            record = await repository.upsert_assessment_instruction(
+            record = await instruction_repository.upsert_assessment_instruction(
                 session,
                 assignment_id=req.assignment_id,
                 course_id=req.course_id,
@@ -134,7 +138,8 @@ async def upsert_assessment_instruction(  # type: ignore[override]
 @instructions_bp.get("/assessment-instructions")
 @inject
 async def list_assessment_instructions(  # type: ignore[override]
-    repository: FromDishka[CJRepositoryProtocol],
+    session_provider: FromDishka[SessionProviderProtocol],
+    instruction_repository: FromDishka[AssessmentInstructionRepositoryProtocol],
     corr: FromDishka[CorrelationContext],
 ) -> tuple[dict[str, Any], int]:
     """List assessment instructions with pagination support."""
@@ -144,9 +149,9 @@ async def list_assessment_instructions(  # type: ignore[override]
     grade_scale = request.args.get("grade_scale") or None
     offset = (page - 1) * page_size
 
-    async with repository.session() as session:
+    async with session_provider.session() as session:
         try:
-            items, total = await repository.list_assessment_instructions(
+            items, total = await instruction_repository.list_assessment_instructions(
                 session,
                 limit=page_size,
                 offset=offset,
@@ -176,13 +181,14 @@ async def list_assessment_instructions(  # type: ignore[override]
 @inject
 async def get_assessment_instruction_by_assignment(  # type: ignore[override]
     assignment_id: str,
-    repository: FromDishka[CJRepositoryProtocol],
+    session_provider: FromDishka[SessionProviderProtocol],
+    instruction_repository: FromDishka[AssessmentInstructionRepositoryProtocol],
     corr: FromDishka[CorrelationContext],
 ) -> tuple[dict[str, Any], int]:
     """Fetch assignment-specific instructions."""
 
-    async with repository.session() as session:
-        record = await repository.get_assessment_instruction(
+    async with session_provider.session() as session:
+        record = await instruction_repository.get_assessment_instruction(
             session,
             assignment_id=assignment_id,
             course_id=None,
@@ -206,13 +212,14 @@ async def get_assessment_instruction_by_assignment(  # type: ignore[override]
 @inject
 async def delete_assignment_instruction(  # type: ignore[override]
     assignment_id: str,
-    repository: FromDishka[CJRepositoryProtocol],
+    session_provider: FromDishka[SessionProviderProtocol],
+    instruction_repository: FromDishka[AssessmentInstructionRepositoryProtocol],
     corr: FromDishka[CorrelationContext],
 ) -> tuple[dict[str, Any], int]:
     """Delete assignment-scoped instructions."""
 
-    async with repository.session() as session:
-        deleted = await repository.delete_assessment_instruction(
+    async with session_provider.session() as session:
+        deleted = await instruction_repository.delete_assessment_instruction(
             session,
             assignment_id=assignment_id,
             course_id=None,
@@ -236,13 +243,14 @@ async def delete_assignment_instruction(  # type: ignore[override]
 @inject
 async def delete_course_instruction(  # type: ignore[override]
     course_id: str,
-    repository: FromDishka[CJRepositoryProtocol],
+    session_provider: FromDishka[SessionProviderProtocol],
+    instruction_repository: FromDishka[AssessmentInstructionRepositoryProtocol],
     corr: FromDishka[CorrelationContext],
 ) -> tuple[dict[str, Any], int]:
     """Delete course-level fallback instructions."""
 
-    async with repository.session() as session:
-        deleted = await repository.delete_assessment_instruction(
+    async with session_provider.session() as session:
+        deleted = await instruction_repository.delete_assessment_instruction(
             session,
             assignment_id=None,
             course_id=course_id,

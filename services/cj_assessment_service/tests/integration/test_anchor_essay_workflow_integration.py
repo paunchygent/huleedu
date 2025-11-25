@@ -19,11 +19,16 @@ from common_core import EssayComparisonWinner
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from services.cj_assessment_service.cj_core_logic.grade_projection.context_service import (
+    ProjectionContextService,
+)
+from services.cj_assessment_service.cj_core_logic.grade_projection.projection_repository import (
+    GradeProjectionRepository,
+)
 from services.cj_assessment_service.cj_core_logic.grade_projector import GradeProjector
 from services.cj_assessment_service.cj_core_logic.scoring_ranking import (
     record_comparisons_and_update_scores,
 )
-from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
 from services.cj_assessment_service.models_api import (
     ComparisonResult,
@@ -38,8 +43,11 @@ from services.cj_assessment_service.models_db import (
     ProcessedEssay,
 )
 from services.cj_assessment_service.protocols import (
-    CJRepositoryProtocol,
+    AnchorRepositoryProtocol,
+    AssessmentInstructionRepositoryProtocol,
+    SessionProviderProtocol,
 )
+from services.cj_assessment_service.tests.fixtures.database_fixtures import PostgresDataAccess
 
 if TYPE_CHECKING:
     pass
@@ -48,6 +56,24 @@ if TYPE_CHECKING:
 @pytest.mark.integration
 class TestAnchorEssayWorkflow:
     """Test the complete anchor essay workflow with grade projection."""
+
+    def _make_grade_projector(
+        self,
+        *,
+        session_provider: SessionProviderProtocol,
+        instruction_repository: AssessmentInstructionRepositoryProtocol,
+        anchor_repository: AnchorRepositoryProtocol,
+    ) -> GradeProjector:
+        context_service = ProjectionContextService(
+            session_provider=session_provider,
+            instruction_repository=instruction_repository,
+            anchor_repository=anchor_repository,
+        )
+        return GradeProjector(
+            session_provider=session_provider,
+            context_service=context_service,
+            repository=GradeProjectionRepository(),
+        )
 
     async def _create_assessment_context(
         self,
@@ -87,7 +113,7 @@ class TestAnchorEssayWorkflow:
 
     async def _create_batch_with_essays(
         self,
-        repository: CJRepositoryProtocol,
+        repository: PostgresDataAccess,
         session: AsyncSession,
         student_count: int,
         anchor_grades: list[str],
@@ -156,6 +182,7 @@ class TestAnchorEssayWorkflow:
             )
 
         await session.flush()
+        await session.commit()
         return cj_batch.id, student_essays, anchor_essays
 
     def _generate_comparison_results(
@@ -228,10 +255,14 @@ class TestAnchorEssayWorkflow:
 
     async def test_full_anchor_workflow_with_comprehensive_anchors(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_repository: PostgresDataAccess,
         postgres_session: AsyncSession,
+        postgres_session_provider: Any,
+        postgres_comparison_repository: Any,
+        postgres_essay_repository: Any,
+        postgres_instruction_repository: AssessmentInstructionRepositoryProtocol,
+        postgres_anchor_repository: AnchorRepositoryProtocol,
         mock_content_client: AsyncMock,
-        test_settings: Settings,
     ) -> None:
         """Test grade projection with comprehensive anchor coverage (all grades)."""
         # Create assessment context
@@ -283,7 +314,9 @@ class TestAnchorEssayWorkflow:
         scores = await record_comparisons_and_update_scores(
             all_essays=essay_objects,
             comparison_results=comparison_results,
-            db_session=postgres_session,
+            session_provider=postgres_session_provider,
+            comparison_repository=postgres_comparison_repository,
+            essay_repository=postgres_essay_repository,
             cj_batch_id=batch_id,
             correlation_id=correlation_id,
         )
@@ -306,10 +339,12 @@ class TestAnchorEssayWorkflow:
         result = await postgres_session.execute(stmt)
         rankings = []
         for row in result:
+            score = row.current_bt_score or 0.0
+            se = row.current_bt_se or 0.0
             ranking_dict = {
                 "els_essay_id": row.els_essay_id,
-                "bradley_terry_score": row.current_bt_score,
-                "bradley_terry_se": row.current_bt_se,
+                "bradley_terry_score": score,
+                "bradley_terry_se": se,
                 "is_anchor": row.is_anchor,
             }
             if row.is_anchor and row.processing_metadata:
@@ -323,9 +358,12 @@ class TestAnchorEssayWorkflow:
         mock_content_client.fetch_content.side_effect = mock_fetch_content
 
         # Calculate grade projections
-        grade_projector = GradeProjector()
+        grade_projector = self._make_grade_projector(
+            session_provider=postgres_session_provider,
+            instruction_repository=postgres_instruction_repository,
+            anchor_repository=postgres_anchor_repository,
+        )
         projection_summary = await grade_projector.calculate_projections(
-            session=postgres_session,
             rankings=rankings,
             cj_batch_id=batch_id,
             assignment_id=assignment_id,
@@ -393,10 +431,14 @@ class TestAnchorEssayWorkflow:
 
     async def test_grade_projection_with_sparse_anchors(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_repository: PostgresDataAccess,
         postgres_session: AsyncSession,
+        postgres_session_provider: Any,
+        postgres_comparison_repository: Any,
+        postgres_essay_repository: Any,
+        postgres_instruction_repository: AssessmentInstructionRepositoryProtocol,
+        postgres_anchor_repository: AnchorRepositoryProtocol,
         mock_content_client: AsyncMock,
-        test_settings: Settings,
     ) -> None:
         """Test grade projection with sparse anchor coverage (only A, C, E grades)."""
         # Create assessment context
@@ -441,7 +483,9 @@ class TestAnchorEssayWorkflow:
         await record_comparisons_and_update_scores(
             all_essays=essay_objects,
             comparison_results=comparison_results,
-            db_session=postgres_session,
+            session_provider=postgres_session_provider,
+            comparison_repository=postgres_comparison_repository,
+            essay_repository=postgres_essay_repository,
             cj_batch_id=batch_id,
             correlation_id=correlation_id,
         )
@@ -457,10 +501,12 @@ class TestAnchorEssayWorkflow:
         result = await postgres_session.execute(stmt)
         rankings = []
         for row in result:
+            score = row.current_bt_score or 0.0
+            se = row.current_bt_se or 0.0
             ranking_dict = {
                 "els_essay_id": row.els_essay_id,
-                "bradley_terry_score": row.current_bt_score,
-                "bradley_terry_se": row.current_bt_se,
+                "bradley_terry_score": score,
+                "bradley_terry_se": se,
                 "is_anchor": row.is_anchor,
             }
             if row.is_anchor and row.processing_metadata:
@@ -471,9 +517,12 @@ class TestAnchorEssayWorkflow:
         mock_content_client.fetch_content.side_effect = lambda cid, corr: f"Content {cid}"
 
         # Calculate projections with sparse anchors
-        grade_projector = GradeProjector()
+        grade_projector = self._make_grade_projector(
+            session_provider=postgres_session_provider,
+            instruction_repository=postgres_instruction_repository,
+            anchor_repository=postgres_anchor_repository,
+        )
         projection_summary = await grade_projector.calculate_projections(
-            session=postgres_session,
             rankings=rankings,
             cj_batch_id=batch_id,
             assignment_id=assignment_id,
@@ -495,10 +544,14 @@ class TestAnchorEssayWorkflow:
 
     async def test_batch_with_no_anchors(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_repository: PostgresDataAccess,
         postgres_session: AsyncSession,
+        postgres_session_provider: Any,
+        postgres_comparison_repository: Any,
+        postgres_essay_repository: Any,
+        postgres_instruction_repository: AssessmentInstructionRepositoryProtocol,
+        postgres_anchor_repository: AnchorRepositoryProtocol,
         mock_content_client: AsyncMock,
-        test_settings: Settings,
     ) -> None:
         """Test that batches without anchors complete but don't produce grade projections."""
         # Create batch with only student essays (no anchors)
@@ -531,7 +584,9 @@ class TestAnchorEssayWorkflow:
         scores = await record_comparisons_and_update_scores(
             all_essays=essay_objects,
             comparison_results=comparison_results,
-            db_session=postgres_session,
+            session_provider=postgres_session_provider,
+            comparison_repository=postgres_comparison_repository,
+            essay_repository=postgres_essay_repository,
             cj_batch_id=batch_id,
             correlation_id=correlation_id,
         )
@@ -558,9 +613,12 @@ class TestAnchorEssayWorkflow:
         ]
 
         # Try to calculate projections
-        grade_projector = GradeProjector()
+        grade_projector = self._make_grade_projector(
+            session_provider=postgres_session_provider,
+            instruction_repository=postgres_instruction_repository,
+            anchor_repository=postgres_anchor_repository,
+        )
         projection_summary = await grade_projector.calculate_projections(
-            session=postgres_session,
             rankings=rankings,
             cj_batch_id=batch_id,
             assignment_id=None,  # No assignment context
@@ -578,10 +636,14 @@ class TestAnchorEssayWorkflow:
 
     async def test_grade_boundary_behavior(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_repository: PostgresDataAccess,
         postgres_session: AsyncSession,
+        postgres_session_provider: Any,
+        postgres_comparison_repository: Any,
+        postgres_essay_repository: Any,
+        postgres_instruction_repository: AssessmentInstructionRepositoryProtocol,
+        postgres_anchor_repository: AnchorRepositoryProtocol,
         mock_content_client: AsyncMock,
-        test_settings: Settings,
     ) -> None:
         """Test that grade boundaries and fine grades work correctly."""
         # Create assessment context
@@ -649,7 +711,9 @@ class TestAnchorEssayWorkflow:
         await record_comparisons_and_update_scores(
             all_essays=essay_objects,
             comparison_results=comparison_results,
-            db_session=postgres_session,
+            session_provider=postgres_session_provider,
+            comparison_repository=postgres_comparison_repository,
+            essay_repository=postgres_essay_repository,
             cj_batch_id=batch_id,
             correlation_id=correlation_id,
         )
@@ -665,10 +729,12 @@ class TestAnchorEssayWorkflow:
         result = await postgres_session.execute(stmt)
         rankings = []
         for row in result:
+            score = row.current_bt_score or 0.0
+            se = row.current_bt_se or 0.0
             ranking_dict = {
                 "els_essay_id": row.els_essay_id,
-                "bradley_terry_score": row.current_bt_score,
-                "bradley_terry_se": row.current_bt_se,
+                "bradley_terry_score": score,
+                "bradley_terry_se": se,
                 "is_anchor": row.is_anchor,
             }
             if row.is_anchor and row.processing_metadata:
@@ -679,9 +745,12 @@ class TestAnchorEssayWorkflow:
         mock_content_client.fetch_content.side_effect = lambda cid, corr: f"Content {cid}"
 
         # Calculate projections
-        grade_projector = GradeProjector()
+        grade_projector = self._make_grade_projector(
+            session_provider=postgres_session_provider,
+            instruction_repository=postgres_instruction_repository,
+            anchor_repository=postgres_anchor_repository,
+        )
         projection_summary = await grade_projector.calculate_projections(
-            session=postgres_session,
             rankings=rankings,
             cj_batch_id=batch_id,
             assignment_id=assignment_id,

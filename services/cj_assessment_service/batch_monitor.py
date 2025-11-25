@@ -21,8 +21,6 @@ from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import SystemProcessingMetadata
 from common_core.status_enums import BatchStatus, CJBatchStateEnum, ProcessingStage
 from huleedu_service_libs.logging_utils import create_service_logger
-from sqlalchemy import and_, select
-from sqlalchemy.orm import selectinload
 
 from services.cj_assessment_service.cj_core_logic import scoring_ranking
 from services.cj_assessment_service.cj_core_logic.batch_finalizer import BatchFinalizer
@@ -30,22 +28,23 @@ from services.cj_assessment_service.cj_core_logic.dual_event_publisher import (
     DualEventPublishingData,
     publish_dual_assessment_events,
 )
-from services.cj_assessment_service.cj_core_logic.grade_projector import (
-    GradeProjector,
-)
 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
 from services.cj_assessment_service.metrics import get_business_metrics
 from services.cj_assessment_service.models_api import EssayForComparison
 from services.cj_assessment_service.models_db import CJBatchState, CJBatchUpload
 
 if TYPE_CHECKING:
-    from sqlalchemy.ext.asyncio import AsyncSession
-
+    from services.cj_assessment_service.cj_core_logic.grade_projector import (
+        GradeProjector as GradeProjectorType,
+    )
     from services.cj_assessment_service.config import Settings
     from services.cj_assessment_service.protocols import (
+        CJBatchRepositoryProtocol,
+        CJComparisonRepositoryProtocol,
+        CJEssayRepositoryProtocol,
         CJEventPublisherProtocol,
-        CJRepositoryProtocol,
         ContentClientProtocol,
+        SessionProviderProtocol,
     )
 
 logger = create_service_logger(__name__)
@@ -56,23 +55,35 @@ class BatchMonitor:
 
     def __init__(
         self,
-        repository: CJRepositoryProtocol,
+        session_provider: SessionProviderProtocol,
+        batch_repository: CJBatchRepositoryProtocol,
+        essay_repository: CJEssayRepositoryProtocol,
+        comparison_repository: CJComparisonRepositoryProtocol,
         event_publisher: CJEventPublisherProtocol,
         content_client: ContentClientProtocol,
         settings: Settings,
+        grade_projector: GradeProjectorType,
     ) -> None:
         """Initialize the batch monitor.
 
         Args:
-            repository: Database access interface
+            session_provider: Session provider for database access
+            batch_repository: Batch repository for batch operations
+            essay_repository: Essay repository for essay operations
+            comparison_repository: Comparison repository for comparison operations
             event_publisher: Event publishing interface
             content_client: Content client for fetching anchor essays
             settings: Service configuration
+            grade_projector: Grade projector for calculating projections
         """
-        self._repository = repository
+        self._session_provider = session_provider
+        self._batch_repository = batch_repository
+        self._essay_repository = essay_repository
+        self._comparison_repository = comparison_repository
         self._event_publisher = event_publisher
         self._content_client = content_client
         self._settings = settings
+        self._grade_projector = grade_projector
 
         # Configuration
         self.timeout_hours = settings.BATCH_TIMEOUT_HOURS
@@ -108,23 +119,13 @@ class BatchMonitor:
                     CJBatchStateEnum.WAITING_CALLBACKS,
                 ]
 
-                async with self._repository.session() as session:
-                    # Find potentially stuck batches
-                    stmt = (
-                        select(CJBatchState)
-                        .where(
-                            and_(
-                                CJBatchState.state.in_(monitored_states),
-                                CJBatchState.last_activity_at < stuck_threshold,
-                            )
-                        )
-                        .options(
-                            selectinload(CJBatchState.batch_upload)  # Eager load relationship
-                        )
+                async with self._session_provider.session() as session:
+                    # Find potentially stuck batches using batch repository
+                    stuck_batch_states = await self._batch_repository.get_stuck_batches(
+                        session=session,
+                        states=monitored_states,
+                        stuck_threshold=stuck_threshold,
                     )
-
-                    result = await session.execute(stmt)
-                    stuck_batch_states = result.scalars().all()
 
                     if stuck_batch_states:
                         stuck_count = len(stuck_batch_states)
@@ -160,18 +161,9 @@ class BatchMonitor:
                             self._stuck_batches_gauge.set(0)
 
                     # Fast-path completion sweeper: finalize batches with all callbacks received
-                    ready_stmt = (
-                        select(CJBatchState)
-                        .options(selectinload(CJBatchState.batch_upload))
-                        .where(
-                            CJBatchState.state == CJBatchStateEnum.WAITING_CALLBACKS,
-                            CJBatchState.total_comparisons > 0,
-                            (CJBatchState.completed_comparisons + CJBatchState.failed_comparisons)
-                            >= CJBatchState.total_comparisons,
-                        )
+                    ready_batches = await self._batch_repository.get_batches_ready_for_completion(
+                        session=session
                     )
-                    ready_result = await session.execute(ready_stmt)
-                    ready_batches = ready_result.scalars().all()
 
                     for ready_state in ready_batches:
                         try:
@@ -189,15 +181,18 @@ class BatchMonitor:
                                 extra=log_extra,
                             )
                             finalizer = BatchFinalizer(
-                                database=self._repository,
+                                session_provider=self._session_provider,
+                                batch_repository=self._batch_repository,
+                                essay_repository=self._essay_repository,
+                                comparison_repository=self._comparison_repository,
                                 event_publisher=self._event_publisher,
                                 content_client=self._content_client,
                                 settings=self._settings,
+                                grade_projector=self._grade_projector,
                             )
                             await finalizer.finalize_scoring(
                                 batch_id=ready_state.batch_id,
                                 correlation_id=correlation_id,
-                                session=session,
                                 log_extra=log_extra,
                             )
                         except Exception as e:  # pragma: no cover
@@ -283,7 +278,7 @@ class BatchMonitor:
                 },
             )
 
-            async with self._repository.session() as session:
+            async with self._session_provider.session() as session:
                 if progress_pct >= 80:
                     # Force to scoring if mostly complete
                     logger.info(
@@ -295,14 +290,18 @@ class BatchMonitor:
                         },
                     )
 
-                    # Update state to SCORING
-                    stmt = (
-                        select(CJBatchState)
-                        .where(CJBatchState.batch_id == batch_id)
-                        .with_for_update()
+                    # Update state to SCORING with FOR UPDATE lock
+                    batch_state_db = await self._batch_repository.get_batch_state_for_update(
+                        session=session,
+                        batch_id=batch_id,
+                        for_update=True,
                     )
-                    result = await session.execute(stmt)
-                    batch_state_db = result.scalar_one()
+                    if not batch_state_db:
+                        logger.error(
+                            "Batch state not found for stuck batch",
+                            extra={"batch_id": batch_id},
+                        )
+                        return
 
                     batch_state_db.state = CJBatchStateEnum.SCORING
                     batch_state_db.last_activity_at = datetime.now(UTC)
@@ -325,7 +324,6 @@ class BatchMonitor:
                     # Trigger scoring process for forced batch
                     await self._trigger_scoring(
                         batch_id=batch_id,
-                        session=session,
                         correlation_id=UUID(batch_state.batch_upload.event_correlation_id),
                     )
 
@@ -340,14 +338,18 @@ class BatchMonitor:
                         },
                     )
 
-                    # Update state to FAILED
-                    stmt = (
-                        select(CJBatchState)
-                        .where(CJBatchState.batch_id == batch_id)
-                        .with_for_update()
+                    # Update state to FAILED with FOR UPDATE lock
+                    batch_state_db = await self._batch_repository.get_batch_state_for_update(
+                        session=session,
+                        batch_id=batch_id,
+                        for_update=True,
                     )
-                    result = await session.execute(stmt)
-                    batch_state_db = result.scalar_one()
+                    if not batch_state_db:
+                        logger.error(
+                            "Batch state not found for stuck batch",
+                            extra={"batch_id": batch_id},
+                        )
+                        return
 
                     batch_state_db.state = CJBatchStateEnum.FAILED
                     batch_state_db.last_activity_at = datetime.now(UTC)
@@ -428,158 +430,159 @@ class BatchMonitor:
     async def _trigger_scoring(
         self,
         batch_id: int,
-        session: AsyncSession,
         correlation_id: UUID,
     ) -> None:
         """Trigger Bradley-Terry scoring for a stuck batch forced to SCORING state.
 
         Args:
             batch_id: The CJ batch ID
-            session: Active database session
             correlation_id: Correlation ID for event tracing
         """
-        try:
-            logger.info(
-                "Triggering Bradley-Terry scoring for forced batch",
-                extra={
-                    "batch_id": batch_id,
-                    "correlation_id": correlation_id,
-                },
-            )
-
-            # Get batch upload for BOS batch ID
-            batch_upload = await session.get(CJBatchUpload, batch_id)
-            if not batch_upload:
-                logger.error(
-                    "Batch upload not found for batch ID",
-                    extra={
-                        "batch_id": batch_id,
-                        "correlation_id": correlation_id,
-                    },
-                )
-                return
-
-            # Get all essays for this batch
-            essays = await self._repository.get_essays_for_cj_batch(
-                session=session,
-                cj_batch_id=batch_id,
-            )
-
-            if not essays:
-                logger.error(
-                    "No essays found for batch, cannot calculate scores",
-                    extra={
-                        "batch_id": batch_id,
-                        "correlation_id": correlation_id,
-                    },
-                )
-                return
-
-            # Convert to API model format for scoring function
-            essays_for_api = [
-                EssayForComparison(
-                    id=essay.els_essay_id,
-                    text_content=essay.content,
-                    current_bt_score=essay.current_bt_score,
-                )
-                for essay in essays
-            ]
-
-            # Get all existing comparisons (empty list if none)
-            comparisons: list[Any] = []
-
-            # Calculate final Bradley-Terry scores
-            await scoring_ranking.record_comparisons_and_update_scores(
-                all_essays=essays_for_api,
-                comparison_results=comparisons,
-                db_session=session,
-                cj_batch_id=batch_id,
-                correlation_id=correlation_id,
-            )
-
-            # Update batch status to completed
-            await self._repository.update_cj_batch_status(
-                session=session,
-                cj_batch_id=batch_id,
-                status=CJBatchStateEnum.COMPLETED,
-            )
-
-            # Get final rankings
-            rankings = await scoring_ranking.get_essay_rankings(session, batch_id, correlation_id)
-
-            # Calculate grade projections using async GradeProjector
-            grade_projector = GradeProjector()
-            grade_projections = await grade_projector.calculate_projections(
-                session=session,
-                rankings=rankings,
-                cj_batch_id=batch_id,
-                assignment_id=batch_upload.assignment_id
-                if hasattr(batch_upload, "assignment_id")
-                else None,
-                course_code=batch_upload.course_code
-                if hasattr(batch_upload, "course_code")
-                else "",
-                content_client=self._content_client,
-                correlation_id=correlation_id,
-            )
-
-            # Log if no projections are available (no anchor essays)
-            if not grade_projections.projections_available:
+        async with self._session_provider.session() as session:
+            try:
                 logger.info(
-                    "No grade projections available - no anchor essays present",
+                    "Triggering Bradley-Terry scoring for forced batch",
                     extra={
                         "batch_id": batch_id,
                         "correlation_id": correlation_id,
                     },
                 )
 
-            # Extract data from batch_upload for publishing
-            # user_id MUST be present for resource consumption tracking
-            if not batch_upload.user_id:
-                raise ValueError(
-                    f"user_id is None for batch {batch_upload.id} - identity threading failed. "
-                    f"This is a critical error that should never happen in production."
+                # Get batch upload for BOS batch ID
+                batch_upload = await session.get(CJBatchUpload, batch_id)
+                if not batch_upload:
+                    logger.error(
+                        "Batch upload not found for batch ID",
+                        extra={
+                            "batch_id": batch_id,
+                            "correlation_id": correlation_id,
+                        },
+                    )
+                    return
+
+                # Get all essays for this batch
+                essays = await self._essay_repository.get_essays_for_cj_batch(
+                    session=session,
+                    cj_batch_id=batch_id,
                 )
 
-            publishing_data = DualEventPublishingData(
-                bos_batch_id=batch_upload.bos_batch_id,
-                cj_batch_id=str(batch_upload.id),
-                assignment_id=batch_upload.assignment_id,
-                course_code=batch_upload.course_code,
-                user_id=batch_upload.user_id,  # Will raise if None due to check above
-                org_id=batch_upload.org_id,
-                created_at=batch_upload.created_at,
-            )
+                if not essays:
+                    logger.error(
+                        "No essays found for batch, cannot calculate scores",
+                        extra={
+                            "batch_id": batch_id,
+                            "correlation_id": correlation_id,
+                        },
+                    )
+                    return
 
-            # Use centralized dual event publishing function
-            await publish_dual_assessment_events(
-                rankings=rankings,
-                grade_projections=grade_projections,
-                publishing_data=publishing_data,  # Pass DTO
-                event_publisher=self._event_publisher,
-                settings=self._settings,
-                correlation_id=correlation_id,
-                processing_started_at=batch_upload.created_at,
-            )
+                # Convert to API model format for scoring function
+                essays_for_api = [
+                    EssayForComparison(
+                        id=essay.els_essay_id,
+                        text_content=essay.assessment_input_text,
+                        current_bt_score=essay.current_bt_score,
+                    )
+                    for essay in essays
+                ]
 
-            logger.info(
-                "Successfully triggered scoring and published completion for forced batch",
-                extra={
-                    "batch_id": batch_id,
-                    "correlation_id": correlation_id,
-                    "essay_count": len(essays),
-                    "status": "COMPLETED",
-                },
-            )
+                # Get all existing comparisons (empty list if none)
+                comparisons: list[Any] = []
 
-        except Exception as e:
-            logger.error(
-                "Failed to trigger scoring for stuck batch",
-                extra={
-                    "batch_id": batch_id,
-                    "correlation_id": correlation_id,
-                    "error": str(e),
-                    "error_type": type(e).__name__,
-                },
-                exc_info=True,
-            )
+                # Calculate final Bradley-Terry scores
+                await scoring_ranking.record_comparisons_and_update_scores(
+                    all_essays=essays_for_api,
+                    comparison_results=comparisons,
+                    session_provider=self._session_provider,
+                    comparison_repository=self._comparison_repository,
+                    essay_repository=self._essay_repository,
+                    cj_batch_id=batch_id,
+                    correlation_id=correlation_id,
+                )
+
+                # Update batch status to completed
+                await self._batch_repository.update_cj_batch_status(
+                    session=session,
+                    cj_batch_id=batch_id,
+                    status=CJBatchStateEnum.COMPLETED,
+                )
+
+                # Get final rankings
+                rankings = await scoring_ranking.get_essay_rankings(
+                    self._session_provider, self._essay_repository, batch_id, correlation_id
+                )
+
+                # Calculate grade projections using injected GradeProjector
+                grade_projections = await self._grade_projector.calculate_projections(
+                    rankings=rankings,
+                    cj_batch_id=batch_id,
+                    assignment_id=batch_upload.assignment_id
+                    if hasattr(batch_upload, "assignment_id")
+                    else None,
+                    course_code=batch_upload.course_code
+                    if hasattr(batch_upload, "course_code")
+                    else "",
+                    content_client=self._content_client,
+                    correlation_id=correlation_id,
+                )
+
+                # Log if no projections are available (no anchor essays)
+                if not grade_projections.projections_available:
+                    logger.info(
+                        "No grade projections available - no anchor essays present",
+                        extra={
+                            "batch_id": batch_id,
+                            "correlation_id": correlation_id,
+                        },
+                    )
+
+                # Extract data from batch_upload for publishing
+                # user_id MUST be present for resource consumption tracking
+                if not batch_upload.user_id:
+                    raise ValueError(
+                        f"user_id is None for batch {batch_upload.id} - identity threading failed. "
+                        f"This is a critical error that should never happen in production."
+                    )
+
+                publishing_data = DualEventPublishingData(
+                    bos_batch_id=batch_upload.bos_batch_id,
+                    cj_batch_id=str(batch_upload.id),
+                    assignment_id=batch_upload.assignment_id,
+                    course_code=batch_upload.course_code,
+                    user_id=batch_upload.user_id,  # Will raise if None due to check above
+                    org_id=batch_upload.org_id,
+                    created_at=batch_upload.created_at,
+                )
+
+                # Use centralized dual event publishing function
+                await publish_dual_assessment_events(
+                    rankings=rankings,
+                    grade_projections=grade_projections,
+                    publishing_data=publishing_data,  # Pass DTO
+                    event_publisher=self._event_publisher,
+                    settings=self._settings,
+                    correlation_id=correlation_id,
+                    processing_started_at=batch_upload.created_at,
+                )
+
+                logger.info(
+                    "Successfully triggered scoring and published completion for forced batch",
+                    extra={
+                        "batch_id": batch_id,
+                        "correlation_id": correlation_id,
+                        "essay_count": len(essays),
+                        "status": "COMPLETED",
+                    },
+                )
+
+            except Exception as e:
+                logger.error(
+                    "Failed to trigger scoring for stuck batch",
+                    extra={
+                        "batch_id": batch_id,
+                        "correlation_id": correlation_id,
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                    },
+                    exc_info=True,
+                )

@@ -14,6 +14,8 @@ child_rules: ["070.1-performance-testing-methodology"]
 - **Integration Tests**: Limited scope component interactions
 - **E2E Tests**: Major user flows (use sparingly)
 
+**Contract Test Reference Pattern**: See `tests/contract/test_phase_outcome_contracts.py` for a canonical structure (Pydantic schema validation + encode/decode roundtrip) when adding or updating event/API contracts.
+
 ## 2. Core Rules
 - **Runner (Standard)**: `pdm run pytest-root <path-or-nodeid>`
 - **Anywhere (Alias)**: `pyp <path-or-nodeid>` after `source scripts/dev-aliases.sh`
@@ -24,6 +26,7 @@ child_rules: ["070.1-performance-testing-methodology"]
 - **FORBIDDEN**: Mixing abstraction levels in same test
 - **FORBIDDEN**: Simplifying tests to make them pass - fix underlying issues
 - **Timeouts**: Individual test timeouts MUST be ≤ 60 seconds. For event-driven flows, default to 30 seconds and synchronize via Kafka events (no polling). If a test needs more, split it or improve determinism instead of increasing the timeout.
+- **Time Control (Recommended)**: Prefer deterministic time sources (clock abstractions or time-freezing helpers) over `sleep()` when verifying time-dependent behavior.
 
 ## 3. DI/Protocol Testing Patterns
 - **MUST** override Dishka providers in tests to inject mocks for protocol dependencies
@@ -69,6 +72,11 @@ def _clear_prometheus_registry():
     yield
 ```
 
+### 5.3. Metrics Testing Patterns
+- **Pattern**: Use lightweight fake counters/gauges (e.g. objects exposing `labels()`, `inc()`, `set()`) to capture metric interactions in unit tests.
+- **Pattern**: Monkeypatch metric access helpers (for example, `get_business_metrics`) to return these fakes instead of real Prometheus collectors.
+- **Goal**: Assert labels and increments without depending on global Prometheus state or real registries.
+
 ## 6. Database Configuration Standards
 
 ### 6.1. DATABASE_URL Pattern Requirements
@@ -105,6 +113,27 @@ os.environ["SERVICE_DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
 - **FORBIDDEN**: `try/except pass` blocks hiding model rebuilding failures
 - **FORBIDDEN**: Mocking at wrong abstraction levels
 - **FORBIDDEN**: Using `AsyncMock()` directly for async context managers
+
+## 8. Enum Usage in Tests
+
+### 8.1. Status Enums
+- **MUST** use enum objects for status-related parameters in tests (e.g. `BatchStatus`, `EssayStatus`).
+- **FORBIDDEN**: String literals for status values in internal business-logic tests.
+
+### 8.2. Boundary Testing Pattern
+- **MUST** test string-to-enum conversion at API boundaries (request parsing).
+- **MUST** test enum-to-string conversion at event publishing boundaries.
+- **MUST** use enum objects for all internal domain logic and mock assertions.
+
+## 9. Integration Testing Standards
+
+### 9.1. Database Integration Testing
+- **MUST** use real database instances (e.g. testcontainers) when testing repository implementations.
+- **SHOULD** prefer production-like databases over in-memory alternatives for parity.
+
+### 9.2. Test Isolation
+- **MUST** ensure test containers clean up automatically.
+- **PATTERN**: Use appropriate pytest fixture scopes to control container lifecycle.
 
 ---
 **Fix underlying issues, don't simplify tests.**

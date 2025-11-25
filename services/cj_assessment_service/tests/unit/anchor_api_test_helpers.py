@@ -7,14 +7,25 @@ the anchor management API endpoints across multiple test files.
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from datetime import datetime
 from typing import Any, AsyncContextManager, AsyncIterator, Sequence
 from uuid import UUID
 
+from common_core.status_enums import CJBatchStateEnum
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from services.cj_assessment_service.models_db import AnchorEssayReference, AssessmentInstruction
-from services.cj_assessment_service.protocols import CJRepositoryProtocol, ContentClientProtocol
-from services.cj_assessment_service.tests.unit.instruction_store import AssessmentInstructionStore
+from services.cj_assessment_service.models_db import (
+    AnchorEssayReference,
+    AssessmentInstruction,
+    CJBatchState,
+)
+from services.cj_assessment_service.protocols import (
+    AnchorRepositoryProtocol,
+    AssessmentInstructionRepositoryProtocol,
+    ContentClientProtocol,
+    SessionProviderProtocol,
+)
+from services.cj_assessment_service.tests.unit.test_mocks import AssessmentInstructionStore
 
 
 class MockContentClient(ContentClientProtocol):
@@ -93,8 +104,12 @@ class MockAsyncSession(AsyncSession):
             raise RuntimeError("Database flush failed")
 
 
-class MockCJRepository(CJRepositoryProtocol):
-    """Mock implementation of CJRepositoryProtocol for testing."""
+class MockCJRepository(
+    SessionProviderProtocol,
+    AnchorRepositoryProtocol,
+    AssessmentInstructionRepositoryProtocol,
+):
+    """Mock combining SessionProvider, Anchor, and AssessmentInstruction protocols."""
 
     def __init__(self, behavior: str = "success") -> None:
         """Initialize mock with configurable behavior."""
@@ -268,6 +283,16 @@ class MockCJRepository(CJRepositoryProtocol):
         """Mock implementation - not used in anchor management tests."""
         return None
 
+    async def get_comparison_pair_by_correlation_id(
+        self, session: AsyncSession, correlation_id: UUID
+    ) -> Any | None:
+        """Mock implementation - not used in anchor management tests."""
+        return None
+
+    async def get_batch_state(self, session: AsyncSession, batch_id: int) -> Any | None:
+        """Mock implementation - not used in anchor management tests."""
+        return None
+
     async def store_comparison_results(
         self,
         session: AsyncSession,
@@ -349,6 +374,40 @@ class MockCJRepository(CJRepositoryProtocol):
         """Mock implementation - not used in anchor management tests."""
         pass
 
+    async def get_stuck_batches(
+        self,
+        session: AsyncSession,
+        states: list[CJBatchStateEnum],
+        stuck_threshold: datetime,
+    ) -> list[CJBatchState]:
+        """Mock implementation - not used in anchor management tests."""
+        return []
+
+    async def get_batches_ready_for_completion(
+        self,
+        session: AsyncSession,
+    ) -> list[CJBatchState]:
+        """Mock implementation - not used in anchor management tests."""
+        return []
+
+    async def get_batch_state_for_update(
+        self,
+        session: AsyncSession,
+        batch_id: int,
+        for_update: bool = False,
+    ) -> CJBatchState | None:
+        """Mock implementation - not used in anchor management tests."""
+        return None
+
+    async def update_batch_state(
+        self,
+        session: AsyncSession,
+        batch_id: int,
+        state: CJBatchStateEnum,
+    ) -> None:
+        """Mock implementation - not used in anchor management tests."""
+        pass
+
 
 class MissingStorageIdClient(ContentClientProtocol):
     """Mock client that doesn't return storage_id for error testing."""
@@ -369,7 +428,11 @@ class MissingStorageIdClient(ContentClientProtocol):
         return "Mock content"
 
 
-class FailingMockRepository:
+class FailingMockRepository(
+    SessionProviderProtocol,
+    AnchorRepositoryProtocol,
+    AssessmentInstructionRepositoryProtocol,
+):
     """Mock repository that raises unexpected exception."""
 
     @asynccontextmanager
@@ -377,3 +440,70 @@ class FailingMockRepository:
         """Raise unexpected exception during session creation."""
         raise ValueError("Unexpected database error")
         yield  # This will never be reached but satisfies the type checker
+
+    async def upsert_anchor_reference(
+        self,
+        session: AsyncSession,
+        *,
+        assignment_id: str,
+        anchor_label: str,
+        grade: str,
+        grade_scale: str,
+        text_storage_id: str,
+    ) -> int:
+        raise ValueError("Intentional failure")
+
+    async def get_anchor_essay_references(
+        self,
+        session: AsyncSession,
+        assignment_id: str,
+        grade_scale: str | None = None,
+    ) -> list[Any]:
+        raise ValueError("Intentional failure")
+
+    async def get_assessment_instruction(
+        self,
+        session: AsyncSession,
+        assignment_id: str | None,
+        course_id: str | None,
+    ) -> AssessmentInstruction | None:
+        raise ValueError("Intentional failure")
+
+    async def get_assignment_context(
+        self,
+        session: AsyncSession,
+        assignment_id: str,
+    ) -> dict[str, Any] | None:
+        raise ValueError("Intentional failure")
+
+    async def upsert_assessment_instruction(
+        self,
+        session: AsyncSession,
+        *,
+        assignment_id: str | None,
+        course_id: str | None,
+        instructions_text: str,
+        grade_scale: str,
+        student_prompt_storage_id: str | None = None,
+        judge_rubric_storage_id: str | None = None,
+    ) -> AssessmentInstruction:
+        raise ValueError("Intentional failure")
+
+    async def list_assessment_instructions(
+        self,
+        session: AsyncSession,
+        *,
+        limit: int,
+        offset: int,
+        grade_scale: str | None = None,
+    ) -> tuple[list[AssessmentInstruction], int]:
+        raise ValueError("Intentional failure")
+
+    async def delete_assessment_instruction(
+        self,
+        session: AsyncSession,
+        *,
+        assignment_id: str | None,
+        course_id: str | None,
+    ) -> bool:
+        raise ValueError("Intentional failure")

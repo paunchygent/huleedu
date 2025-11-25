@@ -17,12 +17,18 @@ from common_core.models.error_models import ErrorDetail
 from services.cj_assessment_service.cj_core_logic.content_hydration import (
     hydrate_prompt_text,
 )
+from services.cj_assessment_service.cj_core_logic.grade_projector import GradeProjector
 from services.cj_assessment_service.event_processor import process_single_message
 from services.cj_assessment_service.models_api import PromptHydrationFailure
 from services.cj_assessment_service.protocols import (
+    CJComparisonRepositoryProtocol,
     CJEventPublisherProtocol,
     ContentClientProtocol,
     LLMInteractionProtocol,
+)
+from services.cj_assessment_service.tests.unit.test_mocks import (
+    MockInstructionRepository,
+    MockSessionProvider,
 )
 
 
@@ -149,8 +155,6 @@ async def test_process_message_increments_prompt_success_metric(
 ) -> None:
     """Successful prompt hydration should increment success metric exactly once."""
 
-    from services.cj_assessment_service.tests.unit.mocks import MockDatabase
-
     # Arrange request data with explicit assignment and storage ID
     event_data = cj_assessment_request_data_with_overrides.model_copy(
         update={
@@ -170,7 +174,9 @@ async def test_process_message_increments_prompt_success_metric(
 
     kafka_msg = _create_consumer_record(envelope.model_dump(mode="json"))
 
-    repository = MockDatabase()
+    # Use dedicated session provider and instruction repository mocks
+    session_provider = MockSessionProvider()
+    instruction_repository = MockInstructionRepository()
     content_client = AsyncMock(spec=ContentClientProtocol)
     content_client.fetch_content.return_value = "Prompt body"
     event_publisher = AsyncMock(spec=CJEventPublisherProtocol)
@@ -205,10 +211,16 @@ async def test_process_message_increments_prompt_success_metric(
     # Act
     await process_single_message(
         msg=kafka_msg,
-        database=repository,
+        session_provider=session_provider,
+        batch_repository=Mock(),
+        essay_repository=Mock(),
+        instruction_repository=instruction_repository,
+        anchor_repository=Mock(),
+        comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
         content_client=content_client,
         event_publisher=event_publisher,
         llm_interaction=llm_interaction,
+        grade_projector=Mock(spec=GradeProjector),
         settings_obj=settings,
     )
 
@@ -227,8 +239,6 @@ async def test_process_message_hydrates_judge_rubric_text(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Ensure judge rubric storage/text are hydrated and forwarded in request data."""
-
-    from services.cj_assessment_service.tests.unit.mocks import MockDatabase
 
     assignment_id = "assignment-judge-001"
     prompt_storage = "prompt-storage-with-overrides"
@@ -252,15 +262,19 @@ async def test_process_message_hydrates_judge_rubric_text(
 
     kafka_msg = _create_consumer_record(envelope.model_dump(mode="json"))
 
-    repository = MockDatabase()
-    repository._instruction_store.upsert(
-        assignment_id=assignment_id,
-        course_id=None,
-        instructions_text="Judge using rubric",
-        grade_scale="swedish_8_anchor",
-        student_prompt_storage_id=prompt_storage,
-        judge_rubric_storage_id=rubric_storage,
-    )
+    session_provider = MockSessionProvider()
+    instruction_repository = MockInstructionRepository()
+
+    async with session_provider.session() as session:
+        await instruction_repository.upsert_assessment_instruction(
+            session,
+            assignment_id=assignment_id,
+            course_id=None,
+            instructions_text="Judge using rubric",
+            grade_scale="swedish_8_anchor",
+            student_prompt_storage_id=prompt_storage,
+            judge_rubric_storage_id=rubric_storage,
+        )
 
     content_client = AsyncMock(spec=ContentClientProtocol)
     content_client.fetch_content = AsyncMock(
@@ -297,10 +311,16 @@ async def test_process_message_hydrates_judge_rubric_text(
 
     await process_single_message(
         msg=kafka_msg,
-        database=repository,
+        session_provider=session_provider,
+        batch_repository=Mock(),
+        essay_repository=Mock(),
+        instruction_repository=instruction_repository,
+        anchor_repository=Mock(),
+        comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
         content_client=content_client,
         event_publisher=event_publisher,
         llm_interaction=llm_interaction,
+        grade_projector=Mock(spec=GradeProjector),
         settings_obj=settings,
     )
 

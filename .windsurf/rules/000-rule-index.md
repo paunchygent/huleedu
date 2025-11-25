@@ -94,7 +94,7 @@ scope: "all"
 - [095-textual-tui-patterns.md](mdc:095-textual-tui-patterns.md): Textual TUI development patterns and corrections to AI training data
 
 ## Frontend Development Standards
-- [200-frontend-core-rules.md](mdc:200-frontend-core-rules.md): Core frontend architecture patterns (Svelte 5 + Vite, TypeScript, modular design)
+- [200-frontend-core-rules.md](mdc:200-frontend-core-rules.md): Core frontend architecture patterns (Vue 3 + Vite, TypeScript, modular design)
 - [201-frontend-development-utilities.md](mdc:201-frontend-development-utilities.md): Frontend development utilities
 - [210-frontend-dashboard-rules.md](mdc:210-frontend-dashboard-rules.md): Teacher dashboard patterns and real-time UI components
 

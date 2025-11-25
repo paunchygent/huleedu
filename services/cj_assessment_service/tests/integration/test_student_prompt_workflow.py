@@ -27,7 +27,13 @@ from services.cj_assessment_service.api.admin import student_prompts_bp
 from services.cj_assessment_service.cj_core_logic.batch_preparation import create_cj_batch
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.models_api import CJAssessmentRequestData, EssayToProcess
-from services.cj_assessment_service.protocols import CJRepositoryProtocol, ContentClientProtocol
+from services.cj_assessment_service.protocols import (
+    AssessmentInstructionRepositoryProtocol,
+    CJBatchRepositoryProtocol,
+    ContentClientProtocol,
+    SessionProviderProtocol,
+)
+from services.cj_assessment_service.tests.fixtures.database_fixtures import PostgresDataAccess
 
 
 def _patch_decode(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -45,7 +51,10 @@ def _patch_decode(monkeypatch: pytest.MonkeyPatch) -> None:
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_student_prompt_workflow_end_to_end(
-    postgres_repository: CJRepositoryProtocol,
+    postgres_data_access: PostgresDataAccess,
+    postgres_session_provider: SessionProviderProtocol,
+    postgres_batch_repository: CJBatchRepositoryProtocol,
+    postgres_instruction_repository: AssessmentInstructionRepositoryProtocol,
     mock_content_client: AsyncMock,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -58,8 +67,14 @@ async def test_student_prompt_workflow_end_to_end(
 
     class TestProvider(Provider):
         @provide(scope=Scope.REQUEST)
-        def provide_repository(self) -> CJRepositoryProtocol:  # type: ignore[override]
-            return postgres_repository
+        def provide_session_provider(self) -> SessionProviderProtocol:  # type: ignore[override]
+            return postgres_session_provider
+
+        @provide(scope=Scope.REQUEST)
+        def provide_instruction_repository(
+            self,
+        ) -> AssessmentInstructionRepositoryProtocol:  # type: ignore[override]
+            return postgres_instruction_repository
 
         @provide(scope=Scope.REQUEST)
         def provide_content_client(self) -> ContentClientProtocol:  # type: ignore[override]
@@ -79,8 +94,8 @@ async def test_student_prompt_workflow_end_to_end(
 
     # --- Seed AssessmentInstruction without a prompt ---
     assignment_id = "assignment-itg-1"
-    async with postgres_repository.session() as session:
-        await postgres_repository.upsert_assessment_instruction(
+    async with postgres_session_provider.session() as session:
+        await postgres_data_access.upsert_assessment_instruction(
             session=session,
             assignment_id=assignment_id,
             course_id=None,
@@ -88,6 +103,8 @@ async def test_student_prompt_workflow_end_to_end(
             grade_scale="swedish_8_anchor",
             student_prompt_storage_id=None,
         )
+        # Commit so the admin HTTP surface can see this instruction via a new session
+        await session.commit()
 
     # Prepare Content Service mocks for upload + retrieval
     uploaded_storage_id = "uploaded-storage-001"
@@ -107,8 +124,8 @@ async def test_student_prompt_workflow_end_to_end(
         assert upload_payload["student_prompt_storage_id"] == uploaded_storage_id
 
         # Verify instruction now carries the storage-by-reference
-        async with postgres_repository.session() as session:
-            instruction = await postgres_repository.get_assessment_instruction(
+        async with postgres_session_provider.session() as session:
+            instruction = await postgres_data_access.get_assessment_instruction(
                 session=session,
                 assignment_id=assignment_id,
                 course_id=None,
@@ -159,14 +176,17 @@ async def test_student_prompt_workflow_end_to_end(
     cj_batch_id_hydrated = await create_cj_batch(
         request_data=request_data_hydrate,
         correlation_id=uuid4(),
-        database=postgres_repository,
+        session_provider=postgres_session_provider,
+        batch_repository=postgres_batch_repository,
+        instruction_repository=postgres_instruction_repository,
         content_client=mock_content_client,
         log_extra={"test": "student_prompt_integration"},
     )
 
-    async with postgres_repository.session() as session:
-        hydrated_batch = await postgres_repository.get_cj_batch_upload(
-            session, cj_batch_id_hydrated
+    async with postgres_session_provider.session() as session:
+        hydrated_batch = await postgres_data_access.get_cj_batch_upload(
+            session=session,
+            cj_batch_id=cj_batch_id_hydrated,
         )
         assert hydrated_batch is not None
         assert hydrated_batch.assignment_id == assignment_id
@@ -194,14 +214,17 @@ async def test_student_prompt_workflow_end_to_end(
     cj_batch_id_explicit = await create_cj_batch(
         request_data=request_data_explicit,
         correlation_id=uuid4(),
-        database=postgres_repository,
+        session_provider=postgres_session_provider,
+        batch_repository=postgres_batch_repository,
+        instruction_repository=postgres_instruction_repository,
         content_client=mock_content_client,
         log_extra={"test": "student_prompt_integration"},
     )
 
-    async with postgres_repository.session() as session:
-        explicit_batch = await postgres_repository.get_cj_batch_upload(
-            session, cj_batch_id_explicit
+    async with postgres_session_provider.session() as session:
+        explicit_batch = await postgres_data_access.get_cj_batch_upload(
+            session=session,
+            cj_batch_id=cj_batch_id_explicit,
         )
         assert explicit_batch is not None
         assert explicit_batch.assignment_id == assignment_id

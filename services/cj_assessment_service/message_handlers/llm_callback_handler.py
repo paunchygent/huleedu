@@ -26,13 +26,18 @@ from huleedu_service_libs.observability import trace_operation, use_trace_contex
 from services.cj_assessment_service.cj_core_logic.batch_callback_handler import (
     continue_cj_assessment_workflow,
 )
+from services.cj_assessment_service.cj_core_logic.grade_projector import GradeProjector
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.metrics import get_business_metrics
 from services.cj_assessment_service.protocols import (
+    AssessmentInstructionRepositoryProtocol,
+    CJBatchRepositoryProtocol,
+    CJComparisonRepositoryProtocol,
+    CJEssayRepositoryProtocol,
     CJEventPublisherProtocol,
-    CJRepositoryProtocol,
     ContentClientProtocol,
     LLMInteractionProtocol,
+    SessionProviderProtocol,
 )
 
 logger = create_service_logger("cj_assessment.llm_callback_handler")
@@ -40,22 +45,31 @@ logger = create_service_logger("cj_assessment.llm_callback_handler")
 
 async def handle_llm_comparison_callback(
     msg: ConsumerRecord,
-    database: CJRepositoryProtocol,
+    session_provider: SessionProviderProtocol,
+    batch_repository: CJBatchRepositoryProtocol,
+    essay_repository: CJEssayRepositoryProtocol,
+    comparison_repository: CJComparisonRepositoryProtocol,
     event_publisher: CJEventPublisherProtocol,
     content_client: ContentClientProtocol,
     llm_interaction: LLMInteractionProtocol,
     settings: Settings,
+    instruction_repository: AssessmentInstructionRepositoryProtocol,
+    grade_projector: GradeProjector,
     tracer: "Tracer | None" = None,
 ) -> bool:
     """Handle LLM comparison result callback from LLM Provider Service.
 
     Args:
         msg: Kafka consumer record containing LLM comparison result
-        database: Database access protocol
+        session_provider: Session provider for database transactions
+        batch_repository: Batch repository for batch operations
+        essay_repository: Essay repository for essay operations
+        comparison_repository: Comparison repository for comparison operations
         event_publisher: Event publisher protocol
         content_client: Content client for fetching anchor essays
         llm_interaction: LLM interaction protocol
         settings: Application settings
+        instruction_repository: Instruction repository for assessment instructions
         tracer: Optional OpenTelemetry tracer for distributed tracing
 
     Returns:
@@ -155,22 +169,32 @@ async def handle_llm_comparison_callback(
                     await continue_cj_assessment_workflow(
                         comparison_result=comparison_result,
                         correlation_id=envelope.correlation_id,
-                        database=database,
+                        session_provider=session_provider,
+                        batch_repository=batch_repository,
+                        essay_repository=essay_repository,
+                        comparison_repository=comparison_repository,
                         event_publisher=event_publisher,
                         settings=settings,
                         content_client=content_client,
                         llm_interaction=llm_interaction,
+                        instruction_repository=instruction_repository,
+                        grade_projector=grade_projector,
                     )
         else:
             # No parent context, process without it
             await continue_cj_assessment_workflow(
                 comparison_result=comparison_result,
                 correlation_id=envelope.correlation_id,
-                database=database,
+                session_provider=session_provider,
+                batch_repository=batch_repository,
+                essay_repository=essay_repository,
+                comparison_repository=comparison_repository,
                 event_publisher=event_publisher,
                 settings=settings,
                 content_client=content_client,
                 llm_interaction=llm_interaction,
+                instruction_repository=instruction_repository,
+                grade_projector=grade_projector,
             )
 
         # Record callback processing metrics

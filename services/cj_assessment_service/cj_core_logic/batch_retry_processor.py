@@ -19,8 +19,8 @@ from services.cj_assessment_service.cj_core_logic.llm_batching import (
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.protocols import (
     BatchProcessorProtocol,
-    CJRepositoryProtocol,
     LLMInteractionProtocol,
+    SessionProviderProtocol,
 )
 
 from .batch_pool_manager import BatchPoolManager
@@ -34,7 +34,7 @@ class BatchRetryProcessor:
 
     def __init__(
         self,
-        database: CJRepositoryProtocol,
+        session_provider: SessionProviderProtocol,
         llm_interaction: LLMInteractionProtocol,
         settings: Settings,
         pool_manager: BatchPoolManager,
@@ -43,13 +43,13 @@ class BatchRetryProcessor:
         """Initialize batch retry processor.
 
         Args:
-            database: Database access protocol implementation
+            session_provider: Session provider protocol implementation
             llm_interaction: LLM interaction protocol implementation
             settings: Application settings
             pool_manager: Pool manager for failed comparison handling
             batch_submitter: Core batch submission handler (protocol)
         """
-        self.database = database
+        self._session_provider = session_provider
         self.llm_interaction = llm_interaction
         self.settings = settings
         self.pool_manager = pool_manager
@@ -62,14 +62,13 @@ class BatchRetryProcessor:
     ) -> dict[str, Any]:
         """Load stored processing metadata for a CJ batch."""
 
-        async with self.database.session() as session:
-            from .batch_submission import get_batch_state
+        from .batch_submission import get_batch_state
 
-            batch_state = await get_batch_state(
-                session=session,
-                cj_batch_id=cj_batch_id,
-                correlation_id=correlation_id,
-            )
+        batch_state = await get_batch_state(
+            session_provider=self._session_provider,
+            cj_batch_id=cj_batch_id,
+            correlation_id=correlation_id,
+        )
 
         metadata = batch_state.processing_metadata if batch_state else None
         return metadata if isinstance(metadata, dict) else {}

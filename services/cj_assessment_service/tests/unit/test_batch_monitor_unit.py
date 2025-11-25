@@ -20,21 +20,27 @@ from common_core.event_enums import ProcessingEvent
 from common_core.events.cj_assessment_events import CJAssessmentFailedV1
 from common_core.metadata_models import SystemProcessingMetadata
 from common_core.status_enums import BatchStatus, CJBatchStateEnum, ProcessingStage
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.cj_assessment_service.batch_monitor import BatchMonitor
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.models_db import CJBatchState, CJBatchUpload
+from services.cj_assessment_service.protocols import (
+    CJBatchRepositoryProtocol,
+    CJComparisonRepositoryProtocol,
+    SessionProviderProtocol,
+)
 
 
 class TestBatchMonitorRecoveryStrategy:
     """Test BatchMonitor recovery strategy behavior."""
 
     @pytest.fixture
-    def mock_repository(self) -> AsyncMock:
-        """Create mock repository with database session."""
+    def mock_session_provider(self) -> AsyncMock:
+        """Create mock session provider with database session."""
         from unittest.mock import Mock
 
-        repository = AsyncMock()
+        session_provider = AsyncMock(spec=SessionProviderProtocol)
 
         # Create a proper async context manager that actually works
         class MockAsyncContextManager:
@@ -48,14 +54,19 @@ class TestBatchMonitorRecoveryStrategy:
                 return None
 
         # Create the session mock
-        session_mock = AsyncMock()
+        session_mock = AsyncMock(spec=AsyncSession)
         context_manager = MockAsyncContextManager(session_mock)
 
         # IMPORTANT: session() is NOT async - it returns an async context manager
         # So use regular Mock, not AsyncMock
-        repository.session = Mock(return_value=context_manager)
+        session_provider.session = Mock(return_value=context_manager)
 
-        return repository
+        return session_provider
+
+    @pytest.fixture
+    def mock_batch_repository(self) -> AsyncMock:
+        """Create mock batch repository."""
+        return AsyncMock(spec=CJBatchRepositoryProtocol)
 
     @pytest.fixture
     def mock_event_publisher(self) -> AsyncMock:
@@ -78,17 +89,29 @@ class TestBatchMonitorRecoveryStrategy:
     @pytest.fixture
     def batch_monitor(
         self,
-        mock_repository: AsyncMock,
+        mock_session_provider: AsyncMock,
+        mock_batch_repository: AsyncMock,
         mock_event_publisher: AsyncMock,
         mock_content_client: AsyncMock,
         mock_settings: Settings,
     ) -> BatchMonitor:
         """Create BatchMonitor instance with mocked dependencies."""
+        from services.cj_assessment_service.cj_core_logic.grade_projector import (
+            GradeProjector,
+        )
+        from services.cj_assessment_service.protocols import CJEssayRepositoryProtocol
+
+        mock_essay_repository = AsyncMock(spec=CJEssayRepositoryProtocol)
+        mock_grade_projector = AsyncMock(spec=GradeProjector)
         return BatchMonitor(
-            repository=mock_repository,
+            session_provider=mock_session_provider,
+            batch_repository=mock_batch_repository,
+            comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
+            essay_repository=mock_essay_repository,
             event_publisher=mock_event_publisher,
             content_client=mock_content_client,
             settings=mock_settings,
+            grade_projector=mock_grade_projector,
         )
 
     @pytest.fixture
@@ -132,7 +155,8 @@ class TestBatchMonitorRecoveryStrategy:
     async def test_recovery_strategy_high_progress_forces_scoring(
         self,
         batch_monitor: BatchMonitor,
-        mock_repository: AsyncMock,
+        mock_session_provider: AsyncMock,
+        mock_batch_repository: AsyncMock,
         sample_batch_upload: CJBatchUpload,
     ) -> None:
         """Test that batches >= 80% complete are forced to SCORING state."""
@@ -144,20 +168,14 @@ class TestBatchMonitorRecoveryStrategy:
             batch_upload=sample_batch_upload,
         )
 
-        # Mock database operations - the real code has MULTIPLE execute calls
-        session = mock_repository.session.return_value.session_mock
+        # Mock database operations
+        session = mock_session_provider.session.return_value.session_mock
         # Create a separate batch_state_db object that represents what comes from DB
         batch_state_db = self.create_stuck_batch_state(
             batch_id=1, completed=17, total=20, batch_upload=sample_batch_upload
         )
-        # Fix: scalar_one should return actual objects, not coroutines
-        from unittest.mock import Mock
-
-        execute_result1 = Mock()
-        execute_result1.scalar_one.return_value = batch_state_db
-        execute_result2 = Mock()
-        execute_result2.scalar_one.return_value = batch_state_db  # Same object for update query
-        session.execute.side_effect = [execute_result1, execute_result2]
+        # Mock the batch repository to return batch_state_db for FOR UPDATE query
+        mock_batch_repository.get_batch_state_for_update.return_value = batch_state_db
 
         # Act: Handle the stuck batch
         await batch_monitor._handle_stuck_batch(batch_state)
@@ -171,12 +189,17 @@ class TestBatchMonitorRecoveryStrategy:
 
         # Verify database commit was called
         session.commit.assert_called_once()
+        # Verify repository was called with correct parameters
+        mock_batch_repository.get_batch_state_for_update.assert_called_once_with(
+            session=session, batch_id=1, for_update=True
+        )
 
     @pytest.mark.asyncio
     async def test_recovery_strategy_low_progress_marks_failed(
         self,
         batch_monitor: BatchMonitor,
-        mock_repository: AsyncMock,
+        mock_session_provider: AsyncMock,
+        mock_batch_repository: AsyncMock,
         mock_event_publisher: AsyncMock,
         sample_batch_upload: CJBatchUpload,
     ) -> None:
@@ -190,19 +213,13 @@ class TestBatchMonitorRecoveryStrategy:
         )
 
         # Mock database operations
-        session = mock_repository.session.return_value.session_mock
+        session = mock_session_provider.session.return_value.session_mock
         # Create a separate batch_state_db object that represents what comes from DB
         batch_state_db = self.create_stuck_batch_state(
             batch_id=1, completed=6, total=10, batch_upload=sample_batch_upload
         )
-        # Fix: scalar_one should return actual objects, not coroutines
-        from unittest.mock import Mock
-
-        execute_result1 = Mock()
-        execute_result1.scalar_one.return_value = batch_state_db
-        execute_result2 = Mock()
-        execute_result2.scalar_one.return_value = batch_state_db  # Same object for update query
-        session.execute.side_effect = [execute_result1, execute_result2]
+        # Mock the batch repository to return batch_state_db for FOR UPDATE query
+        mock_batch_repository.get_batch_state_for_update.return_value = batch_state_db
         session.get.return_value = sample_batch_upload
 
         # Act: Handle the stuck batch
@@ -235,7 +252,8 @@ class TestBatchMonitorRecoveryStrategy:
     async def test_progress_calculation_with_zero_total(
         self,
         batch_monitor: BatchMonitor,
-        mock_repository: AsyncMock,
+        mock_session_provider: AsyncMock,
+        mock_batch_repository: AsyncMock,
         sample_batch_upload: CJBatchUpload,
     ) -> None:
         """Test progress calculation edge case with zero total comparisons."""
@@ -248,19 +266,13 @@ class TestBatchMonitorRecoveryStrategy:
         )
 
         # Mock database operations
-        session = mock_repository.session.return_value.session_mock
+        session = mock_session_provider.session.return_value.session_mock
         # Create a separate batch_state_db object that represents what comes from DB
         batch_state_db = self.create_stuck_batch_state(
             batch_id=1, completed=0, total=0, batch_upload=sample_batch_upload
         )
-        # Fix: scalar_one should return actual objects, not coroutines
-        from unittest.mock import Mock
-
-        execute_result1 = Mock()
-        execute_result1.scalar_one.return_value = batch_state_db
-        execute_result2 = Mock()
-        execute_result2.scalar_one.return_value = batch_state_db  # Same object for update query
-        session.execute.side_effect = [execute_result1, execute_result2]
+        # Mock the batch repository to return batch_state_db for FOR UPDATE query
+        mock_batch_repository.get_batch_state_for_update.return_value = batch_state_db
         session.get.return_value = sample_batch_upload
 
         # Act: Handle the stuck batch
@@ -275,7 +287,8 @@ class TestBatchMonitorRecoveryStrategy:
     async def test_progress_calculation_exactly_eighty_percent(
         self,
         batch_monitor: BatchMonitor,
-        mock_repository: AsyncMock,
+        mock_session_provider: AsyncMock,
+        mock_batch_repository: AsyncMock,
         sample_batch_upload: CJBatchUpload,
     ) -> None:
         """Test boundary condition: exactly 80% progress."""
@@ -288,19 +301,12 @@ class TestBatchMonitorRecoveryStrategy:
         )
 
         # Mock database operations
-        session = mock_repository.session.return_value.session_mock
         # Create a separate batch_state_db object that represents what comes from DB
         batch_state_db = self.create_stuck_batch_state(
             batch_id=1, completed=8, total=10, batch_upload=sample_batch_upload
         )
-        # Fix: scalar_one should return actual objects, not coroutines
-        from unittest.mock import Mock
-
-        execute_result1 = Mock()
-        execute_result1.scalar_one.return_value = batch_state_db
-        execute_result2 = Mock()
-        execute_result2.scalar_one.return_value = batch_state_db  # Same object for update query
-        session.execute.side_effect = [execute_result1, execute_result2]
+        # Mock the batch repository to return batch_state_db for FOR UPDATE query
+        mock_batch_repository.get_batch_state_for_update.return_value = batch_state_db
 
         # Act: Handle the stuck batch
         await batch_monitor._handle_stuck_batch(batch_state)
@@ -314,7 +320,8 @@ class TestBatchMonitorRecoveryStrategy:
     async def test_system_metadata_generation_for_failure_event(
         self,
         batch_monitor: BatchMonitor,
-        mock_repository: AsyncMock,
+        mock_session_provider: AsyncMock,
+        mock_batch_repository: AsyncMock,
         mock_event_publisher: AsyncMock,
         sample_batch_upload: CJBatchUpload,
     ) -> None:
@@ -328,19 +335,13 @@ class TestBatchMonitorRecoveryStrategy:
         )
 
         # Mock database operations
-        session = mock_repository.session.return_value.session_mock
+        session = mock_session_provider.session.return_value.session_mock
         # Create a separate batch_state_db object that represents what comes from DB
         batch_state_db = self.create_stuck_batch_state(
             batch_id=1, completed=3, total=10, batch_upload=sample_batch_upload
         )
-        # Fix: scalar_one should return actual objects, not coroutines
-        from unittest.mock import Mock
-
-        execute_result1 = Mock()
-        execute_result1.scalar_one.return_value = batch_state_db
-        execute_result2 = Mock()
-        execute_result2.scalar_one.return_value = batch_state_db  # Same object for update query
-        session.execute.side_effect = [execute_result1, execute_result2]
+        # Mock the batch repository to return batch_state_db for FOR UPDATE query
+        mock_batch_repository.get_batch_state_for_update.return_value = batch_state_db
         session.get.return_value = sample_batch_upload
 
         # Act: Handle the stuck batch
@@ -362,7 +363,8 @@ class TestBatchMonitorRecoveryStrategy:
     async def test_batch_state_last_activity_update(
         self,
         batch_monitor: BatchMonitor,
-        mock_repository: AsyncMock,
+        mock_session_provider: AsyncMock,
+        mock_batch_repository: AsyncMock,
         sample_batch_upload: CJBatchUpload,
     ) -> None:
         """Test that last_activity_at is updated during recovery."""
@@ -377,20 +379,13 @@ class TestBatchMonitorRecoveryStrategy:
         batch_state.last_activity_at = old_timestamp
 
         # Mock database operations
-        session = mock_repository.session.return_value.session_mock
         # Create a separate batch_state_db object that represents what comes from DB
         batch_state_db = self.create_stuck_batch_state(
             batch_id=1, completed=9, total=10, batch_upload=sample_batch_upload
         )
         batch_state_db.last_activity_at = old_timestamp  # Set old timestamp on DB object
-        # Fix: scalar_one should return actual objects, not coroutines
-        from unittest.mock import Mock
-
-        execute_result1 = Mock()
-        execute_result1.scalar_one.return_value = batch_state_db
-        execute_result2 = Mock()
-        execute_result2.scalar_one.return_value = batch_state_db  # Same object for update query
-        session.execute.side_effect = [execute_result1, execute_result2]
+        # Mock the batch repository to return batch_state_db for FOR UPDATE query
+        mock_batch_repository.get_batch_state_for_update.return_value = batch_state_db
 
         # Act: Handle the stuck batch
         await batch_monitor._handle_stuck_batch(batch_state)

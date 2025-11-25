@@ -63,8 +63,8 @@ COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
 
 # Check Write operations
 if [[ "$TOOL_NAME" == "Write" ]] && [[ -n "$FILE_PATH" ]]; then
-  # Check if writing to .claude/
-  if [[ "$FILE_PATH" =~ \.claude/ ]]; then
+  # Check if writing to PROJECT .claude/ (not home directory ~/.claude/)
+  if [[ "$FILE_PATH" =~ $CLAUDE_PROJECT_DIR/\.claude/ ]]; then
     # Extract the path relative to .claude/
     RELATIVE_PATH="${FILE_PATH#*/.claude/}"
 
@@ -204,8 +204,8 @@ if [[ "$TOOL_NAME" == "Bash" ]] && [[ -n "$COMMAND" ]]; then
     exit 0
   fi
 
-  # Check for mkdir commands in .claude/
-  if [[ "$COMMAND" =~ mkdir.*\.claude/ ]]; then
+  # Check for mkdir commands in PROJECT .claude/ (not home directory ~/.claude/)
+  if [[ "$COMMAND" =~ mkdir.*$CLAUDE_PROJECT_DIR/\.claude/ ]]; then
     # Extract the directory being created
     if [[ "$COMMAND" =~ mkdir[[:space:]]+(-p[[:space:]]+)?(.+) ]]; then
       DIR_PATH="${BASH_REMATCH[2]}"

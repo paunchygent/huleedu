@@ -8,17 +8,17 @@ import pytest
 
 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
 from services.cj_assessment_service.models_db import ProcessedEssay
-from services.cj_assessment_service.protocols import CJRepositoryProtocol
+from services.cj_assessment_service.tests.fixtures.database_fixtures import PostgresDataAccess
 
 
 @pytest.mark.asyncio
 async def test_create_or_update_sets_is_anchor_flag(
-    postgres_repository: CJRepositoryProtocol,
+    postgres_data_access: PostgresDataAccess,
 ) -> None:
     """Repository should persist the is_anchor flag derived from metadata."""
 
-    async with postgres_repository.session() as session:
-        batch = await postgres_repository.create_new_cj_batch(
+    async with postgres_data_access.session() as session:
+        batch = await postgres_data_access.create_new_cj_batch(
             session=session,
             bos_batch_id="anchor-flag-batch",
             event_correlation_id=str(uuid4()),
@@ -28,7 +28,7 @@ async def test_create_or_update_sets_is_anchor_flag(
             expected_essay_count=2,
         )
 
-        anchor = await postgres_repository.create_or_update_cj_processed_essay(
+        anchor = await postgres_data_access.create_or_update_cj_processed_essay(
             session=session,
             cj_batch_id=batch.id,
             els_essay_id="ANCHOR_SAMPLE",
@@ -37,7 +37,7 @@ async def test_create_or_update_sets_is_anchor_flag(
             processing_metadata={"is_anchor": True, "anchor_grade": "A"},
         )
 
-        student = await postgres_repository.create_or_update_cj_processed_essay(
+        student = await postgres_data_access.create_or_update_cj_processed_essay(
             session=session,
             cj_batch_id=batch.id,
             els_essay_id="student-1",

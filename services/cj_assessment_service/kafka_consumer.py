@@ -19,6 +19,7 @@ from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_co
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import RedisClientProtocol
 
+from services.cj_assessment_service.cj_core_logic.grade_projector import GradeProjector
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.event_processor import (
     # TODO: To be implemented by Agent Beta
@@ -26,10 +27,15 @@ from services.cj_assessment_service.event_processor import (
     process_single_message,
 )
 from services.cj_assessment_service.protocols import (
+    AnchorRepositoryProtocol,
+    AssessmentInstructionRepositoryProtocol,
+    CJBatchRepositoryProtocol,
+    CJComparisonRepositoryProtocol,
+    CJEssayRepositoryProtocol,
     CJEventPublisherProtocol,
-    CJRepositoryProtocol,
     ContentClientProtocol,
     LLMInteractionProtocol,
+    SessionProviderProtocol,
 )
 
 logger = create_service_logger("cj_assessment.kafka.consumer")
@@ -41,20 +47,32 @@ class CJAssessmentKafkaConsumer:
     def __init__(
         self,
         settings: Settings,
-        database: CJRepositoryProtocol,
+        session_provider: SessionProviderProtocol,
+        batch_repository: CJBatchRepositoryProtocol,
+        essay_repository: CJEssayRepositoryProtocol,
+        comparison_repository: CJComparisonRepositoryProtocol,
+        instruction_repository: AssessmentInstructionRepositoryProtocol,
+        anchor_repository: AnchorRepositoryProtocol,
         content_client: ContentClientProtocol,
         event_publisher: CJEventPublisherProtocol,
         llm_interaction: LLMInteractionProtocol,
         redis_client: RedisClientProtocol,
+        grade_projector: GradeProjector,
         tracer: "Tracer | None" = None,
     ) -> None:
         """Initialize with injected dependencies."""
         self.settings = settings
-        self.database = database
+        self.session_provider = session_provider
+        self.batch_repository = batch_repository
+        self.essay_repository = essay_repository
+        self.comparison_repository = comparison_repository
+        self.instruction_repository = instruction_repository
+        self.anchor_repository = anchor_repository
         self.content_client = content_client
         self.event_publisher = event_publisher
         self.llm_interaction = llm_interaction
         self.redis_client = redis_client
+        self.grade_projector = grade_projector
         self.tracer = tracer
         self.consumer: AIOKafkaConsumer | None = None
         self.should_stop = False
@@ -73,11 +91,17 @@ class CJAssessmentKafkaConsumer:
         ) -> bool | None:
             result = await process_single_message(
                 msg=msg,
-                database=self.database,
+                session_provider=self.session_provider,
+                batch_repository=self.batch_repository,
+                essay_repository=self.essay_repository,
+                instruction_repository=self.instruction_repository,
+                anchor_repository=self.anchor_repository,
+                comparison_repository=self.comparison_repository,
                 content_client=self.content_client,
                 event_publisher=self.event_publisher,
                 llm_interaction=self.llm_interaction,
                 settings_obj=self.settings,
+                grade_projector=self.grade_projector,
                 tracer=self.tracer,
             )
             await confirm_idempotency()  # Confirm after successful processing
@@ -90,11 +114,16 @@ class CJAssessmentKafkaConsumer:
         ) -> bool | None:
             result = await process_llm_result(
                 msg=msg,
-                database=self.database,
+                session_provider=self.session_provider,
+                batch_repository=self.batch_repository,
+                essay_repository=self.essay_repository,
+                comparison_repository=self.comparison_repository,
                 event_publisher=self.event_publisher,
                 content_client=self.content_client,
                 llm_interaction=self.llm_interaction,
                 settings_obj=self.settings,
+                instruction_repository=self.instruction_repository,
+                grade_projector=self.grade_projector,
                 tracer=self.tracer,
             )
             await confirm_idempotency()  # Confirm after successful processing
@@ -105,10 +134,6 @@ class CJAssessmentKafkaConsumer:
 
     async def start_consumer(self) -> None:
         """Start the Kafka consumer and begin processing messages."""
-        # Initialize database schema
-        await self.database.initialize_db_schema()
-        logger.info("Database schema initialized")
-
         # Subscribe to BOTH topics
         topics = [
             self.settings.CJ_ASSESSMENT_REQUEST_TOPIC,  # Original requests

@@ -10,15 +10,19 @@ from uuid import uuid4
 import pytest
 from common_core.events.cj_assessment_events import GradeProjectionSummary
 from common_core.status_enums import CJBatchStateEnum as CoreCJState
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.cj_assessment_service.cj_core_logic import batch_finalizer as bf
 from services.cj_assessment_service.cj_core_logic.batch_finalizer import BatchFinalizer
 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
 from services.cj_assessment_service.models_db import CJBatchUpload
 from services.cj_assessment_service.protocols import (
+    CJBatchRepositoryProtocol,
+    CJComparisonRepositoryProtocol,
+    CJEssayRepositoryProtocol,
     CJEventPublisherProtocol,
-    CJRepositoryProtocol,
     ContentClientProtocol,
+    SessionProviderProtocol,
 )
 
 
@@ -26,12 +30,17 @@ from services.cj_assessment_service.protocols import (
 async def test_finalize_scoring_transitions_state(monkeypatch: pytest.MonkeyPatch) -> None:
     """Scoring finalization should move the CJ state machine into SCORING -> COMPLETED."""
 
-    repo = AsyncMock(spec=CJRepositoryProtocol)
-    repo.get_essays_for_cj_batch.return_value = [
+    # Setup per-aggregate repository mocks
+    session_provider = AsyncMock(spec=SessionProviderProtocol)
+    batch_repo = AsyncMock(spec=CJBatchRepositoryProtocol)
+    essay_repo = AsyncMock(spec=CJEssayRepositoryProtocol)
+
+    essay_repo.get_essays_for_cj_batch.return_value = [
         SimpleNamespace(els_essay_id="ANCHOR_A", assessment_input_text="A", current_bt_score=0.0),
         SimpleNamespace(els_essay_id="student-1", assessment_input_text="S1", current_bt_score=0.0),
     ]
-    repo.update_cj_batch_status = AsyncMock()
+    batch_repo.update_cj_batch_status = AsyncMock()
+    batch_repo.update_batch_state = AsyncMock()
 
     event_publisher = AsyncMock(spec=CJEventPublisherProtocol)
     content_client = AsyncMock(spec=ContentClientProtocol)
@@ -50,8 +59,10 @@ async def test_finalize_scoring_transitions_state(monkeypatch: pytest.MonkeyPatc
     batch.org_id = "org-abc"
     batch.assignment_id = "assignment-xyz"
 
-    session = AsyncMock()
+    session = AsyncMock(spec=AsyncSession)
     session.get.return_value = batch
+    session_provider.session.return_value.__aenter__.return_value = session
+    session_provider.session.return_value.__aexit__.return_value = None
 
     class _FakeScoring:
         async def record_comparisons_and_update_scores(
@@ -94,18 +105,24 @@ async def test_finalize_scoring_transitions_state(monkeypatch: pytest.MonkeyPatc
                 )
 
     publish_mock = AsyncMock()
-    update_state_mock = AsyncMock()
 
     monkeypatch.setattr(bf, "scoring_ranking", _FakeScoring())
-    monkeypatch.setattr(bf, "grade_projector", _FakeGradeProjector())
     monkeypatch.setattr(bf, "publish_dual_assessment_events", publish_mock)
-    monkeypatch.setattr(bf, "update_batch_state_in_session", update_state_mock)
 
+    from services.cj_assessment_service.cj_core_logic.grade_projector import (
+        GradeProjector,
+    )
+
+    grade_projector = AsyncMock(spec=GradeProjector)
     finalizer = BatchFinalizer(
-        database=repo,
+        session_provider=session_provider,
+        batch_repository=batch_repo,
+        comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
+        essay_repository=essay_repo,
         event_publisher=event_publisher,
         content_client=content_client,
         settings=settings,
+        grade_projector=grade_projector,
     )
 
     correlation_id = uuid4()
@@ -114,16 +131,19 @@ async def test_finalize_scoring_transitions_state(monkeypatch: pytest.MonkeyPatc
     await finalizer.finalize_scoring(
         batch_id=batch.id,
         correlation_id=correlation_id,
-        session=session,
         log_extra=log_extra,
     )
 
     assert publish_mock.await_count == 1
-    assert repo.update_cj_batch_status.await_count == 1
-
-    assert update_state_mock.await_count == 2
-    first_call_state = update_state_mock.await_args_list[0].kwargs["state"]
-    second_call_state = update_state_mock.await_args_list[1].kwargs["state"]
-
-    assert first_call_state == CoreCJState.SCORING
-    assert second_call_state == CoreCJState.COMPLETED
+    assert batch_repo.update_batch_state.await_count == 2
+    batch_repo.update_batch_state.assert_any_await(
+        session=session,
+        batch_id=batch.id,
+        state=CoreCJState.SCORING,
+    )
+    batch_repo.update_batch_state.assert_any_await(
+        session=session,
+        batch_id=batch.id,
+        state=CoreCJState.COMPLETED,
+    )
+    assert batch_repo.update_cj_batch_status.await_count == 1

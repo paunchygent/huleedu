@@ -6,10 +6,12 @@ for operational monitoring and observability.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
 from common_core.error_enums import ErrorCode
+from common_core.status_enums import CJBatchStateEnum
 from dishka import FromDishka
 from huleedu_service_libs.database import DatabaseHealthChecker
 from huleedu_service_libs.error_handling.error_detail_factory import (
@@ -23,7 +25,10 @@ from quart_dishka import inject
 
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.models_api import ErrorResponse
-from services.cj_assessment_service.protocols import CJRepositoryProtocol
+from services.cj_assessment_service.protocols import (
+    CJBatchRepositoryProtocol,
+    SessionProviderProtocol,
+)
 
 health_bp = Blueprint("health_routes", __name__)
 
@@ -218,7 +223,8 @@ async def liveness_probe(settings: FromDishka[Settings]) -> tuple[Response, int]
 @health_bp.route("/healthz/ready")
 @inject
 async def readiness_probe(
-    repository: FromDishka[CJRepositoryProtocol],
+    session_provider: FromDishka[SessionProviderProtocol],
+    batch_repository: FromDishka[CJBatchRepositoryProtocol],
     settings: FromDishka[Settings],
 ) -> tuple[Response, int]:
     """Kubernetes readiness probe endpoint.
@@ -241,8 +247,7 @@ async def readiness_probe(
 
         # Check database readiness
         try:
-            async with repository.session() as session:
-                # Simple query to verify DB connectivity
+            async with session_provider.session() as session:
                 from sqlalchemy import text
 
                 result = await session.execute(text("SELECT 1"))
@@ -254,15 +259,7 @@ async def readiness_probe(
 
         # Check for stuck batches (indicates monitoring is working)
         try:
-            async with repository.session() as session:
-                from datetime import UTC, datetime, timedelta
-
-                from common_core.status_enums import CJBatchStateEnum
-                from sqlalchemy import select
-
-                from services.cj_assessment_service.models_db import CJBatchState
-
-                # Count active batches
+            async with session_provider.session() as session:
                 active_states = [
                     CJBatchStateEnum.INITIALIZING,
                     CJBatchStateEnum.GENERATING_PAIRS,
@@ -270,20 +267,16 @@ async def readiness_probe(
                     CJBatchStateEnum.SCORING,
                 ]
 
-                stmt = select(CJBatchState).where(CJBatchState.state.in_(active_states))
-                result = await session.execute(stmt)
-                active_batches = result.scalars().all()
-
-                # Check for stuck batches (no activity for > 2 hours)
                 stuck_threshold = datetime.now(UTC) - timedelta(hours=2)
-                stuck_count = sum(
-                    1 for batch in active_batches if batch.last_activity_at < stuck_threshold
+                stuck_batches = await batch_repository.get_stuck_batches(
+                    session=session,
+                    states=active_states,
+                    stuck_threshold=stuck_threshold,
                 )
 
-                # Warn if too many stuck batches
-                if stuck_count > 5:
+                if len(stuck_batches) > 5:
                     checks["batch_monitoring"] = False
-                    logger.warning(f"Too many stuck batches: {stuck_count}")
+                    logger.warning(f"Too many stuck batches: {len(stuck_batches)}")
 
         except Exception as e:
             logger.warning(f"Batch monitoring check failed: {e}")

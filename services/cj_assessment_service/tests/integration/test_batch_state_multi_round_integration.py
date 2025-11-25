@@ -16,8 +16,12 @@ from common_core.status_enums import CJBatchStateEnum
 from services.cj_assessment_service.cj_core_logic.batch_processor import BatchProcessor
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
+from services.cj_assessment_service.implementations.session_provider_impl import (
+    CJSessionProviderImpl,
+)
 from services.cj_assessment_service.models_db import CJBatchState
-from services.cj_assessment_service.protocols import CJRepositoryProtocol, LLMInteractionProtocol
+from services.cj_assessment_service.protocols import LLMInteractionProtocol
+from services.cj_assessment_service.tests.fixtures.database_fixtures import PostgresDataAccess
 
 
 @pytest.mark.integration
@@ -26,7 +30,8 @@ class TestBatchStateMultiRoundIntegration:
 
     async def test_multi_round_batch_accumulation(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_data_access: PostgresDataAccess,
+        postgres_session_provider: CJSessionProviderImpl,
     ) -> None:
         """Simulate 100-comparison batch with 10 submissions of 10 comparisons each.
 
@@ -38,8 +43,8 @@ class TestBatchStateMultiRoundIntegration:
         - Final state matches database reality
         """
         # 1. Setup: Create a batch in the database
-        async with postgres_repository.session() as session:
-            cj_batch = await postgres_repository.create_new_cj_batch(
+        async with postgres_session_provider.session() as session:
+            cj_batch = await postgres_data_access.create_new_cj_batch(
                 session=session,
                 bos_batch_id="multi-round-test-batch",
                 event_correlation_id=str(uuid4()),
@@ -84,9 +89,10 @@ class TestBatchStateMultiRoundIntegration:
 
         # 2. Setup BatchProcessor with real repository but mock LLM
         batch_processor = BatchProcessor(
-            database=postgres_repository,
+            session_provider=postgres_session_provider,
             llm_interaction=AsyncMock(spec=LLMInteractionProtocol),
             settings=Settings(),
+            batch_repository=postgres_data_access.batch_repo,
         )
 
         # 3. Simulate 10 iterations
@@ -103,7 +109,7 @@ class TestBatchStateMultiRoundIntegration:
             )
 
             # Verify state after this iteration
-            async with postgres_repository.session() as session:
+            async with postgres_session_provider.session() as session:
                 state = await session.get(CJBatchState, batch_id)
                 assert state is not None
 
@@ -122,7 +128,7 @@ class TestBatchStateMultiRoundIntegration:
                 assert state.state == CJBatchStateEnum.WAITING_CALLBACKS
 
         # 4. Final verification
-        async with postgres_repository.session() as session:
+        async with postgres_session_provider.session() as session:
             final_state = await session.get(CJBatchState, batch_id)
             assert final_state is not None
             assert final_state.total_budget == 100

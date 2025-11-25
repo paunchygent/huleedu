@@ -13,6 +13,7 @@ ComparisonPair rows, not just in-memory tasks.
 from __future__ import annotations
 
 from typing import Any
+from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
 
 import pytest
@@ -30,9 +31,13 @@ from services.cj_assessment_service.models_api import (
 )
 from services.cj_assessment_service.models_db import ComparisonPair, ProcessedEssay
 from services.cj_assessment_service.protocols import (
-    CJRepositoryProtocol,
+    AssessmentInstructionRepositoryProtocol,
+    CJBatchRepositoryProtocol,
+    CJComparisonRepositoryProtocol,
     LLMInteractionProtocol,
+    SessionProviderProtocol,
 )
+from services.cj_assessment_service.tests.fixtures.database_fixtures import PostgresDataAccess
 
 
 @pytest.mark.integration
@@ -46,7 +51,7 @@ class TestPairGenerationRandomizationIntegration:
 
     async def _create_12x12_batch(
         self,
-        repository: CJRepositoryProtocol,
+        repository: PostgresDataAccess,
     ) -> tuple[int, str]:
         """Create a CJ batch with 12 anchors and 12 student essays.
 
@@ -94,14 +99,14 @@ class TestPairGenerationRandomizationIntegration:
                 )
                 essay.is_anchor = True
 
-            await session.flush()
+            await session.commit()  # Commit so data is visible to other sessions
             cj_batch_id = cj_batch.id
 
         return cj_batch_id, bos_batch_id
 
     async def _load_essays_for_api_model(
         self,
-        repository: CJRepositoryProtocol,
+        repository: PostgresDataAccess,
         cj_batch_id: int,
     ) -> tuple[list[EssayForComparison], list[ProcessedEssay]]:
         """Load ProcessedEssay rows and convert them to EssayForComparison models."""
@@ -153,7 +158,8 @@ class TestPairGenerationRandomizationIntegration:
         self,
         *,
         cj_batch_id: int,
-        repository: CJRepositoryProtocol,
+        session_provider: SessionProviderProtocol,
+        batch_repository: CJBatchRepositoryProtocol,
         llm_interaction: LLMInteractionProtocol,
         settings: Settings,
         essays_for_api_model: list[EssayForComparison],
@@ -169,7 +175,10 @@ class TestPairGenerationRandomizationIntegration:
         return await submit_comparisons_for_async_processing(
             essays_for_api_model=essays_for_api_model,
             cj_batch_id=cj_batch_id,
-            database=repository,
+            session_provider=session_provider,
+            batch_repository=batch_repository,
+            comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
+            instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
             llm_interaction=llm_interaction,
             request_data=request_data,
             settings=settings,
@@ -179,7 +188,9 @@ class TestPairGenerationRandomizationIntegration:
 
     async def test_anchor_positions_are_balanced_in_db(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_session_provider: SessionProviderProtocol,
+        postgres_repository: PostgresDataAccess,
+        postgres_batch_repository: CJBatchRepositoryProtocol,
         mock_llm_interaction_async: LLMInteractionProtocol,
         test_settings: Settings,
     ) -> None:
@@ -223,7 +234,8 @@ class TestPairGenerationRandomizationIntegration:
         # Step 3: Submit comparisons via the real entry point
         submitted = await self._submit_comparisons(
             cj_batch_id=cj_batch_id,
-            repository=postgres_repository,
+            session_provider=postgres_session_provider,
+            batch_repository=postgres_batch_repository,
             llm_interaction=mock_llm_interaction_async,
             settings=test_settings,
             essays_for_api_model=essays_for_api_model,

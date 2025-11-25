@@ -26,6 +26,7 @@ from services.cj_assessment_service.cj_core_logic.dual_event_publisher import (
 from services.cj_assessment_service.cj_core_logic.error_categorization import (
     create_parsing_error_detail,
 )
+from services.cj_assessment_service.cj_core_logic.grade_projector import GradeProjector
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.message_handlers.cj_request_handler import (
     handle_cj_assessment_request,
@@ -34,10 +35,15 @@ from services.cj_assessment_service.message_handlers.llm_callback_handler import
     handle_llm_comparison_callback,
 )
 from services.cj_assessment_service.protocols import (
+    AnchorRepositoryProtocol,
+    AssessmentInstructionRepositoryProtocol,
+    CJBatchRepositoryProtocol,
+    CJComparisonRepositoryProtocol,
+    CJEssayRepositoryProtocol,
     CJEventPublisherProtocol,
-    CJRepositoryProtocol,
     ContentClientProtocol,
     LLMInteractionProtocol,
+    SessionProviderProtocol,
 )
 
 logger = create_service_logger("event_processor")
@@ -83,11 +89,17 @@ async def publish_assessment_completion(
 
 async def process_single_message(
     msg: ConsumerRecord,
-    database: CJRepositoryProtocol,
+    session_provider: SessionProviderProtocol,
+    batch_repository: CJBatchRepositoryProtocol,
+    essay_repository: CJEssayRepositoryProtocol,
+    instruction_repository: AssessmentInstructionRepositoryProtocol,
+    anchor_repository: AnchorRepositoryProtocol,
+    comparison_repository: CJComparisonRepositoryProtocol,
     content_client: ContentClientProtocol,
     event_publisher: CJEventPublisherProtocol,
     llm_interaction: LLMInteractionProtocol,
     settings_obj: Settings,
+    grade_projector: GradeProjector,
     tracer: "Tracer | None" = None,
 ) -> bool:
     """Process a single Kafka message containing CJ assessment request.
@@ -97,7 +109,12 @@ async def process_single_message(
 
     Args:
         msg: Kafka consumer record
-        database: Database access protocol
+        session_provider: Session provider for database transactions
+        batch_repository: Batch repository for batch-level operations
+        essay_repository: Essay repository for essay operations
+        instruction_repository: Instruction repository for assessment instructions
+        anchor_repository: Anchor repository for anchor essay management
+        comparison_repository: Comparison repository for comparison pair operations
         content_client: Content client protocol
         event_publisher: Event publisher protocol
         llm_interaction: LLM interaction protocol
@@ -145,11 +162,17 @@ async def process_single_message(
                 return await handle_cj_assessment_request(
                     msg,
                     envelope,
-                    database,
+                    session_provider,
+                    batch_repository,
+                    essay_repository,
+                    instruction_repository,
+                    anchor_repository,
+                    comparison_repository,
                     content_client,
                     event_publisher,
                     llm_interaction,
                     settings_obj,
+                    grade_projector,
                     tracer,
                 )
     else:
@@ -157,22 +180,33 @@ async def process_single_message(
         return await handle_cj_assessment_request(
             msg,
             envelope,
-            database,
+            session_provider,
+            batch_repository,
+            essay_repository,
+            instruction_repository,
+            anchor_repository,
+            comparison_repository,
             content_client,
             event_publisher,
             llm_interaction,
             settings_obj,
+            grade_projector,
             tracer,
         )
 
 
 async def process_llm_result(
     msg: ConsumerRecord,
-    database: CJRepositoryProtocol,
+    session_provider: SessionProviderProtocol,
+    batch_repository: CJBatchRepositoryProtocol,
+    essay_repository: CJEssayRepositoryProtocol,
+    comparison_repository: CJComparisonRepositoryProtocol,
     event_publisher: CJEventPublisherProtocol,
     content_client: ContentClientProtocol,
     llm_interaction: LLMInteractionProtocol,
     settings_obj: Settings,
+    instruction_repository: AssessmentInstructionRepositoryProtocol,
+    grade_projector: GradeProjector,
     tracer: "Tracer | None" = None,
 ) -> bool:
     """Process LLM comparison result callback from LLM Provider Service.
@@ -181,11 +215,15 @@ async def process_llm_result(
 
     Args:
         msg: Kafka consumer record containing LLM comparison result
-        database: Database access protocol
+        session_provider: Session provider for database transactions
+        batch_repository: Batch repository for batch operations
+        essay_repository: Essay repository for essay operations
+        comparison_repository: Comparison repository for comparison operations
         event_publisher: Event publisher protocol
         content_client: Content client for fetching anchor essays
         llm_interaction: LLM interaction protocol
         settings_obj: Application settings
+        instruction_repository: Instruction repository for assessment instructions
         tracer: Optional OpenTelemetry tracer
 
     Returns:
@@ -193,10 +231,15 @@ async def process_llm_result(
     """
     return await handle_llm_comparison_callback(
         msg,
-        database,
+        session_provider,
+        batch_repository,
+        essay_repository,
+        comparison_repository,
         event_publisher,
         content_client,
         llm_interaction,
         settings_obj,
+        instruction_repository,
+        grade_projector,
         tracer,
     )

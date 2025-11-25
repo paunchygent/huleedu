@@ -47,8 +47,10 @@ from services.cj_assessment_service.models_db import (
 )
 from services.cj_assessment_service.protocols import (
     BatchProcessorProtocol,
-    CJRepositoryProtocol,
     LLMInteractionProtocol,
+)
+from services.cj_assessment_service.tests.fixtures.database_fixtures import (
+    PostgresDataAccess,
 )
 
 if TYPE_CHECKING:
@@ -65,7 +67,7 @@ class TestRetryMechanisms:
 
     async def _create_test_batch(
         self,
-        repository: CJRepositoryProtocol,
+        data_access: PostgresDataAccess,
         essay_count: int = 5,
         batch_id: str = "retry-test-batch",
     ) -> tuple[int, list[ProcessedEssay]]:
@@ -79,9 +81,9 @@ class TestRetryMechanisms:
         Returns:
             Tuple of (cj_batch_id, list of processed essays)
         """
-        async with repository.session() as session:
+        async with data_access.session_provider.session() as session:
             # Create batch
-            cj_batch = await repository.create_new_cj_batch(
+            cj_batch = await data_access.create_new_cj_batch(
                 session=session,
                 bos_batch_id=batch_id,
                 event_correlation_id=str(uuid4()),
@@ -95,7 +97,7 @@ class TestRetryMechanisms:
             # Create essays
             essays = []
             for i in range(essay_count):
-                essay = await repository.create_or_update_cj_processed_essay(
+                essay = await data_access.create_or_update_cj_processed_essay(
                     session=session,
                     cj_batch_id=cj_batch.id,
                     els_essay_id=f"retry_essay_{i:03d}",
@@ -137,16 +139,17 @@ class TestRetryMechanisms:
 
     async def test_add_failed_comparison_to_pool(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_data_access: PostgresDataAccess,
         test_settings: Settings,
     ) -> None:
         """Test that failed comparisons are correctly added to the pool."""
         # Create test batch
-        batch_id, essays = await self._create_test_batch(postgres_repository)
+        batch_id, essays = await self._create_test_batch(postgres_data_access)
 
         # Create pool manager
         pool_manager = BatchPoolManager(
-            database=postgres_repository,
+            session_provider=postgres_data_access.session_provider,
+            batch_repository=postgres_data_access.batch_repo,
             settings=test_settings,
         )
 
@@ -169,34 +172,34 @@ class TestRetryMechanisms:
         )
 
         # Verify pool was updated
-        async with postgres_repository.session() as session:
-            batch_state = await get_batch_state(
-                session=session,
-                cj_batch_id=batch_id,
-                correlation_id=correlation_id,
-            )
+        batch_state = await get_batch_state(
+            session_provider=postgres_data_access.session_provider,
+            batch_repository=postgres_data_access.batch_repo,
+            cj_batch_id=batch_id,
+            correlation_id=correlation_id,
+        )
 
-            assert batch_state.processing_metadata is not None
-            failed_pool = FailedComparisonPool.model_validate(batch_state.processing_metadata)
+        assert batch_state.processing_metadata is not None
+        failed_pool = FailedComparisonPool.model_validate(batch_state.processing_metadata)
 
-            # Check pool contents
-            assert len(failed_pool.failed_comparison_pool) == 1
-            failed_entry = failed_pool.failed_comparison_pool[0]
+        # Check pool contents
+        assert len(failed_pool.failed_comparison_pool) == 1
+        failed_entry = failed_pool.failed_comparison_pool[0]
 
-            assert failed_entry.essay_a_id == essays[0].els_essay_id
-            assert failed_entry.essay_b_id == essays[1].els_essay_id
-            assert failed_entry.failure_reason == "LLM timeout during comparison"
-            assert failed_entry.retry_count == 0
-            assert failed_entry.original_batch_id == str(batch_id)
-            assert failed_entry.correlation_id == correlation_id
+        assert failed_entry.essay_a_id == essays[0].els_essay_id
+        assert failed_entry.essay_b_id == essays[1].els_essay_id
+        assert failed_entry.failure_reason == "LLM timeout during comparison"
+        assert failed_entry.retry_count == 0
+        assert failed_entry.original_batch_id == str(batch_id)
+        assert failed_entry.correlation_id == correlation_id
 
-            # Check statistics
-            assert failed_pool.pool_statistics.total_failed == 1
-            assert failed_pool.pool_statistics.permanently_failed == 0
+        # Check statistics
+        assert failed_pool.pool_statistics.total_failed == 1
+        assert failed_pool.pool_statistics.permanently_failed == 0
 
     async def test_threshold_based_retry_batch_formation(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_data_access: PostgresDataAccess,
         test_settings: Settings,
     ) -> None:
         """Test that retry batches are formed when threshold is reached."""
@@ -207,10 +210,11 @@ class TestRetryMechanisms:
         test_settings.MAX_RETRY_ATTEMPTS = 2
 
         # Create test batch
-        batch_id, essays = await self._create_test_batch(postgres_repository, essay_count=6)
+        batch_id, essays = await self._create_test_batch(postgres_data_access, essay_count=6)
 
         pool_manager = BatchPoolManager(
-            database=postgres_repository,
+            session_provider=postgres_data_access.session_provider,
+            batch_repository=postgres_data_access.batch_repo,
             settings=test_settings,
         )
 
@@ -266,25 +270,25 @@ class TestRetryMechanisms:
         assert len(retry_tasks) == 3, "Should form batch with all 3 failed comparisons"
 
         # Verify retry counts were incremented
-        async with postgres_repository.session() as session:
-            batch_state = await get_batch_state(
-                session=session,
-                cj_batch_id=batch_id,
-                correlation_id=uuid4(),
-            )
+        batch_state = await get_batch_state(
+            session_provider=postgres_data_access.session_provider,
+            batch_repository=postgres_data_access.batch_repo,
+            cj_batch_id=batch_id,
+            correlation_id=uuid4(),
+        )
 
-            failed_pool = FailedComparisonPool.model_validate(batch_state.processing_metadata)
+        failed_pool = FailedComparisonPool.model_validate(batch_state.processing_metadata)
 
-            # All entries should have retry_count = 1
-            for entry in failed_pool.failed_comparison_pool:
-                assert entry.retry_count == 1
+        # All entries should have retry_count = 1
+        for entry in failed_pool.failed_comparison_pool:
+            assert entry.retry_count == 1
 
-            # Statistics should be updated
-            assert failed_pool.pool_statistics.retry_attempts == 1
+        # Statistics should be updated
+        assert failed_pool.pool_statistics.retry_attempts == 1
 
     async def test_end_of_batch_fairness_retry(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_data_access: PostgresDataAccess,
         test_settings: Settings,
     ) -> None:
         """Test that force_retry_all processes any remaining failures for fairness."""
@@ -294,10 +298,11 @@ class TestRetryMechanisms:
         test_settings.MAX_RETRY_ATTEMPTS = 3
 
         # Create test batch
-        batch_id, essays = await self._create_test_batch(postgres_repository)
+        batch_id, essays = await self._create_test_batch(postgres_data_access)
 
         pool_manager = BatchPoolManager(
-            database=postgres_repository,
+            session_provider=postgres_data_access.session_provider,
+            batch_repository=postgres_data_access.batch_repo,
             settings=test_settings,
         )
 
@@ -341,20 +346,20 @@ class TestRetryMechanisms:
         assert len(retry_tasks) == 2, "Should process all remaining failures"
 
         # Verify pool statistics reflect fairness processing
-        async with postgres_repository.session() as session:
-            batch_state = await get_batch_state(
-                session=session,
-                cj_batch_id=batch_id,
-                correlation_id=uuid4(),
-            )
+        batch_state = await get_batch_state(
+            session_provider=postgres_data_access.session_provider,
+            batch_repository=postgres_data_access.batch_repo,
+            cj_batch_id=batch_id,
+            correlation_id=uuid4(),
+        )
 
-            failed_pool = FailedComparisonPool.model_validate(batch_state.processing_metadata)
-            assert failed_pool.pool_statistics.retry_attempts == 1
-            assert all(entry.retry_count == 1 for entry in failed_pool.failed_comparison_pool)
+        failed_pool = FailedComparisonPool.model_validate(batch_state.processing_metadata)
+        assert failed_pool.pool_statistics.retry_attempts == 1
+        assert all(entry.retry_count == 1 for entry in failed_pool.failed_comparison_pool)
 
     async def test_retry_count_and_permanent_failure(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_data_access: PostgresDataAccess,
         test_settings: Settings,
     ) -> None:
         """Test that comparisons are marked permanently failed after max retries."""
@@ -365,10 +370,11 @@ class TestRetryMechanisms:
         test_settings.RETRY_BATCH_SIZE = 10
 
         # Create test batch
-        batch_id, essays = await self._create_test_batch(postgres_repository)
+        batch_id, essays = await self._create_test_batch(postgres_data_access)
 
         pool_manager = BatchPoolManager(
-            database=postgres_repository,
+            session_provider=postgres_data_access.session_provider,
+            batch_repository=postgres_data_access.batch_repo,
             settings=test_settings,
         )
 
@@ -394,14 +400,14 @@ class TestRetryMechanisms:
         assert len(retry_tasks_1) == 1
 
         # Verify retry count = 1
-        async with postgres_repository.session() as session:
-            batch_state = await get_batch_state(
-                session=session,
-                cj_batch_id=batch_id,
-                correlation_id=uuid4(),
-            )
-            failed_pool = FailedComparisonPool.model_validate(batch_state.processing_metadata)
-            assert failed_pool.failed_comparison_pool[0].retry_count == 1
+        batch_state = await get_batch_state(
+            session_provider=postgres_data_access.session_provider,
+            batch_repository=postgres_data_access.batch_repo,
+            cj_batch_id=batch_id,
+            correlation_id=uuid4(),
+        )
+        failed_pool = FailedComparisonPool.model_validate(batch_state.processing_metadata)
+        assert failed_pool.failed_comparison_pool[0].retry_count == 1
 
         # Second retry
         retry_tasks_2 = await pool_manager.form_retry_batch(
@@ -413,24 +419,24 @@ class TestRetryMechanisms:
         assert len(retry_tasks_2) == 1
 
         # After second retry, entry should be removed (permanently failed)
-        async with postgres_repository.session() as session:
-            batch_state = await get_batch_state(
-                session=session,
-                cj_batch_id=batch_id,
-                correlation_id=uuid4(),
-            )
-            failed_pool = FailedComparisonPool.model_validate(batch_state.processing_metadata)
+        batch_state = await get_batch_state(
+            session_provider=postgres_data_access.session_provider,
+            batch_repository=postgres_data_access.batch_repo,
+            cj_batch_id=batch_id,
+            correlation_id=uuid4(),
+        )
+        failed_pool = FailedComparisonPool.model_validate(batch_state.processing_metadata)
 
-            # Pool should be empty (entry removed as permanently failed)
-            assert len(failed_pool.failed_comparison_pool) == 0
+        # Pool should be empty (entry removed as permanently failed)
+        assert len(failed_pool.failed_comparison_pool) == 0
 
-            # Statistics should reflect permanent failure
-            assert failed_pool.pool_statistics.permanently_failed == 1
-            assert failed_pool.pool_statistics.retry_attempts == 2
+        # Statistics should reflect permanent failure
+        assert failed_pool.pool_statistics.permanently_failed == 1
+        assert failed_pool.pool_statistics.retry_attempts == 2
 
     async def test_pool_statistics_tracking(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_data_access: PostgresDataAccess,
         test_settings: Settings,
     ) -> None:
         """Test that pool statistics are accurately tracked."""
@@ -440,10 +446,11 @@ class TestRetryMechanisms:
         test_settings.MAX_RETRY_ATTEMPTS = 3
 
         # Create test batch
-        batch_id, essays = await self._create_test_batch(postgres_repository, essay_count=6)
+        batch_id, essays = await self._create_test_batch(postgres_data_access, essay_count=6)
 
         pool_manager = BatchPoolManager(
-            database=postgres_repository,
+            session_provider=postgres_data_access.session_provider,
+            batch_repository=postgres_data_access.batch_repo,
             settings=test_settings,
         )
 
@@ -461,18 +468,18 @@ class TestRetryMechanisms:
             )
 
         # Check initial statistics
-        async with postgres_repository.session() as session:
-            batch_state = await get_batch_state(
-                session=session,
-                cj_batch_id=batch_id,
-                correlation_id=uuid4(),
-            )
-            failed_pool = FailedComparisonPool.model_validate(batch_state.processing_metadata)
+        batch_state = await get_batch_state(
+            session_provider=postgres_data_access.session_provider,
+            batch_repository=postgres_data_access.batch_repo,
+            cj_batch_id=batch_id,
+            correlation_id=uuid4(),
+        )
+        failed_pool = FailedComparisonPool.model_validate(batch_state.processing_metadata)
 
-            assert failed_pool.pool_statistics.total_failed == 4
-            assert failed_pool.pool_statistics.retry_attempts == 0
-            assert failed_pool.pool_statistics.permanently_failed == 0
-            assert failed_pool.pool_statistics.successful_retries == 0
+        assert failed_pool.pool_statistics.total_failed == 4
+        assert failed_pool.pool_statistics.retry_attempts == 0
+        assert failed_pool.pool_statistics.permanently_failed == 0
+        assert failed_pool.pool_statistics.successful_retries == 0
 
         # Form retry batch
         correlation_id = uuid4()
@@ -486,31 +493,32 @@ class TestRetryMechanisms:
         assert len(retry_tasks) == 4  # All 4 failures should be retried
 
         # Check updated statistics
-        async with postgres_repository.session() as session:
-            batch_state = await get_batch_state(
-                session=session,
-                cj_batch_id=batch_id,
-                correlation_id=uuid4(),
-            )
-            failed_pool = FailedComparisonPool.model_validate(batch_state.processing_metadata)
+        batch_state = await get_batch_state(
+            session_provider=postgres_data_access.session_provider,
+            batch_repository=postgres_data_access.batch_repo,
+            cj_batch_id=batch_id,
+            correlation_id=uuid4(),
+        )
+        failed_pool = FailedComparisonPool.model_validate(batch_state.processing_metadata)
 
-            assert failed_pool.pool_statistics.retry_attempts == 1
-            assert failed_pool.pool_statistics.last_retry_batch == f"retry_batch_{correlation_id}"
-            # All entries still in pool with retry_count = 1
-            assert len(failed_pool.failed_comparison_pool) == 4
-            assert all(entry.retry_count == 1 for entry in failed_pool.failed_comparison_pool)
+        assert failed_pool.pool_statistics.retry_attempts == 1
+        assert failed_pool.pool_statistics.last_retry_batch == f"retry_batch_{correlation_id}"
+        # All entries still in pool with retry_count = 1
+        assert len(failed_pool.failed_comparison_pool) == 4
+        assert all(entry.retry_count == 1 for entry in failed_pool.failed_comparison_pool)
 
     async def test_failed_pool_persistence(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_data_access: PostgresDataAccess,
         test_settings: Settings,
     ) -> None:
         """Test that failed pool data persists correctly in processing_metadata."""
         # Create test batch
-        batch_id, essays = await self._create_test_batch(postgres_repository)
+        batch_id, essays = await self._create_test_batch(postgres_data_access)
 
         pool_manager = BatchPoolManager(
-            database=postgres_repository,
+            session_provider=postgres_data_access.session_provider,
+            batch_repository=postgres_data_access.batch_repo,
             settings=test_settings,
         )
 
@@ -532,30 +540,30 @@ class TestRetryMechanisms:
             )
 
         # Read pool data back
-        async with postgres_repository.session() as session:
-            batch_state = await get_batch_state(
-                session=session,
-                cj_batch_id=batch_id,
-                correlation_id=uuid4(),
-            )
+        batch_state = await get_batch_state(
+            session_provider=postgres_data_access.session_provider,
+            batch_repository=postgres_data_access.batch_repo,
+            cj_batch_id=batch_id,
+            correlation_id=uuid4(),
+        )
 
-            assert batch_state.processing_metadata is not None
+        assert batch_state.processing_metadata is not None
 
-            # Validate pool can be reconstructed from metadata
-            failed_pool = FailedComparisonPool.model_validate(batch_state.processing_metadata)
+        # Validate pool can be reconstructed from metadata
+        failed_pool = FailedComparisonPool.model_validate(batch_state.processing_metadata)
 
-            assert len(failed_pool.failed_comparison_pool) == 3
+        assert len(failed_pool.failed_comparison_pool) == 3
 
-            # Verify all data is preserved
-            for i, entry in enumerate(failed_pool.failed_comparison_pool):
-                assert entry.essay_a_id == essays[i].els_essay_id
-                assert entry.essay_b_id == essays[i + 1].els_essay_id
-                assert entry.failure_reason == f"Persistence test failure {i}"
-                assert entry.retry_count == 0
-                assert entry.original_batch_id == str(batch_id)
-                assert entry.correlation_id == correlation_ids[i]
-                assert entry.comparison_task is not None
-                assert entry.comparison_task.prompt == "Compare these essays for retry testing"
+        # Verify all data is preserved
+        for i, entry in enumerate(failed_pool.failed_comparison_pool):
+            assert entry.essay_a_id == essays[i].els_essay_id
+            assert entry.essay_b_id == essays[i + 1].els_essay_id
+            assert entry.failure_reason == f"Persistence test failure {i}"
+            assert entry.retry_count == 0
+            assert entry.original_batch_id == str(batch_id)
+            assert entry.correlation_id == correlation_ids[i]
+            assert entry.comparison_task is not None
+            assert entry.comparison_task.prompt == "Compare these essays for retry testing"
 
         # Modify pool and verify persistence
         await pool_manager.form_retry_batch(
@@ -565,22 +573,22 @@ class TestRetryMechanisms:
         )
 
         # Read modified pool
-        async with postgres_repository.session() as session:
-            batch_state = await get_batch_state(
-                session=session,
-                cj_batch_id=batch_id,
-                correlation_id=uuid4(),
-            )
+        batch_state = await get_batch_state(
+            session_provider=postgres_data_access.session_provider,
+            batch_repository=postgres_data_access.batch_repo,
+            cj_batch_id=batch_id,
+            correlation_id=uuid4(),
+        )
 
-            failed_pool = FailedComparisonPool.model_validate(batch_state.processing_metadata)
+        failed_pool = FailedComparisonPool.model_validate(batch_state.processing_metadata)
 
-            # All entries should have incremented retry count
-            assert all(entry.retry_count == 1 for entry in failed_pool.failed_comparison_pool)
-            assert failed_pool.pool_statistics.retry_attempts == 1
+        # All entries should have incremented retry count
+        assert all(entry.retry_count == 1 for entry in failed_pool.failed_comparison_pool)
+        assert failed_pool.pool_statistics.retry_attempts == 1
 
     async def test_retry_batch_uses_persisted_system_prompt(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_data_access: PostgresDataAccess,
         test_settings: Settings,
     ) -> None:
         """Regression guard: retry submissions reuse persisted LLM overrides."""
@@ -590,10 +598,11 @@ class TestRetryMechanisms:
         test_settings.RETRY_BATCH_SIZE = 2
         test_settings.MAX_RETRY_ATTEMPTS = 1
 
-        batch_id, essays = await self._create_test_batch(postgres_repository)
+        batch_id, essays = await self._create_test_batch(postgres_data_access)
 
         pool_manager = BatchPoolManager(
-            database=postgres_repository,
+            session_provider=postgres_data_access.session_provider,
+            batch_repository=postgres_data_access.batch_repo,
             settings=test_settings,
         )
 
@@ -616,13 +625,12 @@ class TestRetryMechanisms:
             "system_prompt_override": "Persisted guard prompt",
         }
 
-        async with postgres_repository.session() as session:
-            await merge_batch_processing_metadata(
-                session=session,
-                cj_batch_id=batch_id,
-                metadata_updates={"llm_overrides": override_payload},
-                correlation_id=uuid4(),
-            )
+        await merge_batch_processing_metadata(
+            session_provider=postgres_data_access.session_provider,
+            cj_batch_id=batch_id,
+            metadata_updates={"llm_overrides": override_payload},
+            correlation_id=uuid4(),
+        )
 
         mock_llm_interaction = AsyncMock(spec=LLMInteractionProtocol)
         mock_batch_submitter = AsyncMock(spec=BatchProcessorProtocol)
@@ -636,7 +644,7 @@ class TestRetryMechanisms:
         )
 
         retry_processor = BatchRetryProcessor(
-            database=postgres_repository,
+            session_provider=postgres_data_access.session_provider,
             llm_interaction=mock_llm_interaction,
             settings=test_settings,
             pool_manager=pool_manager,
@@ -659,7 +667,7 @@ class TestRetryMechanisms:
 
     async def test_retry_batch_submission_flow(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_data_access: PostgresDataAccess,
         test_settings: Settings,
     ) -> None:
         """Test the full retry batch submission flow."""
@@ -669,7 +677,7 @@ class TestRetryMechanisms:
         test_settings.MAX_RETRY_ATTEMPTS = 2
 
         # Create test batch
-        batch_id, essays = await self._create_test_batch(postgres_repository)
+        batch_id, essays = await self._create_test_batch(postgres_data_access)
 
         # Mock dependencies
         mock_llm_interaction = AsyncMock(spec=LLMInteractionProtocol)
@@ -685,12 +693,13 @@ class TestRetryMechanisms:
         )
 
         pool_manager = BatchPoolManager(
-            database=postgres_repository,
+            session_provider=postgres_data_access.session_provider,
+            batch_repository=postgres_data_access.batch_repo,
             settings=test_settings,
         )
 
         retry_processor = BatchRetryProcessor(
-            database=postgres_repository,
+            session_provider=postgres_data_access.session_provider,
             llm_interaction=mock_llm_interaction,
             settings=test_settings,
             pool_manager=pool_manager,
@@ -729,20 +738,20 @@ class TestRetryMechanisms:
         assert call_args.kwargs["config_overrides"] is None
 
         # Verify pool was updated
-        async with postgres_repository.session() as session:
-            batch_state = await get_batch_state(
-                session=session,
-                cj_batch_id=batch_id,
-                correlation_id=uuid4(),
-            )
+        batch_state = await get_batch_state(
+            session_provider=postgres_data_access.session_provider,
+            batch_repository=postgres_data_access.batch_repo,
+            cj_batch_id=batch_id,
+            correlation_id=uuid4(),
+        )
 
-            failed_pool = FailedComparisonPool.model_validate(batch_state.processing_metadata)
-            assert failed_pool.pool_statistics.retry_attempts == 1
-            assert all(entry.retry_count == 1 for entry in failed_pool.failed_comparison_pool)
+        failed_pool = FailedComparisonPool.model_validate(batch_state.processing_metadata)
+        assert failed_pool.pool_statistics.retry_attempts == 1
+        assert all(entry.retry_count == 1 for entry in failed_pool.failed_comparison_pool)
 
     async def test_concurrent_failure_handling(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_data_access: PostgresDataAccess,
         test_settings: Settings,
     ) -> None:
         """Test that concurrent additions to failed pool are handled correctly.
@@ -750,10 +759,11 @@ class TestRetryMechanisms:
         With SELECT FOR UPDATE locking, all concurrent updates should be preserved.
         """
         # Create test batch
-        batch_id, essays = await self._create_test_batch(postgres_repository, essay_count=10)
+        batch_id, essays = await self._create_test_batch(postgres_data_access, essay_count=10)
 
         pool_manager = BatchPoolManager(
-            database=postgres_repository,
+            session_provider=postgres_data_access.session_provider,
+            batch_repository=postgres_data_access.batch_repo,
             settings=test_settings,
         )
 
@@ -775,37 +785,37 @@ class TestRetryMechanisms:
         await asyncio.gather(*tasks)
 
         # Verify all failures were recorded correctly
-        async with postgres_repository.session() as session:
-            batch_state = await get_batch_state(
-                session=session,
-                cj_batch_id=batch_id,
-                correlation_id=uuid4(),
-            )
+        batch_state = await get_batch_state(
+            session_provider=postgres_data_access.session_provider,
+            batch_repository=postgres_data_access.batch_repo,
+            cj_batch_id=batch_id,
+            correlation_id=uuid4(),
+        )
 
-            failed_pool = FailedComparisonPool.model_validate(batch_state.processing_metadata)
+        failed_pool = FailedComparisonPool.model_validate(batch_state.processing_metadata)
 
-            # With proper locking, all 8 failures should be recorded
-            assert len(failed_pool.failed_comparison_pool) == 8, (
-                "All concurrent failures should be recorded"
-            )
-            assert failed_pool.pool_statistics.total_failed == 8
+        # With proper locking, all 8 failures should be recorded
+        assert len(failed_pool.failed_comparison_pool) == 8, (
+            "All concurrent failures should be recorded"
+        )
+        assert failed_pool.pool_statistics.total_failed == 8
 
-            # Verify no duplicates
-            seen_pairs = set()
-            for entry in failed_pool.failed_comparison_pool:
-                pair_key = (entry.essay_a_id, entry.essay_b_id)
-                assert pair_key not in seen_pairs, f"Duplicate pair found: {pair_key}"
-                seen_pairs.add(pair_key)
+        # Verify no duplicates
+        seen_pairs = set()
+        for entry in failed_pool.failed_comparison_pool:
+            pair_key = (entry.essay_a_id, entry.essay_b_id)
+            assert pair_key not in seen_pairs, f"Duplicate pair found: {pair_key}"
+            seen_pairs.add(pair_key)
 
-            # Verify all have correct initial state
-            for entry in failed_pool.failed_comparison_pool:
-                assert entry.retry_count == 0
-                assert entry.original_batch_id == str(batch_id)
-                assert "Concurrent failure" in entry.failure_reason
+        # Verify all have correct initial state
+        for entry in failed_pool.failed_comparison_pool:
+            assert entry.retry_count == 0
+            assert entry.original_batch_id == str(batch_id)
+            assert "Concurrent failure" in entry.failure_reason
 
     async def test_process_remaining_failed_comparisons(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_data_access: PostgresDataAccess,
         test_settings: Settings,
     ) -> None:
         """Test the end-of-batch processing of remaining failed comparisons."""
@@ -815,7 +825,7 @@ class TestRetryMechanisms:
         test_settings.MAX_RETRY_ATTEMPTS = 3
 
         # Create test batch
-        batch_id, essays = await self._create_test_batch(postgres_repository)
+        batch_id, essays = await self._create_test_batch(postgres_data_access)
 
         # Mock dependencies
         mock_llm_interaction = AsyncMock(spec=LLMInteractionProtocol)
@@ -831,12 +841,13 @@ class TestRetryMechanisms:
         )
 
         pool_manager = BatchPoolManager(
-            database=postgres_repository,
+            session_provider=postgres_data_access.session_provider,
+            batch_repository=postgres_data_access.batch_repo,
             settings=test_settings,
         )
 
         retry_processor = BatchRetryProcessor(
-            database=postgres_repository,
+            session_provider=postgres_data_access.session_provider,
             llm_interaction=mock_llm_interaction,
             settings=test_settings,
             pool_manager=pool_manager,
@@ -869,18 +880,18 @@ class TestRetryMechanisms:
         mock_batch_submitter.submit_comparison_batch.assert_called_once()
 
         # Verify pool was updated
-        async with postgres_repository.session() as session:
-            batch_state = await get_batch_state(
-                session=session,
-                cj_batch_id=batch_id,
-                correlation_id=uuid4(),
-            )
+        batch_state = await get_batch_state(
+            session_provider=postgres_data_access.session_provider,
+            batch_repository=postgres_data_access.batch_repo,
+            cj_batch_id=batch_id,
+            correlation_id=uuid4(),
+        )
 
-            failed_pool = FailedComparisonPool.model_validate(batch_state.processing_metadata)
+        failed_pool = FailedComparisonPool.model_validate(batch_state.processing_metadata)
 
-            # All entries should have been retried
-            assert failed_pool.pool_statistics.retry_attempts == 1
-            assert all(entry.retry_count == 1 for entry in failed_pool.failed_comparison_pool)
+        # All entries should have been retried
+        assert failed_pool.pool_statistics.retry_attempts == 1
+        assert all(entry.retry_count == 1 for entry in failed_pool.failed_comparison_pool)
 
-            # Should still have 3 entries (not removed yet)
-            assert len(failed_pool.failed_comparison_pool) == 3
+        # Should still have 3 entries (not removed yet)
+        assert len(failed_pool.failed_comparison_pool) == 3

@@ -18,15 +18,21 @@ from common_core.models.error_models import ErrorDetail
 from common_core.status_enums import CJBatchStateEnum
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from services.cj_assessment_service.cj_core_logic.grade_projector import GradeProjector
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
 from services.cj_assessment_service.event_processor import process_llm_result
 from services.cj_assessment_service.protocols import (
+    AssessmentInstructionRepositoryProtocol,
+    CJBatchRepositoryProtocol,
+    CJComparisonRepositoryProtocol,
+    CJEssayRepositoryProtocol,
     CJEventPublisherProtocol,
-    CJRepositoryProtocol,
     ContentClientProtocol,
     LLMInteractionProtocol,
+    SessionProviderProtocol,
 )
+from services.cj_assessment_service.tests.fixtures.database_fixtures import PostgresDataAccess
 
 # CJBatchState import removed - not used in this test file
 
@@ -34,6 +40,11 @@ from services.cj_assessment_service.protocols import (
 @pytest.fixture
 def mock_llm_interaction() -> AsyncMock:
     return AsyncMock(spec=LLMInteractionProtocol)
+
+
+@pytest.fixture
+def mock_grade_projector() -> AsyncMock:
+    return AsyncMock(spec=GradeProjector)
 
 
 @pytest.mark.integration
@@ -162,10 +173,14 @@ class TestErrorHandlingIntegration:
 
     async def test_callback_for_unknown_correlation_id(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_session_provider: SessionProviderProtocol,
+        postgres_batch_repository: CJBatchRepositoryProtocol,
+        postgres_essay_repository: CJEssayRepositoryProtocol,
+        postgres_comparison_repository: CJComparisonRepositoryProtocol,
         mock_event_publisher: CJEventPublisherProtocol,
         test_settings: Settings,
         mock_llm_interaction: AsyncMock,
+        mock_grade_projector: AsyncMock,
     ) -> None:
         """Test handling of orphaned callbacks."""
         # Arrange - Use a correlation_id that has no corresponding comparison pair in database
@@ -187,18 +202,23 @@ class TestErrorHandlingIntegration:
 
         result = await process_llm_result(
             kafka_msg,
-            postgres_repository,
+            postgres_session_provider,
+            postgres_batch_repository,
+            postgres_essay_repository,
+            postgres_comparison_repository,
             mock_event_publisher,
             mock_content_client,
             mock_llm_interaction,
             test_settings,
+            instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
+            grade_projector=mock_grade_projector,
         )
 
         # Assert - Message acknowledged but no database changes made
         assert result is True  # Acknowledged to prevent reprocessing
 
         # Verify database state - should have no comparison pairs
-        async with postgres_repository.session() as session:
+        async with postgres_session_provider.session() as session:
             from sqlalchemy import select
 
             from services.cj_assessment_service.models_db import ComparisonPair
@@ -209,10 +229,15 @@ class TestErrorHandlingIntegration:
 
     async def test_duplicate_callback_idempotency(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_session_provider: SessionProviderProtocol,
+        postgres_batch_repository: CJBatchRepositoryProtocol,
+        postgres_essay_repository: CJEssayRepositoryProtocol,
+        postgres_comparison_repository: CJComparisonRepositoryProtocol,
+        postgres_data_access: PostgresDataAccess,
         mock_event_publisher: CJEventPublisherProtocol,
         test_settings: Settings,
         mock_llm_interaction: AsyncMock,
+        mock_grade_projector: AsyncMock,
     ) -> None:
         """Test idempotent handling of duplicate callbacks."""
         # Arrange - Create real database setup with incomplete comparison pair
@@ -220,11 +245,11 @@ class TestErrorHandlingIntegration:
         request_id = "pair-123"
 
         # Create real database state with incomplete comparison pair
-        async with postgres_repository.session() as session:
+        async with postgres_data_access.session() as session:
             from services.cj_assessment_service.enums_db import CJBatchStatusEnum
 
             # Create batch using repository method
-            batch = await postgres_repository.create_new_cj_batch(
+            batch = await postgres_data_access.create_new_cj_batch(
                 session=session,
                 bos_batch_id=str(uuid4()),
                 event_correlation_id=str(uuid4()),
@@ -236,7 +261,7 @@ class TestErrorHandlingIntegration:
             batch.processing_metadata = {"student_prompt_text": "Compare essays"}
 
             # Create essays that will be referenced by comparison pair
-            await postgres_repository.create_or_update_cj_processed_essay(
+            await postgres_data_access.create_or_update_cj_processed_essay(
                 session=session,
                 cj_batch_id=batch.id,
                 els_essay_id="essay-a",
@@ -244,7 +269,7 @@ class TestErrorHandlingIntegration:
                 assessment_input_text="Essay A content for comparison",
             )
 
-            await postgres_repository.create_or_update_cj_processed_essay(
+            await postgres_data_access.create_or_update_cj_processed_essay(
                 session=session,
                 cj_batch_id=batch.id,
                 els_essay_id="essay-b",
@@ -284,19 +309,29 @@ class TestErrorHandlingIntegration:
         # Act - Process same callback twice to test idempotency
         result1 = await process_llm_result(
             kafka_msg,
-            postgres_repository,
+            postgres_session_provider,
+            postgres_batch_repository,
+            postgres_essay_repository,
+            postgres_comparison_repository,
             mock_event_publisher,
             mock_content_client,
             mock_llm_interaction,
             test_settings,
+            instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
+            grade_projector=mock_grade_projector,
         )
         result2 = await process_llm_result(
             kafka_msg,
-            postgres_repository,
+            postgres_session_provider,
+            postgres_batch_repository,
+            postgres_essay_repository,
+            postgres_comparison_repository,
             mock_event_publisher,
             mock_content_client,
             mock_llm_interaction,
             test_settings,
+            instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
+            grade_projector=mock_grade_projector,
         )
 
         # Assert - Both processed successfully (idempotent)
@@ -305,7 +340,7 @@ class TestErrorHandlingIntegration:
 
         # Verify database state - comparison pair was updated by first callback
         # and idempotent behavior means second callback didn't change it
-        async with postgres_repository.session() as session:
+        async with postgres_data_access.session() as session:
             from sqlalchemy import select
 
             from services.cj_assessment_service.models_db import ComparisonPair
@@ -324,10 +359,15 @@ class TestErrorHandlingIntegration:
 
     async def test_high_failure_rate_batch_termination(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_data_access: PostgresDataAccess,
+        postgres_session_provider: SessionProviderProtocol,
+        postgres_batch_repository: CJBatchRepositoryProtocol,
+        postgres_essay_repository: CJEssayRepositoryProtocol,
+        postgres_comparison_repository: CJComparisonRepositoryProtocol,
         mock_event_publisher: CJEventPublisherProtocol,
         test_settings: Settings,
         mock_llm_interaction: AsyncMock,
+        mock_grade_projector: AsyncMock,
     ) -> None:
         """Test batch failure when error rate exceeds threshold."""
         # Arrange - Create real database setup with multiple comparison pairs
@@ -335,12 +375,12 @@ class TestErrorHandlingIntegration:
 
         # Create real database state with batch and comparison pairs
         comparison_correlation_ids = []
-        async with postgres_repository.session() as session:
+        async with postgres_data_access.session() as session:
             from services.cj_assessment_service.enums_db import CJBatchStatusEnum
             from services.cj_assessment_service.models_db import ComparisonPair
 
             # Create batch using repository method
-            batch = await postgres_repository.create_new_cj_batch(
+            batch = await postgres_data_access.create_new_cj_batch(
                 session=session,
                 bos_batch_id=str(uuid4()),
                 event_correlation_id=str(batch_correlation_id),
@@ -353,14 +393,14 @@ class TestErrorHandlingIntegration:
 
             # Create essays first (before comparison pairs)
             for i in range(10):
-                await postgres_repository.create_or_update_cj_processed_essay(
+                await postgres_data_access.create_or_update_cj_processed_essay(
                     session=session,
                     cj_batch_id=batch.id,
                     els_essay_id=f"essay-a-{i}",
                     text_storage_id=f"storage-a-{i}",
                     assessment_input_text=f"Essay A content {i}",
                 )
-                await postgres_repository.create_or_update_cj_processed_essay(
+                await postgres_data_access.create_or_update_cj_processed_essay(
                     session=session,
                     cj_batch_id=batch.id,
                     els_essay_id=f"essay-b-{i}",
@@ -403,11 +443,16 @@ class TestErrorHandlingIntegration:
 
             result = await process_llm_result(
                 kafka_msg,
-                postgres_repository,
+                postgres_session_provider,
+                postgres_batch_repository,
+                postgres_essay_repository,
+                postgres_comparison_repository,
                 mock_event_publisher,
                 mock_content_client,
                 mock_llm_interaction,
                 test_settings,
+                instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
+                grade_projector=mock_grade_projector,
             )
             success_results.append(result)
 
@@ -423,11 +468,16 @@ class TestErrorHandlingIntegration:
 
             result = await process_llm_result(
                 kafka_msg,
-                postgres_repository,
+                postgres_session_provider,
+                postgres_batch_repository,
+                postgres_essay_repository,
+                postgres_comparison_repository,
                 mock_event_publisher,
                 mock_content_client,
                 mock_llm_interaction,
                 test_settings,
+                instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
+                grade_projector=mock_grade_projector,
             )
             error_results.append(result)
 
@@ -440,7 +490,7 @@ class TestErrorHandlingIntegration:
         # Note: Due to model compatibility between test and production models,
         # the callback handler currently cannot find the test comparison pairs,
         # but it gracefully handles callbacks by returning True (acknowledged)
-        async with postgres_repository.session() as session:
+        async with postgres_data_access.session() as session:
             from sqlalchemy import select
 
             from services.cj_assessment_service.models_db import ComparisonPair
@@ -466,10 +516,14 @@ class TestErrorHandlingIntegration:
 
     async def test_malformed_callback_message(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_session_provider: SessionProviderProtocol,
+        postgres_batch_repository: CJBatchRepositoryProtocol,
+        postgres_essay_repository: CJEssayRepositoryProtocol,
+        postgres_comparison_repository: CJComparisonRepositoryProtocol,
         mock_event_publisher: CJEventPublisherProtocol,
         test_settings: Settings,
         mock_llm_interaction: AsyncMock,
+        mock_grade_projector: AsyncMock,
     ) -> None:
         """Test handling of malformed callback messages with real repository.
 
@@ -484,7 +538,7 @@ class TestErrorHandlingIntegration:
         kafka_msg.value = b"invalid json content"
 
         # Track database session creation to verify no calls
-        original_session = postgres_repository.session
+        original_session = postgres_session_provider.session
         session_call_count = 0
 
         @asynccontextmanager
@@ -494,7 +548,7 @@ class TestErrorHandlingIntegration:
             async with original_session() as session:
                 yield session
 
-        postgres_repository.session = tracked_session  # type: ignore[method-assign]
+        postgres_session_provider.session = tracked_session  # type: ignore[method-assign]
 
         # Act - Process malformed message
         # Create mock content client
@@ -502,11 +556,16 @@ class TestErrorHandlingIntegration:
 
         result = await process_llm_result(
             kafka_msg,
-            postgres_repository,
+            postgres_session_provider,
+            postgres_batch_repository,
+            postgres_essay_repository,
+            postgres_comparison_repository,
             mock_event_publisher,
             mock_content_client,
             mock_llm_interaction,
             test_settings,
+            instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
+            grade_projector=mock_grade_projector,
         )
 
         # Assert - Message acknowledged to prevent reprocessing
@@ -518,14 +577,18 @@ class TestErrorHandlingIntegration:
         )
 
         # Restore original session method
-        postgres_repository.session = original_session  # type: ignore[method-assign]
+        postgres_session_provider.session = original_session  # type: ignore[method-assign]
 
     async def test_database_connection_failure(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_session_provider: SessionProviderProtocol,
+        postgres_batch_repository: CJBatchRepositoryProtocol,
+        postgres_essay_repository: CJEssayRepositoryProtocol,
+        postgres_comparison_repository: CJComparisonRepositoryProtocol,
         mock_event_publisher: CJEventPublisherProtocol,
         test_settings: Settings,
         mock_llm_interaction: AsyncMock,
+        mock_grade_projector: AsyncMock,
     ) -> None:
         """Test handling of database connection failures with real repository.
 
@@ -542,7 +605,7 @@ class TestErrorHandlingIntegration:
         )
 
         # Make repository session creation fail
-        original_session = postgres_repository.session
+        original_session = postgres_session_provider.session
 
         @asynccontextmanager
         async def failing_session() -> AsyncGenerator[AsyncSession, None]:
@@ -550,7 +613,7 @@ class TestErrorHandlingIntegration:
             # This yield is unreachable but needed for syntax
             yield  # pragma: no cover
 
-        postgres_repository.session = failing_session  # type: ignore[method-assign]
+        postgres_session_provider.session = failing_session  # type: ignore[method-assign]
 
         # Create Kafka message
         kafka_msg = self._create_kafka_message(callback, request_id)
@@ -561,28 +624,38 @@ class TestErrorHandlingIntegration:
 
         result = await process_llm_result(
             kafka_msg,
-            postgres_repository,
+            postgres_session_provider,
+            postgres_batch_repository,
+            postgres_essay_repository,
+            postgres_comparison_repository,
             mock_event_publisher,
             mock_content_client,
             mock_llm_interaction,
             test_settings,
+            instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
+            grade_projector=mock_grade_projector,
         )
 
         # Assert - Message still acknowledged to prevent infinite retries
         assert result is True
 
         # Restore original session method
-        postgres_repository.session = original_session  # type: ignore[method-assign]
+        postgres_session_provider.session = original_session  # type: ignore[method-assign]
 
         # Verify error was logged (in a real scenario)
         # The error would be logged by the error handling in process_llm_result
 
     async def test_event_publishing_failure(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_data_access: PostgresDataAccess,
+        postgres_session_provider: SessionProviderProtocol,
+        postgres_batch_repository: CJBatchRepositoryProtocol,
+        postgres_essay_repository: CJEssayRepositoryProtocol,
+        postgres_comparison_repository: CJComparisonRepositoryProtocol,
         mock_event_publisher: CJEventPublisherProtocol,
         test_settings: Settings,
         mock_llm_interaction: AsyncMock,
+        mock_grade_projector: AsyncMock,
     ) -> None:
         """Test handling of event publishing failures with real database operations.
 
@@ -595,11 +668,11 @@ class TestErrorHandlingIntegration:
         batch_id = str(uuid4())
 
         # Create real batch and comparison pair in database
-        async with postgres_repository.session() as session:
+        async with postgres_data_access.session() as session:
             from services.cj_assessment_service.models_db import ComparisonPair
 
             # Create batch
-            batch = await postgres_repository.create_new_cj_batch(
+            batch = await postgres_data_access.create_new_cj_batch(
                 session=session,
                 bos_batch_id=batch_id,
                 event_correlation_id=str(correlation_id),
@@ -611,7 +684,7 @@ class TestErrorHandlingIntegration:
             batch.processing_metadata = {"student_prompt_text": "Test instructions"}
 
             # Create essays BEFORE comparison pair (foreign key requirement)
-            await postgres_repository.create_or_update_cj_processed_essay(
+            await postgres_data_access.create_or_update_cj_processed_essay(
                 session=session,
                 cj_batch_id=batch.id,
                 els_essay_id="essay-a",
@@ -619,7 +692,7 @@ class TestErrorHandlingIntegration:
                 assessment_input_text="Essay A content for comparison",
             )
 
-            await postgres_repository.create_or_update_cj_processed_essay(
+            await postgres_data_access.create_or_update_cj_processed_essay(
                 session=session,
                 cj_batch_id=batch.id,
                 els_essay_id="essay-b",
@@ -661,18 +734,23 @@ class TestErrorHandlingIntegration:
 
         result = await process_llm_result(
             kafka_msg,
-            postgres_repository,
+            postgres_session_provider,
+            postgres_batch_repository,
+            postgres_essay_repository,
+            postgres_comparison_repository,
             mock_event_publisher,
             mock_content_client,
             mock_llm_interaction,
             test_settings,
+            instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
+            grade_projector=mock_grade_projector,
         )
 
         # Assert - Message acknowledged despite publishing failure
         assert result is True
 
         # Verify database operations completed successfully
-        async with postgres_repository.session() as session:
+        async with postgres_data_access.session() as session:
             from sqlalchemy import select
 
             # Check that the comparison pair was updated with winner

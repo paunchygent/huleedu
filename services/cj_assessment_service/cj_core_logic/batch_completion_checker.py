@@ -12,10 +12,12 @@ from common_core.status_enums import CJBatchStateEnum
 from huleedu_service_libs.error_handling import HuleEduError, raise_processing_error
 from huleedu_service_libs.logging_utils import create_service_logger
 
-from services.cj_assessment_service.protocols import CJRepositoryProtocol
+from services.cj_assessment_service.protocols import (
+    CJBatchRepositoryProtocol,
+    SessionProviderProtocol,
+)
 
 from .batch_config import BatchConfigOverrides, get_effective_threshold
-from .batch_submission import get_batch_state
 
 logger = create_service_logger("cj_assessment_service.batch_completion_checker")
 
@@ -23,13 +25,19 @@ logger = create_service_logger("cj_assessment_service.batch_completion_checker")
 class BatchCompletionChecker:
     """Handles batch completion evaluation and threshold checking."""
 
-    def __init__(self, database: CJRepositoryProtocol) -> None:
+    def __init__(
+        self,
+        session_provider: SessionProviderProtocol,
+        batch_repo: CJBatchRepositoryProtocol,
+    ) -> None:
         """Initialize batch completion checker.
 
         Args:
-            database: Database access protocol implementation
+            session_provider: Session provider for database access
+            batch_repo: Batch repository for batch state operations
         """
-        self.database = database
+        self._session_provider = session_provider
+        self._batch_repo = batch_repo
 
     async def check_batch_completion(
         self,
@@ -51,10 +59,10 @@ class BatchCompletionChecker:
             HuleEduError: On database operation failure
         """
         try:
-            async with self.database.session() as session:
+            async with self._session_provider.session() as session:
                 # Get batch state from database
-                batch_state = await get_batch_state(
-                    session=session, cj_batch_id=cj_batch_id, correlation_id=correlation_id
+                batch_state = await self._batch_repo.get_batch_state(
+                    session=session, batch_id=cj_batch_id
                 )
 
                 if not batch_state:

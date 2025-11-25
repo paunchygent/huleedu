@@ -11,15 +11,26 @@ import uuid
 from collections.abc import Callable, Coroutine
 from datetime import UTC, datetime
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from aiokafka import ConsumerRecord
 from common_core.domain_enums import CourseCode
 from common_core.event_enums import ProcessingEvent, topic_name
 
+from services.cj_assessment_service.cj_core_logic.grade_projector import GradeProjector
 from services.cj_assessment_service.event_processor import process_single_message
-from services.cj_assessment_service.tests.unit.mocks import MockDatabase, MockRedisClient
+from services.cj_assessment_service.protocols import (
+    AnchorRepositoryProtocol,
+    AssessmentInstructionRepositoryProtocol,
+    CJBatchRepositoryProtocol,
+    CJComparisonRepositoryProtocol,
+    CJEssayRepositoryProtocol,
+)
+from services.cj_assessment_service.tests.unit.test_mocks import (
+    MockRedisClient,
+    MockSessionProvider,
+)
 
 # --- Test Helpers ---
 
@@ -90,10 +101,19 @@ def sample_cj_request_event() -> dict:
 
 
 @pytest.fixture
-def mock_boundary_services(
-    mock_cj_repository: MockDatabase,
-) -> tuple[MockDatabase, AsyncMock, AsyncMock, AsyncMock, Any]:
+def mock_boundary_services() -> dict[str, Any]:
     """Create mock boundary services (external dependencies only)."""
+
+    session_provider = MockSessionProvider()
+
+    batch_repository = AsyncMock(spec=CJBatchRepositoryProtocol)
+    batch_repository.create_new_cj_batch.side_effect = Exception("DB create batch failed")
+
+    essay_repository = AsyncMock(spec=CJEssayRepositoryProtocol)
+    instruction_repository = AsyncMock(spec=AssessmentInstructionRepositoryProtocol)
+    anchor_repository = AsyncMock(spec=AnchorRepositoryProtocol)
+    comparison_repository = AsyncMock(spec=CJComparisonRepositoryProtocol)
+
     mock_content_client = AsyncMock()
     mock_content_client.fetch_content = AsyncMock(
         return_value="Sample essay content for testing CJ assessment."
@@ -110,13 +130,18 @@ def mock_boundary_services(
         SERVICE_NAME = "cj_assessment_service"
 
     settings = Settings()
-    return (
-        mock_cj_repository,
-        mock_content_client,
-        mock_event_publisher,
-        mock_llm_interaction,
-        settings,
-    )
+    return {
+        "session_provider": session_provider,
+        "batch_repository": batch_repository,
+        "essay_repository": essay_repository,
+        "instruction_repository": instruction_repository,
+        "anchor_repository": anchor_repository,
+        "comparison_repository": comparison_repository,
+        "content_client": mock_content_client,
+        "event_publisher": mock_event_publisher,
+        "llm_interaction": mock_llm_interaction,
+        "settings": settings,
+    }
 
 
 # --- Test Cases ---
@@ -125,15 +150,16 @@ def mock_boundary_services(
 @pytest.mark.asyncio
 async def test_processing_failure_keeps_lock(
     sample_cj_request_event: dict,
-    mock_boundary_services: tuple[MockDatabase, AsyncMock, AsyncMock, AsyncMock, MagicMock],
+    mock_boundary_services: dict[str, Any],
     mock_redis_client: MockRedisClient,
 ) -> None:
     """Test that business logic failures keep Redis lock to prevent infinite retries."""
     from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer
 
-    database, content_client, event_publisher, llm_interaction, settings = mock_boundary_services
-
-    database.should_fail_create_batch = True
+    content_client = mock_boundary_services["content_client"]
+    event_publisher = mock_boundary_services["event_publisher"]
+    llm_interaction = mock_boundary_services["llm_interaction"]
+    settings = mock_boundary_services["settings"]
 
     kafka_msg = create_mock_kafka_message(sample_cj_request_event)
 
@@ -149,10 +175,16 @@ async def test_processing_failure_keeps_lock(
     ) -> bool:
         result = await process_single_message(
             msg=msg,
-            database=database,
+            session_provider=mock_boundary_services["session_provider"],
+            batch_repository=mock_boundary_services["batch_repository"],
+            essay_repository=mock_boundary_services["essay_repository"],
+            instruction_repository=mock_boundary_services["instruction_repository"],
+            anchor_repository=mock_boundary_services["anchor_repository"],
+            comparison_repository=mock_boundary_services["comparison_repository"],
             content_client=content_client,
             event_publisher=event_publisher,
             llm_interaction=llm_interaction,
+            grade_projector=Mock(spec=GradeProjector),
             settings_obj=settings,
         )
         await confirm_idempotency()  # Confirm after successful processing

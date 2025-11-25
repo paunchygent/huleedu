@@ -12,162 +12,469 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 
 ---
 
-## 🎯 ACTIVE WORK (2025-11-23)
+## 🎯 ACTIVE WORK (2025-11-25)
 
-### CJ Stability & Validation Fixes (In Progress)
+### Update (2025-11-25 - CJ shim cleanup)
+- Removed the deprecated `CJRepositoryProtocol` interface and deleted `implementations/db_access_impl.py`; code now exclusively uses per-aggregate repositories.
+- Replaced legacy `MockDatabase` usage with `MockSessionProvider` + per-aggregate repo mocks in unit tests (`test_cj_idempotency_failures`, `test_event_processor_prompt_context`) and dropped `deprecated_mocks.py`.
+- Updated `test_eng5_scale_flows` to use `postgres_repository.get_anchor_essay_references` instead of db_access_impl helper; adjusted anchor repo integration doc references.
+- Quality gates: `pdm run format-all`, `pdm run lint-fix --unsafe-fixes`, `pdm run typecheck-all` all clean. Targeted tests: `pdm run pytest-root services/cj_assessment_service/tests/unit/test_cj_idempotency_failures.py -q` and `pdm run pytest-root services/cj_assessment_service/tests/unit/test_event_processor_prompt_context.py -q` both pass (testcontainers spin up Postgres/ryuk). No integration tests run for ENG5 anchors (requires Docker; logically aligned).
 
-**Status**: Multiple high-priority fixes in progress across CJ service
+### Update (2025-11-25 - Admin prompt upload tests)
+- Fixed admin student prompt upload unit tests by updating `AdminRepositoryMock.session()` to yield an `AsyncMock` session with `commit`/`rollback`/`flush` so the new `session.commit()` call in `api/admin/student_prompts.py` no longer raises `AttributeError`. Command executed: `pdm run pytest-root services/cj_assessment_service/tests/unit/test_admin_prompt_endpoints.py -k 'prompt_upload_success' -v` (2 passed, 7 deselected).
 
-**Active Tasks**:
-- **Cj Assessment Code Hardening** (`TASKS/assessment/cj-assessment-code-hardening.md`)
-- **Cj Llm Serial Bundle Validation Fixes** (`TASKS/assessment/cj-llm-serial-bundle-validation-fixes.md`)
-- **Cj Batch State And Completion Fixes** (`TASKS/assessment/cj-batch-state-and-completion-fixes.md`)
+### Session Summary (2025-11-25 - CJ Assessment Refactor & Test Debugging)
 
-See individual task documents for details.
+**Starting Point**: 29 failed tests, 661 passed
+**Ending Point**: 7 failed tests, 683 passed (+22 tests fixed)
 
-**Latest (2025-11-22)**:
-- Prompt block serialization now raises in non-production (falls back only in production) to surface template bugs; all `test_llm_interaction_impl_unit.py` cases green.
+#### Root Causes Identified & Fixed
 
----
+**Issue 1: FOR UPDATE + LEFT OUTER JOIN Conflict (20+ test failures)**
+- **File**: `services/cj_assessment_service/implementations/batch_repository.py`
+- **Problem**: `CJBatchState.batch_upload` relationship uses `lazy="joined"`, causing SQLAlchemy to generate `LEFT OUTER JOIN`. PostgreSQL forbids `FOR UPDATE` on nullable outer joins.
+- **Fix**: Added `noload(CJBatchState.batch_upload)` when `for_update=True` in `get_batch_state_for_update()` method (lines 153-180)
+- **Import Added**: `from sqlalchemy.orm import noload, selectinload` (line 10-12)
 
-## 📋 READY FOR IMPLEMENTATION (Next Session)
+**Issue 2: Missing Commit in Scoring Function (3+ test failures)**
+- **File**: `services/cj_assessment_service/cj_core_logic/scoring_ranking.py`
+- **Problem**: `record_comparisons_and_update_scores()` updated scores but never committed. The `CJSessionProviderImpl.session()` context manager does NOT auto-commit on exit.
+- **Fix**: Added explicit `await session.commit()` after `_update_essay_scores_in_database()` (line 233-234)
 
-### 1. ELS Transaction Boundary Violations (High Priority)
+**Issue 3: Test Fixtures Using flush() Instead of commit() (5+ test failures)**
+- **Files**:
+  - `services/cj_assessment_service/tests/integration/test_pair_generation_randomization_integration.py` (line 102)
+  - `services/cj_assessment_service/tests/integration/test_incremental_scoring_integration.py` (line 110)
+- **Problem**: Test setup used `session.flush()` which doesn't persist data for other sessions to see.
+- **Fix**: Changed to `session.commit()` in test batch creation methods.
 
-**Task Doc**: `TASKS/infrastructure/fix-els-transaction-boundary-violations.md` (migrated 2025-11-21)
-**Status**: Investigation complete ✅, Task approved ✅, Ready for implementation
+**Issue 4: Outdated Test Expectation**
+- **File**: `services/cj_assessment_service/tests/integration/test_batch_repository.py` (lines 397-408)
+- **Problem**: Test `test_applies_for_update_lock` expected FOR UPDATE to fail with DBAPIError. After the noload() fix, it now works correctly.
+- **Fix**: Updated test to verify FOR UPDATE works (returns state successfully) instead of expecting failure.
 
-**Summary**: Systematic scan revealed 17 handler files creating multiple independent transaction blocks instead of single Unit of Work pattern. Violates architectural standard for Handler-Level Unit of Work with Transactional Outbox.
+**Issue 5: Fresh Session Required for Cross-Session Data Visibility**
+- **File**: `services/cj_assessment_service/tests/integration/test_bt_scoring_integration.py` (lines 318-335, 477-488)
+- **Problem**: Tests used `postgres_session` fixture after scoring committed in a different session. Old session had stale cached data.
+- **Fix**: Changed verification queries to use fresh sessions via `postgres_session_provider.session()`.
 
-**Priority Files**:
-- `batch_coordination_handler_impl.py` (7 transaction blocks - highest impact)
-- Result handlers (4 files, 6 blocks)
-- Command handlers (3 files, 3 blocks)
+#### Critical Architectural Lesson: Session Commit Responsibility
 
-**Implementation Phases**:
-1. Phase 1: Refactor batch_coordination_handler_impl.py
-2. Phase 2: Refactor result and command handlers
-3. Phase 3: Validate session propagation in collaborators
-4. Phase 4: Integration tests and atomicity verification
-
-**Architectural Reference**: `.claude/rules/042.1-transactional-outbox-pattern.md` (Lines 64-82, 137-143)
-**Pattern Example**: `services/class_management_service/implementations/batch_author_matches_handler.py:126-192`
-
----
-
-### 2. LPS Rate Limiting Implementation (Awaiting Approval)
-
-**Task Doc**: `TASKS/infrastructure/lps-rate-limiting-implementation.md` (migrated 2025-11-21)
-**Status**: Investigation complete ✅, 5 PRs defined, Awaiting implementation approval
-
-**Summary**: No rate limiting enforcement exists. Queue processor sends requests as fast as it dequeues them. Can exceed Anthropic tier 1 limits (50 req/min, 40K tokens/min) under high load.
-
-**Implementation Plan**: 5 PRs (2-3 weeks, 1 developer)
-
-- **PR1 (P0)**: Token Bucket Rate Limiter - Dual-bucket algorithm (requests/min + tokens/min)
-- **PR2 (P1)**: Rate Limit Header Reading - Parse `x-ratelimit-*` headers, dynamic adjustment
-- **PR3 (P2)**: Configurable CJ Semaphore - Override hardcoded default=3
-- **PR4 (P1)**: Inter-Request Delay - Add `inter_request_delay_ms` config (default: 100ms)
-- **PR5 (P2)**: Startup Validation - Fail-fast if settings exceed tier limits
-
-**Acceptance Criteria**: No 429 errors under normal load, configurable limits, graceful degradation, full test coverage
-
----
-
-## ✅ RECENTLY COMPLETED (Reference Only)
-
-- **2025-11-23 Rule Frontmatter Schema** - All 92 rules now have Pydantic-compliant frontmatter (8 fields: 5 required, 3 optional). Validation passes with zero errors. See `README_FIRST.md` for summary.
-- **2025-11-23 Prompt Cache Benchmark Complete** - Typer CLI, ENG5 fixtures, raw response capture, Sonnet validation (hits 16, read 43K/write 1.4K tokens). Results persisted in `docs/research/benchmarks/prompt-cache/`.
-- **2025-11-23 Queue Processor Tests Fixed** - `test_queue_processor_completion_removal.py` integration tests passing (4/4).
-- **2025-11-22 MyPy Configuration Consolidation** - All typecheck scripts functional. Fixed `libs/mypy.ini`, updated Rule 086. See `TASKS/infrastructure/MYPY_CONFIGURATION_INVESTIGATION_AND_CONSOLIDATION.md`
-- **2025-11-22 Infrastructure Tooling** - Task filtering (`pdm run tasks-now`), PEP 735 migration, AGENTS.md sync hook, linting consolidation
-- **2025-11-22 CJ Prompt Cache Template Builder** - Phase 1 complete with PromptBlock models, template builder, 40/40 tests passing. Wiring merged.
-- **2025-11-21 Task Migration Complete** - 36 files migrated from `.claude/work/tasks/` to `TASKS/` with proper frontmatter and domain organization. See `MIGRATION_SUMMARY_2025-11-21.md`
-- **2025-11-21 CJ Completion Idempotency** - Guard + unique constraint migration applied, 6/6 tests passing. See `TASKS/assessment/cj-completion-event-idempotency.md`
-- **2025-11-21 Database Enum Audit** - 9 services checked, 2 fixed (ELS, BOS), prevention implemented (`pdm run validate-enum-drift`). See `.claude/research/database-enum-audit-2025-11-21.md`
-- **2025-11-21 CJ BatchMonitor Embed** - Monitor operational in app.py, stalled batch recovered, infra healthy
-- **2025-11-21 PDM Skill Created** - Migration skill in `.claude/skills/pdm/` with Context7 integration
-- **2025-11-21 ELS Slot Assignment Fix** - Lock-aware retries for Option B allocator, contention test passing
-- **2025-11-20 Prompt Propagation Fix** - BOS → BCS batch_metadata propagation, committed
-- **2025-11-19 Logging Infrastructure** - File persistence + Docker rotation (5 PRs). See `TASKS/infrastructure/logging-file-persistence-docker-rotation.md`
-- **2025-11-19 Loki Cardinality Fix** - 7.5M → 25 streams (300,000x improvement), JSON parsing operational
-- **2025-11-19 CJ Batch State Fixes** - Total budget tracking, completion denominator, position randomization (7 PRs)
-- **2025-11-18 LLM Batch Strategy** - Serial bundle infrastructure complete (Phases 1-3). See `TASKS/integrations/llm-batch-strategy-checklist.md`
-- **2025-11-17 HTTP API Contracts Migration** - CJ ↔ LPS cross-service imports eliminated (8 commits)
-
----
-
-## 🎯 CJ E2E Test Latency Finding (2025-11-21)
-
-**Context**: Not a bug, architectural observation from test run
-
-**Observation**: Functional test `test_complete_cj_assessment_processing_pipeline` took ~3m56s despite 4 essays and 6 comparisons.
-
-**Root Cause**: Completion gate uses percent-of-budget (95% of `total_budget=350`). For n=4 (nC2=6), completion_rate=6/350 (~1.7%) never satisfies gate. Batch stayed in WAITING_CALLBACKS until BatchMonitor sweep (5m interval) forced completion.
-
-**Note**: Callbacks arrived within ~12s, scoring ran immediately once monitor triggered. No LLM/network slowness.
-
-**Resolution**: Stability-first completion now implemented (addresses this issue). Completion denominator capped to nC2.
-
----
-
-## 📚 INVESTIGATION RUNBOOKS (Appendix)
-
-### Database Enum Drift Detection
-
-**Context**: Two critical enum mismatches discovered 2025-11-21 (ELS `essay_status_enum`, BOS `batch_status_enum`) blocking 100% of pipeline flows.
-
-**Status**: ✅ Audit complete, prevention implemented, no additional mismatches found
-
-**Prevention Implemented**:
-- CI/local check: `pdm run validate-enum-drift` (uses dev DBs)
-- Startup validation: ELS and BOS fail-fast on enum mismatch (non-prod environments)
-- Rule update: `.claude/rules/085-database-migration-standards.md` mandates enum drift guard
-
-**Root Cause**: Bulk addition of expanded enums landed 2025-07-17 with no migrations. Divergence persisted until 2025-11-21 fixes.
-
-**Services Audited**: 9 services with databases - no new mismatches found
-- ✅ CJ, RAS, Email, Entitlements: enums match DB
-- ✅ Spellchecker, File, NLP, Class Management: no status enums or non-status only
-
-**Research Doc**: `.claude/research/database-enum-audit-2025-11-21.md`
-
----
-
-### CJ Completion Event Debugging
-
-**Validation Script**: `scripts/validate_duplicate_completion_events.sh`
-
-**Purpose**: Detect duplicate `cj_assessment.completed` events in outbox
-
-**Usage**:
-```bash
-./scripts/validate_duplicate_completion_events.sh
+**IMPORTANT**: `CJSessionProviderImpl.session()` does NOT auto-commit:
+```python
+# From implementations/session_provider_impl.py
+@asynccontextmanager
+async def session(self) -> AsyncIterator[AsyncSession]:
+    session = self._session_maker()
+    try:
+        yield session
+    except Exception:
+        await session.rollback()
+        raise
+    finally:
+        await session.close()  # No commit here!
 ```
 
-**What it checks**:
-- Duplicate outbox entries for same `aggregate_id`
-- Multiple completion events within short time windows (<5 min)
-- Summary statistics: `total_events / unique_batches` ratio
+**Implication**: All functions that modify data and expect persistence MUST explicitly call `await session.commit()` before the context manager exits.
 
-**Research**: `.claude/research/cj-completion-event-validation-results-2025-11-21.md`
+---
+
+### CJ Assessment Service Refactor & Deployment Readiness
+
+**Service entrypoint / process model**
+- CJ Assessment is now a single integrated Quart + Kafka service:
+  - Entry: `services/cj_assessment_service/app.py` (via `create_app(Settings())`).
+  - Kafka consumption and batch monitoring wired via Dishka DI in `app.py` (`CJAssessmentKafkaConsumer` + `BatchMonitor`).
+- Legacy standalone worker entrypoint has been removed:
+  - `services/cj_assessment_service/worker_main.py` deleted.
+  - README updated to describe `kafka_consumer.py` + `app.py` as the only runtime surfaces.
+  - Root `docker-compose.services.yml` already uses the Dockerfile that runs `app.py` directly; no command changes needed.
+- High-level rule for future work: **GradeProjector is always obtained via DI** (or explicit test fixture), never via `GradeProjector()` in production code.
+
+**ENG5 scale flows / grade projection DI**
+- ENG5 integration tests now:
+  - Create `AssessmentInstruction` + `AnchorEssayReference` in a single session and `commit()` so `ProjectionContextService` (which uses its own `SessionProviderProtocol`) can see them.
+  - Create CJ batches + essays via `postgres_session_provider.session()` and commit before returning.
+  - Build `ProjectionContextService(session_provider, instruction_repository, anchor_repository)` and pass it into `GradeProjector(session_provider=..., context_service=...)`.
+- `GradeProjector.__init__` now enforces explicit DI:
+  - Requires `session_provider` and `ProjectionContextService`.
+  - Uses injected `SessionProviderProtocol` to store projections, aligning runtime with the per-aggregate repo refactor.
+
+**Workflow continuation & callbacks**
+- `trigger_existing_workflow_continuation(...)` signature now includes `grade_projector: GradeProjector | None` and:
+  - Raises a clear `ValueError` if `should_finalize` is `True` and no projector was provided.
+  - Injects the projector into `BatchFinalizer` for final scoring and event publishing.
+- Call graph is now DI-aligned end-to-end:
+  - `CJAssessmentKafkaConsumer` → `event_processor.process_single_message` → `cj_request_handler.handle_cj_assessment_request` → `run_cj_assessment_workflow` (with GradeProjector).
+  - `CJAssessmentKafkaConsumer` → `event_processor.process_llm_result` → `llm_callback_handler.handle_llm_comparison_callback` → `batch_callback_handler.continue_cj_assessment_workflow` → `workflow_continuation.trigger_existing_workflow_continuation` (with GradeProjector).
+  - `tests/integration/callback_simulator.CallbackSimulator` mirrors the same signature and threads the projector along.
+
+**Student prompt workflow / admin surface**
+- Admin + batch hydration path now uses explicit commit semantics:
+  - `test_student_prompt_workflow_end_to_end` seeds `AssessmentInstruction` via `postgres_data_access.upsert_assessment_instruction(...)` and calls `session.commit()` so the admin HTTP call sees the instruction in a fresh session.
+  - `api/admin/student_prompts.upload_student_prompt(...)` uses `session_provider.session()` and calls `session.commit()` after `upsert_assessment_instruction(...)` to persist `student_prompt_storage_id` for subsequent requests.
+  - Batch preparation (`create_cj_batch`) auto‑hydrates `student_prompt_storage_id` from the instruction when omitted in the request payload, and respects explicit prompt IDs/text when provided.
+
+**Deployment readiness (CJ Assessment Service)**
+- Docker:
+  - Production and dev Dockerfiles (`services/cj_assessment_service/Dockerfile*`) already run `app.py` as the CMD; no changes required after dropping `worker_main.py`.
+  - `docker-compose.services.yml` starts `cj_assessment_service` against these Dockerfiles and exposes port `9095:9090` for health/metrics.
+- README alignment:
+  - Local dev instructions now treat CJ Assessment as a single integrated service:
+    - `pdm install`, configure `.env`, run `pdm run start` (HTTP + Kafka).
+  - No references remain to `worker_main.py` as a standalone worker.
+- Remaining risk: any external scripts or tooling that directly invoked `python services/cj_assessment_service/worker_main.py` must be updated to call into the `app.py` entrypoint or use the standard `pdm run start` alias. Compose/Docker are already aligned.
+
+---
+
+### Previously Blocked Docker-Backed Tests (now confirmed)
+
+The following CJ Assessment tests, which were previously only “logically fixed”, have now been executed and confirmed passing on a Docker-capable dev machine (Docker + `postgres:15` available):
+
+- ✅ `services/cj_assessment_service/tests/integration/test_metadata_persistence_integration.py::test_original_request_metadata_persists_and_rehydrates`
+- ✅ `services/cj_assessment_service/tests/integration/test_real_database_integration.py::TestRealDatabaseIntegration::test_full_batch_lifecycle_with_real_database`
+- ✅ `services/cj_assessment_service/tests/integration/test_student_prompt_workflow.py::test_student_prompt_workflow_end_to_end`
+- ✅ `services/cj_assessment_service/tests/integration/test_eng5_scale_flows.py` (all three tests, including both ENG5 scale projection paths)
+- ✅ `services/cj_assessment_service/tests/unit/test_event_processor_prompt_context.py` (all seven unit tests)
+
+These runs validate, end-to-end:
+
+- Correct commit sequencing and metadata persistence for `create_cj_batch` and `prepare_essays_for_assessment`.
+- ENG5 legacy vs national grade scales, including anchor filtering, context resolution via `ProjectionContextService`, and GradeProjector DI wiring.
+- Real database lifecycle: request handling → batch creation → mock LLM callbacks → continuation/finalization → dual event publishing, all through per-aggregate repos + `SessionProviderProtocol`.
+- Student prompt workflow: admin upload (with commit), CLI retrieval, and batch hydration behavior across sessions.
+
+**Category 2: Unit Test Mock Configuration Issues (2 tests)**
+- `test_event_processor_prompt_context.py::test_process_message_increments_prompt_success_metric`
+- `test_event_processor_prompt_context.py::test_process_message_hydrates_judge_rubric_text`
+
+**Root Cause**: Mock configuration issues (likely missing `@asynccontextmanager` pattern for session providers).
+
+---
+
+**Previous Session Context (2025-11-24):**
+
+**Verification snapshot (2025-11-24 PM, post-fixture migration pass):**
+- Added `PostgresDataAccess` test façade (session provider + per-aggregate repos) to replace legacy `postgres_repository` fixture.
+- Converted integration tests to per-aggregate/session-provider wiring: `test_anchor_repository_upsert.py`, `test_batch_repository.py`, `test_comparison_repository.py`, `test_real_database_integration.py`, `test_async_workflow_continuation_integration.py`, `test_batch_state_multi_round_integration.py`. Partial conversion in `test_error_handling_integration.py` (more cleanup pending).
+- `GradeProjector` now instantiated with real `ProjectionContextService` in integration flow; real session provider/repos passed to `process_single_message`.
+- Grep still shows remaining `postgres_repository` references (notably `test_error_handling_integration.py` and other integration files) plus `CJRepositoryProtocol` definition/shim/tests.
+- Public AsyncSession exposure still present in `batch_submission.py`; removal pending.
+
+### CJ Repository Protocol Refactoring (80% COMPLETE)
+
+**Task Doc**: `TASKS/assessment/cj-db-per-aggregate-repository-refactor.md`
+**Status**: Waves 1-4 Complete (80%), Waves 5-6 Remaining (20%)
+
+**Session Summary (2025-11-24)**:
+
+Successfully completed **Waves 1-4** of the CJ Repository Protocol Refactoring, migrating 10 core modules from monolithic `CJRepositoryProtocol` to per-aggregate repository protocols.
+
+**Completed This Session**:
+
+### Wave 1: Independent Modules ✅
+1. **workflow_orchestrator.py** - Already refactored (verified pattern compliance)
+2. **batch_monitor.py** - Replaced ALL raw SQL with repository methods
+   - Lines 112-126 → `batch_repo.get_stuck_batches()`
+   - Lines 163-174 → `batch_repo.get_batches_ready_for_completion()`
+   - Lines 299-305, 344-350 → `batch_repo.get_batch_state_for_update(for_update=True)`
+3. **context_builder.py** - Removed AsyncSession from public API (line 61)
+4. **Typecheck fixes** - 18 files updated (76 test errors fixed)
+
+### Wave 2: Complex Multi-Repo Modules ✅
+5. **batch_preparation.py** (485 LoC) - Multi-repo dependencies
+   - Replaced `CJRepositoryProtocol` with 5 per-aggregate protocols
+   - Updated `create_cj_batch()` and `prepare_essays_for_assessment()`
+6. **comparison_processing.py** (488 LoC) - Multi-repo dependencies
+   - Added SessionProviderProtocol, CJBatchRepositoryProtocol, CJEssayRepositoryProtocol
+   - Updated 3 public functions
+7. **Cascade updates** - 7 caller files updated
+8. **Test fixes** - 76 errors across 15 test files (all resolved)
+
+### Wave 3: Callback Chain ✅
+9. **batch_callback_handler.py** (184 LoC)
+10. **callback_state_manager.py** (162 LoC)
+11. **callback_persistence_service.py** (190 LoC)
+12. **Added**: CJComparisonRepositoryProtocol to callback chain
+13. **Cascade updates** - 5 files (llm_callback_handler, event_processor, kafka_consumer, di, worker_main)
+14. **Test fixes** - 51 errors resolved
+
+### Wave 4: Finalizer & Grade Projection ✅
+15. **batch_finalizer.py** (343 LoC - CRITICAL)
+    - Replaced CJRepositoryProtocol with 3 per-aggregate protocols
+    - Updated 11 files total
+16. **grade_projector.py** (265 LoC)
+    - Removed AsyncSession from public API
+    - Added SessionProviderProtocol injection
+    - **Fixed all 15 failing grade projector tests**
+    - Updated 12 files total
+17. **Final typecheck fixes** - 20 errors resolved (missing grade_projector parameters)
+
+**Quality Gates**: ✅ typecheck-all (0 errors in 1316 files) | ✅ format-all | ✅ lint-fix | ✅ 22 grade projector tests passing
+
+**Total Files Modified This Session**: ~60 files (production code, tests, DI configuration)
+
+---
+
+### Session Update (2025-11-24 evening)
+
+- Runtime pipeline now off `CJRepositoryProtocol`: `event_processor`, message handlers, `batch_callback_handler`, `workflow_continuation`, `comparison_processing`, `comparison_batch_orchestrator`, `content_hydration`, `health_routes`, `worker_main`, `kafka_consumer`, `app` now use per-aggregate repos + `SessionProviderProtocol`.
+- BatchMonitor no longer depends on deprecated repo; uses batch/essay/comparison repos only.
+- Admin APIs (`instructions`, `student_prompts`, `judge_rubrics`, `anchor_management`) migrated to instruction/anchor repos + session provider.
+- Removed deprecated `postgres_repository` fixture from `tests/fixtures/database_fixtures.py` (needs follow-up in consuming tests).
+- Remaining CJRepository occurrences are shim/DI/test references; production call sites largely migrated.
+- Latest: Migrated `test_error_handling_integration.py` to session-provider/per-aggregate wiring (process_llm_result calls updated) and converted `test_repository_anchor_flag.py` to `PostgresDataAccess`.
+
+### Session Update (2025-11-24 night - Codex)
+
+- Converted remaining `merge_*` helper call sites to `session_provider` API (workflow_continuation, batch_preparation, retry integration, batch finalizer test, identity flow fixtures); removed legacy `session=`/monkeypatch patterns.
+- Fixed `batch_pool_manager.form_retry_batch` indentation/logic and anchor metadata merge to use session provider.
+- Ran `pdm run format-all` and `pdm run lint-fix --unsafe-fixes` (clean); `pdm run typecheck-all` currently fails with pre-existing CJRepositoryProtocol/test call-site arg mismatches (139 errors) pending broader cleanup.
+- Added `@asynccontextmanager` wrapper to `PostgresDataAccess.session`, aligned `BatchMonitor` unit fixtures with the new constructor, and typed the multi-round batch state integration fixture to keep the updated APIs consistent.
+- Removed legacy `database=` keywords from the remaining cj_assessment_service unit and integration suites (LLM callbacks, comparison processing helpers, event processor tracking, workflow continuation, and idempotency tests) so they pass the session_provider + per-repo arguments used by the refactored APIs.
+- Continued the migration by dropping `database=` calls from the metadata, system prompt hierarchy, pair generation, real database, and async workflow continuation integration suites and ensuring `CallbackSimulator`/workflow continuation helpers only use the new session_provider/repo parameters.
+- Callback simulator now builds comparison pairs and correlation mappings directly via the shared `SessionProviderProtocol`, removing the last `CJRepositoryProtocol` dependency from that helper.
+- Shifted workflow-continuation and callback-state-manager tests to `SessionProviderProtocol` mocks and started wiring every `submit_comparisons_for_async_processing` call site to accept the new `batch_repository` argument; the remaining typecheck failures are due to a few missing imports/annotations and lingering `session=` keywords.
+- Resolved the targeted typecheck blockers: workflow_continuation unit tests now import `AsyncSession`/`AsyncGenerator` helpers, callback-state-manager tests call `check_batch_completion_conditions` with `session_provider`, the identity-threading fixture yields an async generator, the relevant integration suites pass `postgres_batch_repository`, and `test_real_database_integration` is annotated; reran `pdm run typecheck-all` to confirm zero errors.
+
+## 📋 REMAINING WORK (PR3 Close-Out)
+
+### Immediate: Fix Remaining 7 Test Failures
+
+**High Priority - Workflow Commit Issues (5 tests)**:
+1. Commit-and-metadata sequencing fixed in `services/cj_assessment_service/cj_core_logic/batch_preparation.py`:
+   - `create_cj_batch()` now commits the newly created `CJBatchUpload` inside its session, then applies `merge_batch_upload_metadata()` and `merge_batch_processing_metadata()` in fresh sessions. This ensures the batch row exists before any cross-session metadata updates run and removes the `cj_processed_essays.cj_batch_id → cj_batch_uploads.id` FK race called out in the previous session.
+   - `prepare_essays_for_assessment()` now:
+     - Collects per-essay and anchor metadata in local lists,
+     - Persists all `cj_processed_essays` (students + anchors) in a single transaction with `await session.commit()`, and only then
+     - Calls `merge_essay_processing_metadata()` in fresh sessions. This eliminates the earlier pattern where metadata merges ran in a different session that could not see uncommitted `ProcessedEssay` rows.
+2. Because the integration fixtures spin up Postgres via `testcontainers`, running these 5 workflow tests in this environment currently fails at Docker connection time rather than on application logic. The logical FK/commit issues should be revalidated in a Docker-capable CI/dev environment by rerunning:
+   - `pdm run pytest-root services/cj_assessment_service/tests/integration/test_metadata_persistence_integration.py::test_original_request_metadata_persists_and_rehydrates`
+   - Plus the remaining four workflow tests listed above.
+
+**Medium Priority - Mock Configuration (2 tests)**:
+1. `test_event_processor_prompt_context.py` has been updated so that:
+   - Both `test_process_message_increments_prompt_success_metric` and `test_process_message_hydrates_judge_rubric_text` use a shared `MockDatabase` instance as both `session_provider` and `instruction_repository`, providing a real `session()` async context manager and async instruction lookups that satisfy `hydrate_judge_rubric_context()` and the request handler.
+   - `run_cj_assessment_workflow` remains patched to an `AsyncMock`, so these tests stay focused on prompt/rubric hydration and metric increments, not on the full workflow orchestration.
+2. Full execution of this unit module is also currently blocked by the same Docker-based Postgres fixture setup (the test session tries to start a Postgres container up front). In a normal dev/CI environment with Docker available, re-run:
+   - `pdm run pytest-root services/cj_assessment_service/tests/unit/test_event_processor_prompt_context.py`
+
+### Ongoing Refactoring Tasks
+
+- [ ] Finish `test_error_handling_integration.py` conversion to per-aggregate repos/session provider
+- [ ] Sweep remaining integration/unit tests for `postgres_repository`/`CJRepositoryProtocol` fixtures
+- [ ] Public API cleanup: remove `AsyncSession` exposure in `batch_submission.py`
+- [ ] Shim removal: delete `CJRepositoryProtocol` + `implementations/db_access_impl.py`
+- [ ] Grep gates: no `CJRepositoryProtocol`; no public APIs accept `AsyncSession`
+- [ ] Quality gates: `pdm run format-all`; `pdm run lint-fix --unsafe-fixes`; `pdm run typecheck-all`; `pdm run pytest-root services/cj_assessment_service/tests`
+
+**Current Test Status**: 7 failures, 683 passed (was 29 failures on 2025-11-24). In this local environment, additional test runs are blocked by missing Docker; logical fixes have been applied but require verification in a Docker-capable environment.
+
+**Category 1: Mock Context Manager Issues (25 tests)**
+- `test_batch_preparation_identity_flow.py` (21 tests)
+- `test_comparison_processing.py` (2 tests)
+- `test_completion_threshold.py` (2 tests)
+
+**Error Pattern**:
+```
+TypeError: 'coroutine' object does not support the asynchronous context manager protocol
+```
+
+**Root Cause**: Mock `session_provider.session()` returns bare coroutine instead of async context manager.
+
+**Fix Pattern**:
+```python
+# OLD (fails):
+mock_session_provider.session = AsyncMock()  # Returns coroutine
+
+# NEW (works):
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def mock_session():
+    mock_session_object = AsyncMock()
+    yield mock_session_object
+
+mock_session_provider.session = mock_session  # Returns context manager
+```
+
+**Category 2: Missing Await (1 test)**
+- `test_comparison_processing.py::test_request_additional_comparisons_no_essays`
+
+**Fix**: Add `await` to async function call in test assertion.
+
+**Method**: Launch 1-2 mypy-type-fixer or test-engineer agents to systematically update test fixtures.
+
+---
+
+### Final Verification (est. 1 hour)
+
+**Grep Verifications**:
+```bash
+# 1. Verify CJRepositoryProtocol only in definition/shim
+rg "CJRepositoryProtocol" services/cj_assessment_service --type py
+
+# Expected: Only in protocols.py (definition) and db_access_impl.py (shim)
+
+# 2. Verify AsyncSession only in implementations
+rg "AsyncSession" services/cj_assessment_service/cj_core_logic --type py
+
+# Expected: Only in repository implementations, not in public APIs
+
+# 3. Verify no direct session exposure in utilities
+rg "session: AsyncSession" services/cj_assessment_service/cj_core_logic --type py
+
+# Expected: Empty result (all should use SessionProviderProtocol)
+```
+
+**Quality Gates**:
+```bash
+pdm run format-all
+pdm run lint-fix --unsafe-fixes
+pdm run typecheck-all  # Should show 0 errors
+pdm run pytest-root services/cj_assessment_service/tests  # Should show 0 failures
+```
+
+**Deliverables**:
+1. Generate comprehensive file change report
+2. Document all function signature updates
+3. Update TASKS/assessment/cj-db-per-aggregate-repository-refactor.md with completion status
+4. Archive this handoff.md to `.claude/archive/refactoring/2025-11-24-cj-repository-refactor-complete.md`
 
 ---
 
 ## 📝 NOTES FOR NEXT SESSION
 
-1. **Uncommitted work is significant**: ~1570 additions across 36 files. Review carefully before committing.
-2. **CJ completion logic substantially refactored**: Stability-first approach, major changes to workflow_continuation.py
-3. **All quality gates passing**: typecheck ✅, format ✅, lint ✅ (except pre-existing F821s)
-4. **Docker containers healthy**: No deployment issues, CJ service running 2 hours with embedded monitor
-5. **ELS transaction boundary violations are next logical priority**: Architectural compliance, high impact on data consistency
+### Critical Success Patterns (REPLICATE THESE)
+
+**1. Agent Usage Pattern (HIGHLY SUCCESSFUL)**
+- Use **code-implementation-specialist** for production code refactoring (3-5 files max per agent)
+- Use **mypy-type-fixer** for test signature fixes (launch 2-4 in parallel for 50+ errors)
+- Use **research-diagnostic** for complex investigations (DI resolution, error analysis)
+- Always launch agents **in parallel** when tasks are independent (single tool call with multiple agents)
+
+**2. Quality Gate Pattern (MANDATORY)**
+After each wave:
+1. Run `pdm run format-all` from repo root
+2. Run `pdm run lint-fix --unsafe-fixes` from repo root
+3. Run `pdm run typecheck-all` - address ALL errors before continuing
+4. If test errors, use mypy-type-fixer agents in parallel (4+ agents for 50+ errors)
+
+**3. FOR UPDATE Lock Constraint (CRITICAL)**
+When using `with_for_update()`:
+- Fetch ONLY the target row: `select(CJBatchState).where(...).with_for_update()`
+- NO `selectinload()`/`joinedload()` with nullable-side relationships
+- If related data needed, fetch separately or let lazy load fire
+
+**4. Test Failure Categorization (IMPORTANT)**
+- Mock context manager issues → Need `@asynccontextmanager` decorator
+- Missing parameters → Use mypy-type-fixer agents in parallel
+- DI enforcement errors → Intentional (tests must provide dependencies)
+
+### Wave 5 Instructions (EXPLICIT)
+
+**Launch 2 agents in parallel**:
+```
+Agent 1: Refactor pair_generation.py + scoring_ranking.py
+- Remove AsyncSession from functions at lines 32, 167, 208 (pair_gen)
+- Remove AsyncSession from functions at lines 36, 267, 323 (scoring_rank)
+- Replace with SessionProviderProtocol injection
+- Update all callers
+- Run quality gates
+
+Agent 2: Refactor content_hydration.py + comparison_batch_orchestrator.py
+- Analyze for AsyncSession exposure
+- Replace with SessionProviderProtocol if needed
+- Update all callers
+- Run quality gates
+```
+
+After both agents complete:
+1. Run `pdm run typecheck-all`
+2. If errors, launch mypy-type-fixer agents in parallel (2-4 agents)
+3. Verify 0 errors before proceeding to Wave 6
+
+### Wave 6 Instructions (EXPLICIT)
+
+**Test fixture fixes (30 failures)**:
+
+**Option A**: Use test-engineer agent:
+```
+Task: Fix 30 test failures - all are mock fixture issues
+- 25 tests: Mock session_provider needs @asynccontextmanager
+- 1 test: Missing await statement
+- 4 tests: Various mock configuration issues
+
+Pattern:
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def mock_session():
+    yield AsyncMock()
+
+mock_session_provider.session = mock_session
+```
+
+**Option B**: Use mypy-type-fixer agents (if test-engineer struggles):
+```
+Launch 2 agents in parallel:
+Agent 1: Fix test_batch_preparation_identity_flow.py (21 tests)
+Agent 2: Fix remaining tests (9 tests)
+```
+
+### Lessons Learned (CRITICAL)
+
+**Session-Specific Lessons (2025-11-25):**
+
+✅ **Session Provider Does NOT Auto-Commit**: `CJSessionProviderImpl.session()` only rollbacks on exception and closes. All data-modifying functions MUST call `await session.commit()` explicitly.
+
+✅ **FOR UPDATE + Relationships**: PostgreSQL forbids `FOR UPDATE` on nullable LEFT OUTER JOINs. Use `noload()` to disable eager loading when acquiring locks:
+```python
+stmt = select(Model).where(...).options(noload(Model.relationship)).with_for_update()
+```
+
+✅ **flush() vs commit()**: `flush()` only sends SQL to DB within current transaction. `commit()` persists data so OTHER sessions can see it. Tests with multiple sessions MUST use `commit()`.
+
+✅ **Fresh Sessions for Verification**: After function commits in its own session, use a NEW session to verify persisted data - the old session has stale cached objects even after `expire_all()`.
+
+**General Best Practices:**
+
+**DO**:
+✅ Launch agents in parallel when tasks are independent
+✅ Run typecheck after EVERY wave (catches issues early)
+✅ Use mypy-type-fixer for signature fixes (fast, reliable)
+✅ Break work into manageable chunks (3-5 files per agent)
+✅ Follow established patterns from completed waves
+
+**DON'T**:
+❌ Try to fix 50+ typecheck errors manually (use agents)
+❌ Skip quality gates between waves (creates compound errors)
+❌ Launch agents sequentially when parallel is possible (wastes time)
+❌ Guess at signatures (reference the actual function definitions)
+❌ Create new patterns (follow Waves 1-4 examples)
+❌ Assume session provider auto-commits (it doesn't!)
+❌ Use flush() when data needs to be visible to other sessions
+
+### Current Repository State (2025-11-25)
+
+**Production Code**: ✅ Clean (0 typecheck errors)
+**Test Code**: ⚠️ 7 failures (down from 29 on 2025-11-24)
+  - 5 workflow integration tests (FK violations from missing commits)
+  - 2 unit tests (mock configuration)
+**Quality**: ✅ All format/lint gates passing
+**Architecture**: ✅ Per-aggregate repository pattern enforced across 10 core modules
 
 ---
 
-## 🔍 Archived Work
+## ✅ RECENTLY COMPLETED (Reference Only)
 
-**Location**: `.claude/archive/handoff-history/`
-
-For reference, previous versions and completed work from 2025-11-18 to 2025-11-21 are preserved in:
-- `handoff-2025-11-21-pre-cleanup.md` (full backup before this cleanup)
-- `2025-11-18-to-2025-11-21-completed-work.md` (archived completed sections)
+- **2025-11-25 CJ Assessment Test Debugging** - Fixed 22 test failures (29→7). Root causes: FOR UPDATE + LEFT OUTER JOIN conflict (fixed with noload()), missing commits in scoring_ranking.py, test fixtures using flush() instead of commit(). Files modified: batch_repository.py, scoring_ranking.py, test_batch_repository.py, test_bt_scoring_integration.py, test_pair_generation_randomization_integration.py, test_incremental_scoring_integration.py.
+- **2025-11-24 CJ Repository Refactoring Waves 1-4** - Refactored 10 core modules (workflow_orchestrator, batch_monitor, context_builder, batch_preparation, comparison_processing, callback chain, batch_finalizer, grade_projector). 60+ files modified. Fixed 176 test errors. 0 typecheck errors. All quality gates passing.
+- **2025-11-24 CJ Repository Refactoring Phase 1-2** - Added 6 new repository methods, refactored 5 modules to use per-aggregate protocols, updated shim and all test mocks. 18 integration tests passing.
+- **2025-11-23 ELS Transaction Boundary Violations** - Fixed session propagation in command handlers and batch coordination handler.
+- **2025-11-23 PR #18 Test Coverage Complete** - Created comprehensive test coverage for 3 new refactored modules: 31 tests passing.
+- **2025-11-23 PR #18 Critical Bug Fixes** - Fixed 3 critical runtime bugs in CJ assessment refactoring.
+- **2025-11-23 Rule Frontmatter Schema** - All 92 rules now have Pydantic-compliant frontmatter.
+- **2025-11-22 MyPy Configuration Consolidation** - All typecheck scripts functional.
+- **2025-11-21 Task Migration Complete** - 36 files migrated from `.claude/work/tasks/` to `TASKS/`.
+- **2025-11-21 Database Enum Audit** - 9 services checked, 2 fixed (ELS, BOS).

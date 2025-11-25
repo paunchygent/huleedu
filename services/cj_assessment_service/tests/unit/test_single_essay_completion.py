@@ -22,152 +22,44 @@ from services.cj_assessment_service.cj_core_logic.batch_finalizer import (
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
 from services.cj_assessment_service.models_db import (
-    AssessmentInstruction,
     CJBatchUpload,
     ProcessedEssay,
 )
 from services.cj_assessment_service.protocols import (
+    CJBatchRepositoryProtocol,
+    CJComparisonRepositoryProtocol,
+    CJEssayRepositoryProtocol,
     CJEventPublisherProtocol,
-    CJRepositoryProtocol,
     ContentClientProtocol,
 )
-from services.cj_assessment_service.tests.unit.instruction_store import AssessmentInstructionStore
+from services.cj_assessment_service.tests.unit.test_mocks import MockSessionProvider
 
 
-@asynccontextmanager
-async def session_ctx(session: AsyncMock) -> AsyncIterator[AsyncMock]:
-    yield session
+@pytest.fixture
+def mock_session_provider() -> MockSessionProvider:
+    """Provide mock session provider for tests."""
+    return MockSessionProvider()
 
 
-class RepoMock(CJRepositoryProtocol):
-    def __init__(self, session: AsyncMock, essays: list[ProcessedEssay]) -> None:
-        self._session = session
-        self._essays = essays
-        self.status_updates: list[tuple[int, CJBatchStatusEnum]] = []
-        self.score_updates: list[dict[str, float]] = []
-        self._instruction_store = AssessmentInstructionStore()
+@pytest.fixture
+def mock_essay_repo() -> AsyncMock:
+    """Provide mock essay repository."""
+    return AsyncMock(spec=CJEssayRepositoryProtocol)
 
-    def session(self) -> Any:
-        return session_ctx(self._session)
 
-    async def get_essays_for_cj_batch(self, session: Any, cj_batch_id: int) -> list[Any]:
-        return self._essays
-
-    async def update_cj_batch_status(self, session: Any, cj_batch_id: int, status: Any) -> None:
-        self.status_updates.append((cj_batch_id, status))
-
-    async def update_essay_scores_in_batch(
-        self, session: Any, cj_batch_id: int, scores: dict[str, float]
-    ) -> None:
-        self.score_updates.append(scores)
-
-    # Unused protocol methods for this test
-    async def get_assessment_instruction(
-        self, session: Any, assignment_id: str | None, course_id: str | None
-    ) -> AssessmentInstruction | None:  # noqa: E501
-        return self._instruction_store.get(assignment_id=assignment_id, course_id=course_id)
-
-    async def get_cj_batch_upload(self, session: Any, cj_batch_id: int) -> Any | None:
-        return self._session._batch
-
-    async def get_assignment_context(
-        self,
-        session: Any,
-        assignment_id: str,
-    ) -> dict[str, Any] | None:
-        return {
-            "assignment_id": assignment_id,
-            "instructions_text": "Mock",
-            "grade_scale": "swedish_8_anchor",
-        }
-
-    async def get_anchor_essay_references(
-        self,
-        session: Any,
-        assignment_id: str,
-        grade_scale: str | None = None,
-    ) -> list[Any]:
-        return []
-
-    async def store_grade_projections(self, session: Any, projections: list[Any]) -> None:
-        return None
-
-    async def create_new_cj_batch(self, *args: Any, **kwargs: Any) -> Any:
-        return None
-
-    async def create_or_update_cj_processed_essay(self, *args: Any, **kwargs: Any) -> Any:
-        return None
-
-    async def get_comparison_pair_by_essays(self, *args: Any, **kwargs: Any) -> Any | None:
-        return None
-
-    async def store_comparison_results(self, *args: Any, **kwargs: Any) -> None:
-        return None
-
-    async def get_final_cj_rankings(self, *args: Any, **kwargs: Any) -> list[dict[str, Any]]:
-        return []
-
-    async def upsert_assessment_instruction(
-        self,
-        session: Any,
-        *,
-        assignment_id: str | None,
-        course_id: str | None,
-        instructions_text: str,
-        grade_scale: str,
-        student_prompt_storage_id: str | None = None,
-        judge_rubric_storage_id: str | None = None,
-    ) -> AssessmentInstruction:
-        return self._instruction_store.upsert(
-            assignment_id=assignment_id,
-            course_id=course_id,
-            instructions_text=instructions_text,
-            grade_scale=grade_scale,
-            student_prompt_storage_id=student_prompt_storage_id,
-            judge_rubric_storage_id=judge_rubric_storage_id,
-        )
-
-    async def list_assessment_instructions(
-        self,
-        session: Any,
-        *,
-        limit: int,
-        offset: int,
-        grade_scale: str | None = None,
-    ) -> tuple[list[AssessmentInstruction], int]:
-        return self._instruction_store.list(limit=limit, offset=offset, grade_scale=grade_scale)
-
-    async def delete_assessment_instruction(
-        self,
-        session: Any,
-        *,
-        assignment_id: str | None,
-        course_id: str | None,
-    ) -> bool:
-        return self._instruction_store.delete(
-            assignment_id=assignment_id,
-            course_id=course_id,
-        )
-
-    async def initialize_db_schema(self) -> None:
-        return None
-
-    async def upsert_anchor_reference(
-        self,
-        session: Any,
-        *,
-        assignment_id: str,
-        anchor_label: str,
-        grade: str,
-        grade_scale: str,
-        text_storage_id: str,
-    ) -> int:
-        """Stub implementation for test mocks."""
-        return 1  # Return a mock anchor ID
+@pytest.fixture
+def mock_batch_repo() -> AsyncMock:
+    """Provide mock batch repository."""
+    return AsyncMock(spec=CJBatchRepositoryProtocol)
 
 
 @pytest.mark.asyncio
-async def test_finalize_single_essay_publishes_and_updates(monkeypatch: Any) -> None:
+async def test_finalize_single_essay_publishes_and_updates(
+    monkeypatch: Any,
+    mock_session_provider: MockSessionProvider,
+    mock_essay_repo: AsyncMock,
+    mock_batch_repo: AsyncMock,
+) -> None:
     # Arrange
     correlation_id = uuid4()
 
@@ -192,9 +84,21 @@ async def test_finalize_single_essay_publishes_and_updates(monkeypatch: Any) -> 
     essay.is_anchor = False
     essay.current_bt_score = None
 
-    session = AsyncMock(spec=AsyncSession)
-    session.get.return_value = batch
-    repo = RepoMock(session, [essay])
+    # Configure mock essay repository
+    mock_essay_repo.get_essays_for_cj_batch.return_value = [essay]
+
+    # Mock the session returned by MockSessionProvider to return the batch on get()
+    original_session_method = mock_session_provider.session
+
+    @asynccontextmanager
+    async def patched_session() -> AsyncIterator[AsyncSession]:
+        async with original_session_method() as session:
+            # Replace get with an AsyncMock that returns the batch
+            get_mock = AsyncMock(return_value=batch)
+            monkeypatch.setattr(session, "get", get_mock)
+            yield session
+
+    monkeypatch.setattr(mock_session_provider, "session", patched_session)
 
     event_publisher = AsyncMock(spec=CJEventPublisherProtocol)
     content_client = AsyncMock(spec=ContentClientProtocol)
@@ -227,7 +131,7 @@ async def test_finalize_single_essay_publishes_and_updates(monkeypatch: Any) -> 
     class _FakeGP:
         class GradeProjector:
             async def calculate_projections(
-                self, *args: Any, **kwargs: Any
+                self, *_args: Any, **_kwargs: Any
             ) -> GradeProjectionSummary:
                 return GradeProjectionSummary(
                     projections_available=False,
@@ -237,28 +141,45 @@ async def test_finalize_single_essay_publishes_and_updates(monkeypatch: Any) -> 
                 )
 
     monkeypatch.setattr(bf, "scoring_ranking", _FakeSR())
-    monkeypatch.setattr(bf, "grade_projector", _FakeGP())
 
     log_extra = {"correlation_id": str(correlation_id)}
 
     # Act
+    from services.cj_assessment_service.cj_core_logic.grade_projector import (
+        GradeProjector,
+    )
+
+    grade_projector = AsyncMock(spec=GradeProjector)
+    grade_projector.calculate_projections.return_value = GradeProjectionSummary(
+        projections_available=False,
+        primary_grades={},
+        confidence_labels={},
+        confidence_scores={},
+    )
     finalizer = BatchFinalizer(
-        database=repo,
+        session_provider=mock_session_provider,
+        batch_repository=mock_batch_repo,
+        comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
+        essay_repository=mock_essay_repo,
         event_publisher=event_publisher,
         content_client=content_client,
         settings=settings,
+        grade_projector=grade_projector,
     )
     await finalizer.finalize_single_essay(
         batch_id=batch.id,
         correlation_id=correlation_id,
-        session=session,
         log_extra=log_extra,
     )
 
     # Assert: status updated, minimal score set, events published
-    assert repo.status_updates[-1][1] == CJBatchStatusEnum.COMPLETE_INSUFFICIENT_ESSAYS
-    assert any(
-        "student_1" in scores and scores["student_1"] == 0.0 for scores in repo.score_updates
-    )
+    mock_batch_repo.update_cj_batch_status.assert_called()
+    status_call_args = mock_batch_repo.update_cj_batch_status.call_args
+    assert status_call_args[1]["status"] == CJBatchStatusEnum.COMPLETE_INSUFFICIENT_ESSAYS
+
+    mock_essay_repo.update_essay_scores_in_batch.assert_called()
+    scores_call_args = mock_essay_repo.update_essay_scores_in_batch.call_args
+    assert scores_call_args[1]["scores"]["student_1"] == 0.0
+
     event_publisher.publish_assessment_completed.assert_called_once()
     event_publisher.publish_assessment_result.assert_called_once()

@@ -53,10 +53,14 @@ from services.cj_assessment_service.models_db import (
     ComparisonPair,
     ProcessedEssay,
 )
+from services.cj_assessment_service.tests.fixtures.database_fixtures import PostgresDataAccess
 
 if TYPE_CHECKING:
     from services.cj_assessment_service.protocols import (
-        CJRepositoryProtocol,
+        CJBatchRepositoryProtocol,
+        CJComparisonRepositoryProtocol,
+        CJEssayRepositoryProtocol,
+        SessionProviderProtocol,
     )
 
 
@@ -66,7 +70,7 @@ class TestIncrementalScoring:
 
     async def _create_test_batch_with_essays(
         self,
-        repository: CJRepositoryProtocol,
+        repository: PostgresDataAccess,
         session: AsyncSession,
         essay_count: int,
         batch_id: str = "test-batch",
@@ -103,7 +107,7 @@ class TestIncrementalScoring:
                 )
             )
 
-        await session.flush()
+        await session.commit()  # Commit so data is visible to other sessions
 
         # Calculate expected number of comparisons (n * (n-1) / 2)
         expected_comparisons = essay_count * (essay_count - 1) // 2
@@ -201,8 +205,11 @@ class TestIncrementalScoring:
 
     async def test_progressive_score_refinement(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_repository: PostgresDataAccess,
         postgres_session: AsyncSession,
+        postgres_session_provider: SessionProviderProtocol,
+        postgres_comparison_repository: CJComparisonRepositoryProtocol,
+        postgres_essay_repository: CJEssayRepositoryProtocol,
         mock_event_publisher: AsyncMock,
         test_settings: Settings,
     ) -> None:
@@ -263,7 +270,9 @@ class TestIncrementalScoring:
                 scores = await record_comparisons_and_update_scores(
                     all_essays=essays,
                     comparison_results=comparison_results,
-                    db_session=postgres_session,
+                    session_provider=postgres_session_provider,
+                    comparison_repository=postgres_comparison_repository,
+                    essay_repository=postgres_essay_repository,
                     cj_batch_id=batch_id,
                     correlation_id=correlation_id,
                 )
@@ -289,7 +298,8 @@ class TestIncrementalScoring:
 
                 # Get rankings and track changes
                 rankings = await get_essay_rankings(
-                    db_session=postgres_session,
+                    session_provider=postgres_session_provider,
+                    essay_repository=postgres_essay_repository,
                     cj_batch_id=batch_id,
                     correlation_id=correlation_id,
                 )
@@ -332,8 +342,11 @@ class TestIncrementalScoring:
 
     async def test_stability_detection_mechanism(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_repository: PostgresDataAccess,
         postgres_session: AsyncSession,
+        postgres_session_provider: SessionProviderProtocol,
+        postgres_comparison_repository: CJComparisonRepositoryProtocol,
+        postgres_essay_repository: CJEssayRepositoryProtocol,
         mock_event_publisher: AsyncMock,
         test_settings: Settings,
     ) -> None:
@@ -411,7 +424,9 @@ class TestIncrementalScoring:
             scores = await record_comparisons_and_update_scores(
                 all_essays=essays,
                 comparison_results=comparison_results,
-                db_session=postgres_session,
+                session_provider=postgres_session_provider,
+                comparison_repository=postgres_comparison_repository,
+                essay_repository=postgres_essay_repository,
                 cj_batch_id=batch_id,
                 correlation_id=correlation_id,
             )
@@ -451,8 +466,11 @@ class TestIncrementalScoring:
 
     async def test_score_evolution_mechanism(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_repository: PostgresDataAccess,
         postgres_session: AsyncSession,
+        postgres_session_provider: SessionProviderProtocol,
+        postgres_comparison_repository: CJComparisonRepositoryProtocol,
+        postgres_essay_repository: CJEssayRepositoryProtocol,
     ) -> None:
         """Test that the scoring mechanism correctly handles incremental data.
 
@@ -529,7 +547,9 @@ class TestIncrementalScoring:
             scores = await record_comparisons_and_update_scores(
                 all_essays=essays,
                 comparison_results=comparison_results,
-                db_session=postgres_session,
+                session_provider=postgres_session_provider,
+                comparison_repository=postgres_comparison_repository,
+                essay_repository=postgres_essay_repository,
                 cj_batch_id=batch_id,
                 correlation_id=correlation_id,
             )
@@ -586,8 +606,11 @@ class TestIncrementalScoring:
 
     async def test_callback_processing_mechanism(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_repository: PostgresDataAccess,
         postgres_session: AsyncSession,
+        postgres_session_provider: SessionProviderProtocol,
+        postgres_comparison_repository: CJComparisonRepositoryProtocol,
+        postgres_essay_repository: CJEssayRepositoryProtocol,
         mock_event_publisher: AsyncMock,
         mock_content_client: AsyncMock,
         test_settings: Settings,
@@ -660,7 +683,9 @@ class TestIncrementalScoring:
         scores = await record_comparisons_and_update_scores(
             all_essays=essays,
             comparison_results=comparison_results,
-            db_session=postgres_session,
+            session_provider=postgres_session_provider,
+            comparison_repository=postgres_comparison_repository,
+            essay_repository=postgres_essay_repository,
             cj_batch_id=batch_id,
             correlation_id=correlation_id,
         )
@@ -691,8 +716,12 @@ class TestIncrementalScoring:
 
     async def test_batch_completion_at_threshold(
         self,
-        postgres_repository: CJRepositoryProtocol,
+        postgres_repository: PostgresDataAccess,
         postgres_session: AsyncSession,
+        postgres_session_provider: SessionProviderProtocol,
+        postgres_comparison_repository: CJComparisonRepositoryProtocol,
+        postgres_essay_repository: CJEssayRepositoryProtocol,
+        postgres_batch_repository: CJBatchRepositoryProtocol,
     ) -> None:
         """Test that batch completes when reaching the 80% threshold."""
         # Create small batch
@@ -760,7 +789,9 @@ class TestIncrementalScoring:
         await record_comparisons_and_update_scores(
             all_essays=essays,
             comparison_results=comparison_results,
-            db_session=postgres_session,
+            session_provider=postgres_session_provider,
+            comparison_repository=postgres_comparison_repository,
+            essay_repository=postgres_essay_repository,
             cj_batch_id=batch_id,
             correlation_id=correlation_id,
         )
@@ -774,7 +805,10 @@ class TestIncrementalScoring:
         await postgres_session.commit()  # Commit so other sessions can see it
 
         # Check if should trigger completion
-        completion_checker = BatchCompletionChecker(postgres_repository)
+        completion_checker = BatchCompletionChecker(
+            session_provider=postgres_session_provider,
+            batch_repo=postgres_batch_repository,
+        )
         should_complete = await completion_checker.check_batch_completion(
             cj_batch_id=batch_id,
             correlation_id=correlation_id,

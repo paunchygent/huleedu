@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 from uuid import uuid4
 
@@ -24,13 +23,11 @@ from services.cj_assessment_service.models_api import (
 )
 from services.cj_assessment_service.protocols import (
     BatchProcessorProtocol,
-    CJRepositoryProtocol,
     LLMInteractionProtocol,
 )
+from services.cj_assessment_service.tests.unit.test_mocks import MockSessionProvider
 
-# Import shared fixtures (includes mock_get_batch_state)
 pytest_plugins = ["services.cj_assessment_service.tests.unit.conftest_pool"]
-pytestmark = pytest.mark.usefixtures("mock_get_batch_state")
 
 
 class TestBatchRetryProcessor:
@@ -48,14 +45,9 @@ class TestBatchRetryProcessor:
         return mock_settings
 
     @pytest.fixture
-    def mock_database(self) -> AsyncMock:
-        """Create mock database protocol."""
-        mock_db = AsyncMock(spec=CJRepositoryProtocol)
-        session_cm = AsyncMock()
-        session_cm.__aenter__.return_value = AsyncMock()
-        session_cm.__aexit__.return_value = AsyncMock()
-        mock_db.session.return_value = session_cm
-        return mock_db
+    def mock_session_provider(self) -> MockSessionProvider:
+        """Create mock session provider."""
+        return MockSessionProvider()
 
     @pytest.fixture
     def mock_llm_interaction(self) -> AsyncMock:
@@ -79,7 +71,7 @@ class TestBatchRetryProcessor:
     @pytest.fixture
     def retry_processor(
         self,
-        mock_database: AsyncMock,
+        mock_session_provider: MockSessionProvider,
         mock_llm_interaction: AsyncMock,
         mock_settings: Settings,
         mock_pool_manager: AsyncMock,
@@ -87,7 +79,7 @@ class TestBatchRetryProcessor:
     ) -> BatchRetryProcessor:
         """Create BatchRetryProcessor instance for testing."""
         return BatchRetryProcessor(
-            database=mock_database,
+            session_provider=mock_session_provider,
             llm_interaction=mock_llm_interaction,
             settings=mock_settings,
             pool_manager=mock_pool_manager,
@@ -174,7 +166,6 @@ class TestBatchRetryProcessor:
         retry_processor: BatchRetryProcessor,
         mock_pool_manager: AsyncMock,
         mock_batch_submitter: AsyncMock,
-        mock_get_batch_state: AsyncMock,
         sample_comparison_task: ComparisonTask,
     ) -> None:
         """Ensure retry submits reuse persisted LLM overrides when they exist."""
@@ -201,42 +192,48 @@ class TestBatchRetryProcessor:
 
         mock_pool_manager.form_retry_batch.return_value = retry_tasks
         mock_batch_submitter.submit_comparison_batch.return_value = submission_result
-        mock_get_batch_state.return_value = SimpleNamespace(
-            processing_metadata={
-                "llm_overrides": overrides_metadata,
-                "original_request": {"cj_source": "eng5_runner"},
-            }
-        )
+        with patch.object(
+            retry_processor,
+            "_load_processing_metadata",
+            AsyncMock(
+                return_value={
+                    "llm_overrides": overrides_metadata,
+                    "original_request": {"cj_source": "eng5_runner"},
+                }
+            ),
+        ):
+            # Mock metrics
+            with patch(
+                "services.cj_assessment_service.metrics.get_business_metrics"
+            ) as mock_get_metrics:
+                mock_metric = Mock()
+                mock_get_metrics.return_value = {"cj_retry_batches_submitted_total": mock_metric}
 
-        # Mock metrics
-        with patch(
-            "services.cj_assessment_service.metrics.get_business_metrics"
-        ) as mock_get_metrics:
-            mock_metric = Mock()
-            mock_get_metrics.return_value = {"cj_retry_batches_submitted_total": mock_metric}
+                # Act
+                result = await retry_processor.submit_retry_batch(
+                    cj_batch_id=cj_batch_id,
+                    correlation_id=correlation_id,
+                )
 
-            # Act
-            result = await retry_processor.submit_retry_batch(
-                cj_batch_id=cj_batch_id,
-                correlation_id=correlation_id,
-            )
-
-            # Assert
-            assert result is not None
-            call_args = mock_batch_submitter.submit_comparison_batch.call_args
-            assert call_args[1]["model_override"] == overrides_metadata["model_override"]
-            assert (
-                call_args[1]["temperature_override"] == overrides_metadata["temperature_override"]
-            )
-            assert call_args[1]["max_tokens_override"] == overrides_metadata["max_tokens_override"]
-            assert (
-                call_args[1]["system_prompt_override"]
-                == overrides_metadata["system_prompt_override"]
-            )
-            assert call_args[1]["provider_override"] == overrides_metadata["provider_override"]
-            metadata_context = call_args[1]["metadata_context"]
-            assert metadata_context["cj_source"] == "eng5_runner"
-            assert metadata_context["cj_request_type"] == "cj_retry"
+                # Assert
+                assert result is not None
+                call_args = mock_batch_submitter.submit_comparison_batch.call_args
+                assert call_args[1]["model_override"] == overrides_metadata["model_override"]
+                assert (
+                    call_args[1]["temperature_override"]
+                    == overrides_metadata["temperature_override"]
+                )
+                assert (
+                    call_args[1]["max_tokens_override"] == overrides_metadata["max_tokens_override"]
+                )
+                assert (
+                    call_args[1]["system_prompt_override"]
+                    == overrides_metadata["system_prompt_override"]
+                )
+                assert call_args[1]["provider_override"] == overrides_metadata["provider_override"]
+                metadata_context = call_args[1]["metadata_context"]
+                assert metadata_context["cj_source"] == "eng5_runner"
+                assert metadata_context["cj_request_type"] == "cj_retry"
 
     async def test_submit_retry_batch_disabled(
         self,

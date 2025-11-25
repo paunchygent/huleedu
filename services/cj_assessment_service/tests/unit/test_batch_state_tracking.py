@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
@@ -11,31 +11,38 @@ from common_core.status_enums import CJBatchStateEnum
 from services.cj_assessment_service.cj_core_logic.batch_processor import BatchProcessor
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.models_db import CJBatchState
-from services.cj_assessment_service.protocols import CJRepositoryProtocol, LLMInteractionProtocol
+from services.cj_assessment_service.protocols import (
+    CJBatchRepositoryProtocol,
+    LLMInteractionProtocol,
+    SessionProviderProtocol,
+)
+from services.cj_assessment_service.tests.unit.test_mocks import MockSessionProvider
 
 
 @pytest.fixture
-def mock_database() -> AsyncMock:
-    """Return a mock repository with a pre-configured session context manager."""
-
-    mock_db = AsyncMock(spec=CJRepositoryProtocol)
-    mock_session = AsyncMock()
-    mock_session.add = Mock()
-    mock_session.commit = AsyncMock()
-    mock_session.flush = AsyncMock()
-    mock_db.session.return_value.__aenter__.return_value = mock_session
-    mock_db.session.return_value.__aexit__.return_value = None
-    return mock_db
+def mock_session_provider() -> MockSessionProvider:
+    """Return a mock session provider with properly configured session."""
+    return MockSessionProvider()
 
 
 @pytest.fixture
-def batch_processor(mock_database: AsyncMock) -> BatchProcessor:
+def mock_batch_repo() -> AsyncMock:
+    """Return a mock batch repository."""
+    return AsyncMock(spec=CJBatchRepositoryProtocol)
+
+
+@pytest.fixture
+def batch_processor(
+    mock_session_provider: SessionProviderProtocol,
+    mock_batch_repo: AsyncMock,
+) -> BatchProcessor:
     """Instantiate the batch processor under test."""
 
     return BatchProcessor(
-        database=mock_database,
+        session_provider=mock_session_provider,
         llm_interaction=AsyncMock(spec=LLMInteractionProtocol),
         settings=Settings(DEFAULT_BATCH_SIZE=10),
+        batch_repository=mock_batch_repo,
     )
 
 
@@ -57,16 +64,14 @@ def _build_mock_state() -> CJBatchState:
 
 @pytest.mark.asyncio
 async def test_first_submission_sets_budget_and_totals(
-    batch_processor: BatchProcessor, mock_database: AsyncMock
+    batch_processor: BatchProcessor,
+    mock_session_provider: MockSessionProvider,
+    mock_batch_repo: AsyncMock,
 ) -> None:
     """The first submission should capture total budget and initialize counters."""
 
     batch_state = _build_mock_state()
-    mock_result = Mock()
-    mock_result.scalar_one_or_none.return_value = batch_state
-
-    session = mock_database.session.return_value.__aenter__.return_value
-    session.execute = AsyncMock(return_value=mock_result)
+    mock_batch_repo.get_batch_state_for_update = AsyncMock(return_value=batch_state)
 
     await batch_processor._update_batch_state_with_totals(
         cj_batch_id=batch_state.batch_id,
@@ -79,12 +84,15 @@ async def test_first_submission_sets_budget_and_totals(
     assert batch_state.total_comparisons == 25
     assert batch_state.submitted_comparisons == 25
     assert batch_state.current_iteration == 1
+    session = mock_session_provider.get_last_session()
     session.commit.assert_awaited_once()
 
 
 @pytest.mark.asyncio
 async def test_subsequent_submission_accumulates_counters(
-    batch_processor: BatchProcessor, mock_database: AsyncMock
+    batch_processor: BatchProcessor,
+    mock_session_provider: MockSessionProvider,
+    mock_batch_repo: AsyncMock,
 ) -> None:
     """Later submissions should increment totals instead of overwriting them."""
 
@@ -95,11 +103,7 @@ async def test_subsequent_submission_accumulates_counters(
     batch_state.current_iteration = 1
     batch_state.processing_metadata = {}
 
-    mock_result = Mock()
-    mock_result.scalar_one_or_none.return_value = batch_state
-
-    session = mock_database.session.return_value.__aenter__.return_value
-    session.execute = AsyncMock(return_value=mock_result)
+    mock_batch_repo.get_batch_state_for_update = AsyncMock(return_value=batch_state)
 
     await batch_processor._update_batch_state_with_totals(
         cj_batch_id=batch_state.batch_id,
@@ -112,4 +116,5 @@ async def test_subsequent_submission_accumulates_counters(
     assert batch_state.total_comparisons == 55
     assert batch_state.submitted_comparisons == 55
     assert batch_state.current_iteration == 2
+    session = mock_session_provider.get_last_session()
     session.commit.assert_awaited_once()

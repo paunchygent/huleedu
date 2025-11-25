@@ -9,7 +9,7 @@ This guide demonstrates the proper approach to integration testing in the CJ Ass
 The original integration tests suffered from **over-mocking** of internal components:
 
 ### ❌ OVER-MOCKED (Problems)
-- `CJRepositoryProtocol` - Internal database repository
+- Per-aggregate repository protocols - Internal database repositories
 - Database sessions - SQLAlchemy operations
 - Query results - Database query chains
 - Entity objects - Database records as `MagicMock()`
@@ -31,7 +31,7 @@ The original integration tests suffered from **over-mocking** of internal compon
 - No data leakage between tests
 
 ### Repository Implementation
-- Real `CJRepositoryProtocol` implementation
+- Real PostgresDataAccess implementation (provides all aggregate repository protocols)
 - Real SQLAlchemy queries and operations
 - Real database transactions and constraints
 
@@ -70,10 +70,20 @@ async def db_session(sqlite_engine: AsyncEngine) -> AsyncGenerator[AsyncSession,
 #### Repository Implementations
 ```python
 @pytest.fixture
-async def real_repository(
+async def postgres_data_access(
     sqlite_engine: AsyncEngine, test_settings: Settings
-) -> AsyncGenerator[CJRepositoryProtocol, None]:
-    """Create real repository implementation with SQLite backend."""
+) -> AsyncGenerator[PostgresDataAccess, None]:
+    """Create real PostgresDataAccess implementation with SQLite backend.
+
+    PostgresDataAccess implements all per-aggregate repository protocols:
+    - SessionProviderProtocol
+    - CJBatchRepositoryProtocol
+    - CJEssayRepositoryProtocol
+    - CJComparisonRepositoryProtocol
+    - AnchorRepositoryProtocol
+    - AssessmentInstructionRepositoryProtocol
+    - GradeProjectionRepositoryProtocol
+    """
 ```
 
 #### External Service Mocks
@@ -91,20 +101,20 @@ def mock_content_client() -> AsyncMock:
 ```python
 async def test_database_isolation_between_tests(
     self,
-    real_repository: CJRepositoryProtocol,
+    postgres_data_access: PostgresDataAccess,
     db_verification_helpers,
 ) -> None:
     """Test that database transactions are properly isolated between tests."""
-    async with real_repository.session() as session:
+    async with postgres_data_access.session() as session:
         # Verify clean state
         assert await db_verification_helpers.verify_no_data_leakage(session)
         
         # Create test data
-        batch = await real_repository.create_new_cj_batch(...)
-        
+        batch = await postgres_data_access.create_new_cj_batch(...)
+
         # Verify creation
         assert await db_verification_helpers.verify_batch_exists(session, batch.id)
-    
+
     # Transaction is automatically rolled back
 ```
 
@@ -112,7 +122,7 @@ async def test_database_isolation_between_tests(
 ```python
 async def test_full_batch_lifecycle_with_real_database(
     self,
-    real_repository: CJRepositoryProtocol,
+    postgres_data_access: PostgresDataAccess,
     mock_content_client: ContentClientProtocol,
     mock_event_publisher: CJEventPublisherProtocol,
     mock_llm_interaction: LLMInteractionProtocol,
@@ -123,16 +133,16 @@ async def test_full_batch_lifecycle_with_real_database(
     # Process actual event with real database
     result = await process_single_message(
         kafka_msg,
-        real_repository,  # REAL database operations
+        postgres_data_access,  # REAL database operations
         mock_content_client,  # MOCKED external service
         mock_event_publisher,  # MOCKED external service
         mock_llm_interaction,  # MOCKED external service
         test_settings,
     )
-    
+
     # Verify real database state
-    async with real_repository.session() as session:
-        batches = await real_repository.get_essays_for_cj_batch(session, 1)
+    async with postgres_data_access.session() as session:
+        batches = await postgres_data_access.get_essays_for_cj_batch(session, 1)
         assert len(batches) == essay_count
 ```
 
@@ -141,10 +151,13 @@ async def test_full_batch_lifecycle_with_real_database(
 @pytest.mark.expensive
 async def test_real_database_operations_with_postgresql(
     self,
-    postgres_repository: CJRepositoryProtocol,
+    postgres_data_access_real_db: PostgresDataAccess,
     db_verification_helpers,
 ) -> None:
-    """Test with PostgreSQL for production parity."""
+    """Test with PostgreSQL for production parity.
+
+    Uses PostgresDataAccess with real PostgreSQL testcontainer backend.
+    """
     # Uses testcontainers PostgreSQL instance
     # Tests PostgreSQL-specific features
     # Validates production database compatibility
@@ -201,10 +214,13 @@ def mock_content_client() -> AsyncMock:
 #### Internal Components (Use Real Implementation)
 ```python
 @pytest.fixture
-async def real_repository(
+async def postgres_data_access(
     sqlite_engine: AsyncEngine, test_settings: Settings
-) -> AsyncGenerator[CJRepositoryProtocol, None]:
-    """Internal repository - use real implementation."""
+) -> AsyncGenerator[PostgresDataAccess, None]:
+    """Internal repository - use real PostgresDataAccess implementation.
+
+    Provides all per-aggregate repository protocols in one fixture.
+    """
     # Real database operations
     # Real transaction handling
     # Real constraint enforcement
@@ -213,13 +229,13 @@ async def real_repository(
 ## Migration from Over-Mocked Tests
 
 ### 1. Identify Over-Mocking
-- Look for `AsyncMock(spec=CJRepositoryProtocol)`
+- Look for `AsyncMock(spec=<repository protocol>)` in place of real repositories
 - Find complex mock chains like `mock_session.execute.return_value.scalar_one_or_none`
 - Spot entity objects created as `MagicMock()`
 
 ### 2. Replace with Real Implementation
-- Replace mocked repository with `real_repository` fixture
-- Use real database sessions from `db_session` fixture
+- Replace mocked repositories with `postgres_data_access` fixture
+- Use real database sessions from `db_session` fixture or `postgres_data_access.session()`
 - Create real database records with repository methods
 
 ### 3. Update Test Logic
@@ -254,7 +270,7 @@ async def real_repository(
 - Separate fast (SQLite) from expensive (PostgreSQL) tests
 
 ### 2. Fixture Usage
-- Prefer `real_repository` over mocked repository
+- Prefer `postgres_data_access` over mocked per-aggregate repositories
 - Use `db_verification_helpers` for database state assertions
 - Apply `@pytest.mark.expensive` for PostgreSQL tests
 
@@ -272,13 +288,17 @@ async def real_repository(
 
 ### 1. Don't Over-Mock Internal Components
 ```python
-# ❌ BAD: Mocking internal repository
-repo = AsyncMock(spec=CJRepositoryProtocol)
-repo.session.return_value.execute.return_value.scalar_one_or_none.return_value = mock_result
+# ❌ BAD: Mocking internal repositories (deprecated pattern)
+repo = AsyncMock(spec=CJBatchRepositoryProtocol)
+repo.get_cj_batch_upload.return_value = mock_result
 
-# ✅ GOOD: Using real repository
-async with real_repository.session() as session:
-    result = await real_repository.get_essays_for_cj_batch(session, batch_id)
+# ❌ ALSO BAD: Mocking per-aggregate repositories
+mock_batch_repo = AsyncMock(spec=CJBatchRepositoryProtocol)
+mock_essay_repo = AsyncMock(spec=CJEssayRepositoryProtocol)
+
+# ✅ GOOD: Using real PostgresDataAccess implementation
+async with postgres_data_access.session() as session:
+    result = await postgres_data_access.get_essays_for_cj_batch(session, batch_id)
 ```
 
 ### 2. Don't Ignore Test Isolation

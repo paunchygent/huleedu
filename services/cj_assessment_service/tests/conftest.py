@@ -44,7 +44,7 @@ from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from services.cj_assessment_service.config import Settings
-from services.cj_assessment_service.tests.unit.mocks import MockDatabase, MockRedisClient
+from services.cj_assessment_service.tests.unit.test_mocks import MockRedisClient
 
 # NOW rebuild models with all types available
 BaseEventData.model_rebuild(raise_errors=True)
@@ -361,17 +361,8 @@ def sample_comparison_results() -> list[dict[str, Any]]:
 @pytest.fixture
 def mock_redis_client() -> MockRedisClient:
     """Provide a mock Redis client for idempotency testing."""
-    from services.cj_assessment_service.tests.unit.mocks import MockRedisClient
 
     return MockRedisClient()
-
-
-@pytest.fixture
-def mock_cj_repository() -> MockDatabase:
-    """Provide a mock CJ repository for idempotency testing."""
-    from services.cj_assessment_service.tests.unit.mocks import MockDatabase
-
-    return MockDatabase()
 
 
 @pytest.fixture

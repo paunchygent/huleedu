@@ -15,14 +15,25 @@ from common_core.events.llm_provider_events import LLMComparisonResultV1
 from common_core.models.error_models import ErrorDetail
 from huleedu_service_libs.error_handling import create_error_detail_with_context
 
+from services.cj_assessment_service.cj_core_logic.grade_projector import GradeProjector
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.event_processor import process_llm_result
 from services.cj_assessment_service.protocols import (
+    AssessmentInstructionRepositoryProtocol,
+    CJBatchRepositoryProtocol,
+    CJComparisonRepositoryProtocol,
+    CJEssayRepositoryProtocol,
     CJEventPublisherProtocol,
-    CJRepositoryProtocol,
     ContentClientProtocol,
     LLMInteractionProtocol,
+    SessionProviderProtocol,
 )
+
+
+@pytest.fixture
+def mock_grade_projector_local() -> AsyncMock:
+    """Create mock grade projector for testing."""
+    return AsyncMock(spec=GradeProjector)
 
 
 @pytest.fixture
@@ -35,12 +46,6 @@ def mock_settings() -> Settings:
 
 
 @pytest.fixture
-def mock_database() -> AsyncMock:
-    """Create mock database protocol."""
-    return AsyncMock(spec=CJRepositoryProtocol)
-
-
-@pytest.fixture
 def mock_event_publisher() -> AsyncMock:
     """Create mock event publisher protocol."""
     return AsyncMock(spec=CJEventPublisherProtocol)
@@ -50,6 +55,30 @@ def mock_event_publisher() -> AsyncMock:
 def mock_llm_interaction() -> AsyncMock:
     """Create mock LLM interaction protocol."""
     return AsyncMock(spec=LLMInteractionProtocol)
+
+
+@pytest.fixture
+def mock_session_provider() -> AsyncMock:
+    """Create mock session provider protocol."""
+    return AsyncMock(spec=SessionProviderProtocol)
+
+
+@pytest.fixture
+def mock_batch_repository() -> AsyncMock:
+    """Create mock batch repository protocol."""
+    return AsyncMock(spec=CJBatchRepositoryProtocol)
+
+
+@pytest.fixture
+def mock_essay_repository() -> AsyncMock:
+    """Create mock essay repository protocol."""
+    return AsyncMock(spec=CJEssayRepositoryProtocol)
+
+
+@pytest.fixture
+def mock_comparison_repository() -> AsyncMock:
+    """Create mock comparison repository protocol."""
+    return AsyncMock(spec=CJComparisonRepositoryProtocol)
 
 
 def create_llm_callback_message(
@@ -148,10 +177,14 @@ class TestLLMCallbackProcessing:
     async def test_process_llm_result_success(
         self,
         mock_continue_workflow: AsyncMock,
-        mock_database: AsyncMock,
         mock_event_publisher: AsyncMock,
         mock_settings: Settings,
         mock_llm_interaction: AsyncMock,
+        mock_session_provider: AsyncMock,
+        mock_batch_repository: AsyncMock,
+        mock_essay_repository: AsyncMock,
+        mock_comparison_repository: AsyncMock,
+        mock_grade_projector_local: AsyncMock,
     ) -> None:
         """Test successful processing of LLM comparison result."""
         # Arrange
@@ -174,11 +207,16 @@ class TestLLMCallbackProcessing:
 
         result = await process_llm_result(
             msg=msg,
-            database=mock_database,
+            session_provider=mock_session_provider,
+            batch_repository=mock_batch_repository,
+            essay_repository=mock_essay_repository,
+            comparison_repository=mock_comparison_repository,
+            instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
             event_publisher=mock_event_publisher,
             content_client=mock_content_client,
             llm_interaction=mock_llm_interaction,
             settings_obj=mock_settings,
+            grade_projector=mock_grade_projector_local,
             tracer=None,
         )
 
@@ -202,10 +240,14 @@ class TestLLMCallbackProcessing:
     async def test_process_llm_result_error_callback(
         self,
         mock_continue_workflow: AsyncMock,
-        mock_database: AsyncMock,
         mock_event_publisher: AsyncMock,
         mock_settings: Settings,
         mock_llm_interaction: AsyncMock,
+        mock_session_provider: AsyncMock,
+        mock_batch_repository: AsyncMock,
+        mock_essay_repository: AsyncMock,
+        mock_comparison_repository: AsyncMock,
+        mock_grade_projector_local: AsyncMock,
     ) -> None:
         """Test processing of error callback from LLM provider."""
         # Arrange
@@ -225,11 +267,16 @@ class TestLLMCallbackProcessing:
 
         result = await process_llm_result(
             msg=msg,
-            database=mock_database,
+            session_provider=mock_session_provider,
+            batch_repository=mock_batch_repository,
+            essay_repository=mock_essay_repository,
+            comparison_repository=mock_comparison_repository,
+            instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
             event_publisher=mock_event_publisher,
             content_client=mock_content_client,
             llm_interaction=mock_llm_interaction,
             settings_obj=mock_settings,
+            grade_projector=mock_grade_projector_local,
             tracer=None,
         )
 
@@ -251,10 +298,14 @@ class TestLLMCallbackProcessing:
     async def test_process_llm_result_preserves_request_metadata(
         self,
         mock_continue_workflow: AsyncMock,
-        mock_database: AsyncMock,
         mock_event_publisher: AsyncMock,
         mock_settings: Settings,
         mock_llm_interaction: AsyncMock,
+        mock_session_provider: AsyncMock,
+        mock_batch_repository: AsyncMock,
+        mock_essay_repository: AsyncMock,
+        mock_comparison_repository: AsyncMock,
+        mock_grade_projector_local: AsyncMock,
     ) -> None:
         """Ensure additive metadata is available to downstream workflow logic."""
         request_metadata = {
@@ -271,11 +322,16 @@ class TestLLMCallbackProcessing:
         mock_content_client = AsyncMock(spec=ContentClientProtocol)
         await process_llm_result(
             msg=msg,
-            database=mock_database,
+            session_provider=mock_session_provider,
+            batch_repository=mock_batch_repository,
+            essay_repository=mock_essay_repository,
+            comparison_repository=mock_comparison_repository,
+            instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
             event_publisher=mock_event_publisher,
             content_client=mock_content_client,
             llm_interaction=mock_llm_interaction,
             settings_obj=mock_settings,
+            grade_projector=mock_grade_projector_local,
             tracer=None,
         )
 
@@ -288,10 +344,14 @@ class TestLLMCallbackProcessing:
     async def test_process_llm_result_invalid_message(
         self,
         mock_continue_workflow: AsyncMock,
-        mock_database: AsyncMock,
         mock_event_publisher: AsyncMock,
         mock_settings: Settings,
         mock_llm_interaction: AsyncMock,
+        mock_session_provider: AsyncMock,
+        mock_batch_repository: AsyncMock,
+        mock_essay_repository: AsyncMock,
+        mock_comparison_repository: AsyncMock,
+        mock_grade_projector_local: AsyncMock,
     ) -> None:
         """Test handling of invalid callback messages."""
         # Create invalid message (not proper JSON)
@@ -315,11 +375,16 @@ class TestLLMCallbackProcessing:
 
         result = await process_llm_result(
             msg=msg,
-            database=mock_database,
+            session_provider=mock_session_provider,
+            batch_repository=mock_batch_repository,
+            essay_repository=mock_essay_repository,
+            comparison_repository=mock_comparison_repository,
+            instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
             event_publisher=mock_event_publisher,
             content_client=mock_content_client,
             llm_interaction=mock_llm_interaction,
             settings_obj=mock_settings,
+            grade_projector=mock_grade_projector_local,
             tracer=None,
         )
 
@@ -335,10 +400,14 @@ class TestLLMCallbackProcessing:
     async def test_process_llm_result_workflow_error(
         self,
         mock_continue_workflow: AsyncMock,
-        mock_database: AsyncMock,
         mock_event_publisher: AsyncMock,
         mock_settings: Settings,
         mock_llm_interaction: AsyncMock,
+        mock_session_provider: AsyncMock,
+        mock_batch_repository: AsyncMock,
+        mock_essay_repository: AsyncMock,
+        mock_comparison_repository: AsyncMock,
+        mock_grade_projector_local: AsyncMock,
     ) -> None:
         """Test handling when workflow processing fails."""
         # Arrange
@@ -361,11 +430,16 @@ class TestLLMCallbackProcessing:
 
         result = await process_llm_result(
             msg=msg,
-            database=mock_database,
+            session_provider=mock_session_provider,
+            batch_repository=mock_batch_repository,
+            essay_repository=mock_essay_repository,
+            comparison_repository=mock_comparison_repository,
+            instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
             event_publisher=mock_event_publisher,
             content_client=mock_content_client,
             llm_interaction=mock_llm_interaction,
             settings_obj=mock_settings,
+            grade_projector=mock_grade_projector_local,
             tracer=None,
         )
 
@@ -379,10 +453,14 @@ class TestLLMCallbackProcessing:
     async def test_process_llm_result_multiple_callbacks(
         self,
         mock_continue_workflow: AsyncMock,
-        mock_database: AsyncMock,
         mock_event_publisher: AsyncMock,
         mock_settings: Settings,
         mock_llm_interaction: AsyncMock,
+        mock_session_provider: AsyncMock,
+        mock_batch_repository: AsyncMock,
+        mock_essay_repository: AsyncMock,
+        mock_comparison_repository: AsyncMock,
+        mock_grade_projector_local: AsyncMock,
     ) -> None:
         """Test processing multiple callbacks in sequence."""
         # Arrange
@@ -403,11 +481,16 @@ class TestLLMCallbackProcessing:
 
             result = await process_llm_result(
                 msg=msg,
-                database=mock_database,
+                session_provider=mock_session_provider,
+                batch_repository=mock_batch_repository,
+                essay_repository=mock_essay_repository,
+                comparison_repository=mock_comparison_repository,
+                instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
                 event_publisher=mock_event_publisher,
                 content_client=mock_content_client,
                 llm_interaction=mock_llm_interaction,
                 settings_obj=mock_settings,
+                grade_projector=mock_grade_projector_local,
                 tracer=None,
             )
 

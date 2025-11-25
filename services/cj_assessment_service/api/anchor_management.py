@@ -10,7 +10,12 @@ from quart import Blueprint, request
 from quart_dishka import inject
 
 from services.cj_assessment_service.models_api import RegisterAnchorRequest
-from services.cj_assessment_service.protocols import CJRepositoryProtocol, ContentClientProtocol
+from services.cj_assessment_service.protocols import (
+    AnchorRepositoryProtocol,
+    AssessmentInstructionRepositoryProtocol,
+    ContentClientProtocol,
+    SessionProviderProtocol,
+)
 
 logger = create_service_logger("anchor_management")
 
@@ -20,7 +25,9 @@ bp = Blueprint("anchors", __name__, url_prefix="/api/v1/anchors")
 @bp.post("/register")
 @inject
 async def register_anchor_essay(
-    repository: FromDishka[CJRepositoryProtocol],
+    session_provider: FromDishka[SessionProviderProtocol],
+    instruction_repository: FromDishka[AssessmentInstructionRepositoryProtocol],
+    anchor_repository: FromDishka[AnchorRepositoryProtocol],
     content_client: FromDishka[ContentClientProtocol],
 ) -> tuple[dict, int]:
     """Register an anchor essay for calibration.
@@ -62,8 +69,8 @@ async def register_anchor_essay(
         return {"error": error_messages}, 400
 
     try:
-        async with repository.session() as session:
-            assignment_context = await repository.get_assignment_context(
+        async with session_provider.session() as session:
+            assignment_context = await instruction_repository.get_assignment_context(
                 session,
                 register_request.assignment_id,
             )
@@ -108,7 +115,7 @@ async def register_anchor_essay(
                 logger.error("Content Service did not return storage_id")
                 return {"error": "Failed to store essay content"}, 500
 
-            anchor_id = await repository.upsert_anchor_reference(
+            anchor_id = await anchor_repository.upsert_anchor_reference(
                 session,
                 assignment_id=register_request.assignment_id,
                 anchor_label=anchor_label,

@@ -37,6 +37,7 @@ def test_resolve_requested_max_pairs(
 ) -> None:
     settings = Mock(spec=Settings)
     settings.MAX_PAIRWISE_COMPARISONS = settings_cap
+    settings.SYSTEM_PROMPT = "CJ system prompt"
     request_data = CJAssessmentRequestData(
         bos_batch_id="test-batch",
         assignment_id="test-assign",
@@ -80,11 +81,16 @@ def test_build_budget_metadata_without_overrides() -> None:
 
 
 @pytest.mark.asyncio
-async def test_request_additional_comparisons_no_essays(monkeypatch: pytest.MonkeyPatch) -> None:
-    database = AsyncMock()
+async def test_request_additional_comparisons_no_essays(
+    monkeypatch: pytest.MonkeyPatch, mock_session_provider: AsyncMock
+) -> None:
     llm_interaction = AsyncMock()
     settings = Mock(spec=Settings)
     settings.MAX_PAIRWISE_COMPARISONS = 500
+
+    # Create mock repository protocols
+    batch_repository = AsyncMock()
+    essay_repository = AsyncMock()
 
     load_mock = AsyncMock(return_value=[])
     monkeypatch.setattr(cp, "_load_essays_for_batch", load_mock)
@@ -93,7 +99,11 @@ async def test_request_additional_comparisons_no_essays(monkeypatch: pytest.Monk
 
     result = await cp.request_additional_comparisons_for_batch(
         cj_batch_id=7,
-        database=database,
+        session_provider=mock_session_provider,
+        batch_repository=batch_repository,
+        essay_repository=essay_repository,
+        comparison_repository=AsyncMock(spec=cp.CJComparisonRepositoryProtocol),
+        instruction_repository=AsyncMock(spec=cp.AssessmentInstructionRepositoryProtocol),
         llm_interaction=llm_interaction,
         settings=settings,
         correlation_id=uuid4(),
@@ -104,13 +114,16 @@ async def test_request_additional_comparisons_no_essays(monkeypatch: pytest.Monk
     )
 
     assert result is False
-    load_mock.assert_awaited_once_with(database=database, cj_batch_id=7)
+    load_mock.assert_awaited_once_with(
+        session_provider=mock_session_provider, essay_repository=essay_repository, cj_batch_id=7
+    )
     submit_mock.assert_not_awaited()
 
 
 @pytest.mark.asyncio
 async def test_request_additional_comparisons_submits_new_iteration(
     monkeypatch: pytest.MonkeyPatch,
+    mock_session_provider: AsyncMock,
 ) -> None:
     essays = [
         EssayForComparison(
@@ -126,18 +139,6 @@ async def test_request_additional_comparisons_submits_new_iteration(
     monkeypatch.setattr(cp, "submit_comparisons_for_async_processing", submit_mock)
 
     # Mock database with proper async context manager support for session()
-    database = AsyncMock()
-    mock_session = AsyncMock()
-
-    # Create a proper async context manager mock
-    class AsyncContextManagerMock:
-        async def __aenter__(self) -> AsyncMock:
-            return mock_session
-
-        async def __aexit__(self, exc_type: object, exc_val: object, exc_tb: object) -> None:
-            pass
-
-    database.session = Mock(return_value=AsyncContextManagerMock())
 
     # Mock batch metadata that will be retrieved from database
     mock_batch = Mock()
@@ -149,7 +150,10 @@ async def test_request_additional_comparisons_submits_new_iteration(
     mock_batch.org_id = "org-99"
     mock_batch.processing_metadata = {"student_prompt_text": "Prompt from batch"}
 
-    database.get_cj_batch_upload = AsyncMock(return_value=mock_batch)
+    # Create mock repository protocols
+    batch_repository = AsyncMock()
+    batch_repository.get_cj_batch_upload = AsyncMock(return_value=mock_batch)
+    essay_repository = AsyncMock()
 
     llm_interaction = AsyncMock()
     settings = Mock(spec=Settings)
@@ -172,7 +176,11 @@ async def test_request_additional_comparisons_submits_new_iteration(
 
     result = await cp.request_additional_comparisons_for_batch(
         cj_batch_id=42,
-        database=database,
+        session_provider=mock_session_provider,
+        batch_repository=batch_repository,
+        essay_repository=essay_repository,
+        comparison_repository=AsyncMock(spec=cp.CJComparisonRepositoryProtocol),
+        instruction_repository=AsyncMock(spec=cp.AssessmentInstructionRepositoryProtocol),
         llm_interaction=llm_interaction,
         settings=settings,
         correlation_id=uuid4(),
@@ -183,13 +191,15 @@ async def test_request_additional_comparisons_submits_new_iteration(
     )
 
     assert result is True
-    load_mock.assert_awaited_once_with(database=database, cj_batch_id=42)
+    load_mock.assert_awaited_once_with(
+        session_provider=mock_session_provider, essay_repository=essay_repository, cj_batch_id=42
+    )
     submit_mock.assert_awaited_once()
 
     assert submit_mock.await_args is not None
     submit_kwargs = submit_mock.await_args.kwargs
     assert submit_kwargs["cj_batch_id"] == 42
-    assert submit_kwargs["database"] is database
+    assert submit_kwargs["session_provider"] is mock_session_provider
     assert submit_kwargs["llm_interaction"] is llm_interaction
 
     request_data = submit_kwargs["request_data"]

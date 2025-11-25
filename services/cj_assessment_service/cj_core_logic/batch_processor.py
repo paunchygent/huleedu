@@ -20,8 +20,9 @@ from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.models_api import CJAssessmentRequestData, ComparisonTask
 from services.cj_assessment_service.models_db import CJBatchState
 from services.cj_assessment_service.protocols import (
-    CJRepositoryProtocol,
+    CJBatchRepositoryProtocol,
     LLMInteractionProtocol,
+    SessionProviderProtocol,
 )
 
 from .batch_config import (
@@ -30,9 +31,8 @@ from .batch_config import (
 )
 from .batch_submission import (
     BatchSubmissionResult,
-    get_batch_state,
     submit_batch_chunk,
-    update_batch_state_in_session,
+    update_batch_state,
 )
 
 logger = create_service_logger("cj_assessment_service.batch_processor")
@@ -43,20 +43,23 @@ class BatchProcessor:
 
     def __init__(
         self,
-        database: CJRepositoryProtocol,
+        session_provider: SessionProviderProtocol,
         llm_interaction: LLMInteractionProtocol,
         settings: Settings,
+        batch_repository: CJBatchRepositoryProtocol,
     ) -> None:
         """Initialize core batch processor.
 
         Args:
-            database: Database access protocol implementation
+            session_provider: Session provider protocol implementation
             llm_interaction: LLM interaction protocol implementation
             settings: Application settings
+            batch_repository: Batch repository for state persistence
         """
-        self.database = database
+        self._session_provider = session_provider
         self.llm_interaction = llm_interaction
         self.settings = settings
+        self._batch_repository = batch_repository
 
     async def submit_comparison_batch(
         self,
@@ -135,7 +138,8 @@ class BatchProcessor:
                     cj_batch_id=cj_batch_id,
                     correlation_id=correlation_id,
                     llm_interaction=self.llm_interaction,
-                    database=self.database,  # Pass database for tracking records
+                    session_provider=self._session_provider,
+                    batch_repository=self._batch_repository,
                     model_override=model_override,
                     temperature_override=temperature_override,
                     max_tokens_override=max_tokens_override,
@@ -278,13 +282,13 @@ class BatchProcessor:
     ) -> None:
         """Update batch state in database."""
         try:
-            async with self.database.session() as session:
-                await update_batch_state_in_session(
-                    session=session,
-                    cj_batch_id=cj_batch_id,
-                    state=state,
-                    correlation_id=correlation_id,
-                )
+            await update_batch_state(
+                session_provider=self._session_provider,
+                batch_repository=self._batch_repository,
+                cj_batch_id=cj_batch_id,
+                state=state,
+                correlation_id=correlation_id,
+            )
 
         except Exception as e:
             logger.error(
@@ -317,13 +321,10 @@ class BatchProcessor:
         """Update batch state with cumulative totals and iteration counter."""
 
         try:
-            async with self.database.session() as session:
-                # Lock batch state row without eager-loading nullable relationships to
-                # avoid Postgres "FOR UPDATE" + outer join restrictions.
-                batch_state = await get_batch_state(
+            async with self._session_provider.session() as session:
+                batch_state = await self._batch_repository.get_batch_state_for_update(
                     session=session,
-                    cj_batch_id=cj_batch_id,
-                    correlation_id=correlation_id,
+                    batch_id=cj_batch_id,
                     for_update=True,
                 )
 
