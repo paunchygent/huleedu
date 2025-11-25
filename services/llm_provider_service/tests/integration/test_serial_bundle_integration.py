@@ -257,7 +257,7 @@ async def test_serial_bundle_defers_incompatible_request_to_pending() -> None:
         )
     ]
 
-    await queue_processor._process_request_serial_bundle(first_request)
+    result = await queue_processor._process_request_serial_bundle(first_request)
 
     # Only the first request is processed in this bundle.
     mock_comparison_processor.process_comparison_batch.assert_awaited_once()
@@ -265,7 +265,7 @@ async def test_serial_bundle_defers_incompatible_request_to_pending() -> None:
     assert len(awaited_call.args[0]) == 1
 
     # Incompatible request is stored for later processing.
-    assert queue_processor._pending_request is incompatible_request
+    assert result.pending_request is incompatible_request
 
 
 @pytest.mark.asyncio

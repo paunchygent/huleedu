@@ -181,7 +181,7 @@ class TestCheckLatestModels:
         )
         models = await checker.check_latest_models()
 
-        # Should only include Anthropic model
+        # Should only include Anthropic Claude 4.5 model
         assert len(models) == 1
         assert models[0].model_id == "anthropic/claude-haiku-4-5-20251001"
 
@@ -222,13 +222,15 @@ class TestCheckLatestModels:
         )
         models = await checker.check_latest_models()
 
-        # Should only include Claude 3 model
+        # Should exclude Claude 2.x; include only 4.5 tier
         assert len(models) == 1
         assert models[0].model_id == "anthropic/claude-haiku-4-5-20251001"
 
     @pytest.mark.asyncio
-    async def test_includes_all_claude_3_models(self, mocker: Mock, settings: Settings) -> None:
-        """Should include Anthropic Claude 4.5 tier models and exclude Claude 3.x."""
+    async def test_includes_only_claude_4_5_tier_models(
+        self, mocker: Mock, settings: Settings
+    ) -> None:
+        """Should include only Anthropic Claude 4.5 tier models (exclude 3.x)."""
         mock_session = Mock()
         mock_response = AsyncMock()
         mock_response.status = 200
@@ -268,12 +270,11 @@ class TestCheckLatestModels:
         )
         models = await checker.check_latest_models()
 
+        # Should only include Claude 4.5 tier models (filters out 3.x)
+        assert len(models) == 2
         model_ids = {m.model_id for m in models}
-        # Claude 3.x model should be excluded
-        assert "anthropic/claude-3-opus-20240229" not in model_ids
-        # Claude 4.5 tier models should be included
-        assert "anthropic/claude-sonnet-4-5-20250929" in model_ids
         assert "anthropic/claude-haiku-4-5-20251001" in model_ids
+        assert "anthropic/claude-sonnet-4-5-20250929" in model_ids
 
     @pytest.mark.asyncio
     async def test_handles_api_error_gracefully(self, mocker: Mock, settings: Settings) -> None:

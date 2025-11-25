@@ -365,7 +365,7 @@ Essay B content""",
                 metadata={"prompt_sha256": "abc"},
             )
         ]
-        setattr(queue_processor, "_publish_callback_event", AsyncMock())
+        setattr(queue_processor.executor, "publish_callback_event", AsyncMock())
 
         await queue_processor._process_request_serial_bundle(queued_request)
 
@@ -430,8 +430,8 @@ class TestSerialBundleProcessing:
         mock_queue_manager.dequeue = AsyncMock(side_effect=[second_request, None])
         mock_queue_manager.update_status = AsyncMock()
         mock_queue_manager.remove = AsyncMock()
-        setattr(queue_processor, "_publish_callback_event", AsyncMock())
-        setattr(queue_processor, "_handle_request_success", AsyncMock())
+        setattr(queue_processor.executor, "publish_callback_event", AsyncMock())
+        setattr(queue_processor.executor.result_handler, "handle_request_success", AsyncMock())
         setattr(queue_processor, "_record_completion_metrics", Mock())
 
         mock_comparison_processor.process_comparison_batch.return_value = [
@@ -461,11 +461,13 @@ class TestSerialBundleProcessing:
             ),
         ]
 
-        await queue_processor._process_request_serial_bundle(first_request)
+        result = await queue_processor._process_request_serial_bundle(first_request)
 
         mock_comparison_processor.process_comparison_batch.assert_awaited_once()
-        assert queue_processor._pending_request is None
-        handle_success_mock = cast(AsyncMock, getattr(queue_processor, "_handle_request_success"))
+        assert result.pending_request is None
+        handle_success_mock = cast(
+            AsyncMock, getattr(queue_processor.executor.result_handler, "handle_request_success")
+        )
         assert handle_success_mock.await_count == 2
 
     @pytest.mark.asyncio
@@ -516,8 +518,8 @@ class TestSerialBundleProcessing:
         mock_queue_manager.dequeue = AsyncMock(side_effect=[incompatible_request])
         mock_queue_manager.update_status = AsyncMock()
         mock_queue_manager.remove = AsyncMock()
-        setattr(queue_processor, "_publish_callback_event", AsyncMock())
-        setattr(queue_processor, "_handle_request_success", AsyncMock())
+        setattr(queue_processor.executor, "publish_callback_event", AsyncMock())
+        setattr(queue_processor.executor.result_handler, "handle_request_success", AsyncMock())
         setattr(queue_processor, "_record_completion_metrics", Mock())
 
         mock_comparison_processor.process_comparison_batch.return_value = [
@@ -535,9 +537,9 @@ class TestSerialBundleProcessing:
             )
         ]
 
-        await queue_processor._process_request_serial_bundle(first_request)
+        result = await queue_processor._process_request_serial_bundle(first_request)
 
-        assert queue_processor._pending_request is incompatible_request
+        assert result.pending_request is incompatible_request
         mock_comparison_processor.process_comparison_batch.assert_awaited_once()
         awaited_call = mock_comparison_processor.process_comparison_batch.await_args
         assert len(awaited_call.args[0]) == 1
@@ -590,7 +592,7 @@ class TestSerialBundleProcessing:
         mock_queue_manager.dequeue = AsyncMock(side_effect=[second_request, None])
         mock_queue_manager.update_status = AsyncMock()
         setattr(queue_processor, "_record_completion_metrics", Mock())
-        setattr(queue_processor, "_handle_request_hule_error", AsyncMock())
+        setattr(queue_processor.executor.result_handler, "handle_request_hule_error", AsyncMock())
 
         try:
             raise_processing_error(
@@ -604,7 +606,9 @@ class TestSerialBundleProcessing:
 
         await queue_processor._process_request_serial_bundle(first_request)
 
-        handle_error_mock = cast(AsyncMock, getattr(queue_processor, "_handle_request_hule_error"))
+        handle_error_mock = cast(
+            AsyncMock, getattr(queue_processor.executor.result_handler, "handle_request_hule_error")
+        )
         assert handle_error_mock.await_count == 2
 
 

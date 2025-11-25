@@ -182,12 +182,14 @@ class TestComparisonBatchInterface:
         assert await_calls[0].kwargs == {
             "provider": LLMProviderType.OPENAI,
             "user_prompt": "prompt-a",
+            "prompt_blocks": None,
             "correlation_id": responses[0].correlation_id,
             "model_override": "gpt-4o",
         }
         assert await_calls[1].kwargs == {
             "provider": LLMProviderType.ANTHROPIC,
             "user_prompt": "prompt-b",
+            "prompt_blocks": None,
             "correlation_id": responses[1].correlation_id,
             "model_override": "claude-3",
         }
@@ -390,6 +392,7 @@ Essay A content
 **Essay B (ID: test_b):**
 Essay B content""",
             correlation_id=correlation_id,
+            prompt_blocks=None,
             system_prompt_override=None,
             model_override=None,
             temperature_override=0.1,
