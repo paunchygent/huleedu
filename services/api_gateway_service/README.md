@@ -254,13 +254,13 @@ Reference: `.claude/rules/075-test-creation-methodology.md`
 Environment variables (prefix: `API_GATEWAY_`):
 
 - `API_GATEWAY_SERVICE_NAME`: Service identifier (default: api-gateway-service)
-- `API_GATEWAY_HTTP_HOST`: Server host (default: 0.0.0.0)  
+- `API_GATEWAY_HTTP_HOST`: Server host (default: 0.0.0.0)
 - `API_GATEWAY_HTTP_PORT`: Server port (default: 4001)
 - `API_GATEWAY_LOG_LEVEL`: Logging level (default: INFO)
 - `API_GATEWAY_CORS_ORIGINS`: Allowed CORS origins (JSON array)
 - `API_GATEWAY_KAFKA_BOOTSTRAP_SERVERS`: Kafka servers (default: kafka:9092)
-- `API_GATEWAY_FILE_SERVICE_URL`: File Service URL (default: http://file_service:8000)
-- `API_GATEWAY_CMS_API_URL`: Class Management Service URL (default: http://class_management_service:8000)
+- `API_GATEWAY_FILE_SERVICE_URL`: File Service URL (default: http://file_service:7001)
+- `API_GATEWAY_CMS_API_URL`: Class Management Service URL (default: http://class_management_service:5002)
 - `API_GATEWAY_BOS_URL`: Batch Orchestrator Service URL (internal-only; default: http://batch_orchestrator_service:5000)
 - `API_GATEWAY_REDIS_URL`: Redis URL for rate limiting (default: redis://redis:6379)
 - `API_GATEWAY_JWT_SECRET_KEY`: JWT signing secret (REQUIRED)

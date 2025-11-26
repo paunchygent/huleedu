@@ -367,8 +367,8 @@ MAX_PAIRWISE_COMPARISONS=150
 SCORE_STABILITY_THRESHOLD=0.05
 COMPARISONS_PER_STABILITY_CHECK_ITERATION=10
 
-# HTTP API Configuration 
-METRICS_PORT=9090          # Port for health and metrics endpoints
+# HTTP API Configuration
+HTTP_PORT=9090             # Port for health and metrics endpoints
 
 # LLM Configuration Overrides Support
 # Default models and parameters can be overridden per-request via event data
@@ -549,7 +549,7 @@ pdm run start
 
 ### Observability Features
 
-- **Metrics**: Prometheus metrics exposed on configured `METRICS_PORT` (default: 9090)
+- **Metrics**: Prometheus metrics exposed on configured `HTTP_PORT` (default: 9090)
   - `huleedu_cj_prompt_fetch_failures_total{reason}` tracks prompt hydration failures (Content Service errors, missing refs, legacy fallbacks)
   - `huleedu_cj_prompt_fetch_success_total` counts successful student prompt hydrations across event processing and batch preparation
   - `cj_llm_requests_total{batching_mode}` records total LLM comparisons by effective batching mode (`per_request`, `serial_bundle`, `provider_batch_api`).

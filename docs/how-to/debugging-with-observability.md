@@ -415,8 +415,8 @@ curl http://localhost:9090/-/healthy
 # Check if service has OTEL endpoint configured
 docker inspect huleedu_api_gateway_service | jq '.[0].Config.Env | .[] | select(. | contains("OTEL_EXPORTER"))'
 
-# Trigger a request
-curl -X POST http://localhost:8000/api/v1/healthz
+# Trigger a request (API Gateway on port 8080 in Docker, 4001 locally)
+curl -X GET http://localhost:8080/healthz
 
 # Check Jaeger after 10 seconds
 curl -s "http://localhost:16686/api/traces?service=api_gateway_service&limit=10" | jq '.data | length'

@@ -142,7 +142,7 @@ class TestApplicationSetup:
 
         # Test default configuration values
         default_settings = Settings()
-        assert default_settings.METRICS_PORT == 8083
+        assert default_settings.HTTP_PORT == 8083
         assert default_settings.SERVICE_NAME == "entitlements_service"
 
     @pytest.mark.parametrize(
@@ -401,7 +401,7 @@ class TestApplicationSetup:
 
         # Service-specific constants
         assert settings.SERVICE_NAME == "entitlements_service"
-        assert settings.METRICS_PORT == 8083
+        assert settings.HTTP_PORT == 8083
         assert isinstance(settings.DEFAULT_USER_CREDITS, int)
         assert isinstance(settings.DEFAULT_ORG_CREDITS, int)
 

@@ -80,17 +80,17 @@ class Settings(SecureServiceSettings, JWTValidationSettings):
 
     # Service URLs & Strategies
     CMS_API_URL: str = Field(
-        default="http://class_management_service:8000",
+        default="http://class_management_service:5002",
         description="Class Management Service base URL",
         validation_alias=AliasChoices("API_GATEWAY_CMS_API_URL", "CLASS_MANAGEMENT_SERVICE_URL"),
     )
     FILE_SERVICE_URL: str = Field(
-        default="http://file_service:8000",
+        default="http://file_service:7001",
         description="File Service base URL for file upload proxy",
         validation_alias=AliasChoices("API_GATEWAY_FILE_SERVICE_URL", "FILE_SERVICE_URL"),
     )
     RESULT_AGGREGATOR_URL: str = Field(
-        default="http://result_aggregator_service:8000",
+        default="http://result_aggregator_service:4003",
         description="Result Aggregator Service base URL",
         validation_alias=AliasChoices(
             "API_GATEWAY_RESULT_AGGREGATOR_URL", "RESULT_AGGREGATOR_SERVICE_URL"

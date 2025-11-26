@@ -58,7 +58,7 @@ Key settings include:
 
 * `CONTENT_SERVICE_LOG_LEVEL`: Logging verbosity (Default: "INFO").
 * `CONTENT_SERVICE_CONTENT_STORE_ROOT_PATH`: Root directory for content files. (Default: `./.local_content_store_mvp` for local, `/data/huleedu_content_store` in Docker).
-* `CONTENT_SERVICE_PORT`: Service listening port.
+* `PORT` or `HTTP_PORT`: Service listening port (Default: 8000).
 
 An example environment file is available at `services/content_service/.env.example`.
 

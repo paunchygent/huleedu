@@ -37,8 +37,8 @@ class Settings(SecureServiceSettings):
     DEFAULT_ORG_CREDITS: int = 500
     CREDIT_MINIMUM_BALANCE: int = 0  # Prevent negative balances
 
-    # Metrics port (inherited from SecureServiceSettings but can override)
-    METRICS_PORT: int = 8083
+    # HTTP server port
+    HTTP_PORT: int = 8083
 
     # Database Connection Pool Settings (following established patterns)
     DATABASE_POOL_SIZE: int = 5

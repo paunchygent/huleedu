@@ -122,7 +122,7 @@ pdm install
 docker build -t huleedu-file-service .
 
 # Run container
-docker run -p 7001:7001 -p 9094:9094 huleedu-file-service
+docker run -p 7001:7001 -p 9099:9099 huleedu-file-service
 ```
 
 ## Circuit Breaker Monitoring

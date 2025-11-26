@@ -36,7 +36,7 @@ class TestEntitlementsServiceSettings:
             assert settings.RATE_LIMIT_ENABLED is True
             assert settings.REDIS_URL == "redis://redis:6379/0"
             assert settings.KAFKA_BOOTSTRAP_SERVERS == "kafka:9092"
-            assert settings.METRICS_PORT == 8083
+            assert settings.HTTP_PORT == 8083
             assert settings.LOG_LEVEL == "INFO"
             assert settings.ENVIRONMENT == Environment.DEVELOPMENT
 
@@ -58,7 +58,7 @@ class TestEntitlementsServiceSettings:
             ),
             ("ENTITLEMENTS_POLICY_CACHE_TTL", "600", "POLICY_CACHE_TTL", 600),
             ("ENTITLEMENTS_DEFAULT_USER_CREDITS", "100", "DEFAULT_USER_CREDITS", 100),
-            ("ENTITLEMENTS_METRICS_PORT", "9090", "METRICS_PORT", 9090),
+            ("ENTITLEMENTS_HTTP_PORT", "9090", "HTTP_PORT", 9090),
             ("ENTITLEMENTS_DATABASE_POOL_SIZE", "10", "DATABASE_POOL_SIZE", 10),
             (
                 "ENTITLEMENTS_REDIS_URL",
@@ -116,7 +116,7 @@ class TestEntitlementsServiceSettings:
         [
             ("ENTITLEMENTS_POLICY_CACHE_TTL", "not_a_number"),
             ("ENTITLEMENTS_DEFAULT_USER_CREDITS", "text_value"),
-            ("ENTITLEMENTS_METRICS_PORT", "port_text"),
+            ("ENTITLEMENTS_HTTP_PORT", "port_text"),
             ("ENTITLEMENTS_DATABASE_POOL_SIZE", "pool_text"),
             ("ENTITLEMENTS_KAFKA_CIRCUIT_BREAKER_FAILURE_THRESHOLD", "failure_text"),
         ],
@@ -420,20 +420,20 @@ class TestEntitlementsServiceSettings:
     def test_zero_value_integer_environment_variables(self) -> None:
         """Test handling of zero values for integer environment variables."""
         with patch.dict(
-            os.environ, {"ENTITLEMENTS_POLICY_CACHE_TTL": "0", "ENTITLEMENTS_METRICS_PORT": "0"}
+            os.environ, {"ENTITLEMENTS_POLICY_CACHE_TTL": "0", "ENTITLEMENTS_HTTP_PORT": "0"}
         ):
             settings = Settings()
             assert settings.POLICY_CACHE_TTL == 0
-            assert settings.METRICS_PORT == 0
+            assert settings.HTTP_PORT == 0
             assert isinstance(settings.POLICY_CACHE_TTL, int)
-            assert isinstance(settings.METRICS_PORT, int)
+            assert isinstance(settings.HTTP_PORT, int)
 
     @pytest.mark.parametrize(
         "field_name, large_value",
         [
             ("POLICY_CACHE_TTL", 2147483647),
             ("DEFAULT_USER_CREDITS", 2147483647),
-            ("METRICS_PORT", 65535),  # Max port number
+            ("HTTP_PORT", 65535),  # Max port number
         ],
     )
     def test_very_large_integer_environment_variables(

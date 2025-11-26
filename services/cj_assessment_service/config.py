@@ -258,8 +258,8 @@ class Settings(SecureServiceSettings, JWTValidationSettings):
         "exactly."
     )
 
-    # Metrics configuration
-    METRICS_PORT: int = 9090
+    # HTTP server configuration
+    HTTP_PORT: int = 9090
 
     # Circuit Breaker Configuration
     CIRCUIT_BREAKER_ENABLED: bool = Field(

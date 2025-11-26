@@ -140,7 +140,7 @@ def create_app(settings: Settings | None = None) -> HuleEduApp:
             logger.info("Entitlements Service started successfully")
             logger.info("Health endpoint: /healthz")
             logger.info("Metrics endpoint: /metrics")
-            logger.info(f"API endpoints: /v1/entitlements/* on port {settings.METRICS_PORT}")
+            logger.info(f"API endpoints: /v1/entitlements/* on port {settings.HTTP_PORT}")
             if not settings.is_production():
                 logger.info("Admin endpoints: /v1/admin/* (development mode)")
 
@@ -226,14 +226,14 @@ app = create_app()
 if __name__ == "__main__":
     settings = Settings()
     config = {
-        "bind": f"0.0.0.0:{settings.METRICS_PORT}",
+        "bind": f"0.0.0.0:{settings.HTTP_PORT}",
         "workers": 1,
         "worker_class": "quart.serving.asyncio.ASGIWorker",
         "accesslog": "-",
         "errorlog": "-",
         "loglevel": settings.LOG_LEVEL.lower(),
     }
-    logger.info(f"Starting Entitlements Service on port {settings.METRICS_PORT}")
+    logger.info(f"Starting Entitlements Service on port {settings.HTTP_PORT}")
     import sys
 
     sys.exit("Please use 'pdm run dev' or 'docker compose up' to start the service")

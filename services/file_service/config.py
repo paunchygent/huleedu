@@ -46,7 +46,7 @@ class Settings(SecureServiceSettings):
     )
     ESSAY_CONTENT_PROVISIONED_TOPIC: str = topic_name(ProcessingEvent.ESSAY_CONTENT_PROVISIONED)
     HTTP_PORT: int = 7001
-    PROMETHEUS_PORT: int = 9092
+    PROMETHEUS_PORT: int = 9099
     HOST: str = "0.0.0.0"
 
     # Content validation settings

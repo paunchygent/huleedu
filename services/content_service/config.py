@@ -31,13 +31,13 @@ class Settings(SecureServiceSettings):
         description="Runtime environment for the service",
     )
     HOST: str = "0.0.0.0"
-    PORT: int = 8001  # Default port, matches docker-compose and pdm dev script for content_service
+    PORT: int = 8000  # Default port, matches docker-compose container port
     WEB_CONCURRENCY: int = 4  # Increased from 1 to handle concurrent batch requests
 
     # Quart app.run() parameters
     DEBUG: bool = False
     HTTP_HOST: str = "0.0.0.0"
-    HTTP_PORT: int = 8001
+    HTTP_PORT: int = 8000
 
     @property
     def DATABASE_URL(self) -> str:
