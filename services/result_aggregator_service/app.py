@@ -26,10 +26,7 @@ from services.result_aggregator_service.di import (
     ServiceProvider,
 )
 from services.result_aggregator_service.kafka_consumer import ResultAggregatorKafkaConsumer
-from services.result_aggregator_service.startup_setup import (
-    initialize_tracing,
-    setup_metrics_endpoint,
-)
+from services.result_aggregator_service.startup_setup import initialize_tracing
 
 # Configure centralized structured logging before creating logger
 configure_service_logging("result_aggregator_service", log_level=settings.LOG_LEVEL)
@@ -71,9 +68,6 @@ def create_app() -> HuleEduApp:
     app.register_blueprint(health_bp)
     app.register_blueprint(query_bp)
 
-    # Setup metrics endpoint
-    setup_metrics_endpoint(app)
-
     return app
 
 
@@ -107,7 +101,6 @@ async def startup() -> None:
             "Result Aggregator Service started",
             host=settings.HOST,
             port=settings.PORT,
-            metrics_port=settings.METRICS_PORT,
         )
         logger.info("Kafka consumer: running")
     except Exception as e:

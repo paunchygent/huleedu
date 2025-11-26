@@ -68,7 +68,6 @@ class Settings(SecureServiceSettings):
     )
 
     # Observability Configuration
-    PROMETHEUS_PORT: int = 9090
     ENABLE_METRICS: bool = True
 
     # Testing Configuration

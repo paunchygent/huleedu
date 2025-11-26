@@ -91,9 +91,7 @@ services:
     networks:
       - huleedu_internal_network
     ports:
-      - "4003:4003"  # API port
-    expose:
-      - "9096"       # Metrics port (internal only)
+      - "4003:4003"  # API port (metrics at /metrics)
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=${ENVIRONMENT:-production}
@@ -107,7 +105,6 @@ services:
       - SERVICE_NAME=result_aggregator_service
       - HOST=0.0.0.0
       - PORT=4003
-      - METRICS_PORT=9096
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
       - OTEL_SERVICE_NAME=result_aggregator
       - OTEL_TRACES_EXPORTER=otlp

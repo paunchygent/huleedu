@@ -75,7 +75,6 @@ class Settings(SecureServiceSettings):
     )
 
     # Monitoring Configuration
-    METRICS_PORT: int = Field(default=9096)
     LOG_LEVEL: str = Field(default="INFO")
 
     # Performance Configuration

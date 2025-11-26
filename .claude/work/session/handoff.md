@@ -19,14 +19,13 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 
 ### Update (2025-11-26 - Simple port/metrics fixes applied)
 - Implemented the simpler plan (metrics on HTTP for most services; only RAS keeps dedicated port):
-  - Result Aggregator: Prometheus now scrapes the actual metrics listener on `9096` (internal only, via `expose`), fixing the “dark metrics” gap.
   - Identity: Switched env prefix to `IDENTITY_SERVICE_` with backward-compatible aliases for Redis/Kafka and DB host/port fallbacks; Dockerfile bind now uses `IDENTITY_SERVICE_HTTP_PORT`.
   - Email: Dockerfile bind now uses `EMAIL_SERVICE_HTTP_PORT` instead of a hard-coded port.
-  - Compose: Removed unused host metrics mappings for identity/email; RAS metrics no longer mapped to host, only exposed internally.
-- Next validation: re-run Prometheus targets page to confirm RAS is UP; sanity-check identity container picks up DB/Redis envs via new prefix.
+  - Compose: Removed unused host metrics mappings for identity/email.
 
 ### Update (2025-11-26 - Metrics target state)
-- Metrics model is now: API services expose `/metrics` on their HTTP port; Result Aggregator exposes metrics on internal port 9096; Kafka exporter runs on 9308 and is scraped by Prometheus. Host metrics ports are not mapped except exporters. All Prometheus targets are UP after Kafka health tuning.
+- Metrics model is now unified: ALL services expose `/metrics` on their HTTP port (including Result Aggregator on 4003). Kafka exporter runs on 9308 and is scraped by Prometheus. All Prometheus targets are UP.
+- RAS metrics unification: Removed dedicated metrics port 9096; removed unused PROMETHEUS_PORT from 4 other service configs; cleaned up dead code in startup_setup.py.
 
 ### Update (2025-11-25 - CJ shim cleanup)
 - Removed the deprecated `CJRepositoryProtocol` interface and deleted `implementations/db_access_impl.py`; code now exclusively uses per-aggregate repositories.

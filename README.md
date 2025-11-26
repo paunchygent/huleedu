@@ -232,7 +232,7 @@ Kafka consumer + HTTP dev API (port 8082) for transactional email delivery. Cons
 - **CJ Assessment**: 9095
 - **NLP Service**: Worker only (no HTTP)
 - **LLM Provider**: 8090
-- **Result Aggregator (RAS)**: 4003, 9096 (metrics)
+- **Result Aggregator (RAS)**: 4003
 - **API Gateway**: 8080
 - **WebSocket Service**: 8081
 - **Email Service**: 8082 (API), 9098 (metrics)

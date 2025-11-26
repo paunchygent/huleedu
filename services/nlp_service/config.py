@@ -59,9 +59,6 @@ class Settings(SecureServiceSettings):
         default="redis://localhost:6379", description="Redis URL for caching and distributed state"
     )
 
-    # Metrics Configuration
-    PROMETHEUS_PORT: int = 9099
-
     # Outbox Pattern Configuration
     OUTBOX_POLLING_INTERVAL: int = Field(default=5, description="Seconds between outbox polls")
     OUTBOX_BATCH_SIZE: int = Field(default=100, description="Max events per relay batch")

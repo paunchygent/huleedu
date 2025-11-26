@@ -2,7 +2,7 @@
 
 ## Service Identity
 
-- **Port**: 4003 (API), 9096 (metrics)
+- **Port**: 4003 (API + metrics at /metrics)
 - **Purpose**: Event aggregation, publishing, and materialized view layer
 - **Pattern**: Event aggregation with transactional outbox and notification projection
 - **Stack**: HuleEduApp, PostgreSQL, Kafka consumer + publisher, Redis cache

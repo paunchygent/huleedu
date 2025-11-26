@@ -189,9 +189,9 @@ pdm run dc-up result_aggregator_service
 # Check logs
 pdm run dc-logs-service result_aggregator_service
 
-# Verify health
+# Verify health and metrics
 curl http://localhost:4003/healthz
-curl http://localhost:9096/metrics
+curl http://localhost:4003/metrics
 ```
 
 ## Conclusion

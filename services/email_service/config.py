@@ -49,9 +49,6 @@ class Settings(SecureServiceSettings):
     # HTTP server port
     HTTP_PORT: int = 8080
 
-    # Prometheus metrics port
-    PROMETHEUS_PORT: int = 9102
-
     # Database Connection Pool Settings (following established patterns)
     DATABASE_POOL_SIZE: int = 5
     DATABASE_MAX_OVERFLOW: int = 10
