@@ -33,6 +33,11 @@ Per-aggregate repositories are now the only supported path; the shim adds dead c
 - Deprecated MockDatabase removed; unit tests rely on session_provider/repo mocks.
 - Targeted pytest suites pass; typecheck-all/lint/format are clean.
 
+## Status (2025-11-25 post-merge)
+
+- Shim removed: `CJRepositoryProtocol`, `implementations/db_access_impl.py`, and legacy `MockDatabase` helpers are gone from the tree (searches return zero hits).
+- Typecheck/format/lint gates are clean; remaining open work is to re-run the Docker-backed CJ workflow tests to confirm no regressions, then flip `status` to `done`.
+
 ## Related
 - TASKS/assessment/cj-db-per-aggregate-repository-refactor.md
 - services/cj_assessment_service/tests/integration/REAL_DATABASE_TESTING_GUIDE.md

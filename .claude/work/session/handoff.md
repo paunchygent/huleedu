@@ -23,6 +23,12 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 ### Update (2025-11-25 - Admin prompt upload tests)
 - Fixed admin student prompt upload unit tests by updating `AdminRepositoryMock.session()` to yield an `AsyncMock` session with `commit`/`rollback`/`flush` so the new `session.commit()` call in `api/admin/student_prompts.py` no longer raises `AttributeError`. Command executed: `pdm run pytest-root services/cj_assessment_service/tests/unit/test_admin_prompt_endpoints.py -k 'prompt_upload_success' -v` (2 passed, 7 deselected).
 
+### Update (2025-11-25 - CJ/LPS doc sync post-merge)
+- Rule 020.7 refreshed: core components now list per-aggregate repositories (batch/essay/comparison/instruction/anchor/grade_projection), note that `worker_main.py` is removed, and added a critical reminder that `CJSessionProviderImpl.session()` never auto-commits (all writers must `await session.commit()`).
+- Rule 020.13 rewritten to match the current queue-only design: `/api/v1/comparison` always returns 202 with `LLMQueuedResponse`; no HTTP polling endpoints; callbacks deliver `LLMComparisonResultV1` with `prompt_sha256` and request metadata echoed.
+- `services/llm_provider_service/README.md` rewritten to reflect the 202+Kafka callback contract, prompt-cache-only policy (no response caching), updated env vars, and a callback-based integration example.
+- Task docs updated with status notes: `cj-db-per-aggregate-repository-refactor` and `remove-cjrepositoryprotocol-shim-and-deprecated-mocks` both note that code is merged/clean, pending Docker-backed test reruns before flipping to `done`.
+
 ### Session Summary (2025-11-25 - CJ Assessment Refactor & Test Debugging)
 
 **Starting Point**: 29 failed tests, 661 passed

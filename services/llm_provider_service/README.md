@@ -1,109 +1,110 @@
 # LLM Provider Service
 
-Centralized LLM provider abstraction and management service for HuleEdu platform.
+Centralized LLM provider abstraction and **queue-first** gateway for CJ Assessment and other HuleEdu workloads.
 
 ## Overview
 
-Centralized LLM provider abstraction with queue-based resilience, model manifest management, and NO response caching (preserves psychometric validity).
+- Asynchronous only: `POST /api/v1/comparison` always returns **202 + queue_id**; results are delivered via Kafka to the caller-supplied `callback_topic` as `LLMComparisonResultV1` envelopes.
+- Resilient queueing: Redis-backed queue with automatic fallback to an in-process local queue plus optional `serial_bundle` draining for efficiency.
+- Manifest-driven provider/model selection with structured output enforcement and prompt hashing (`prompt_sha256`) for replay/analytics.
+- Prompt caching only (provider-side prompt reuse); **response caching is forbidden** to protect psychometric validity.
+- Circuit breakers, OpenTelemetry tracing, and token/cost metrics on every request.
 
 ## Key Features
 
-- **Multi-Provider Support**: Anthropic, OpenAI, Google, OpenRouter with manifest-based model selection
-- **Queue Resilience**: Redis → Local queue fallback with 200/202 response pattern
-- **Circuit Breaker Protection**: Automatic provider failure detection and recovery
-- **Model Manifest**: Centralized single source of truth for all model versions
-- **NO Caching**: Fresh LLM responses for every request (psychometric validity)
-- **Cost Tracking**: Token usage and cost estimation per request
-- **OpenTelemetry**: Full distributed tracing across queue operations
+- **Callback delivery**: Results published to Kafka `callback_topic` (supplied per request); no HTTP polling endpoints.
+- **Queue resilience**: Redis → Local fallback with circuit-breaker-aware queue admission and `serial_bundle` mode for compatible requests.
+- **Prompt metadata integrity**: Provider implementations compute and echo `prompt_sha256` into callbacks; caller `metadata` is preserved verbatim with additive timing/usage fields.
+- **Model manifest**: `model_manifest.py` is the single source of truth; callers should resolve models via manifest helpers before sending overrides.
+- **Observability**: Prometheus metrics for queue depth/wait time, prompt-cache usage, serial-bundle counts, and callback outcomes; full OTEL traces.
 
-## Architecture
+## Architecture (at a glance)
 
-```
-┌─────────────────────┐
-│   API Gateway       │
-└──────────┬──────────┘
-           │ HTTP
-┌──────────▼──────────┐     ┌─────────────┐
-│  LLM Provider       │────▶│    Redis    │
-│    Service          │     │   (Cache)   │
-└──────────┬──────────┘     └─────────────┘
-           │
-           ├─────────────┐
-           │             │
-     ┌─────▼───┐   ┌─────▼───┐
-     │Anthropic│   │ OpenAI  │  ...
-     └─────────┘   └─────────┘
-```
+- Quart API: `/api/v1/comparison`, `/providers`, `/providers/{provider}/test`, `/healthz`, `/metrics`.
+- Queue Processor drains Redis/local queues and invokes provider implementations (Anthropic, OpenAI, Google, OpenRouter, Mock) via orchestrator.
+- Callback Publisher emits `EventEnvelope[LLMComparisonResultV1]` to the request's `callback_topic`; queue entries are removed on publish.
+- Shared connection pools + prompt-cache utilities; no response cache is ever used.
 
 ## API Endpoints
 
-### Core Endpoints
+- `POST /api/v1/comparison` — Enqueue comparison, requires `callback_topic`; returns `LLMQueuedResponse` (202).
+- `GET /api/v1/providers` — List configured providers and circuit breaker state.
+- `POST /api/v1/providers/{provider}/test` — Connectivity test for a specific provider.
+- `GET /healthz`, `GET /metrics` — Health and Prometheus metrics.
 
-- `POST /api/v1/comparison` - Generate LLM comparison for two essays
-- `GET /api/v1/providers` - List available providers and their status
-- `POST /api/v1/providers/{provider}/test` - Test provider connectivity
+## Response Contracts
 
-### Health & Monitoring
-
-- `GET /healthz` - Service health check with dependency status
-- `GET /metrics` - Prometheus metrics
-
-### Response Format (CJ Assessment Compatible)
-
-The service returns responses in a format compatible with CJ Assessment Service:
-
+### 202 Enqueue Response (`LLMQueuedResponse`)
 ```json
 {
-  "winner": "Essay A",         // or "Essay B"
-  "justification": "...",      // Reasoning for the choice
-  "confidence": 4.5,           // 1-5 scale
-  "provider": "anthropic",     // Actual provider used
-  "model": "claude-3-haiku",   // Actual model used
-  "cached": false,             // Whether from cache
-  "response_time_ms": 1500,    // Response time
-  "correlation_id": "...",     // Request correlation ID
-  "token_usage": {...},        // Token usage details
-  "cost_estimate": 0.002       // Estimated cost in USD
+  "queue_id": "uuid",
+  "status": "queued",
+  "message": "Request queued for processing. Result will be delivered via callback to topic: <topic>",
+  "estimated_wait_minutes": 1
 }
+```
 
-## Configuration
+### Kafka Callback (`LLMComparisonResultV1`)
+```json
+{
+  "request_id": "queue uuid",
+  "correlation_id": "uuid",
+  "winner": "essay_a",
+  "justification": "...",
+  "confidence": 4.3,
+  "provider": "anthropic",
+  "model": "claude-haiku-4-5-20251001",
+  "response_time_ms": 1234,
+  "token_usage": {"prompt_tokens": 900, "completion_tokens": 120, "total_tokens": 1020},
+  "cost_estimate": 0.0021,
+  "requested_at": "2025-11-25T00:00:00Z",
+  "completed_at": "2025-11-25T00:00:01Z",
+  "request_metadata": {
+    "essay_a_id": "...",
+    "essay_b_id": "...",
+    "prompt_sha256": "...",
+    "bos_batch_id": "..."
+  }
+}
+```
+Errors use the same envelope with `error_detail` set and winner/justification/confidence omitted.
 
-The service is configured via environment variables with the prefix `LLM_PROVIDER_SERVICE_`:
+## Configuration (env vars, prefix `LLM_PROVIDER_SERVICE_`)
 
 ```bash
-# Service Configuration
+# Service identity
 LLM_PROVIDER_SERVICE_PORT=8080
 LLM_PROVIDER_SERVICE_LOG_LEVEL=INFO
+LLM_PROVIDER_SERVICE_ENVIRONMENT=development
 
-# Provider API Keys
-LLM_PROVIDER_SERVICE_ANTHROPIC_API_KEY=sk-ant-...
-LLM_PROVIDER_SERVICE_OPENAI_API_KEY=sk-...
+# Core dependencies
+LLM_PROVIDER_SERVICE_REDIS_URL=redis://localhost:6379/0
+LLM_PROVIDER_SERVICE_KAFKA_BOOTSTRAP_SERVERS=localhost:9092
+
+# Queue + batching
+LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE=per_request      # per_request | serial_bundle | batch_api
+LLM_PROVIDER_SERVICE_SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL=8  # 1-64
+LLM_PROVIDER_SERVICE_BATCH_API_MODE=disabled                # disabled | nightly | opportunistic
+
+# Prompt caching (prompt blocks only, never responses)
+LLM_PROVIDER_SERVICE_ENABLE_PROMPT_CACHING=true
+LLM_PROVIDER_SERVICE_PROMPT_CACHE_TTL_SECONDS=3600
+LLM_PROVIDER_SERVICE_USE_EXTENDED_TTL_FOR_SERVICE_CONSTANTS=false
+
+# Providers
+LLM_PROVIDER_SERVICE_ANTHROPIC_API_KEY=...
+LLM_PROVIDER_SERVICE_OPENAI_API_KEY=...
 LLM_PROVIDER_SERVICE_GOOGLE_API_KEY=...
 LLM_PROVIDER_SERVICE_OPENROUTER_API_KEY=...
+LLM_PROVIDER_SERVICE_USE_MOCK_LLM=false
 
-# Circuit Breaker Settings
+# Circuit breakers
 LLM_PROVIDER_SERVICE_CIRCUIT_BREAKER_ENABLED=true
 LLM_PROVIDER_SERVICE_LLM_CIRCUIT_BREAKER_FAILURE_THRESHOLD=3
 LLM_PROVIDER_SERVICE_LLM_CIRCUIT_BREAKER_RECOVERY_TIMEOUT=120
-
-# Cache Configuration
-LLM_PROVIDER_SERVICE_LLM_CACHE_ENABLED=true
-LLM_PROVIDER_SERVICE_LLM_CACHE_TTL=3600
-
-# Model Family Tracking (for CLI model checker)
-LLM_PROVIDER_SERVICE_ACTIVE_MODEL_FAMILIES='{"anthropic":["claude-haiku","claude-sonnet"],"openai":["gpt-5","gpt-4.1","gpt-4o"],"google":["gemini-2.5-flash"]}'
 ```
 
-### Queue & batching configuration
-
-```bash
-# Queue / serial-bundle configuration
-LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE=per_request    # per_request | serial_bundle | batch_api
-LLM_PROVIDER_SERVICE_SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL=8
-LLM_PROVIDER_SERVICE_BATCH_API_MODE=disabled              # disabled | nightly | opportunistic
-```
-
-**Model Family Tracking**: Configure which model families trigger actionable alerts (exit code 4) in the model checker CLI. New models in tracked families are prioritized for testing and manifest updates, while untracked families are shown as informational only (exit code 5). Use JSON format with lowercase provider names as keys.
+**Model family tracking**: Configure `LLM_PROVIDER_SERVICE_ACTIVE_MODEL_FAMILIES='{"anthropic":["claude-haiku","claude-sonnet"],...}'` to drive the model checker CLI exit codes.
 
 ### Queue Processing Mode
 
@@ -169,11 +170,11 @@ can correlate rollouts with Redis/local backlog changes.
 # Install dependencies
 pdm install
 
-# Run service locally
+# Run service locally (hot reload)
 pdm run dev
 
-# Run tests
-pdm run test
+# Run tests for this service
+pdm run pytest-root services/llm_provider_service/tests
 ```
 
 ### Docker Build
@@ -188,49 +189,50 @@ docker run -p 8080:8080 llm-provider-service
 
 ## Integration
 
-### Request Format
-
-The service expects requests with the following structure:
+### Request Format (LLMComparisonRequest)
 
 ```json
 {
-  "user_prompt": "Compare these two essays...",
-  "essay_a": "First essay content...",
-  "essay_b": "Second essay content...",
+  "user_prompt": "Full comparison prompt (essays embedded)",
+  "prompt_blocks": [ { "role": "system", "content": "..." }, { "role": "user", "content": "..." } ],
+  "callback_topic": "huleedu.llm_provider.comparison_result.v1",
   "llm_config_overrides": {
-    "provider_override": "anthropic",        // Required: no default
-    "model_override": "claude-3-haiku",      // Optional
-    "temperature_override": 0.1,             // Optional
-    "system_prompt_override": "...",         // Optional
-    "max_tokens_override": 1000              // Optional
+    "provider_override": "anthropic",      // Required
+    "model_override": "claude-haiku-4-5-20251001",
+    "temperature_override": 0.1,
+    "system_prompt_override": "..."
   },
-  "correlation_id": "uuid-string",           // Optional
-  "metadata": {}                             // Optional
+  "correlation_id": "uuid-string",         // Optional
+  "user_id": "optional-user-id",
+  "metadata": { "essay_a_id": "...", "essay_b_id": "...", "bos_batch_id": "..." }
 }
 ```
 
-> **Prompt hash source of truth**: The queue processor appends `prompt_sha256` to every callback—success and error alike. Downstream consumers (CJ Assessment, ENG5 runner, analytics scripts) must treat this hash as authoritative and avoid recomputing prompt digests locally to prevent checksum drift.
+> **Prompt hash source of truth**: The queue processor appends `prompt_sha256` to every callback—success and error alike. Downstream consumers must treat this hash as authoritative and avoid recomputing prompt digests locally.
 
-### Integration Example (CJ Assessment Service)
+### Integration Example (enqueue + consume callback)
 
 ```python
-# HTTP client call to LLM Provider Service
-async with session.post(
-    "http://llm-provider-service:8090/api/v1/comparison",
-    json={
-        "user_prompt": "Compare these two essays",
-        "essay_a": essay_a_content,
-        "essay_b": essay_b_content,
-        "llm_config_overrides": {
-            "provider_override": "anthropic",  # Required
-            "model_override": "claude-haiku-4-5-20251001",
-            "temperature_override": 0.1,
-        },
-        "correlation_id": str(correlation_id),
-    }
-) as response:
-    result = await response.json()
-    # result contains: winner, justification, confidence (1-5 scale)
+from common_core import LLMComparisonRequest
+from common_core.events.llm_provider_events import LLMComparisonResultV1
+
+payload = LLMComparisonRequest(
+    user_prompt=rendered_prompt,
+    prompt_blocks=prompt_blocks,
+    callback_topic="huleedu.llm_provider.comparison_result.v1",
+    llm_config_overrides=overrides,
+    metadata={"essay_a_id": essay_a_id, "essay_b_id": essay_b_id},
+)
+
+resp = await http_client.post("http://llm-provider-service:8080/api/v1/comparison", json=payload.model_dump())
+assert resp.status == 202
+queue_id = (await resp.json())["queue_id"]
+
+async for envelope in kafka_consumer:  # subscribed to callback_topic
+    result = LLMComparisonResultV1.model_validate(envelope.data)
+    if result.request_id == str(queue_id):
+        handle_result(result)
+        break
 ```
 
 ## Model Manifest

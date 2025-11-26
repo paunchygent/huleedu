@@ -39,6 +39,12 @@ Currently, `db_access_impl.py` hosts a large `PostgreSQLCJRepositoryImpl` implem
   - Test individual aggregates or workflows in isolation.
   - Evolve the CJ design towards stricter DDD and per-aggregate repositories.
 
+## Status (2025-11-25 post-merge)
+
+- Per-aggregate repositories are merged and production code no longer imports `CJRepositoryProtocol` or `db_access_impl.py`.
+- Remaining work to close the task: re-run the 5 workflow integration tests and 2 prompt-context unit tests that are currently blocked in this environment (Docker-backed Postgres) to confirm the new commit/metadata sequencing; once they pass, flip `status` to `done`.
+- Session provider still does not auto-commit—callers must `await session.commit()` before exiting the context manager; keep this invariant in future PRs.
+
 The service already has:
 
 - A clear DB schema (`models_db.py`) with aggregates like `CJBatchUpload`, `CJBatchState`, `ProcessedEssay`, `ComparisonPair`, `AssessmentInstruction`, `AnchorEssayReference`, `GradeProjection`.
