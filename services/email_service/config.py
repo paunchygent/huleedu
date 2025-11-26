@@ -46,8 +46,11 @@ class Settings(SecureServiceSettings):
     # Mock provider settings (for testing)
     MOCK_PROVIDER_FAILURE_RATE: float = 0.0  # Default 0% for deterministic tests
 
-    # Metrics port (inherited from SecureServiceSettings but can override)
-    METRICS_PORT: int = 8080
+    # HTTP server port
+    HTTP_PORT: int = 8080
+
+    # Prometheus metrics port
+    PROMETHEUS_PORT: int = 9102
 
     # Database Connection Pool Settings (following established patterns)
     DATABASE_POOL_SIZE: int = 5

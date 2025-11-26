@@ -197,7 +197,7 @@ if __name__ == "__main__":
 
     # Configure Hypercorn
     config = Config()
-    config.bind = [f"0.0.0.0:{settings.METRICS_PORT}"]
+    config.bind = [f"0.0.0.0:{settings.HTTP_PORT}"]
     config.loglevel = settings.LOG_LEVEL.lower()
 
     # Run with Hypercorn

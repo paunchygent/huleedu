@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 from uuid import uuid4
 
 import pytest
@@ -55,18 +55,22 @@ class TestBatchRetryProcessor:
         return AsyncMock(spec=LLMInteractionProtocol)
 
     @pytest.fixture
-    def mock_pool_manager(self) -> AsyncMock:
+    def mock_pool_manager(self) -> MagicMock:
         """Create mock pool manager."""
         from services.cj_assessment_service.cj_core_logic.batch_pool_manager import (
             BatchPoolManager,
         )
 
-        return AsyncMock(spec=BatchPoolManager)
+        manager = MagicMock(spec=BatchPoolManager)
+        manager.form_retry_batch = AsyncMock()
+        return manager
 
     @pytest.fixture
-    def mock_batch_submitter(self) -> AsyncMock:
+    def mock_batch_submitter(self) -> MagicMock:
         """Create mock batch submitter protocol."""
-        return AsyncMock(spec=BatchProcessorProtocol)
+        submitter = MagicMock(spec=BatchProcessorProtocol)
+        submitter.submit_comparison_batch = AsyncMock()
+        return submitter
 
     @pytest.fixture
     def retry_processor(
@@ -74,8 +78,8 @@ class TestBatchRetryProcessor:
         mock_session_provider: MockSessionProvider,
         mock_llm_interaction: AsyncMock,
         mock_settings: Settings,
-        mock_pool_manager: AsyncMock,
-        mock_batch_submitter: AsyncMock,
+        mock_pool_manager: MagicMock,
+        mock_batch_submitter: MagicMock,
     ) -> BatchRetryProcessor:
         """Create BatchRetryProcessor instance for testing."""
         return BatchRetryProcessor(

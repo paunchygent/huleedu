@@ -3,7 +3,7 @@ from __future__ import annotations
 from common_core.config_enums import Environment
 from dotenv import find_dotenv, load_dotenv
 from huleedu_service_libs.config import SecureServiceSettings
-from pydantic import Field, SecretStr
+from pydantic import AliasChoices, Field, SecretStr
 from pydantic_settings import SettingsConfigDict
 
 # Load .env file from repository root
@@ -11,7 +11,7 @@ load_dotenv(find_dotenv(".env"))
 
 
 class Settings(SecureServiceSettings):
-    model_config = SettingsConfigDict(env_prefix="IDENTITY_", extra="ignore")
+    model_config = SettingsConfigDict(env_prefix="IDENTITY_SERVICE_", extra="ignore")
 
     # Service identity
     SERVICE_NAME: str = "identity_service"
@@ -24,8 +24,16 @@ class Settings(SecureServiceSettings):
     )
 
     # Redis / Kafka
-    REDIS_URL: str = Field(default="redis://localhost:6379/0")
-    KAFKA_BOOTSTRAP_SERVERS: str = Field(default="localhost:9092")
+    REDIS_URL: str = Field(
+        default="redis://localhost:6379/0",
+        validation_alias=AliasChoices("IDENTITY_SERVICE_REDIS_URL", "IDENTITY_REDIS_URL"),
+    )
+    KAFKA_BOOTSTRAP_SERVERS: str = Field(
+        default="localhost:9092",
+        validation_alias=AliasChoices(
+            "IDENTITY_SERVICE_KAFKA_BOOTSTRAP_SERVERS", "IDENTITY_KAFKA_BOOTSTRAP_SERVERS"
+        ),
+    )
 
     # JWT configuration
     JWT_DEV_SECRET: SecretStr = Field(
@@ -88,8 +96,14 @@ class Settings(SecureServiceSettings):
 
         env_type = os.getenv("ENV_TYPE", "development").lower()
         if env_type == "docker":
-            dev_host = os.getenv("IDENTITY_SERVICE_DB_HOST", "identity_db")
-            dev_port_str = os.getenv("IDENTITY_SERVICE_DB_PORT", "5432")
+            dev_host = (
+                os.getenv("IDENTITY_SERVICE_DB_HOST")
+                or os.getenv("IDENTITY_DB_HOST")
+                or "identity_db"
+            )
+            dev_port_str = (
+                os.getenv("IDENTITY_SERVICE_DB_PORT") or os.getenv("IDENTITY_DB_PORT") or "5432"
+            )
         else:
             dev_host = "localhost"
             dev_port_str = "5442"

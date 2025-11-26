@@ -61,7 +61,12 @@ scrape_configs:
     
   - job_name: 'result_aggregator_service'
     static_configs:
-      - targets: ['result_aggregator_service:4003']
+      - targets: ['result_aggregator_service:9096']
+    metrics_path: '/metrics'
+
+  - job_name: 'identity_service'
+    static_configs:
+      - targets: ['identity_service:7005']
     metrics_path: '/metrics'
     
   - job_name: 'batch_conductor_service'

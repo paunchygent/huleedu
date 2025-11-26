@@ -195,9 +195,9 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list"]
       interval: 15s
-      timeout: 10s
-      retries: 5
-      start_period: 45s
+      timeout: 20s
+      retries: 10
+      start_period: 120s
 
   # PostgreSQL database for Result Aggregator Service
 

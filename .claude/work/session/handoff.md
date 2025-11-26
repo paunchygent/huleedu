@@ -14,6 +14,20 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 
 ## 🎯 ACTIVE WORK (2025-11-25)
 
+### Update (2025-11-26 - Port config plan review)
+- Reviewed the proposed Docker port standardization plan; found architectural gaps: most services expose metrics on HTTP ports while Result Aggregator uses a separate metrics server, so moving Prometheus to 911x ports would 404 without adding per-service metrics servers; Dockerfiles hard-bind HTTP ports (e.g., identity 7005, email 8080), so renaming PORT→HTTP_PORT won’t change runtime binds; proposed rule id `046` conflicts with existing `046-docker-container-debugging`. Open questions recorded in `.claude/archive/code-reviews/docker-port-configuration-standardization-plan_2025_11_26.md`.
+
+### Update (2025-11-26 - Simple port/metrics fixes applied)
+- Implemented the simpler plan (metrics on HTTP for most services; only RAS keeps dedicated port):
+  - Result Aggregator: Prometheus now scrapes the actual metrics listener on `9096` (internal only, via `expose`), fixing the “dark metrics” gap.
+  - Identity: Switched env prefix to `IDENTITY_SERVICE_` with backward-compatible aliases for Redis/Kafka and DB host/port fallbacks; Dockerfile bind now uses `IDENTITY_SERVICE_HTTP_PORT`.
+  - Email: Dockerfile bind now uses `EMAIL_SERVICE_HTTP_PORT` instead of a hard-coded port.
+  - Compose: Removed unused host metrics mappings for identity/email; RAS metrics no longer mapped to host, only exposed internally.
+- Next validation: re-run Prometheus targets page to confirm RAS is UP; sanity-check identity container picks up DB/Redis envs via new prefix.
+
+### Update (2025-11-26 - Metrics target state)
+- Metrics model is now: API services expose `/metrics` on their HTTP port; Result Aggregator exposes metrics on internal port 9096; Kafka exporter runs on 9308 and is scraped by Prometheus. Host metrics ports are not mapped except exporters. All Prometheus targets are UP after Kafka health tuning.
+
 ### Update (2025-11-25 - CJ shim cleanup)
 - Removed the deprecated `CJRepositoryProtocol` interface and deleted `implementations/db_access_impl.py`; code now exclusively uses per-aggregate repositories.
 - Replaced legacy `MockDatabase` usage with `MockSessionProvider` + per-aggregate repo mocks in unit tests (`test_cj_idempotency_failures`, `test_event_processor_prompt_context`) and dropped `deprecated_mocks.py`.

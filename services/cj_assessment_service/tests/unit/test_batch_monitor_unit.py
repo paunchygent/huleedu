@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, Mock
 from uuid import uuid4
 
 import pytest
@@ -36,11 +36,9 @@ class TestBatchMonitorRecoveryStrategy:
     """Test BatchMonitor recovery strategy behavior."""
 
     @pytest.fixture
-    def mock_session_provider(self) -> AsyncMock:
+    def mock_session_provider(self) -> MagicMock:
         """Create mock session provider with database session."""
-        from unittest.mock import Mock
-
-        session_provider = AsyncMock(spec=SessionProviderProtocol)
+        session_provider = MagicMock(spec=SessionProviderProtocol)
 
         # Create a proper async context manager that actually works
         class MockAsyncContextManager:
@@ -155,7 +153,7 @@ class TestBatchMonitorRecoveryStrategy:
     async def test_recovery_strategy_high_progress_forces_scoring(
         self,
         batch_monitor: BatchMonitor,
-        mock_session_provider: AsyncMock,
+        mock_session_provider: MagicMock,
         mock_batch_repository: AsyncMock,
         sample_batch_upload: CJBatchUpload,
     ) -> None:
@@ -198,7 +196,7 @@ class TestBatchMonitorRecoveryStrategy:
     async def test_recovery_strategy_low_progress_marks_failed(
         self,
         batch_monitor: BatchMonitor,
-        mock_session_provider: AsyncMock,
+        mock_session_provider: MagicMock,
         mock_batch_repository: AsyncMock,
         mock_event_publisher: AsyncMock,
         sample_batch_upload: CJBatchUpload,
@@ -252,7 +250,7 @@ class TestBatchMonitorRecoveryStrategy:
     async def test_progress_calculation_with_zero_total(
         self,
         batch_monitor: BatchMonitor,
-        mock_session_provider: AsyncMock,
+        mock_session_provider: MagicMock,
         mock_batch_repository: AsyncMock,
         sample_batch_upload: CJBatchUpload,
     ) -> None:
@@ -287,7 +285,7 @@ class TestBatchMonitorRecoveryStrategy:
     async def test_progress_calculation_exactly_eighty_percent(
         self,
         batch_monitor: BatchMonitor,
-        mock_session_provider: AsyncMock,
+        mock_session_provider: MagicMock,
         mock_batch_repository: AsyncMock,
         sample_batch_upload: CJBatchUpload,
     ) -> None:
@@ -320,7 +318,7 @@ class TestBatchMonitorRecoveryStrategy:
     async def test_system_metadata_generation_for_failure_event(
         self,
         batch_monitor: BatchMonitor,
-        mock_session_provider: AsyncMock,
+        mock_session_provider: MagicMock,
         mock_batch_repository: AsyncMock,
         mock_event_publisher: AsyncMock,
         sample_batch_upload: CJBatchUpload,
@@ -363,7 +361,7 @@ class TestBatchMonitorRecoveryStrategy:
     async def test_batch_state_last_activity_update(
         self,
         batch_monitor: BatchMonitor,
-        mock_session_provider: AsyncMock,
+        mock_session_provider: MagicMock,
         mock_batch_repository: AsyncMock,
         sample_batch_upload: CJBatchUpload,
     ) -> None:

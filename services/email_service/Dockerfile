@@ -16,4 +16,4 @@ FROM base AS production
 COPY --chown=appuser:appuser services/email_service/ /app/services/email_service/
 USER appuser
 WORKDIR /app
-CMD ["pdm", "run", "-p", "/app", "python", "-m", "hypercorn", "services.email_service.app:app", "--bind", "0.0.0.0:8080"]
+CMD ["sh", "-c", "pdm run -p /app python -m hypercorn services.email_service.app:app --bind 0.0.0.0:${EMAIL_SERVICE_HTTP_PORT:-8080}"]
