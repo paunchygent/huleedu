@@ -227,7 +227,18 @@ class TestCJLPSMetadataRoundtrip:
                             )
 
                             # 8. Verify no unexpected metadata pollution
-                            expected_keys = set(sent_metadata.keys()) | {"prompt_sha256"}
+                            # Allow LPS to append diagnostic/cache metadata without polluting
+                            # CJ fields
+                            allowed_lps_keys = {
+                                "prompt_sha256",
+                                "resolved_provider",
+                                "queue_processing_mode",
+                                "usage",
+                                "cache_read_input_tokens",
+                                "cache_creation_input_tokens",
+                            }
+
+                            expected_keys = set(sent_metadata.keys()) | allowed_lps_keys
                             actual_keys = set(req_metadata.keys())
                             unexpected_keys = actual_keys - expected_keys
                             assert not unexpected_keys, (

@@ -73,8 +73,10 @@ class Settings(SecureServiceSettings):
     PORT: int = 8080
     HOST: str = "0.0.0.0"
 
-    # Testing Configuration
+    # Testing / Mock Configuration
     USE_MOCK_LLM: bool = False  # Enable mock LLM for testing (no API calls)
+    ALLOW_MOCK_PROVIDER: bool = True  # Always register mock provider alongside real providers
+    MOCK_PROVIDER_SEED: int = 42  # Deterministic seed for mock provider outputs
 
     # HuleEdu Service Libs Integration
     REDIS_URL: str = Field(

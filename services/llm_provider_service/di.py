@@ -358,13 +358,18 @@ class LLMProviderServiceProvider(Provider):
         circuit_breaker_registry: CircuitBreakerRegistry,
     ) -> Dict[LLMProviderType, LLMProviderProtocol]:
         """Provide dictionary of available LLM providers with optimized connection pools."""
-        # Use mock provider for testing if enabled
-        if settings.USE_MOCK_LLM:
+        mock_provider = None
+        if settings.ALLOW_MOCK_PROVIDER or settings.USE_MOCK_LLM:
             from services.llm_provider_service.implementations.mock_provider_impl import (
                 MockProviderImpl,
             )
 
-            mock_provider = MockProviderImpl(settings=settings, seed=42)
+            mock_provider = MockProviderImpl(
+                settings=settings, seed=getattr(settings, "MOCK_PROVIDER_SEED", 42)
+            )
+
+        # Full mock mode: replace all providers with the mock implementation
+        if settings.USE_MOCK_LLM and mock_provider is not None:
             return {
                 LLMProviderType.MOCK: mock_provider,
                 LLMProviderType.ANTHROPIC: mock_provider,
@@ -375,7 +380,7 @@ class LLMProviderServiceProvider(Provider):
 
         # Build providers map by calling the individual async provider methods
         # This ensures each provider gets its own optimized connection pool
-        return {
+        provider_map: Dict[LLMProviderType, LLMProviderProtocol] = {
             LLMProviderType.ANTHROPIC: await self.provide_anthropic_provider(
                 pool_manager, settings, retry_manager, circuit_breaker_registry
             ),
@@ -389,6 +394,12 @@ class LLMProviderServiceProvider(Provider):
                 pool_manager, settings, retry_manager, circuit_breaker_registry
             ),
         }
+
+        # Optional mock provider: available for callers even when real providers are enabled
+        if mock_provider is not None:
+            provider_map[LLMProviderType.MOCK] = mock_provider
+
+        return provider_map
 
     @provide(scope=Scope.APP)
     def provide_comparison_processor(

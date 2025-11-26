@@ -68,6 +68,11 @@ async def health_check(
     }
     health_status["providers"] = providers
     health_status["mock_mode"] = settings.USE_MOCK_LLM
+    health_status["mock_provider"] = {
+        "allowed": settings.ALLOW_MOCK_PROVIDER,
+        "registered": settings.ALLOW_MOCK_PROVIDER or settings.USE_MOCK_LLM,
+        "seed": settings.MOCK_PROVIDER_SEED if settings.ALLOW_MOCK_PROVIDER else None,
+    }
 
     # Check if at least one provider is configured
     any_provider_configured = any(p["enabled"] and p["configured"] for p in providers.values())
