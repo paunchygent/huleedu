@@ -70,43 +70,39 @@ for their abstraction level (see Rule 070/075).
 
 ### Prerequisites
 
-1. **Docker Services Running**: Ensure all services are up and healthy
-
+1. **Bring up the dev stack (single path; no functional profile)**  
+   Uses the standard dev compose + overrides already used for day-to-day work.
    ```bash
-   docker-compose up -d
+   pdm run dev-build-start          # build (cached) + start all dev services
+   # or, if already built:
+   pdm run dev-start
    ```
+   - Source `.env` for CLI access: `source .env`
+   - Uses dev images with hot-reload mounts; no additional compose profiles
 
-2. **Dependencies Installed**: Install testing dependencies
-
+2. **Dependencies Installed**  
    ```bash
    pdm install -G monorepo-tools
    ```
 
 ### Running Tests
 
-#### **All Functional Tests**
-
-```bash
-pdm run test-all tests/functional/ -v
-```
-
-#### **Service Health Only**
-
-```bash
-pdm run test-all tests/functional/test_service_health.py -v
-```
-
-#### **Specific Test**
-
-```bash
-pdm run test-all tests/functional/test_service_health.py::TestServiceHealth::test_all_services_health_endpoints -s
-```
-
-#### **With Live Output**
-
-```bash
-pdm run test-all tests/functional/ -s -v
-```
+- **All functional tests (docker-marked, skip slow)**  
+  ```bash
+  pdm run pytest-root tests/functional -m "docker and not slow"
+  ```
+- **Service health only**  
+  ```bash
+  pdm run pytest-root tests/functional/test_service_health.py -m docker
+  ```
+- **Specific test**  
+  ```bash
+  pdm run pytest-root tests/functional/test_service_health.py::TestServiceHealth::test_all_services_healthy -m docker -s
+  ```
+- **Tear down stack**  
+  ```bash
+  pdm run dev-stop
+  ```
 
 ### Test Output Example
 
@@ -151,6 +147,15 @@ service_urls = {
 }
 ```
 
+### **Environment Variables (dev defaults)**
+
+- `JWT_SECRET` (shared by AGW/Identity; from `.env`)
+- `HULEEDU_DB_USER`, `HULEEDU_DB_PASSWORD`, `HULEEDU_DB_HOST` (Postgres in dev compose)
+- `KAFKA_BOOTSTRAP_SERVERS` (dev compose exposes `localhost:9093`)
+- `REDIS_URL` (dev compose exposes `redis://localhost:6379`)
+- `INTERNAL_API_KEY` (service-to-service auth; from `.env`)
+- Always `source .env` in your shell before running functional tests so CLI helpers match the running stack.
+
 ## Technology Stack
 
 - **Test Runner**: pytest with pytest-asyncio
@@ -192,9 +197,11 @@ async def test_service_functionality(self):
 
 ### **Phase 1** (Immediate)
 
+- [x] Enforce: timeouts >60s must be explicitly marked `@pytest.mark.slow`
 - [ ] Expand metrics validation coverage
 - [ ] Add container integration tests with DockerComposeManager
 - [ ] Add test data fixtures for common scenarios
+- [ ] Consolidate overlapping functional flows (pipeline happy-path variants, identity threading/email flows, duplicate NLP/pipeline combinations)
 
 ### **Phase 2** (Short-term)
 

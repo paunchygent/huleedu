@@ -77,6 +77,23 @@ class Settings(SecureServiceSettings):
     USE_MOCK_LLM: bool = False  # Enable mock LLM for testing (no API calls)
     ALLOW_MOCK_PROVIDER: bool = True  # Always register mock provider alongside real providers
     MOCK_PROVIDER_SEED: int = 42  # Deterministic seed for mock provider outputs
+    MOCK_LATENCY_MS: int = 0  # Base artificial latency in ms
+    MOCK_LATENCY_JITTER_MS: int = 0  # Additional random latency in ms
+    MOCK_ERROR_RATE: float = 0.0  # Probability of simulated provider failure (0-1)
+    MOCK_ERROR_CODES: list[int] = Field(
+        default_factory=lambda: [429, 503, 500],
+        description="HTTP-like error codes to sample when simulating failures",
+    )
+    MOCK_ERROR_BURST_RATE: float = 0.0  # Probability of starting a short error burst
+    MOCK_ERROR_BURST_LENGTH: int = 0  # Length of burst (requests) when triggered
+    MOCK_CACHE_ENABLED: bool = True
+    MOCK_CACHE_HIT_RATE: float = 0.0  # Probability of cache hit for identical prompt hash
+    MOCK_TOKENIZER: str = "simple"  # simple | tiktoken
+    MOCK_TOKENS_PER_WORD: float = 0.75  # used when tokenizer unavailable
+    MOCK_OUTCOME_MODE: str = "heuristic"  # heuristic | fixed
+    MOCK_CONFIDENCE_BASE: float = 4.5  # 1-5 scale
+    MOCK_CONFIDENCE_JITTER: float = 0.3  # additive jitter around base
+    MOCK_STREAMING_METADATA: bool = False
 
     # HuleEdu Service Libs Integration
     REDIS_URL: str = Field(
@@ -298,6 +315,28 @@ class Settings(SecureServiceSettings):
         """Ensure response recording is only enabled in development."""
         if v and info.data.get("ENVIRONMENT", "development") != "development":
             raise ValueError("Response recording only allowed in development environment")
+        return v
+
+    @field_validator("MOCK_ERROR_RATE", "MOCK_CACHE_HIT_RATE", "MOCK_ERROR_BURST_RATE")
+    @classmethod
+    def validate_probability(cls, v: float) -> float:
+        """Clamp probability fields to [0, 1]."""
+        if not 0.0 <= v <= 1.0:
+            raise ValueError("probability values must be between 0 and 1")
+        return v
+
+    @field_validator("MOCK_CONFIDENCE_BASE")
+    @classmethod
+    def validate_confidence_base(cls, v: float) -> float:
+        if not 1.0 <= v <= 5.0:
+            raise ValueError("MOCK_CONFIDENCE_BASE must be between 1 and 5")
+        return v
+
+    @field_validator("MOCK_CONFIDENCE_JITTER")
+    @classmethod
+    def validate_confidence_jitter(cls, v: float) -> float:
+        if v < 0:
+            raise ValueError("MOCK_CONFIDENCE_JITTER must be non-negative")
         return v
 
     @field_validator("ACTIVE_MODEL_FAMILIES", mode="before")

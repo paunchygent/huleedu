@@ -79,17 +79,12 @@ async def register_batch(
         metrics = current_app.extensions.get("metrics", {})
         pipeline_execution_metric = metrics.get("pipeline_execution_total")
         if pipeline_execution_metric:
-            # Track pipeline execution requests - pipelines are determined by enable_cj_assessment
-            pipelines = ["spellcheck"]
-            if validated_data.enable_cj_assessment:
-                pipelines.append("cj_assessment")
-
-            for pipeline in pipelines:
-                pipeline_execution_metric.labels(
-                    pipeline_type=pipeline,
-                    outcome=ProcessingStatus.PENDING.value,
-                    batch_id=str(batch_id),
-                ).inc()
+            # Registration no longer determines pipelines; track registration-only metric entry.
+            pipeline_execution_metric.labels(
+                pipeline_type="registration",
+                outcome=ProcessingStatus.PENDING.value,
+                batch_id=str(batch_id),
+            ).inc()
 
         return jsonify(
             {"batch_id": batch_id, "correlation_id": str(correlation_id), "status": "registered"},
@@ -145,7 +140,6 @@ async def get_batch_status(
             "batch_context": {
                 "course_code": batch_context.course_code,
                 "expected_essay_count": batch_context.expected_essay_count,
-                "enable_cj_assessment": batch_context.enable_cj_assessment,
                 "user_id": batch_context.user_id,
             },
             "pipeline_state": pipeline_state.model_dump(mode="json") if pipeline_state else {},

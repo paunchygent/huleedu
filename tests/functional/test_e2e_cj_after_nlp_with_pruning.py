@@ -33,7 +33,7 @@ logger = get_logger(__name__)
 @pytest.mark.e2e
 @pytest.mark.functional
 @pytest.mark.asyncio
-@pytest.mark.timeout(300)  # 5 minute timeout for complete multi-pipeline execution
+@pytest.mark.timeout(120)  # 5 minute timeout for complete multi-pipeline execution
 async def test_e2e_cj_assessment_after_nlp_with_spellcheck_pruning() -> None:
     """
     Test CJ Assessment pipeline execution after NLP pipeline with proper phase pruning.

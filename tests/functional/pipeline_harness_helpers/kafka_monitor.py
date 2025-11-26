@@ -207,7 +207,7 @@ class KafkaMonitorHelper:
                                             f"not initiated in this pipeline execution"
                                         )
 
-                            # Check for phase skipped/pruned events
+                            # Check for phase skipped/pruned events (current contract)
                             elif "phase.skipped" in event_type:
                                 phase_name = event_data.get("phase_name")
                                 storage_id = event_data.get("storage_id")
@@ -218,7 +218,8 @@ class KafkaMonitorHelper:
                                     tracker.reused_storage_ids[phase_name] = storage_id
                                 logger.info(f"⏭️ Phase {phase_name} SKIPPED (reason: {skip_reason})")
 
-                            # Legacy phase reuse detection (remove once phase.skipped events work)
+                            # Legacy phase reuse detection
+                            # (kept for backward compat; prefer phase.skipped)
                             elif "phase.reused" in event_type:
                                 phase_name = event_data.get("phase_name")
                                 storage_id = event_data.get("storage_id")
@@ -226,7 +227,8 @@ class KafkaMonitorHelper:
                                 if storage_id:
                                     tracker.reused_storage_ids[phase_name] = storage_id
                                 logger.info(
-                                    f"⏭️ Phase {phase_name} pruned (reusing existing results)"
+                                    f"⏭️ Phase {phase_name} pruned "
+                                    f"(reusing existing results - legacy)"
                                 )
 
                             # Capture compatibility or dependency resolution failures for assertions

@@ -100,6 +100,7 @@ async def upload_batch_files(
         )
 
         tasks = []
+        added_files: list[dict[str, str]] = []
         for file_storage in uploaded_files:
             if file_storage and file_storage.filename:
                 file_content = file_storage.read()
@@ -113,6 +114,11 @@ async def upload_batch_files(
                     filename=file_storage.filename,
                     file_size_bytes=len(file_content),
                     correlation_id=main_correlation_id,
+                )
+
+                # Track for downstream event publication
+                added_files.append(
+                    {"file_upload_id": file_upload_id, "filename": file_storage.filename}
                 )
 
                 # Pass all required injected dependencies to process_single_file_upload
@@ -143,6 +149,22 @@ async def upload_batch_files(
 
         for task in tasks:
             task.add_done_callback(_handle_task_result)
+
+        # Publish BatchFileAddedV1 events for successfully queued files
+        for file_info in added_files:
+            try:
+                event_data = BatchFileAddedV1(
+                    batch_id=batch_id,
+                    file_upload_id=file_info["file_upload_id"],
+                    filename=file_info["filename"],
+                    user_id=user_id,
+                )
+                await event_publisher.publish_batch_file_added_v1(event_data, main_correlation_id)
+            except Exception as e:
+                logger.error(
+                    f"Error publishing BatchFileAddedV1 event: {e}",
+                    exc_info=True,
+                )
 
         return jsonify(
             {

@@ -10,7 +10,7 @@ owner_team: "agents"
 owner: ""
 program: ""
 created: "2025-09-05"
-last_updated: "2025-11-17"
+last_updated: "2025-11-26"
 related: []
 labels: []
 ---
@@ -112,7 +112,7 @@ Phase 1 — Non‑breaking Additions (greenfield alongside existing)
     - POST <http://localhost:8080/v1/batches/register>
     - Remove user_id from body (AGW injects via Authorization)
     - Provide Authorization: Bearer <jwt>, and X-Correlation-ID
-    - Support optional class_id and enable_cj_assessment
+- Support optional class_id
   - Enhance AuthTestManager:
     - create_individual_user() (no org claim)
     - create_org_user(org_id=...)
@@ -177,7 +177,7 @@ Checkpoints
 tests/utils/service_test_manager.py
 
 - Add ServiceEndpoint("api_gateway_service", 8080, has_http_api=True, has_metrics=True)
-- Add async create_batch_via_agw(expected_essay_count, course_code, user, correlation_id, enable_cj_assessment, class_id=None):
+- Add async create_batch_via_agw(expected_essay_count, course_code, user, correlation_id, class_id=None):
   - Build client-facing model (no identity fields) per AGW batch_routes ClientBatchRegistrationRequest
   - Set Authorization header from AuthTestManager; include X-Correlation-ID
   - POST to <http://localhost:8080/v1/batches/register>; expect 202 with batch_id and correlation_id

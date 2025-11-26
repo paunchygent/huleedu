@@ -65,11 +65,6 @@ class BatchRegistrationRequestV1(BaseModel):
         ),
     )
 
-    # CJ Assessment pipeline parameters
-    enable_cj_assessment: bool = Field(
-        default=False,
-        description="Whether to include CJ assessment in the processing pipeline.",
-    )
     cj_default_llm_model: str | None = Field(
         default=None, description="Default LLM model for CJ assessment (e.g., 'gpt-4o-mini')."
     )

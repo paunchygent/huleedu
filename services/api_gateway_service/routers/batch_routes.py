@@ -79,7 +79,6 @@ class ClientBatchRegistrationRequest(BaseModel):
     course_code: CourseCode
     student_prompt_ref: StorageReferenceMetadata | None = None
     class_id: str | None = None
-    enable_cj_assessment: bool = False
     cj_default_llm_model: str | None = None
     cj_default_temperature: float | None = Field(default=None, ge=0.0, le=2.0)
 
@@ -114,7 +113,6 @@ async def register_batch(
             user_id=user_id,
             org_id=org_id,
             class_id=registration_request.class_id,
-            enable_cj_assessment=registration_request.enable_cj_assessment,
             cj_default_llm_model=registration_request.cj_default_llm_model,
             cj_default_temperature=registration_request.cj_default_temperature,
         )

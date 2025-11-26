@@ -122,13 +122,12 @@ class TestPipelineFailureHandling:
         batch_id = str(uuid4())
         correlation_id = uuid4()
 
-        # Setup batch context with CJ assessment enabled
+        # Setup batch context; pipeline choice is made at request time, not registration
         batch_context = BatchRegistrationRequestV1(
             expected_essay_count=2,
             course_code=CourseCode.SV3,
             student_prompt_ref=make_prompt_ref("prompt-failure-phase"),
             user_id="user_123",
-            enable_cj_assessment=True,
         )
         batch_repository.batch_contexts[batch_id] = batch_context
 
@@ -172,13 +171,12 @@ class TestPipelineFailureHandling:
         batch_id = str(uuid4())
         correlation_id = uuid4()
 
-        # Setup batch context with CJ assessment enabled
+        # Setup batch context; pipeline choice is made at request time, not registration
         batch_context = BatchRegistrationRequestV1(
             expected_essay_count=3,
             course_code=CourseCode.SV2,
             student_prompt_ref=make_prompt_ref("prompt-failure-partial"),
             user_id="user_123",
-            enable_cj_assessment=True,
         )
         batch_repository.batch_contexts[batch_id] = batch_context
 
@@ -238,13 +236,12 @@ class TestPipelineFailureHandling:
         batch_id = str(uuid4())
         correlation_id = uuid4()
 
-        # Setup batch context for CJ assessment
+        # Setup batch context; pipeline choice is made at request time, not registration
         batch_context = BatchRegistrationRequestV1(
             expected_essay_count=5,
             course_code=CourseCode.ENG7,
             student_prompt_ref=make_prompt_ref("prompt-failure-analysis"),
             user_id="user_456",
-            enable_cj_assessment=True,
         )
         batch_repository.batch_contexts[batch_id] = batch_context
 

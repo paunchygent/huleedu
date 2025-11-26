@@ -5,16 +5,22 @@ This includes diagnostic fixtures for deep testing of distributed system state
 and session-level resource management for optimal performance.
 """
 
+import asyncio
 import logging
 import os
 from typing import AsyncGenerator
 
+import aiohttp
 import pytest
 import redis.asyncio as aioredis
 from huleedu_service_libs.logging_utils import (
     configure_service_logging,
     create_service_logger,
 )
+
+from tests.functional.comprehensive_pipeline_utils import PIPELINE_TOPICS
+from tests.utils.kafka_test_manager import KafkaTestManager, create_kafka_test_config
+from tests.utils.service_test_manager import ServiceTestManager
 
 # Configure structlog once for the functional test session
 # Avoid duplicate log output under pytest by removing any handler
@@ -32,9 +38,99 @@ for _h in list(_root.handlers):
 
 logger = create_service_logger("test.functional.conftest")
 
+READINESS_TIMEOUT_SECONDS = int(os.getenv("FUNCTIONAL_READINESS_TIMEOUT", "60"))
+READINESS_RETRY_SECONDS = int(os.getenv("FUNCTIONAL_READINESS_RETRY", "3"))
+REDIS_URL = os.getenv("FUNCTIONAL_REDIS_URL", "redis://localhost:6379")
+
+# Aggregate topics that functional tests commonly touch (pipeline + entitlements + student matching)
+_DEFAULT_KAFKA_TOPICS: set[str] = set(create_kafka_test_config().topics.values()) | set(
+    PIPELINE_TOPICS.values()
+)
+_DEFAULT_KAFKA_TOPICS.update(
+    {
+        "huleedu.entitlements.credit.balance.changed.v1",
+        "huleedu.entitlements.usage.recorded.v1",
+        "huleedu.batch.student.matching.initiate.command.v1",
+        "huleedu.batch.student.matching.requested.v1",
+        "huleedu.batch.author.matches.suggested.v1",
+        "huleedu.class.student.associations.confirmed.v1",
+        "huleedu.batch.pipeline.compatibility_failed.v1",
+    }
+)
+
 
 # NOTE: The clean_distributed_state fixture has been removed in favor of explicit cleanup calls
 # Tests now use distributed_state_manager.quick_redis_cleanup() directly for better control
+
+
+@pytest.fixture(scope="session", autouse=True)
+async def ensure_services_ready() -> AsyncGenerator[None, None]:
+    """
+    Wait for core services to report healthy before running functional tests.
+
+    Uses ServiceTestManager to validate /healthz endpoints with bounded retries.
+    Skips the suite with a clear message if the functional stack is not ready.
+    """
+    manager = ServiceTestManager()
+    deadline = asyncio.get_event_loop().time() + READINESS_TIMEOUT_SECONDS
+    last_error: Exception | None = None
+
+    while asyncio.get_event_loop().time() < deadline:
+        try:
+            await manager.get_validated_endpoints(force_revalidation=True)
+            logger.info("✅ Functional stack healthy, starting tests")
+            break
+        except Exception as exc:  # noqa: BLE001 - broad to capture readiness failures
+            last_error = exc
+            await asyncio.sleep(READINESS_RETRY_SECONDS)
+    else:
+        pytest.skip(f"Functional stack not ready after {READINESS_TIMEOUT_SECONDS}s: {last_error}")
+
+    try:
+        yield
+    finally:
+        logger.info("🏁 Functional stack readiness check complete")
+
+
+@pytest.fixture(scope="session", autouse=True)
+async def ensure_kafka_topics() -> AsyncGenerator[None, None]:
+    """
+    Pre-create Kafka topics to avoid UnknownTopicOrPartition errors during functional runs.
+    """
+    manager = KafkaTestManager()
+    topics = sorted(_DEFAULT_KAFKA_TOPICS)
+    await manager.ensure_topics(topics, num_partitions=3)
+    logger.info("📡 Kafka topics ensured for functional suite")
+    yield
+
+
+async def _delete_prefixed_keys(client: aioredis.Redis, prefixes: list[str]) -> None:
+    """Delete keys matching the provided prefix patterns."""
+    for prefix in prefixes:
+        keys = await client.keys(prefix)
+        if keys:
+            await client.delete(*keys)
+            logger.info(f"🧹 Cleared {len(keys)} Redis keys with prefix '{prefix}'")
+
+
+@pytest.fixture(scope="session", autouse=True)
+async def cleanup_redis_test_keys() -> AsyncGenerator[None, None]:
+    """
+    Ensure test-prefixed Redis keys do not leak between runs.
+    """
+    client = aioredis.from_url(
+        REDIS_URL,
+        decode_responses=True,
+        socket_connect_timeout=5,
+        socket_timeout=5,
+    )
+    try:
+        await _delete_prefixed_keys(client, ["test:*", "ws:*"])
+        yield
+        await _delete_prefixed_keys(client, ["test:*", "ws:*"])
+    finally:
+        await client.aclose()
+        logger.info("🔌 Redis test client disconnected")
 
 
 @pytest.fixture
@@ -84,3 +180,10 @@ async def cleanup_session_resources():
         logger.warning(f"⚠️ Session cleanup error: {e}")
 
     logger.info("✅ Session cleanup completed")
+
+
+@pytest.fixture
+async def http_session() -> AsyncGenerator[aiohttp.ClientSession, None]:
+    """Provide an aiohttp ClientSession for functional tests."""
+    async with aiohttp.ClientSession() as session:
+        yield session

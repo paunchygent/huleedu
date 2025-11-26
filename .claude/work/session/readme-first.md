@@ -282,3 +282,9 @@ For Docker/database troubleshooting, see `CLAUDE.md` sections on Docker Developm
 - Callback simulator now builds comparison pairs and correlation mappings directly via the shared `SessionProviderProtocol`, fully dropping the legacy `CJRepositoryProtocol` dependency from that helper.
 - Additional unit/integration suites (`test_llm_callback_processing`, `test_event_processor_*`, `test_comparison_processing`, `test_workflow_continuation`, `test_cj_idempotency_failures`) have been updated to pass the new session_provider + repo keywords instead of the deprecated `database=` argument.
 - Fixed the remaining typecheck blockers for workflow_continuation/callback_state_manager tests, wired the identity-threading fixture and integration suites to the reshaped session_provider/repo APIs, and reran `pdm run typecheck-all` (now reports zero errors).
+
+## Session Addendum (2025-11-26)
+
+- CJ pipeline selection now relies solely on `ClientBatchPipelineRequestV1` resolution. BOS ignores the legacy registration flag (registration logs a deprecation warning and records registration-only metrics). Regression tests guard that requesting CJ after registering without the flag includes CJ, and requesting non-CJ pipelines while it was set does not add CJ.
+- Legacy flag removed from contracts (common_core), AGW/BOS code paths, and tests; pipeline selection is request-time only.
+- Doc cleanup: Removed lingering references to the deprecated flag from TASKS documentation; repository search currently returns zero matches.

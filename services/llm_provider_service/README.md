@@ -101,8 +101,39 @@ LLM_PROVIDER_SERVICE_ALLOW_MOCK_PROVIDER=true
 LLM_PROVIDER_SERVICE_MOCK_PROVIDER_SEED=42
 # Full mock mode (replaces all providers with mock)
 LLM_PROVIDER_SERVICE_USE_MOCK_LLM=false
+# Mock realism toggles (optional; defaults are zero/no-op for CI)
+LLM_PROVIDER_SERVICE_MOCK_LATENCY_MS=0
+LLM_PROVIDER_SERVICE_MOCK_LATENCY_JITTER_MS=0
+LLM_PROVIDER_SERVICE_MOCK_ERROR_RATE=0.0
+LLM_PROVIDER_SERVICE_MOCK_ERROR_CODES="429,503,500"
+LLM_PROVIDER_SERVICE_MOCK_CACHE_ENABLED=true
+LLM_PROVIDER_SERVICE_MOCK_CACHE_HIT_RATE=0.0
+LLM_PROVIDER_SERVICE_MOCK_TOKENIZER=simple   # or tiktoken
+LLM_PROVIDER_SERVICE_MOCK_TOKENS_PER_WORD=0.75
+LLM_PROVIDER_SERVICE_MOCK_CONFIDENCE_BASE=4.5
+LLM_PROVIDER_SERVICE_MOCK_CONFIDENCE_JITTER=0.3
+LLM_PROVIDER_SERVICE_MOCK_STREAMING_METADATA=false
+
+### Example .env.local profile for realistic dev
+```bash
+LLM_PROVIDER_SERVICE_ALLOW_MOCK_PROVIDER=true
+LLM_PROVIDER_SERVICE_USE_MOCK_LLM=false
+LLM_PROVIDER_SERVICE_MOCK_PROVIDER_SEED=42
+LLM_PROVIDER_SERVICE_MOCK_LATENCY_MS=80
+LLM_PROVIDER_SERVICE_MOCK_LATENCY_JITTER_MS=40
+LLM_PROVIDER_SERVICE_MOCK_ERROR_RATE=0.02
+LLM_PROVIDER_SERVICE_MOCK_ERROR_CODES="429,503"
+LLM_PROVIDER_SERVICE_MOCK_CACHE_ENABLED=true
+LLM_PROVIDER_SERVICE_MOCK_CACHE_HIT_RATE=0.5
+LLM_PROVIDER_SERVICE_MOCK_TOKENIZER=simple
+LLM_PROVIDER_SERVICE_MOCK_TOKENS_PER_WORD=0.75
+LLM_PROVIDER_SERVICE_MOCK_CONFIDENCE_BASE=4.4
+LLM_PROVIDER_SERVICE_MOCK_CONFIDENCE_JITTER=0.3
+LLM_PROVIDER_SERVICE_MOCK_STREAMING_METADATA=false
+```
 
 # Circuit breakers
+```
 LLM_PROVIDER_SERVICE_CIRCUIT_BREAKER_ENABLED=true
 LLM_PROVIDER_SERVICE_LLM_CIRCUIT_BREAKER_FAILURE_THRESHOLD=3
 LLM_PROVIDER_SERVICE_LLM_CIRCUIT_BREAKER_RECOVERY_TIMEOUT=120
@@ -110,7 +141,7 @@ LLM_PROVIDER_SERVICE_LLM_CIRCUIT_BREAKER_RECOVERY_TIMEOUT=120
 
 **Model family tracking**: Configure `LLM_PROVIDER_SERVICE_ACTIVE_MODEL_FAMILIES='{"anthropic":["claude-haiku","claude-sonnet"],...}'` to drive the model checker CLI exit codes.
 
-### Queue Processing Mode
+## Queue Processing Mode
 
 `LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE` determines how dequeued requests flow
 through the comparison processor:
@@ -137,7 +168,7 @@ The queue processor logs `queue_processing_mode` for every dequeued request and 
 callback payload is identical in all modes, so you can safely flip the flag in
 development to validate future batching paths.
 
-### Serial bundle observability
+## Serial bundle observability
 
 When `LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE=serial_bundle` (or
 `provider_batch_api`) is enabled, the queue processor now emits dedicated metrics:
@@ -154,7 +185,7 @@ includes the queue depth, usage percentage, whether the queue is still accepting
 new requests, and (for serial bundles) the bundle size/provider metadata so you
 can correlate rollouts with Redis/local backlog changes.
 
-#### Rolling out `serial_bundle` safely (ENG5-first sketch)
+## Rolling out `serial_bundle` safely (ENG5-first sketch)
 
 - Start in **development** or ENG5-only environments by setting:
   - `LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE=serial_bundle`
@@ -475,7 +506,7 @@ If switching the default model, update environment variables:
 
 ```bash
 # .env or production secrets
-LLM_PROVIDER_SERVICE_ANTHROPIC_MODEL_ID=claude-3-5-sonnet-20250101
+LLM_PROVIDER_SERVICE_ANTHROPIC_MODEL_ID=claude-4-5-sonnet-20250101
 ```
 
 **Note**: The manifest takes precedence. Environment variables are only used for debugging/overrides.

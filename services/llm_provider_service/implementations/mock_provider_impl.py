@@ -1,6 +1,8 @@
 """Mock LLM provider implementation for testing."""
 
+import asyncio
 import hashlib
+import math
 import random
 from typing import Any
 from uuid import UUID
@@ -29,8 +31,7 @@ class MockProviderImpl(LLMProviderProtocol):
         """
         self.settings = settings
         self.performance_mode = performance_mode
-        if seed is not None:
-            random.seed(seed)
+        self.base_seed = seed if seed is not None else settings.MOCK_PROVIDER_SEED
 
     async def generate_comparison(
         self,
@@ -58,31 +59,131 @@ class MockProviderImpl(LLMProviderProtocol):
         Raises:
             HuleEduError: On simulated provider failures
         """
-        # Simulate occasional errors (5% chance) - skip in performance mode
-        if not self.performance_mode and random.random() < 0.05:
-            logger.warning("Mock provider simulating error")
-            raise_external_service_error(
-                service="llm_provider_service",
-                operation="mock_comparison_generation",
-                external_service="mock_provider",
-                message="Mock provider simulated error for testing",
-                correlation_id=correlation_id,
-                details={"provider": "mock", "error_simulation": True},
-            )
+        rng = self._rng(correlation_id)
+        resolved_model = model_override or "mock-model-v1"
 
-        # Build deterministic prompt hash for downstream auditing
+        await self._apply_latency(rng)
+        self._maybe_raise_error(rng, correlation_id, resolved_model)
+
         full_prompt = user_prompt
         prompt_sha256 = hashlib.sha256(full_prompt.encode("utf-8")).hexdigest()
 
-        # Randomly select winner with slight bias towards Essay B
-        winner = (
-            EssayComparisonWinner.ESSAY_A
-            if random.random() < 0.45
-            else EssayComparisonWinner.ESSAY_B
-        )
-        confidence = round(random.uniform(0.6, 0.95), 2)
+        winner = self._pick_winner(prompt_sha256)
+        confidence = self._pick_confidence(rng)
+        justification = self._pick_justification(winner, prompt_sha256)
 
-        # Generate realistic justification based on winner
+        prompt_tokens, completion_tokens = self._estimate_tokens(full_prompt, justification)
+        total_tokens = prompt_tokens + completion_tokens
+
+        usage = {
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "total_tokens": total_tokens,
+        }
+
+        cache_metadata = self._cache_metadata(rng, prompt_tokens)
+
+        metadata: dict[str, Any] = {
+            "prompt_sha256": prompt_sha256,
+            "resolved_provider": "mock",
+            "queue_processing_mode": self.settings.QUEUE_PROCESSING_MODE.value,
+            **cache_metadata,
+            "usage": usage,
+        }
+
+        if self.settings.MOCK_STREAMING_METADATA:
+            metadata["streaming_simulated"] = True
+
+        response = LLMProviderResponse(
+            winner=winner,
+            justification=justification,
+            confidence=confidence,
+            provider=LLMProviderType.MOCK,
+            model=model_override or "mock-model-v1",
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=total_tokens,
+            raw_response={
+                "mock_metadata": {
+                    "temperature": temperature_override or 0.7,
+                    "seed": self.base_seed,
+                }
+            },
+            metadata=metadata,
+        )
+
+        logger.debug(
+            "Mock provider generated response",
+            extra={
+                "winner": winner.value,
+                "confidence": confidence,
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "cache_hit": cache_metadata.get("cache_read_input_tokens", 0) > 0,
+            },
+        )
+        return response
+
+    def _rng(self, correlation_id: UUID) -> random.Random:
+        """Create a deterministic RNG per request based on seed + correlation ID."""
+        combined_seed = hash((self.base_seed, str(correlation_id))) & 0xFFFFFFFF
+        return random.Random(combined_seed)
+
+    async def _apply_latency(self, rng: random.Random) -> None:
+        base_ms = max(0, self.settings.MOCK_LATENCY_MS)
+        jitter_ms = max(0, self.settings.MOCK_LATENCY_JITTER_MS)
+        if base_ms == 0 and jitter_ms == 0:
+            return
+        delay_ms = base_ms + rng.uniform(0, jitter_ms)
+        await asyncio.sleep(delay_ms / 1000.0)
+
+    def _maybe_raise_error(self, rng: random.Random, correlation_id: UUID, model: str) -> None:
+        if self.performance_mode:
+            return
+
+        # Burst mode: if enabled, occasionally force a short run of failures
+        burst_len = max(0, self.settings.MOCK_ERROR_BURST_LENGTH)
+        if self.settings.MOCK_ERROR_BURST_RATE > 0 and burst_len > 0:
+            if rng.random() < self.settings.MOCK_ERROR_BURST_RATE:
+                self._raise_mock_error(rng, correlation_id, model)
+                return
+
+        if rng.random() < self.settings.MOCK_ERROR_RATE:
+            self._raise_mock_error(rng, correlation_id, model)
+
+    def _raise_mock_error(self, rng: random.Random, correlation_id: UUID, model: str) -> None:
+        codes = self.settings.MOCK_ERROR_CODES or [500]
+        code = rng.choice(codes)
+        logger.warning("Mock provider simulating error", extra={"code": code, "model": model})
+        raise_external_service_error(
+            service="llm_provider_service",
+            operation="mock_comparison_generation",
+            external_service="mock_provider",
+            message="Mock provider simulated error for testing",
+            correlation_id=correlation_id,
+            status_code=int(code),
+            details={
+                "provider": "mock",
+                "model": model,
+                "error_simulation": True,
+                "status_code": code,
+            },
+        )
+
+    def _pick_winner(self, prompt_sha256: str) -> EssayComparisonWinner:
+        value = int(prompt_sha256[:8], 16)
+        return EssayComparisonWinner.ESSAY_A if value % 2 == 0 else EssayComparisonWinner.ESSAY_B
+
+    def _pick_confidence(self, rng: random.Random) -> float:
+        base = self.settings.MOCK_CONFIDENCE_BASE
+        jitter = self.settings.MOCK_CONFIDENCE_JITTER
+        val = base + rng.uniform(-jitter, jitter)
+        # Confidence in callbacks is 1-5, but LLMProviderResponse expects 0-1
+        # Normalize to 0-1 scale to satisfy schema
+        normalized = val / 5.0
+        return float(min(1.0, max(0.0, round(normalized, 3))))
+
+    def _pick_justification(self, winner: EssayComparisonWinner, prompt_sha256: str) -> str:
         justification_options = {
             EssayComparisonWinner.ESSAY_A: [
                 "Essay A demonstrates stronger argumentation and clearer structure.",
@@ -100,34 +201,43 @@ class MockProviderImpl(LLMProviderProtocol):
             ],
         }
 
-        justification = random.choice(justification_options[winner])
+        options = justification_options[winner]
+        idx = int(prompt_sha256[8:12], 16) % len(options)
+        return options[idx]
 
-        # Calculate mock token usage (essays are now embedded in user_prompt)
-        prompt_tokens = len(user_prompt.split())
-        completion_tokens = len(justification.split()) + 10  # Add some for structure
-        total_tokens = prompt_tokens + completion_tokens
+    def _estimate_tokens(self, prompt: str, justification: str) -> tuple[int, int]:
+        tokenizer = self.settings.MOCK_TOKENIZER.lower()
+        if tokenizer == "tiktoken":
+            try:
+                import tiktoken  # type: ignore
 
-        metadata: dict[str, Any] = {"prompt_sha256": prompt_sha256}
+                enc = tiktoken.get_encoding("cl100k_base")
+                prompt_tokens = len(enc.encode(prompt))
+                completion_tokens = len(enc.encode(justification)) + 10
+                return prompt_tokens, completion_tokens
+            except Exception:
+                logger.debug("tiktoken unavailable, falling back to simple estimator")
 
-        response = LLMProviderResponse(
-            winner=winner,
-            justification=justification,
-            confidence=confidence,
-            provider=LLMProviderType.MOCK,
-            model=model_override or "mock-model-v1",
-            prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens,
-            total_tokens=total_tokens,
-            raw_response={
-                "mock_metadata": {
-                    "temperature": temperature_override or 0.7,
-                    "seed": random.getstate()[1][0] if hasattr(random, "getstate") else None,
-                }
-            },
-            metadata=metadata,
-        )
+        # Simple estimator: words * multiplier
+        def estimate(text: str) -> int:
+            words = max(1, len(text.split()))
+            return max(1, math.ceil(words * self.settings.MOCK_TOKENS_PER_WORD))
 
-        logger.debug(
-            f"Mock provider generated response: winner={winner.value}, confidence={confidence}"
-        )
-        return response
+        prompt_tokens = estimate(prompt)
+        completion_tokens = estimate(justification) + 10
+        return prompt_tokens, completion_tokens
+
+    def _cache_metadata(self, rng: random.Random, prompt_tokens: int) -> dict[str, Any]:
+        if not self.settings.MOCK_CACHE_ENABLED:
+            return {}
+
+        if rng.random() < self.settings.MOCK_CACHE_HIT_RATE:
+            return {
+                "cache_read_input_tokens": prompt_tokens,
+                "cache_creation_input_tokens": 0,
+            }
+
+        return {
+            "cache_read_input_tokens": 0,
+            "cache_creation_input_tokens": prompt_tokens,
+        }

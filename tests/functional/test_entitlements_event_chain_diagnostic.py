@@ -40,6 +40,7 @@ class TestEntitlementsEventChainDiagnostic:
 
     @pytest.mark.asyncio
     @pytest.mark.docker
+    @pytest.mark.slow
     @pytest.mark.timeout(120)
     async def test_entitlements_event_chain_isolated(self) -> None:
         """

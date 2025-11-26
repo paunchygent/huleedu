@@ -55,7 +55,6 @@ class _MockRepo(BatchRepositoryProtocol):
                 user_id=ctx.user_id,
                 org_id=ctx.org_id,
                 class_id=None,
-                enable_cj_assessment=True,
                 cj_default_llm_model=None,
                 cj_default_temperature=None,
             )

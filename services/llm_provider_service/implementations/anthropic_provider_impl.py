@@ -104,13 +104,14 @@ class AnthropicProviderImpl(LLMProviderProtocol):
             HuleEduError: On any failure to generate comparison
         """
         if not self.api_key:
+            resolved_model = model_override or self.settings.ANTHROPIC_DEFAULT_MODEL
             raise_configuration_error(
                 service="llm_provider_service",
                 operation="generate_comparison",
                 config_key="ANTHROPIC_API_KEY",
                 message="Anthropic API key not configured",
                 correlation_id=correlation_id,
-                details={"provider": "anthropic"},
+                details={"provider": "anthropic", "model": resolved_model},
             )
 
         # Use the complete prompt with essays already embedded
@@ -153,7 +154,7 @@ class AnthropicProviderImpl(LLMProviderProtocol):
             # Preserve existing structured error details from deeper layers
             raise
         except Exception as e:
-            error_details = self._build_error_details_from_exception(e)
+            error_details = self._build_error_details_from_exception(e, model_override)
             http_status = error_details.get("http_status")
             raise_external_service_error(
                 service="llm_provider_service",
@@ -167,14 +168,20 @@ class AnthropicProviderImpl(LLMProviderProtocol):
                 **error_details,
             )
 
-    def _build_error_details_from_exception(self, exc: Exception) -> dict[str, Any]:
+    def _build_error_details_from_exception(
+        self, exc: Exception, model: str | None = None
+    ) -> dict[str, Any]:
         """Construct Anthropic-specific error detail context from an exception.
 
         This enriches ErrorDetail.details for CJ-facing diagnostics without
         changing the high-level ErrorCode semantics (EXTERNAL_SERVICE_ERROR, etc.).
-        """
 
-        details: dict[str, Any] = {"provider": "anthropic"}
+        Args:
+            exc: The exception to build details from
+            model: The model being used (for metrics tracking)
+        """
+        resolved_model = model or self.settings.ANTHROPIC_DEFAULT_MODEL
+        details: dict[str, Any] = {"provider": "anthropic", "model": resolved_model}
         http_status: int = 0
         error_type = "unexpected"
         retryable = False
@@ -356,7 +363,7 @@ class AnthropicProviderImpl(LLMProviderProtocol):
                     field="prompt_blocks",
                     message="1h TTL block must precede 5m TTL blocks",
                     correlation_id=correlation_id,
-                    details={"provider": "anthropic", "block_index": idx},
+                    details={"provider": "anthropic", "model": model, "block_index": idx},
                 )
 
     def _record_ttl_violation(self, *, model: str, stage: str) -> None:
@@ -392,7 +399,7 @@ class AnthropicProviderImpl(LLMProviderProtocol):
                     field="prompt_blocks",
                     message="Constructed payload violates TTL ordering (1h after 5m)",
                     correlation_id=correlation_id,
-                    details={"provider": "anthropic", "block_index": idx},
+                    details={"provider": "anthropic", "model": model, "block_index": idx},
                 )
 
     def _build_message_content(
@@ -590,7 +597,7 @@ class AnthropicProviderImpl(LLMProviderProtocol):
                 parse_target="json",
                 message=f"Failed to parse Anthropic response: {str(e)}",
                 correlation_id=correlation_id,
-                details={"provider": "anthropic"},
+                details={"provider": "anthropic", "model": model},
             )
 
         # Log the structure for debugging
@@ -615,6 +622,7 @@ class AnthropicProviderImpl(LLMProviderProtocol):
                 correlation_id=correlation_id,
                 details={
                     "provider": "anthropic",
+                    "model": model,
                     "stop_reason": stop_reason,
                     "max_tokens": max_tokens,
                 },
@@ -695,7 +703,7 @@ class AnthropicProviderImpl(LLMProviderProtocol):
                     parse_target="tool_response",
                     message=error_msg,
                     correlation_id=correlation_id,
-                    details={"provider": "anthropic"},
+                    details={"provider": "anthropic", "model": model},
                 )
         else:
             # Log the full response for debugging
@@ -732,6 +740,7 @@ class AnthropicProviderImpl(LLMProviderProtocol):
                 correlation_id=correlation_id,
                 details={
                     "provider": "anthropic",
+                    "model": model,
                     "http_status": 200,
                     "error_type": "invalid_response",
                     "retryable": False,
@@ -874,5 +883,5 @@ class AnthropicProviderImpl(LLMProviderProtocol):
                 external_service="anthropic_api",
                 message=error_msg,
                 correlation_id=correlation_id,
-                details={"provider": "anthropic"},
+                details={"provider": "anthropic", "model": model},
             )

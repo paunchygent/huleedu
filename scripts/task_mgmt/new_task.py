@@ -42,11 +42,6 @@ def slugify(text: str) -> str:
     return text.lower().strip("-")
 
 
-def caps_filename(title: str) -> str:
-    s = re.sub(r"[^A-Za-z0-9]+", "_", title.strip()).strip("_")
-    return f"{s.upper()}.md"
-
-
 def build_path(domain: str, program: str | None, filename: str) -> Path:
     if program:
         return TASKS_DIR / "programmes" / program / filename
@@ -73,7 +68,15 @@ def main(argv: list[str]) -> int:
     args = p.parse_args(argv)
 
     today = dt.date.today().isoformat()
-    fn = args.filename or caps_filename(args.title)
+
+    if args.filename:
+        fn = args.filename
+        default_id = Path(fn).stem.lower()
+    else:
+        slug = slugify(args.title)
+        fn = f"{slug}.md"
+        default_id = slug
+
     dest = build_path(args.domain, args.program, fn)
 
     if dest.exists():
@@ -83,7 +86,7 @@ def main(argv: list[str]) -> int:
     dest.parent.mkdir(parents=True, exist_ok=True)
 
     fm_dict = {
-        "id": args.id or "",
+        "id": args.id or default_id,
         "title": args.title,
         "type": "task",
         "status": args.status,

@@ -41,7 +41,7 @@ logger = get_logger(__name__)
 @pytest.mark.e2e
 @pytest.mark.functional
 @pytest.mark.asyncio
-@pytest.mark.timeout(300)  # 5 minute timeout for complete pipeline with student matching
+@pytest.mark.timeout(120)  # 2 minute timeout for complete pipeline with student matching
 async def test_comprehensive_real_batch_with_student_matching() -> None:
     """
     Test complete Phase 2 pipeline with student matching using PipelineTestHarness.

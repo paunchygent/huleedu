@@ -177,42 +177,43 @@ async def create_multiple_test_batches(
 
 def get_pipeline_monitoring_topics() -> list[str]:
     """Get the standard list of topics for monitoring pipeline resolution."""
+    from common_core.event_enums import ProcessingEvent, topic_name
+
     return [
-        "huleedu.commands.batch.pipeline.v1",
-        "huleedu.els.spellcheck.initiate.command.v1",
-        "huleedu.batch.ai_feedback.initiate.command.v1",
-        "huleedu.batch.nlp.initiate.command.v2",
-        "huleedu.batch.cj_assessment.initiate.command.v1",
-        "huleedu.els.batch.phase.outcome.v1",
-        "huleedu.events.batch.initiate_command.v1",
+        topic_name(ProcessingEvent.CLIENT_BATCH_PIPELINE_REQUEST),
+        topic_name(ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND),
+        topic_name(ProcessingEvent.BATCH_AI_FEEDBACK_INITIATE_COMMAND),
+        topic_name(ProcessingEvent.BATCH_NLP_INITIATE_COMMAND_V2),
+        topic_name(ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND),
+        topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME),
     ]
 
 
 def get_state_aware_monitoring_topics() -> list[str]:
     """Get topics for state-aware pipeline monitoring."""
+    from common_core.event_enums import ProcessingEvent, topic_name
+
     return [
-        "huleedu.commands.batch.pipeline.v1",
-        "huleedu.els.spellcheck.initiate.command.v1",
-        "huleedu.batch.ai_feedback.initiate.command.v1",
-        "huleedu.batch.nlp.initiate.command.v2",
-        "huleedu.batch.cj_assessment.initiate.command.v1",
-        "huleedu.els.batch.phase.outcome.v1",
-        "huleedu.events.batch.initiate_command.v1",
+        topic_name(ProcessingEvent.CLIENT_BATCH_PIPELINE_REQUEST),
+        topic_name(ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND),
+        topic_name(ProcessingEvent.BATCH_AI_FEEDBACK_INITIATE_COMMAND),
+        topic_name(ProcessingEvent.BATCH_NLP_INITIATE_COMMAND_V2),
+        topic_name(ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND),
+        topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME),
     ]
 
 
 def get_concurrent_monitoring_topics() -> list[str]:
     """Get topics for concurrent pipeline monitoring."""
-    # Use set to ensure uniqueness
-    return list(
-        set(
-            [
-                "huleedu.commands.batch.pipeline.v1",
-                "huleedu.els.spellcheck.initiate.command.v1",
-                "huleedu.batch.ai_feedback.initiate.command.v1",
-                "huleedu.batch.nlp.initiate.command.v2",
-                "huleedu.batch.cj_assessment.initiate.command.v1",
-                "huleedu.els.batch.phase.outcome.v1",
-            ]
-        )
-    )
+    from common_core.event_enums import ProcessingEvent, topic_name
+
+    topics = {
+        topic_name(ProcessingEvent.CLIENT_BATCH_PIPELINE_REQUEST),
+        topic_name(ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND),
+        topic_name(ProcessingEvent.BATCH_AI_FEEDBACK_INITIATE_COMMAND),
+        topic_name(ProcessingEvent.BATCH_NLP_INITIATE_COMMAND_V2),
+        topic_name(ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND),
+        topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME),
+    }
+
+    return list(topics)

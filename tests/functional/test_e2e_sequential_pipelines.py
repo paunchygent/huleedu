@@ -228,7 +228,7 @@ async def test_e2e_sequential_pipelines_with_phase_pruning() -> None:
 @pytest.mark.e2e
 @pytest.mark.functional
 @pytest.mark.asyncio
-@pytest.mark.timeout(300)
+@pytest.mark.timeout(120)
 @pytest.mark.skipif(
     not os.getenv("ENABLE_AI_FEEDBACK_TESTS"),
     reason="AI Feedback phase not implemented - skipping until service exists",

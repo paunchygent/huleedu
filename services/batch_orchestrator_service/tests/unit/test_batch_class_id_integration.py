@@ -67,12 +67,10 @@ class TestClassIdIntegration:
             expected_essay_count=25,
             user_id="teacher_123",
             class_id="class_456",  # REGULAR batch
-            enable_cj_assessment=True,
         )
 
         assert request.class_id == "class_456"
         assert request.user_id == "teacher_123"
-        assert request.enable_cj_assessment is True
 
     def test_batch_registration_request_without_class_id(self) -> None:
         """Test BatchRegistrationRequestV1 model without class_id (GUEST batch)."""
@@ -88,7 +86,6 @@ class TestClassIdIntegration:
 
         assert request.class_id is None
         assert request.user_id == "guest_teacher_789"
-        assert request.enable_cj_assessment is False  # Default
 
     @pytest.mark.asyncio
     async def test_crud_create_batch_with_class_id(

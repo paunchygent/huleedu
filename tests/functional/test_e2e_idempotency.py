@@ -532,6 +532,7 @@ class TestControlledIdempotencyScenarios:
 
 @pytest.mark.e2e
 @pytest.mark.asyncio
+@pytest.mark.slow
 @pytest.mark.timeout(120)
 class TestE2EPipelineIdempotency:
     """End-to-end pipeline tests with idempotency validation."""

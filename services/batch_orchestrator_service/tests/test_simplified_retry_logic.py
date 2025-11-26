@@ -37,7 +37,6 @@ class TestSimplifiedRetryLogic:
             expected_essay_count=3,
             course_code=CourseCode.ENG6,
             user_id="user_retry_test",
-            enable_cj_assessment=True,
         )
 
     @pytest.fixture

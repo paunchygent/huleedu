@@ -216,7 +216,6 @@ class ServiceTestManager:
         course_code: CourseCode | str = CourseCode.ENG5,
         user: Optional[AuthTestUser] = None,
         correlation_id: str | None = None,
-        enable_cj_assessment: bool = False,
         class_id: str | None = None,
         essay_ids: list[str] | None = None,
         cj_default_llm_model: str | None = None,
@@ -273,7 +272,6 @@ class ServiceTestManager:
         payload: dict[str, Any] = {
             "expected_essay_count": expected_essay_count,
             "course_code": course_code_enum.value,
-            "enable_cj_assessment": enable_cj_assessment,
         }
         if prompt_ref is not None:
             payload["student_prompt_ref"] = serialize_prompt_ref(prompt_ref)
@@ -323,7 +321,6 @@ class ServiceTestManager:
         course_code: CourseCode | str = CourseCode.ENG5,
         user: Optional[AuthTestUser] = None,
         correlation_id: str | None = None,
-        enable_cj_assessment: bool = False,
         class_id: str | None = None,
         student_prompt_ref: StorageReferenceMetadata | None = None,
         attach_prompt: bool = True,
@@ -339,7 +336,6 @@ class ServiceTestManager:
             course_code: Course code for the batch
             user: Test user (uses default if None)
             correlation_id: Correlation ID for tracking
-            enable_cj_assessment: Enable CJ assessment for the batch
             class_id: Optional class ID (triggers REGULAR batch flow)
 
         Returns:
@@ -350,7 +346,6 @@ class ServiceTestManager:
             course_code=course_code,
             user=user,
             correlation_id=correlation_id,
-            enable_cj_assessment=enable_cj_assessment,
             class_id=class_id,
             student_prompt_ref=student_prompt_ref,
             attach_prompt=attach_prompt,
@@ -604,7 +599,6 @@ async def create_test_batch(
     course_code: CourseCode | str = CourseCode.ENG5,
     user: Optional[AuthTestUser] = None,
     correlation_id: str | None = None,
-    enable_cj_assessment: bool = False,
     class_id: str | None = None,
 ) -> tuple[str, str]:
     """Convenience function that uses global service manager."""
@@ -613,7 +607,6 @@ async def create_test_batch(
         course_code,
         user,
         correlation_id,
-        enable_cj_assessment,
         class_id,
     )
 

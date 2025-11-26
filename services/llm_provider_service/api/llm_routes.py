@@ -1,6 +1,5 @@
 """LLM provider API routes."""
 
-import time
 from uuid import uuid4
 
 from common_core import (
@@ -10,7 +9,6 @@ from common_core import (
     LLMQueuedResponse,
 )
 from dishka import FromDishka
-from huleedu_service_libs.error_handling.quart import create_error_response
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.resilience import CircuitBreakerError, CircuitBreakerRegistry
 from quart import Blueprint, Response, jsonify, request
@@ -45,7 +43,6 @@ async def generate_comparison(
 ) -> Response | tuple[Response, int]:
     """Generate essay comparison using configured LLM provider."""
     metrics = get_llm_metrics()
-    start_time = time.time()
 
     try:
         # Parse request first to get correlation_id
@@ -103,38 +100,18 @@ async def generate_comparison(
                 }
             )
 
-            # Call orchestrator
-            try:
-                result = await orchestrator.perform_comparison(
-                    provider=provider_override,
-                    user_prompt=comparison_request.user_prompt,
-                    prompt_blocks=comparison_request.prompt_blocks,
-                    correlation_id=correlation_id,
-                    model_override=model_override,
-                    temperature_override=temperature_override,
-                    system_prompt_override=system_prompt_override,
-                    callback_topic=comparison_request.callback_topic,
-                    request_metadata=comparison_request.metadata,
-                )
-            except HuleEduError as error:
-                # Track metrics for error
-                _duration_ms = int((time.time() - start_time) * 1000)
-                tracer.mark_span_error(error)
-
-                # Extract provider info for metrics
-                provider_for_metrics = provider_override or "unknown"
-                metrics["llm_requests_total"].labels(
-                    provider=provider_for_metrics,
-                    model=model_override or "default",
-                    request_type="comparison",
-                    status="failed",
-                ).inc()
-
-                logger.error(f"Comparison request failed: {str(error)}")
-
-                # Use service libraries error response factory
-                error_response, status_code = create_error_response(error.error_detail)
-                return jsonify(error_response), status_code
+            # Call orchestrator - HuleEduError handled by app-level error handler
+            result = await orchestrator.perform_comparison(
+                provider=provider_override,
+                user_prompt=comparison_request.user_prompt,
+                prompt_blocks=comparison_request.prompt_blocks,
+                correlation_id=correlation_id,
+                model_override=model_override,
+                temperature_override=temperature_override,
+                system_prompt_override=system_prompt_override,
+                callback_topic=comparison_request.callback_topic,
+                request_metadata=comparison_request.metadata,
+            )
 
             # Success - result should not be None
             if not result:
@@ -188,6 +165,9 @@ async def generate_comparison(
                 "details": str(e),
             }
         ), 503
+
+    except HuleEduError:
+        raise
 
     except Exception as e:
         logger.exception("Unexpected error in comparison endpoint")

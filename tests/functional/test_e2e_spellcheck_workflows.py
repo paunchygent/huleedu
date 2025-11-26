@@ -85,6 +85,7 @@ class TestE2ESpellcheckWorkflows:
     @pytest.mark.e2e
     @pytest.mark.docker
     @pytest.mark.asyncio
+    @pytest.mark.slow
     @pytest.mark.timeout(120)  # 2 minute timeout for complete spellcheck pipeline
     async def test_complete_spellcheck_processing_pipeline(
         self, kafka_producer_for_e2e: AIOKafkaProducer

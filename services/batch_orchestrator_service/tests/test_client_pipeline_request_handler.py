@@ -14,7 +14,12 @@ from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.client_commands import ClientBatchPipelineRequestV1, PipelinePromptPayload
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import StorageReferenceMetadata
-from common_core.pipeline_models import PhaseName, PipelineExecutionStatus
+from common_core.pipeline_models import (
+    PhaseName,
+    PipelineExecutionStatus,
+    PipelineStateDetail,
+    ProcessingPipelineState,
+)
 from common_core.status_enums import BatchStatus
 
 from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
@@ -75,7 +80,6 @@ async def test_handle_client_request_passes_prompt_metadata() -> None:
         user_id="teacher-42",
         org_id=None,
         class_id=None,
-        enable_cj_assessment=False,
     )
 
     bcs_client = AsyncMock()
@@ -167,7 +171,6 @@ async def test_handle_client_request_skips_when_pipeline_active() -> None:
         user_id="teacher-007",
         org_id=None,
         class_id=None,
-        enable_cj_assessment=False,
     )
 
     bcs_client = AsyncMock()
@@ -224,7 +227,6 @@ async def test_handle_client_request_prompt_from_assignment_id() -> None:
         user_id="teacher-99",
         org_id=None,
         class_id=None,
-        enable_cj_assessment=True,
     )
 
     bcs_client = AsyncMock()
@@ -293,7 +295,6 @@ async def test_handle_client_request_prompt_from_context() -> None:
         user_id="teacher-ctx",
         org_id=None,
         class_id=None,
-        enable_cj_assessment=True,
     )
 
     bcs_client = AsyncMock()
@@ -337,3 +338,146 @@ async def test_handle_client_request_prompt_from_context() -> None:
         == "context-storage-999"
     )
     batch_repo.store_batch_context.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_pipeline_request_adds_cj_based_on_request_only() -> None:
+    """CJ should be included when requested; registration is pipeline-agnostic."""
+    request_payload = ClientBatchPipelineRequestV1(
+        batch_id="batch-cj-request",
+        requested_pipeline=PhaseName.CJ_ASSESSMENT.value,
+        user_id="teacher-cj",
+        is_retry=False,
+    )
+
+    envelope = EventEnvelope[ClientBatchPipelineRequestV1](
+        event_type=topic_name(ProcessingEvent.CLIENT_BATCH_PIPELINE_REQUEST),
+        source_service="api_gateway_service",
+        correlation_id=uuid4(),
+        data=request_payload.model_dump(mode="json"),
+    )
+    message = _make_kafka_message(envelope)
+
+    registration_context = BatchRegistrationRequestV1(
+        expected_essay_count=2,
+        essay_ids=["essay-1", "essay-2"],
+        course_code=CourseCode.ENG5,
+        student_prompt_ref=None,
+        user_id="teacher-cj",
+        org_id=None,
+        class_id=None,
+    )
+
+    initial_state = ProcessingPipelineState(
+        batch_id="batch-cj-request",
+        requested_pipelines=["spellcheck"],
+        spellcheck=PipelineStateDetail(status=PipelineExecutionStatus.REQUESTED_BY_USER),
+        cj_assessment=PipelineStateDetail(status=PipelineExecutionStatus.SKIPPED_BY_USER_CONFIG),
+    )
+
+    bcs_client = AsyncMock()
+    bcs_client.resolve_pipeline.return_value = {
+        "final_pipeline": [PhaseName.SPELLCHECK.value, PhaseName.CJ_ASSESSMENT.value]
+    }
+
+    batch_repo = AsyncMock()
+    batch_repo.get_batch_context.return_value = registration_context
+    batch_repo.get_batch_by_id.return_value = {
+        "status": BatchStatus.READY_FOR_PIPELINE_EXECUTION.value
+    }
+    # First call: active pipeline check; second call: state update
+    batch_repo.get_processing_pipeline_state.side_effect = [initial_state, initial_state]
+    batch_repo.save_processing_pipeline_state = AsyncMock()
+
+    phase_coordinator = AsyncMock()
+    entitlements_client = AsyncMock()
+    credit_guard = AsyncMock()
+    credit_guard.evaluate.return_value = _StubCreditOutcome()
+
+    handler = ClientPipelineRequestHandler(
+        bcs_client=bcs_client,
+        batch_repo=batch_repo,
+        phase_coordinator=phase_coordinator,
+        entitlements_client=entitlements_client,
+        credit_guard=credit_guard,
+    )
+
+    await handler.handle_client_pipeline_request(message)
+
+    saved_state = batch_repo.save_processing_pipeline_state.await_args.args[1]
+    assert saved_state.requested_pipelines == [
+        PhaseName.SPELLCHECK.value,
+        PhaseName.CJ_ASSESSMENT.value,
+    ]
+    assert saved_state.cj_assessment.status == PipelineExecutionStatus.PENDING_DEPENDENCIES
+
+
+@pytest.mark.asyncio
+async def test_pipeline_request_skips_cj_when_not_requested() -> None:
+    """Only requested pipeline phases should be included."""
+    request_payload = ClientBatchPipelineRequestV1(
+        batch_id="batch-nlp-request",
+        requested_pipeline=PhaseName.NLP.value,
+        user_id="teacher-nlp",
+        is_retry=False,
+    )
+
+    envelope = EventEnvelope[ClientBatchPipelineRequestV1](
+        event_type=topic_name(ProcessingEvent.CLIENT_BATCH_PIPELINE_REQUEST),
+        source_service="api_gateway_service",
+        correlation_id=uuid4(),
+        data=request_payload.model_dump(mode="json"),
+    )
+    message = _make_kafka_message(envelope)
+
+    registration_context = BatchRegistrationRequestV1(
+        expected_essay_count=2,
+        essay_ids=["essay-1", "essay-2"],
+        course_code=CourseCode.SV1,
+        student_prompt_ref=None,
+        user_id="teacher-nlp",
+        org_id=None,
+        class_id=None,
+    )
+
+    initial_state = ProcessingPipelineState(
+        batch_id="batch-nlp-request",
+        requested_pipelines=["spellcheck"],
+        spellcheck=PipelineStateDetail(status=PipelineExecutionStatus.REQUESTED_BY_USER),
+        cj_assessment=PipelineStateDetail(status=PipelineExecutionStatus.SKIPPED_BY_USER_CONFIG),
+    )
+
+    bcs_client = AsyncMock()
+    bcs_client.resolve_pipeline.return_value = {
+        "final_pipeline": [PhaseName.SPELLCHECK.value, PhaseName.NLP.value]
+    }
+
+    batch_repo = AsyncMock()
+    batch_repo.get_batch_context.return_value = registration_context
+    batch_repo.get_batch_by_id.return_value = {
+        "status": BatchStatus.READY_FOR_PIPELINE_EXECUTION.value
+    }
+    batch_repo.get_processing_pipeline_state.side_effect = [initial_state, initial_state]
+    batch_repo.save_processing_pipeline_state = AsyncMock()
+
+    phase_coordinator = AsyncMock()
+    entitlements_client = AsyncMock()
+    credit_guard = AsyncMock()
+    credit_guard.evaluate.return_value = _StubCreditOutcome()
+
+    handler = ClientPipelineRequestHandler(
+        bcs_client=bcs_client,
+        batch_repo=batch_repo,
+        phase_coordinator=phase_coordinator,
+        entitlements_client=entitlements_client,
+        credit_guard=credit_guard,
+    )
+
+    await handler.handle_client_pipeline_request(message)
+
+    saved_state = batch_repo.save_processing_pipeline_state.await_args.args[1]
+    assert saved_state.requested_pipelines == [
+        PhaseName.SPELLCHECK.value,
+        PhaseName.NLP.value,
+    ]
+    assert saved_state.cj_assessment.status == PipelineExecutionStatus.SKIPPED_BY_USER_CONFIG

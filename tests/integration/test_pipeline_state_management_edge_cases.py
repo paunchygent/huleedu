@@ -124,13 +124,12 @@ class TestPipelineEdgeCases:
         batch_id = str(uuid4())
         correlation_id = str(uuid4())
 
-        # Setup batch context with CJ assessment enabled
+        # Setup batch context; pipeline choice is made at request time, not registration
         batch_context = BatchRegistrationRequestV1(
             expected_essay_count=2,
             course_code=CourseCode.SV1,
             student_prompt_ref=make_prompt_ref("prompt-edge-idempotent"),
             user_id="user_123",
-            enable_cj_assessment=True,
         )
         batch_repository.batch_contexts[batch_id] = batch_context
 
@@ -211,7 +210,6 @@ class TestPipelineEdgeCases:
             course_code=CourseCode.SV2,
             student_prompt_ref=make_prompt_ref("prompt-edge-missing-state"),
             user_id="user_123",
-            enable_cj_assessment=True,
         )
         batch_repository.batch_contexts[batch_id] = batch_context
 
@@ -242,7 +240,6 @@ class TestPipelineEdgeCases:
             course_code=CourseCode.ENG5,
             student_prompt_ref=make_prompt_ref("prompt-edge-single"),
             user_id="user_single",
-            enable_cj_assessment=False,  # CJ assessment requires multiple essays
         )
         batch_repository.batch_contexts[batch_id] = batch_context
 
@@ -286,7 +283,6 @@ class TestPipelineEdgeCases:
             course_code=CourseCode.SV1,
             student_prompt_ref=make_prompt_ref("prompt-edge-large"),
             user_id="user_large_batch",
-            enable_cj_assessment=True,
         )
         batch_repository.batch_contexts[batch_id] = batch_context
 

@@ -126,13 +126,13 @@ class TestPipelineProgressionScenarios:
         batch_id = str(uuid4())
         correlation_id = uuid4()
 
-        # Setup batch context with CJ assessment enabled
+        # Setup batch context; pipeline selection happens via resolved pipeline,
+        # not registration flag
         batch_context = BatchRegistrationRequestV1(
             expected_essay_count=3,
             course_code=CourseCode.SV1,
             student_prompt_ref=make_prompt_ref("prompt-progress-cj-enabled"),
             user_id="user_123",
-            enable_cj_assessment=True,  # Critical: CJ assessment enabled
         )
         batch_repository.batch_contexts[batch_id] = batch_context
 
@@ -188,7 +188,6 @@ class TestPipelineProgressionScenarios:
             course_code=CourseCode.ENG6,
             student_prompt_ref=make_prompt_ref("prompt-progress-disabled-cj"),
             user_id="user_456",
-            enable_cj_assessment=True,
         )
         batch_repository.batch_contexts[batch_id] = batch_context
 

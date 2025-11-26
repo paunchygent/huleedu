@@ -38,8 +38,7 @@ class BatchRegistrationRequestV1(BaseModel):
     # Class context
     class_id: str | None = None  # Required for REGULAR batches, None for GUEST
 
-    # CJ assessment configuration
-    enable_cj_assessment: bool = False
+    # CJ assessment configuration (set at pipeline request time)
     cj_default_llm_model: str | None = None
     cj_default_temperature: float | None = Field(default=None, ge=0.0, le=2.0)
 
@@ -93,7 +92,6 @@ async def register_batch(request: ClientRequest, jwt_claims: dict) -> dict:
         user_id=jwt_claims["sub"],  # From JWT
         org_id=jwt_claims.get("org_id"),  # From JWT
         class_id=request.class_id,
-        enable_cj_assessment=request.enable_cj
     )
 
     # Forward to BOS via HTTP

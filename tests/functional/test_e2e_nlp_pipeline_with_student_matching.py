@@ -38,7 +38,7 @@ logger = get_logger(__name__)
 @pytest.mark.e2e
 @pytest.mark.functional
 @pytest.mark.asyncio
-@pytest.mark.timeout(300)  # 5 minute timeout for complete pipeline with student matching
+@pytest.mark.timeout(120)  # 2 minute timeout for complete pipeline with student matching
 async def test_e2e_nlp_pipeline_with_student_matching() -> None:
     """
     Test complete NLP pipeline with student matching for REGULAR batches.
@@ -123,7 +123,7 @@ async def test_e2e_nlp_pipeline_with_student_matching() -> None:
 @pytest.mark.e2e
 @pytest.mark.functional
 @pytest.mark.asyncio
-@pytest.mark.timeout(300)
+@pytest.mark.timeout(120)
 async def test_e2e_nlp_pipeline_guest_batch() -> None:
     """
     Test NLP pipeline for GUEST batches (no student matching).

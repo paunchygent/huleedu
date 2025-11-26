@@ -11,6 +11,7 @@ real student essays, ranking validation, multi-essay coordination.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -61,7 +62,8 @@ class TestE2ECJAssessmentWorkflows:
     @pytest.mark.e2e
     @pytest.mark.docker
     @pytest.mark.asyncio
-    @pytest.mark.timeout(300)  # 5 minute timeout for complete CJ pipeline
+    @pytest.mark.slow
+    @pytest.mark.timeout(120)  # 5 minute timeout for complete CJ pipeline
     async def test_complete_cj_assessment_processing_pipeline(self):
         """
         Test CJ pipeline end-to-end using the PipelineTestHarness (guest flow):
@@ -139,7 +141,7 @@ class TestE2ECJAssessmentWorkflows:
 
             async with aiohttp.ClientSession() as session:
                 headers = {
-                    "X-Internal-API-Key": "internal_dev_key_7f3e9a2b5d1c4f8g",
+                    "X-Internal-API-Key": os.getenv("HULEEDU_INTERNAL_API_KEY", "dev-internal-key"),
                     "X-Service-ID": "api-gateway-service",
                     "X-Correlation-ID": corr,
                 }
@@ -205,7 +207,8 @@ class TestE2ECJAssessmentWorkflows:
     @pytest.mark.e2e
     @pytest.mark.docker
     @pytest.mark.asyncio
-    @pytest.mark.timeout(300)
+    @pytest.mark.slow
+    @pytest.mark.timeout(120)
     async def test_amended_prompt_cj_pipeline_succeeds_without_prompt_payload(self):
         """End-to-end: amend prompt via PATCH then run CJ pipeline without prompt_payload."""
 

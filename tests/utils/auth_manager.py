@@ -19,6 +19,7 @@ that need full user management and lifecycle testing. For unit tests that
 only need JWT tokens, use the simpler jwt_helpers module.
 """
 
+import os
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -80,8 +81,10 @@ class AuthTestManager:
     real authentication when available.
     """
 
-    def __init__(self, jwt_secret: str = "test-secret-key"):
-        self.jwt_secret = jwt_secret
+    def __init__(self, jwt_secret: str | None = None):
+        # Default to functional/dev secrets so AGW accepts tokens
+        env_secret = os.getenv("JWT_SECRET_KEY") or os.getenv("API_GATEWAY_JWT_SECRET_KEY")
+        self.jwt_secret = jwt_secret or env_secret or "test-secret-key"
         self.jwt_algorithm = "HS256"
         self._test_users: Dict[str, AuthTestUser] = {}
         self._default_user: Optional[AuthTestUser] = None

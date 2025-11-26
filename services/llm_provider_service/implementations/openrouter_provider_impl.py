@@ -79,13 +79,14 @@ class OpenRouterProviderImpl(LLMProviderProtocol):
             HuleEduError: On any failure to generate comparison
         """
         if not self.api_key:
+            resolved_model = model_override or self.settings.OPENROUTER_DEFAULT_MODEL
             raise_configuration_error(
                 service="llm_provider_service",
                 operation="generate_comparison",
                 config_key="OPENROUTER_API_KEY",
                 message="OpenRouter API key not configured",
                 correlation_id=correlation_id,
-                details={"provider": "openrouter"},
+                details={"provider": "openrouter", "model": resolved_model},
             )
 
         # OpenRouter needs JSON instruction appended - use format_comparison_prompt  # noqa: E501
@@ -121,13 +122,14 @@ class OpenRouterProviderImpl(LLMProviderProtocol):
             # Type assert since retry manager returns Any
             return result  # type: ignore
         except Exception as e:
+            resolved_model = model_override or self.settings.OPENROUTER_DEFAULT_MODEL
             raise_external_service_error(
                 service="llm_provider_service",
                 operation="openrouter_api_request",
                 external_service="openrouter_api",
                 message=f"OpenRouter API call failed: {str(e)}",
                 correlation_id=correlation_id,
-                details={"provider": "openrouter"},
+                details={"provider": "openrouter", "model": resolved_model},
             )
 
     async def _make_api_request(
@@ -279,6 +281,7 @@ class OpenRouterProviderImpl(LLMProviderProtocol):
                                 correlation_id=correlation_id,
                                 details={
                                     "provider": "openrouter",
+                                    "model": model,
                                     "response_preview": text_content[:100],
                                 },
                             )
@@ -289,7 +292,7 @@ class OpenRouterProviderImpl(LLMProviderProtocol):
                             external_service="openrouter_api",
                             message="No choices in OpenRouter response",
                             correlation_id=correlation_id,
-                            details={"provider": "openrouter"},
+                            details={"provider": "openrouter", "model": model},
                         )
 
                 else:
@@ -309,7 +312,7 @@ class OpenRouterProviderImpl(LLMProviderProtocol):
                             window_seconds=60,  # 1 minute window
                             message=error_msg,
                             correlation_id=correlation_id,
-                            details={"provider": "openrouter", "retry_after": 60},
+                            details={"provider": "openrouter", "model": model, "retry_after": 60},
                         )
                     elif response.status == 401 or response.status == 403:
                         raise_authentication_error(
@@ -317,7 +320,7 @@ class OpenRouterProviderImpl(LLMProviderProtocol):
                             operation="openrouter_api_request",
                             message=error_msg,
                             correlation_id=correlation_id,
-                            details={"provider": "openrouter"},
+                            details={"provider": "openrouter", "model": model},
                         )
                     else:
                         raise_external_service_error(
@@ -326,7 +329,11 @@ class OpenRouterProviderImpl(LLMProviderProtocol):
                             external_service="openrouter_api",
                             message=error_msg,
                             correlation_id=correlation_id,
-                            details={"provider": "openrouter", "status_code": response.status},
+                            details={
+                                "provider": "openrouter",
+                                "model": model,
+                                "status_code": response.status,
+                            },
                         )
 
         except aiohttp.ClientResponseError:
@@ -345,7 +352,7 @@ class OpenRouterProviderImpl(LLMProviderProtocol):
                 external_service="openrouter_api",
                 message=error_msg,
                 correlation_id=correlation_id,
-                details={"provider": "openrouter"},
+                details={"provider": "openrouter", "model": model},
             )
 
     def _get_cached_model_info(self, model: str) -> Optional[Dict]:

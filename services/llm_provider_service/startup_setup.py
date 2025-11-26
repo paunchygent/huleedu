@@ -11,6 +11,7 @@ from quart_dishka import QuartDishka
 
 from services.llm_provider_service.config import Settings
 from services.llm_provider_service.di import LLMProviderServiceProvider
+from services.llm_provider_service.error_handlers import register_lps_error_handlers
 from services.llm_provider_service.implementations.connection_pool_manager_impl import (
     ConnectionPoolManagerImpl,
 )
@@ -25,6 +26,10 @@ async def initialize_services(app: Quart, settings: Settings) -> None:
     logger = create_service_logger("llm_provider_service.startup")
 
     logger.info(f"Starting {settings.SERVICE_NAME} initialization...")
+
+    # Register LPS error handlers with metrics integration
+    register_lps_error_handlers(app)
+    logger.info("LPS error handlers registered")
 
     # Initialize OpenTelemetry tracing
     tracer = init_tracing(settings.SERVICE_NAME)

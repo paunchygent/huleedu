@@ -67,14 +67,8 @@ class BatchProcessingServiceImpl:
         # 1. Persist Full Batch Context
         await self.batch_repo.store_batch_context(batch_id, registration_data)
 
-        # 2. Determine requested pipelines based on registration data (Task 3.1)
+        # 2. Initialize requested pipelines with spellcheck only; pipeline requests append others.
         requested_pipelines = ["spellcheck"]  # Always include spellcheck first
-        if registration_data.enable_cj_assessment:
-            requested_pipelines.append("cj_assessment")
-            self.logger.info(
-                f"CJ assessment enabled for batch {batch_id}",
-                extra={"correlation_id": str(correlation_id)},
-            )
 
         # Future pipeline support
         if getattr(registration_data, "enable_ai_feedback", False):

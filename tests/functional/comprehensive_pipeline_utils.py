@@ -87,7 +87,8 @@ async def register_comprehensive_batch(
     """
     Register a batch specifically for comprehensive pipeline testing.
 
-    CRITICAL: Enables CJ assessment to ensure full pipeline execution.
+    Pipelines are selected later via ClientBatchPipelineRequestV1;
+    registration is pipeline-agnostic.
     Returns the actual correlation ID that will be used by the service for events.
 
     Args:
@@ -116,10 +117,9 @@ async def register_comprehensive_batch(
         course_code=selected_course,
         user=user,
         correlation_id=correlation_id,
-        enable_cj_assessment=True,  # Enable CJ assessment for full pipeline
     )
 
-    logger.info(f"✅ Comprehensive batch registered: {batch_id} (CJ assessment enabled)")
+    logger.info(f"✅ Comprehensive batch registered: {batch_id} (pipelines requested later)")
     logger.info(f"🔗 Actual correlation ID for event monitoring: {actual_correlation_id}")
     return batch_id, actual_correlation_id
 

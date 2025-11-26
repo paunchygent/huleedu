@@ -70,7 +70,6 @@ class TestPostgreSQLBatchRepositoryIntegration:
             student_prompt_ref=make_prompt_ref("prompt-software-engineering"),
             user_id="user_123",
             expected_essay_count=25,
-            enable_cj_assessment=True,
         )
 
     @pytest.fixture
@@ -81,7 +80,6 @@ class TestPostgreSQLBatchRepositoryIntegration:
             course_code=CourseCode.SV2,
             student_prompt_ref=make_prompt_ref("prompt-swedish-culture"),
             user_id="user_integration_test",
-            enable_cj_assessment=True,
         )
 
     @pytest.mark.asyncio
@@ -161,7 +159,6 @@ class TestPostgreSQLBatchRepositoryIntegration:
         assert retrieved_context.course_code == CourseCode.ENG5
         assert retrieved_context.user_id == "user_123"
         assert retrieved_context.expected_essay_count == 25
-        assert retrieved_context.enable_cj_assessment is True
 
     @pytest.mark.asyncio
     async def test_pipeline_state_persistence(

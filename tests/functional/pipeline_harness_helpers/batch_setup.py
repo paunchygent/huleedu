@@ -76,7 +76,6 @@ class BatchSetupHelper:
             course_code=CourseCode.ENG5,
             user=teacher_user,
             correlation_id=correlation_id,
-            enable_cj_assessment=True,
             class_id=class_id,  # This triggers REGULAR flow!
         )
 
@@ -191,7 +190,6 @@ class BatchSetupHelper:
             course_code=CourseCode.ENG5,
             user=user,
             correlation_id=correlation_id,
-            enable_cj_assessment=True,
             attach_prompt=attach_prompt,
             # NO class_id - this triggers GUEST flow!
         )

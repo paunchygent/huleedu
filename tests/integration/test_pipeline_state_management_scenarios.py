@@ -124,13 +124,12 @@ class TestPipelineRealWorldScenarios:
         batch_id = str(uuid4())
         correlation_id = uuid4()
 
-        # Setup batch context for 25 essays with CJ assessment enabled
+        # Setup batch context for 25 essays; pipeline choice is made at request time
         batch_context = BatchRegistrationRequestV1(
             expected_essay_count=25,
             course_code=CourseCode.ENG5,
             student_prompt_ref=make_prompt_ref("prompt-bos-rca"),
             user_id="user_123",
-            enable_cj_assessment=True,
         )
         batch_repository.batch_contexts[batch_id] = batch_context
 

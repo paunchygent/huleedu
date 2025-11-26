@@ -58,7 +58,6 @@ class TestCreditPreflightDenial402:
                     expected_essay_count=3,
                     user=test_user,
                     class_id=None,  # GUEST batch flow
-                    enable_cj_assessment=True,
                 )
 
                 long_text = (
@@ -141,7 +140,6 @@ class TestCreditPreflightDenial402:
                     expected_essay_count=2,
                     user=test_user,
                     class_id=None,
-                    enable_cj_assessment=True,
                 )
 
                 long_text = (
@@ -226,7 +224,6 @@ class TestCreditPreflightDenial402:
                     expected_essay_count=2,
                     user=test_user,
                     class_id=None,
-                    enable_cj_assessment=True,
                 )
 
                 long_text_sv = (

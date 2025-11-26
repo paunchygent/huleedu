@@ -79,7 +79,6 @@ async def test_registration_proxy_injects_identity_and_calls_bos(client_with_org
         "essay_ids": ["e1", "e2"],
         "course_code": CourseCode.SV1.value,
         "class_id": "class-1",
-        "enable_cj_assessment": True,
         "cj_default_llm_model": "gpt-4o-mini",
         "cj_default_temperature": 0.5,
         "student_prompt_ref": prompt_ref_payload,

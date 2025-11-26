@@ -50,6 +50,7 @@ class TestNLPLanguageToolInteractionDiagnostic:
         return make_prompt_ref(prompt_storage_id)
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     @pytest.mark.docker
     @pytest.mark.timeout(120)
     async def test_language_tool_response_diagnostic(self) -> None:
