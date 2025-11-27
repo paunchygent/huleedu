@@ -42,8 +42,9 @@ if [[ "$TOOL_NAME" == "Write" ]] && [[ -n "$FILE_PATH" ]]; then
     # Extract the path relative to docs/
     RELATIVE_PATH="${FILE_PATH#*/docs/}"
 
-    # Skip if writing to root level spec file
-    if [[ "$RELATIVE_PATH" == "DOCS_STRUCTURE_SPEC.md" ]]; then
+    # Allow root-level markdown files (index files, specs, etc.)
+    # These serve as navigation/specification documents at docs/ root
+    if [[ "$RELATIVE_PATH" =~ ^[^/]+\.md$ ]]; then
       exit 0
     fi
 
@@ -83,7 +84,8 @@ fi
 # Check Bash operations that might create directories
 if [[ "$TOOL_NAME" == "Bash" ]] && [[ -n "$COMMAND" ]]; then
   # Check for mkdir commands in docs/
-  if [[ "$COMMAND" =~ mkdir.*docs/ ]]; then
+  # Allow _archive subdirectories within allowed top-level directories
+  if [[ "$COMMAND" =~ mkdir.*docs/ ]] && ! [[ "$COMMAND" =~ mkdir.*docs/(overview|architecture|services|operations|how-to|reference|decisions|product|research)/_archive ]]; then
     cat >&2 << EOF
 🚫 DOCS STRUCTURE VIOLATION
 
@@ -91,6 +93,7 @@ Direct mkdir operations in docs/ are blocked.
   Command: $COMMAND
 
 The docs/ directory structure is locked and enforced.
+Note: _archive subdirectories within allowed directories ARE permitted.
 
 If you need to create a new directory:
   1. Discuss the change with the user
@@ -105,15 +108,18 @@ EOF
     exit 2
   fi
 
-  # Check for mv/rm commands affecting docs/ structure directories
-  if [[ "$COMMAND" =~ (mv|rm).*docs/(overview|architecture|services|operations|how-to|reference|decisions|product|research) ]]; then
+  # Check for directory removal commands (rmdir, rm -r, rm -rf) on core docs/ structure
+  # Allow: rm -f on individual files, mv to _archive
+  # Block: rmdir, rm -r, rm -rf on core directories
+  if [[ "$COMMAND" =~ (rmdir|rm[[:space:]]+-r).*docs/(overview|architecture|services|operations|how-to|reference|decisions|product|research)[/]?$ ]]; then
     cat >&2 << EOF
 🚫 DOCS STRUCTURE VIOLATION
 
-Moving or removing core docs/ directories is blocked.
+Removing core docs/ directories is blocked.
   Command: $COMMAND
 
 The docs/ directory structure is locked and enforced.
+Individual file deletion within directories IS permitted.
 
 If you need to modify the structure:
   1. Discuss the change with the user
