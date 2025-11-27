@@ -2,12 +2,63 @@
 type: runbook
 service: cj_assessment_service
 severity: high
-last_reviewed: 2025-11-21
+last_reviewed: 2025-11-27
 ---
 
 # CJ Assessment & LLM Provider Foundation (Working Reference)
 
 Purpose: single reference for defaults, reasoning, metrics, and open work across CJ Assessment, LLM Provider, ENG5 Runner, and API Gateway callers. Keep this in sync with handoff.md, readme_first.md, and relevant task docs under .claude/work/tasks/.
+
+## User Stories
+
+### US-1: Teacher Views CJ Results with Student Identification
+> As a **teacher** viewing CJ assessment results, I want to see the **student name or filename** alongside the CJ rank and score, so I can **identify whose work I'm evaluating**.
+
+**Acceptance**: RAS API returns `filename` (URL-decoded) for each essay in batch results.
+
+### US-2: GUEST Batch Assessment (No Class Association)
+> As a **teacher** running an experiment with old essays or essays not associated with any class, I want to **upload essays and run CJ assessment** without needing to create a class or associate students, so I can **quickly evaluate relative quality**.
+
+**Context**: GUEST batches have no `class_id`, no `student_id` linkage. Filename is the **ONLY** way to identify students.
+
+**Acceptance**:
+- Batch registration succeeds without `class_id`
+- Pipeline executes spellcheck → CJ without student matching phase
+- Results display filename-based identification
+
+### US-3: REGULAR Batch Assessment (Class Association)
+> As a **teacher** with a class roster, I want to **upload essays for my class** and have the system **match essays to enrolled students**, so results show student names and integrate with gradebook.
+
+**Context**: REGULAR batches have `class_id`, enabling student matching via filename heuristics or manual assignment.
+
+**Acceptance**:
+- Essays matched to students via Class Management Service
+- Results display student names (not just filenames)
+- Grade projections available when anchors configured
+
+### US-4: Optional Spellcheck (Future)
+> As a **teacher**, I want to **optionally skip spellcheck** for essays that are already corrected or when I want to assess raw writing quality.
+
+**Context**: Currently spellcheck is mandatory. Future state allows bypass.
+
+**Acceptance** (future):
+- Pipeline configuration flag to skip spellcheck phase
+- CJ uses `original_text_storage_id` when spellcheck skipped
+- CJ uses `spellcheck_corrected_text_storage_id` when spellcheck runs
+
+### Data Flow Requirements
+
+| User Story | Filename Required | student_id Required | text_storage_id Source |
+|------------|-------------------|---------------------|------------------------|
+| US-1 | ✅ Critical | Optional | Either |
+| US-2 (GUEST) | ✅ Critical (only ID) | ❌ N/A | spellcheck_corrected |
+| US-3 (REGULAR) | ✅ Until matched | ✅ After matching | spellcheck_corrected |
+| US-4 (Future) | ✅ Critical | Optional | original OR corrected |
+
+### Related Tasks
+- [Filename Propagation Task](../../TASKS/assessment/filename-propagation-from-els-to-ras-for-teacher-result-visibility.md) - fixes US-1, US-2 filename gap
+
+---
 
 ## Default knobs (current proposals) and rationale
 
@@ -66,6 +117,21 @@ Purpose: single reference for defaults, reasoning, metrics, and open work across
 - With assignment_id: hydrate prompt/rubric/anchors; grade projections enabled; cached prompts encouraged.
 - Without assignment_id: rankings only; projections off; shorter cache TTL recommended.
 
+## Planned PR: staged submission for serial bundles (non-batch-API)
+- Purpose/story: prevent flooding the full comparison budget at once. Submit comparisons in waves (N bundles per wave), wait for callbacks, run stability check (`SCORE_STABILITY_THRESHOLD`, `MIN_COMPARISONS_FOR_STABILITY_CHECK`), then decide whether to enqueue the next wave. Goal: earlier convergence, lower cost/latency, clearer observability.
+- Scope: `cj_core_logic/comparison_processing.py` (wave size surfaced via settings), `workflow_continuation.py` (stability/budget check after each wave), new setting (e.g., `MAX_BUNDLES_PER_WAVE`) wired through DI.
+- Acceptance: early stop when stable/complete; metrics/events stay thin (no per-iteration vectors); integration/functional tests verify staged submission and stability stop.
+
+## File upload traceability & assignment_id guidance
+- Regular/class batches: assignment_id at upload is recommended for filename-level audit but not required for pipeline execution or student mapping (ELS/Class Mgmt already ties essay_id → student_id). If assignment_id is supplied later (before CJ), ensure BOS/ELS propagate it into the CJ request; uploads may stay unset unless you need filename-level audit.
+- Guest batches: strongly recommended. There is no student context, so CJ → filename joins rely on `file_uploads` having `text_storage_id` (now stored) and, for contextual reporting, `assignment_id`.
+- Best-practice backfill (preferred): add a File Service endpoint `/v1/files/batch/{batch_id}/assignment` that validates ownership and updates all `file_uploads.assignment_id` for the batch. Alternate options: BOS → File Service command/event to update uploads when assignment_id is captured, or a one-off repository-based backfill script (transactional, audited).
+
+### Acceptance criteria for traceability
+1) For new uploads, `file_uploads` rows store `text_storage_id` and (when provided) `assignment_id`; joins CJ ranking → text_storage_id → filename work in guest and class flows.
+2) For late-provided assignment_id, BOS/ELS propagate it into the CJ request before batch prep; if filename-level audit is required, the chosen backfill path updates `file_uploads.assignment_id` for the batch.
+3) Functional runs default to `FUNCTIONAL_ASSIGNMENT_ID` and run with mock LLM; suite skips if mock mode is disabled unless explicitly overridden.
+
 ## Owners/rollout (solo-friendly)
 - Defaults above are starting points; adjust per experiment results. Keep flags: iterative/serial_bundle and prompt cache TTL overridable per env.
 
@@ -74,10 +140,14 @@ Update guidance: treat this doc like handoff/readme_first—update whenever beha
 ## Related references
 - .claude/work/session/handoff.md (current session context)
 - .claude/work/session/readme-first.md (service status snapshot)
+- docs/operations/llm-provider-configuration-hierarchy.md (LLM mock/real config precedence)
 - Tasks: key trackers aligned to this doc:
+  - TASKS/assessment/filename-propagation-from-els-to-ras-for-teacher-result-visibility.md (US-1, US-2 fix)
   - .claude/work/tasks/TASK-CJ-LLM-SERIAL-BUNDLE-VALIDATION-FIXES.md
   - .claude/work/tasks/TASK-CJ-BATCH-STATE-AND-COMPLETION-FIXES.md
   - .claude/work/tasks/TASK-LLM-BATCH-STRATEGY-IMPLEMENTATION.md (+ checklist child)
   - .claude/work/tasks/TASK-LLM-BATCH-STRATEGY-LPS-IMPLEMENTATION.md
   - .claude/work/tasks/TASK-LLM-SERIAL-BUNDLE-METRICS-AND-DIAGNOSTICS-FIX.md
   - .claude/work/tasks/TASK-LLM-QUEUE-EXPIRY-METRICS-FIX.md
+- Investigation reports:
+  - .claude/work/reports/2025-11-27-filename-propagation-flow-mapping.md

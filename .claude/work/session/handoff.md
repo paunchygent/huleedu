@@ -12,22 +12,80 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 
 ---
 
-## 🎯 ACTIVE WORK (2025-11-26)
+## 🎯 ACTIVE WORK (2025-11-27)
 
-### Functional Test Harness Ergonomics (in progress)
+### Filename Propagation Gap (NEW - high priority)
+**Root Cause Identified**: `EssaySlotAssignedV1` event missing `original_file_name` field.
+- File Service → ELS: filename included ✅
+- ELS → RAS: filename **MISSING** in event ❌
+- Result: `essay_results.filename` is NULL, teachers can't identify students
 
-- Hardened `tests/functional/conftest.py`: readiness gate with bounded health retries, Kafka topic precreation, Redis test-key cleanup.
-- Updated `tests/README.md` with new flow, marker guidance, and timeout/consolidation TODOs.
-- Validated: `docker compose ... --profile functional config` and `python -m py_compile tests/functional/conftest.py`.
-- Timeouts >60s now explicitly marked `@pytest.mark.slow`; `tests/README.md` updated to reflect dev stack only (no functional profile) and dev env vars to source from `.env`.
-- Baseline + fix: `tests/functional/test_e2e_client_pipeline_resolution_workflow.py` failed (CJ status `skipped_by_user_config` after flag removal). Added `@pytest.mark.slow` to class and expanded acceptable pre-trigger statuses to include `skipped_by_user_config`; reran file (`pdm run pytest-root ... -m docker`) → PASS (49s).
-- RED ALERT: CJ rankings cannot be mapped back to filenames in functional runs. `file_uploads` lacks `text_storage_id`, so CJ `text_storage_id` → filename join is impossible. Need ingestion to persist `text_storage_id`/essay id for traceability. Task opened: `TASKS/infrastructure/persist-text_storage_id-on-file-uploads-and-enable-mock-llm-for-functional-cj.md` (also to force mock LLM for functional CJ). Additionally, do not run CJ functional tests until uploads also carry `assignment_id` (needed for grade-projection/anchor pools) and the test essay set matches the ENG5 runner student essay bundle.
+**Impact**:
+- GUEST batches: **Critical** - filename is ONLY way to identify students (no class_id)
+- REGULAR batches: filename needed until student matching completes
+
+**Task Created**: `TASKS/assessment/filename-propagation-from-els-to-ras-for-teacher-result-visibility.md`
+- 6 files to modify (event contract + ELS publisher + RAS handler/protocol/repo/updater)
+- No DB migrations needed (column exists)
+- ~2-3 hours implementation
+
+**Investigation Report**: `.claude/work/reports/2025-11-27-filename-propagation-flow-mapping.md`
+
+### LLM Provider Configuration Hierarchy (COMPLETED)
+- Documented 3-tier override hierarchy: `USE_MOCK_LLM` (absolute) → request `provider_override` → service defaults
+- Created runbook: `docs/operations/llm-provider-configuration-hierarchy.md`
+- Added rule section: `.claude/rules/020.13-llm-provider-service-architecture.md` § 6.2.1
+- Key insight: request-level overrides CANNOT bypass `USE_MOCK_LLM=true` (DI boot-time decision)
+
+### JWT Secret Fix (COMPLETED)
+- **Bug**: `docker-compose.dev.yml:177` had hardcoded `JWT_SECRET_KEY=test-secret-key`
+- **Symptom**: Functional tests got 401 Unauthorized (signature mismatch)
+- **Fix**: Changed to `JWT_SECRET_KEY=${JWT_SECRET_KEY}` to use `.env` value
+- CJ functional test now passes: `test_complete_cj_assessment_processing_pipeline`
+
+### CJ Runbook User Stories (COMPLETED)
+- Added User Stories section to `docs/operations/cj-assessment-foundation.md`
+- US-1: Teacher views CJ results with student identification
+- US-2: GUEST batch assessment (no class association)
+- US-3: REGULAR batch assessment (class association)
+- US-4: Optional spellcheck (future)
+- Added data flow requirements table
+
+### Ingestion traceability + mock LLM guard (completed earlier today)
+- Migration `20251127_1200` applied: `assignment_id` column + indexes on `text_storage_id`
+- File uploads now store `assignment_id` for CJ traceability
+- Functional harness enforces mock LLM
+- All targeted unit tests passing
+
+### Functional Test Harness Ergonomics (carry-over)
+- Readiness gate, Kafka topic precreation, Redis cleanup, timeout markers, and dev-stack-only guidance already in place (see notes from 2025-11-26).
+- Functional CJ tests should still wait until assignment_id + ENG5 bundle alignment is verified (see pending above).
 
 ### Deprecate CJ registration flag at batch registration (started)
 - Step 1 done: marked field deprecated in `BatchRegistrationRequestV1` (code + docs) and added AGW warning log when the flag is set.
 - Step 2 done: BOS now ignores the flag entirely for pipeline selection (registration metrics record registration only), and pipeline-request flow drives pipeline state; regression tests added to ensure CJ inclusion/exclusion depends solely on `ClientBatchPipelineRequestV1`.
 - Step 3 done (local codebase): field fully removed from contracts, AGW/BOS code, and tests; only pipeline-request–driven selection remains. No runtime monitoring available in non-deployed env.
 - Doc cleanup: Removed remaining references to the deprecated flag from TASKS docs; repository search is now clean.
+
+---
+
+## ➡️ Forward to next agent
+
+### Priority 1: Filename Propagation Fix (HIGH)
+Implement task: `TASKS/assessment/filename-propagation-from-els-to-ras-for-teacher-result-visibility.md`
+1. Add `original_file_name: str` to `EssaySlotAssignedV1` event contract
+2. Update ELS to include filename when publishing slot assignment
+3. Update RAS to consume filename and populate `essay_results.filename`
+4. Add tests (unit + E2E for GUEST batch filename visibility)
+
+### Priority 2: Verify CJ Functional Test Suite
+- CJ functional test now passes with JWT fix
+- Verify filename appears in RAS results after propagation fix
+- Align functional essay bundle with ENG5 runner student set
+
+### Priority 3: Staged Submission for CJ
+- Implement wave-based submission with stability checks (non-batch-API modes)
+- Settings wiring and tests (see CJ runbook § Planned PR)
 
 ---
 

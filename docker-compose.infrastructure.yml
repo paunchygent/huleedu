@@ -158,6 +158,12 @@ services:
       - huleedu_internal_network
     environment:
       - ALLOW_ANONYMOUS_LOGIN=yes
+    healthcheck:
+      test: ["CMD-SHELL", "zkServer.sh status || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   kafka:
     image: bitnami/kafka:3.7
@@ -165,7 +171,8 @@ services:
     restart: unless-stopped
     init: true  # Enable init system to properly reap zombie processes
     depends_on:
-      - zookeeper
+      zookeeper:
+        condition: service_healthy
     networks:
       - huleedu_internal_network
     ports:
@@ -196,8 +203,8 @@ services:
       test: ["CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list"]
       interval: 15s
       timeout: 20s
-      retries: 10
-      start_period: 120s
+      retries: 8
+      start_period: 60s  # Reduced from 120s since Zookeeper health is now guaranteed
 
   # PostgreSQL database for Result Aggregator Service
 

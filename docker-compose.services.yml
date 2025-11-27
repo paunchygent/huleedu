@@ -31,8 +31,8 @@ services:
       - huleedu_internal_network
     environment:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      - KAFKA_CONNECT_MAX_RETRIES=10
-      - KAFKA_CONNECT_RETRY_DELAY=2.0
+      - KAFKA_CONNECT_MAX_RETRIES=6
+      - KAFKA_CONNECT_RETRY_DELAY=3.0
       - KAFKA_DEFAULT_PARTITIONS=3
       - KAFKA_DEFAULT_REPLICATION_FACTOR=1
     logging: *default-logging
@@ -46,6 +46,8 @@ services:
     depends_on:
       kafka_topic_setup:
         condition: service_completed_successfully
+      content_service_db:
+        condition: service_healthy
     networks:
       - huleedu_internal_network
     ports:
@@ -170,6 +172,8 @@ services:
       kafka_topic_setup:
         condition: service_completed_successfully
       content_service:
+        condition: service_healthy
+      spellchecker_db:
         condition: service_healthy
       redis:
         condition: service_healthy

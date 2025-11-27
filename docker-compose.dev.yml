@@ -174,7 +174,7 @@ services:
       - ENV_TYPE=docker
       - ENVIRONMENT=development
       - LOG_LEVEL=DEBUG
-      - JWT_SECRET_KEY=test-secret-key
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
 
   # Result Aggregator Service
   result_aggregator_service:
@@ -234,6 +234,7 @@ services:
       - HULEEDU_DB_USER=${HULEEDU_DB_USER}
       - HULEEDU_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
       - CJ_ASSESSMENT_SERVICE_LLM_BATCHING_MODE=${CJ_ASSESSMENT_SERVICE_LLM_BATCHING_MODE}
+      - CJ_ASSESSMENT_SERVICE_MAX_PAIRWISE_COMPARISONS=${CJ_ASSESSMENT_SERVICE_MAX_PAIRWISE_COMPARISONS:-20}
 
   # Spellchecker Service (add missing services that we already optimized)
   spellchecker_service:
