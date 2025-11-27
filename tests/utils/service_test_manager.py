@@ -13,6 +13,7 @@ Based on modern testing practices:
 """
 
 import asyncio
+import os
 import time
 from typing import Any, Dict, NamedTuple, Optional
 
@@ -357,6 +358,7 @@ class ServiceTestManager:
         files: list[dict[str, Any]],
         user: Optional[AuthTestUser] = None,
         correlation_id: str | None = None,
+        assignment_id: str | None = None,
     ) -> dict[str, Any]:
         """
         Upload files to File Service batch endpoint.
@@ -366,6 +368,7 @@ class ServiceTestManager:
             files: List of file dictionaries with 'name' and 'content' keys
             user: Test user (uses default if None)
             correlation_id: Correlation ID for tracking
+            assignment_id: Optional assignment identifier for traceability/anchors
 
         Returns:
             dict[str, Any]: Upload response
@@ -380,10 +383,13 @@ class ServiceTestManager:
             user = self.auth_manager.get_default_user()
 
         agw_base_url = endpoints["api_gateway_service"]["base_url"]
+        effective_assignment_id = assignment_id or os.getenv("FUNCTIONAL_ASSIGNMENT_ID")
 
         async with aiohttp.ClientSession() as session:
             data = aiohttp.FormData()
             data.add_field("batch_id", batch_id)
+            if effective_assignment_id:
+                data.add_field("assignment_id", effective_assignment_id)
 
             for file_info in files:
                 data.add_field(

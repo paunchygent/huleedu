@@ -51,7 +51,7 @@ def create_comprehensive_kafka_manager() -> KafkaTestManager:
     return KafkaTestManager()
 
 
-async def load_real_test_essays(max_essays: int = 30) -> list[Path]:
+async def load_real_test_essays(max_essays: int = 6) -> list[Path]:
     """
     Load real student essays from test directory.
 
@@ -66,13 +66,16 @@ async def load_real_test_essays(max_essays: int = 30) -> list[Path]:
     """
     import pytest
 
-    real_test_dir = Path("test_uploads/real_test_batch")
+    real_test_dir = Path("test_uploads/ANCHOR ESSAYS/ROLE_MODELS_ENG5_NP_2016/student_essays")
     if not real_test_dir.exists():
-        pytest.skip("Real test batch directory not found")
+        pytest.skip(
+            "ENG5 runner student essays not found "
+            "(test_uploads/ANCHOR ESSAYS/ROLE_MODELS_ENG5_NP_2016/student_essays)"
+        )
 
-    essay_files = list(real_test_dir.glob("*.txt"))
+    essay_files = sorted(real_test_dir.glob("*.docx"))
     if len(essay_files) < 2:
-        pytest.skip("Need at least 2 real essays for comprehensive test")
+        pytest.skip("Need at least 2 ENG5 runner essays for comprehensive test")
 
     logger.info(f"📚 Found {len(essay_files)} real student essays")
     return essay_files[:max_essays]

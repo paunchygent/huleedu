@@ -41,6 +41,7 @@ logger = create_service_logger("test.functional.conftest")
 READINESS_TIMEOUT_SECONDS = int(os.getenv("FUNCTIONAL_READINESS_TIMEOUT", "60"))
 READINESS_RETRY_SECONDS = int(os.getenv("FUNCTIONAL_READINESS_RETRY", "3"))
 REDIS_URL = os.getenv("FUNCTIONAL_REDIS_URL", "redis://localhost:6379")
+_MOCK_LLM_ENV_VARS = ("LLM_PROVIDER_SERVICE_USE_MOCK_LLM", "USE_MOCK_LLM")
 
 # Aggregate topics that functional tests commonly touch (pipeline + entitlements + student matching)
 _DEFAULT_KAFKA_TOPICS: set[str] = set(create_kafka_test_config().topics.values()) | set(
@@ -61,6 +62,36 @@ _DEFAULT_KAFKA_TOPICS.update(
 
 # NOTE: The clean_distributed_state fixture has been removed in favor of explicit cleanup calls
 # Tests now use distributed_state_manager.quick_redis_cleanup() directly for better control
+
+
+def _mock_llm_enabled() -> bool:
+    """Return True when mock LLM mode is enabled (default)."""
+    provided_flags: list[str] = []
+    for var in _MOCK_LLM_ENV_VARS:
+        flag = os.getenv(var)
+        if flag is not None:
+            provided_flags.append(flag)
+    if not provided_flags:
+        return True  # docker-compose defaults keep mock mode on
+    return all(flag.lower() not in {"false", "0", "no"} for flag in provided_flags)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def enforce_mock_llm_mode() -> None:
+    """
+    Prevent functional runs from hitting real LLM providers.
+
+    Skip the suite when mock mode is explicitly disabled unless ALLOW_REAL_LLM_FUNCTIONAL=1
+    is set. This keeps CJ runs fast and deterministic.
+    """
+    if os.getenv("ALLOW_REAL_LLM_FUNCTIONAL", "").lower() in {"1", "true", "yes"}:
+        return
+    if not _mock_llm_enabled():
+        pytest.skip(
+            "Mock LLM must be enabled for functional suite. "
+            "Set USE_MOCK_LLM=true (or LLM_PROVIDER_SERVICE_USE_MOCK_LLM=true) "
+            "or export ALLOW_REAL_LLM_FUNCTIONAL=1 to bypass."
+        )
 
 
 @pytest.fixture(scope="session", autouse=True)

@@ -26,6 +26,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional, cast
 
 import jwt
+from dotenv import dotenv_values
 from huleedu_service_libs.logging_utils import create_service_logger
 
 logger = create_service_logger("test.auth_manager")
@@ -82,8 +83,12 @@ class AuthTestManager:
     """
 
     def __init__(self, jwt_secret: str | None = None):
-        # Default to functional/dev secrets so AGW accepts tokens
+        # Load from environment first, then .env file, then hardcoded fallback
+        # Priority: explicit param > env var > .env file > hardcoded default
         env_secret = os.getenv("JWT_SECRET_KEY") or os.getenv("API_GATEWAY_JWT_SECRET_KEY")
+        if not env_secret:
+            dotenv = dotenv_values()
+            env_secret = dotenv.get("JWT_SECRET_KEY") or dotenv.get("API_GATEWAY_JWT_SECRET_KEY")
         self.jwt_secret = jwt_secret or env_secret or "test-secret-key"
         self.jwt_algorithm = "HS256"
         self._test_users: Dict[str, AuthTestUser] = {}

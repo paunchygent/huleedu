@@ -1,8 +1,9 @@
 """
 Comprehensive End-to-End Real Batch Test
 
-This test validates the complete pipeline using real student essays from
-/test_uploads/real_test_batch/ and follows the ACTUAL orchestration flow:
+This test validates the complete pipeline using ENG5 runner student essays from
+test_uploads/ANCHOR ESSAYS/ROLE_MODELS_ENG5_NP_2016/student_essays and follows the
+ACTUAL orchestration flow:
 
 1. File Upload → EssayContentProvisionedV1 events
 2. ELS aggregates → BatchEssaysReady event

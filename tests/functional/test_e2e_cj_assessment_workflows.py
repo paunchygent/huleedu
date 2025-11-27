@@ -12,13 +12,13 @@ real student essays, ranking validation, multi-essay coordination.
 from __future__ import annotations
 
 import os
-from pathlib import Path
 
 import pytest
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from tests.functional.pipeline_test_harness import PipelineTestHarness
 from tests.utils.auth_manager import AuthTestManager
+from tests.utils.eng5_runner_samples import load_eng5_runner_student_files
 from tests.utils.kafka_test_manager import KafkaTestManager
 from tests.utils.prompt_reference import make_prompt_ref_payload
 from tests.utils.service_test_manager import ServiceTestManager
@@ -78,13 +78,8 @@ class TestE2ECJAssessmentWorkflows:
         kafka_mgr = KafkaTestManager()
         harness = PipelineTestHarness(service_manager, kafka_mgr, auth_manager)
 
-        # Use real student essays (guest flow)
-        essay_files = [
-            Path("test_uploads/real_test_batch/MHHXGMXL 50 (SA24D ENG 5 WRITING 2025).txt"),
-            Path("test_uploads/real_test_batch/MHHXGMXE 50 (SA24D ENG 5 WRITING 2025).txt"),
-            Path("test_uploads/real_test_batch/MHHXGMUX 50 (SA24D ENG 5 WRITING 2025).txt"),
-            Path("test_uploads/real_test_batch/MHHXGMUU 50 (SA24D ENG 5 WRITING 2025).txt"),
-        ]
+        # Use ENG5 runner student essays (docx) to align with ENG5 validation set
+        essay_files = load_eng5_runner_student_files(max_files=4)
 
         try:
             # Setup guest batch and run CJ pipeline
@@ -138,10 +133,21 @@ class TestE2ECJAssessmentWorkflows:
             import json
 
             import aiohttp
+            from dotenv import dotenv_values
+
+            # Use the teacher/owner token to satisfy RAS internal auth
+            request_user = harness.teacher_user or service_manager.auth_manager.get_default_user()
+            auth_headers = service_manager.get_auth_headers(request_user)
+
+            # Pull the internal API key from env or .env (dev default)
+            internal_api_key: str = os.getenv("HULEEDU_INTERNAL_API_KEY") or str(
+                dotenv_values().get("HULEEDU_INTERNAL_API_KEY", "internal_dev_key_7f3e9a2b5d1c4f8g")
+            )
 
             async with aiohttp.ClientSession() as session:
                 headers = {
-                    "X-Internal-API-Key": os.getenv("HULEEDU_INTERNAL_API_KEY", "dev-internal-key"),
+                    **auth_headers,
+                    "X-Internal-API-Key": internal_api_key,
                     "X-Service-ID": "api-gateway-service",
                     "X-Correlation-ID": corr,
                 }
@@ -217,10 +223,7 @@ class TestE2ECJAssessmentWorkflows:
         kafka_mgr = KafkaTestManager()
         harness = PipelineTestHarness(service_manager, kafka_mgr, auth_manager)
 
-        essay_files = [
-            Path("test_uploads/real_test_batch/MHHXGMXL 50 (SA24D ENG 5 WRITING 2025).txt"),
-            Path("test_uploads/real_test_batch/MHHXGMXE 50 (SA24D ENG 5 WRITING 2025).txt"),
-        ]
+        essay_files = load_eng5_runner_student_files(max_files=2)
 
         try:
             # 1. Setup guest batch WITHOUT an initial prompt (attach later)

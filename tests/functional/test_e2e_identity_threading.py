@@ -7,13 +7,12 @@ Uses ServiceTestManager + KafkaTestManager patterns.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from tests.functional.pipeline_test_harness import PipelineTestHarness
 from tests.utils.auth_manager import AuthTestManager
+from tests.utils.eng5_runner_samples import load_eng5_runner_student_files
 from tests.utils.identity_validation import IdentityValidator
 from tests.utils.kafka_test_manager import KafkaTestManager
 from tests.utils.service_test_manager import ServiceTestManager
@@ -54,10 +53,7 @@ class TestE2EIdentityThreading:
             user_id="test_identity_user", organization_id="test_org_123"
         )
 
-        essay_files = [
-            Path("test_uploads/real_test_batch/MHHXGMXL 50 (SA24D ENG 5 WRITING 2025).txt"),
-            Path("test_uploads/real_test_batch/MHHXGMXE 50 (SA24D ENG 5 WRITING 2025).txt"),
-        ]
+        essay_files = load_eng5_runner_student_files(max_files=2)
 
         try:
             # Start monitoring ResourceConsumptionV1 events with earliest offset to catch all events
@@ -148,10 +144,7 @@ class TestE2EIdentityThreading:
             user_id="teacher_sv_123", organization_id="gymnasium_stockholm"
         )
 
-        essay_files = [
-            Path("test_uploads/real_test_batch/MHHXGMXL 50 (SA24D ENG 5 WRITING 2025).txt"),
-            Path("test_uploads/real_test_batch/MHHXGMXE 50 (SA24D ENG 5 WRITING 2025).txt"),
-        ]
+        essay_files = load_eng5_runner_student_files(max_files=2)
 
         try:
             batch_id, corr = await harness.setup_guest_batch(essay_files, user=test_teacher)
@@ -188,12 +181,7 @@ class TestE2EIdentityThreading:
         harness = PipelineTestHarness(service_manager, kafka_mgr, auth_manager)
 
         # Larger batch for realistic testing
-        essay_files = [
-            Path("test_uploads/real_test_batch/MHHXGMXL 50 (SA24D ENG 5 WRITING 2025).txt"),
-            Path("test_uploads/real_test_batch/MHHXGMXE 50 (SA24D ENG 5 WRITING 2025).txt"),
-            Path("test_uploads/real_test_batch/MHHXGMUX 50 (SA24D ENG 5 WRITING 2025).txt"),
-            Path("test_uploads/real_test_batch/MHHXGMUU 50 (SA24D ENG 5 WRITING 2025).txt"),
-        ]
+        essay_files = load_eng5_runner_student_files(max_files=4)
 
         try:
             batch_id, corr = await harness.setup_guest_batch(essay_files)
@@ -238,10 +226,7 @@ class TestE2EIdentityThreading:
         # Individual user (no org_id)
         individual_user = auth_manager.create_individual_user(user_id="individual_user_123")
 
-        essay_files = [
-            Path("test_uploads/real_test_batch/MHHXGMXL 50 (SA24D ENG 5 WRITING 2025).txt"),
-            Path("test_uploads/real_test_batch/MHHXGMXE 50 (SA24D ENG 5 WRITING 2025).txt"),
-        ]
+        essay_files = load_eng5_runner_student_files(max_files=2)
 
         try:
             batch_id, corr = await harness.setup_guest_batch(essay_files, user=individual_user)
@@ -285,10 +270,7 @@ class TestE2EIdentityThreading:
             user_id="lärare_åsa_123", org_id="skolan_västerås"
         )
 
-        essay_files = [
-            Path("test_uploads/real_test_batch/MHHXGMXL 50 (SA24D ENG 5 WRITING 2025).txt"),
-            Path("test_uploads/real_test_batch/MHHXGMXE 50 (SA24D ENG 5 WRITING 2025).txt"),
-        ]
+        essay_files = load_eng5_runner_student_files(max_files=2)
 
         try:
             batch_id, corr = await harness.setup_guest_batch(essay_files, user=swedish_user)

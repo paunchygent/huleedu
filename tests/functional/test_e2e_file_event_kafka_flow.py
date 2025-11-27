@@ -13,7 +13,6 @@ import asyncio
 import json
 import uuid
 from io import BytesIO
-from pathlib import Path
 from typing import Any, AsyncGenerator
 
 import aiohttp
@@ -23,6 +22,7 @@ from aiokafka import AIOKafkaConsumer
 from huleedu_service_libs.redis_client import RedisClient
 
 from tests.utils.auth_manager import AuthTestManager
+from tests.utils.eng5_runner_samples import load_eng5_runner_student_files
 from tests.utils.service_test_manager import ServiceTestManager
 
 
@@ -31,16 +31,17 @@ class TestEndToEndFileEventKafkaFlow:
 
     @staticmethod
     def _load_valid_essay_bytes() -> bytes:
-        """Load a real essay sample if available; otherwise generate a validation-safe payload."""
-        sample_dir = Path("test_uploads/real_test_batch")
-        if sample_dir.exists():
-            for candidate in sample_dir.glob("*.txt"):
-                try:
-                    data = candidate.read_bytes()
-                    if len(data) > 200:  # ensure comfortably above MIN_CONTENT_LENGTH
-                        return data
-                except Exception:
-                    continue
+        """
+        Load an ENG5 runner essay sample if available; otherwise generate a validation-safe
+        payload.
+        """
+        try:
+            essay_files = load_eng5_runner_student_files(max_files=1)
+            data = essay_files[0].read_bytes()
+            if len(data) > 200:
+                return data
+        except Exception:
+            pass
         # Fallback: generate sufficiently long plain-text content
         return ("This is a validation-safe test essay content. " * 20).encode()
 

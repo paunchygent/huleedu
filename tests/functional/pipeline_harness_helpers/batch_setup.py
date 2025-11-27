@@ -1,6 +1,7 @@
 """Batch setup helper for pipeline tests."""
 
 import asyncio
+import os
 import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, List, Optional, Tuple
@@ -97,6 +98,7 @@ class BatchSetupHelper:
             files=files_data,
             user=teacher_user,
             correlation_id=correlation_id,
+            assignment_id=os.getenv("FUNCTIONAL_ASSIGNMENT_ID", "test_eng5_writing_2025"),
         )
         logger.info(f"✅ File upload successful: {upload_result}")
 
@@ -211,6 +213,7 @@ class BatchSetupHelper:
             files=files_data,
             user=user,
             correlation_id=correlation_id,
+            assignment_id=os.getenv("FUNCTIONAL_ASSIGNMENT_ID", "test_eng5_writing_2025"),
         )
         logger.info(f"✅ File upload successful: {upload_result}")
 

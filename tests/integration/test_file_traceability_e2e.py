@@ -189,6 +189,7 @@ class TestFileTraceabilityE2E:
             assert slot_data["file_upload_id"] == file_upload_id
             assert slot_data["essay_id"] in essay_ids  # Must be one of pre-generated IDs
             assert slot_data["text_storage_id"] == content_event.text_storage_id
+            assert slot_data["original_file_name"] == "test_essay.txt"
 
             # Validate correlation across events
             assert slot_assigned_event["correlation_id"] == str(correlation_id), (
