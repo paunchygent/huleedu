@@ -71,6 +71,14 @@ class BatchRegistrationRequestV1(BaseModel):
     cj_default_temperature: float | None = Field(
         default=None, ge=0.0, le=2.0, description="Default temperature for CJ assessment LLM."
     )
+    assignment_id: str | None = Field(
+        default=None,
+        max_length=100,
+        description=(
+            "Optional assignment identifier for CJ-grade calibration. "
+            "Populated when pipeline requests provide assignment context."
+        ),
+    )
 
     @model_validator(mode="after")
     def validate_essay_count_consistency(self) -> BatchRegistrationRequestV1:

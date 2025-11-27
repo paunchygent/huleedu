@@ -586,6 +586,7 @@ class TestServiceRequestDispatchBusinessImpact:
                 user_id="test-user",
                 org_id=None,
                 correlation_id=correlation_id,
+                assignment_id=None,
             )
 
         # Assert: Business impact verification

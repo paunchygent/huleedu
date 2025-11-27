@@ -60,6 +60,7 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 ## ➡️ Forward to next agent
 
 ### Priority 1: assignment_id Propagation Phase A (HIGH)
+STATUS: COMPLETED (Phase A implemented on 2025-11-27)
 Implement: `TASKS/assessment/propagate-assignment-id-from-bos-to-cj-request-phase-a.md`
 1. Add `assignment_id` field to `BatchServiceCJAssessmentInitiateCommandDataV1`
 2. BOS: pass `assignment_id` from `batch_metadata` to command

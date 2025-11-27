@@ -431,6 +431,7 @@ class SpecializedServiceRequestDispatcher(Protocol):
         correlation_id: UUID,
         session: AsyncSession | None = None,
         student_prompt_ref: Any | None = None,  # StorageReferenceMetadata
+        assignment_id: str | None = None,
     ) -> None:
         """Dispatch CJ assessment requests to CJ Assessment Service with optional prompt reference."""
         ...

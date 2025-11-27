@@ -42,6 +42,9 @@ class BatchRegistrationRequestV1(BaseModel):
     cj_default_llm_model: str | None = None
     cj_default_temperature: float | None = Field(default=None, ge=0.0, le=2.0)
 
+    # Optional assignment context for CJ calibration (populated from pipeline requests)
+    assignment_id: str | None = None
+
     @model_validator(mode="after")
     def validate_essay_count_consistency(self) -> BatchRegistrationRequestV1:
         if self.essay_ids and len(self.essay_ids) != self.expected_essay_count:

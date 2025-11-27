@@ -202,10 +202,15 @@ class ClientPipelineRequestHandler:
                         if prompt_payload.assignment_id:
                             prompt_attached = True
                             prompt_source = "canonical"
+                            # Persist assignment context into batch registration metadata
+                            setattr(batch_context, "assignment_id", prompt_payload.assignment_id)
                         if prompt_payload.cms_prompt_ref:
                             prompt_attached = True
                             prompt_source = "cms"
                             batch_context.student_prompt_ref = prompt_payload.cms_prompt_ref
+
+                        # Persist updated batch context when prompt metadata is present
+                        if prompt_payload.assignment_id or prompt_payload.cms_prompt_ref:
                             try:
                                 await self.batch_repo.store_batch_context(
                                     batch_id=batch_id,
@@ -214,7 +219,7 @@ class ClientPipelineRequestHandler:
                                 )
                             except Exception as e:  # pragma: no cover - defensive logging
                                 logger.warning(
-                                    "Failed to persist updated student_prompt_ref in batch context",
+                                    "Failed to persist updated batch context with prompt metadata",
                                     extra={
                                         "batch_id": batch_id,
                                         "requested_pipeline": requested_pipeline,

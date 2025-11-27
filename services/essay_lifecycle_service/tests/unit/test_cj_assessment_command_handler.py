@@ -124,6 +124,7 @@ class TestCJAssessmentCommandHandler:
             course_code=CourseCode.ENG5,
             class_type="REGULAR",
             student_prompt_ref=student_prompt_ref,
+            assignment_id="assignment-xyz",
         )
 
     # Test: Successful CJ Assessment Command Processing
@@ -208,6 +209,7 @@ class TestCJAssessmentCommandHandler:
                 correlation_id=correlation_id,
                 session=ANY,  # session parameter
                 student_prompt_ref=cj_assessment_command_data.student_prompt_ref,
+                assignment_id=cj_assessment_command_data.assignment_id,
             )
 
     # Test: State Machine Transition Failure
@@ -356,6 +358,7 @@ class TestCJAssessmentCommandHandler:
             assert kwargs["user_id"] == "multi-essay-user-123"
             assert kwargs["org_id"] == "multi-essay-org-456"
             assert "session" in kwargs  # Verify session parameter is passed
+            assert kwargs.get("assignment_id") is None
 
     # Test: Custom Command Data Propagation
     @pytest.mark.asyncio
@@ -417,6 +420,7 @@ class TestCJAssessmentCommandHandler:
                 correlation_id=correlation_id,
                 session=ANY,  # session parameter
                 student_prompt_ref=None,  # Command data has None, dispatcher would hydrate if present
+                assignment_id=None,
             )
 
     # Test: Create command with course code
@@ -572,6 +576,7 @@ class TestCJAssessmentCommandHandler:
                 correlation_id=correlation_id,
                 session=ANY,  # session parameter
                 student_prompt_ref=command_data.student_prompt_ref,
+                assignment_id=None,
             )
 
     # Test: Create command that should fail validation

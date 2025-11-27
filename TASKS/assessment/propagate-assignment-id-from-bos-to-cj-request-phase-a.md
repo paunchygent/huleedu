@@ -2,7 +2,7 @@
 id: 'propagate-assignment-id-from-bos-to-cj-request-phase-a'
 title: 'Propagate assignment_id from BOS to CJ request (Phase A)'
 type: 'task'
-status: 'in_progress'
+status: 'completed'
 priority: 'high'
 domain: 'assessment'
 service: 'batch_orchestrator_service'

@@ -231,6 +231,7 @@ class CJAssessmentCommandHandler:
                             correlation_id=correlation_id,
                             session=session,
                             student_prompt_ref=command_data.student_prompt_ref,
+                            assignment_id=command_data.assignment_id,
                         )
 
                         logger.info(

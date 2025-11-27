@@ -120,3 +120,10 @@ class BatchServiceCJAssessmentInitiateCommandDataV1(BaseEventData):
     # Educational context (from Class Management Service via enhanced BatchEssaysReady)
     # Note: CJ assessment works identically for GUEST and REGULAR classes
     class_type: str  # GUEST or REGULAR - for audit/reporting purposes only
+
+    # Assignment context (from client pipeline request via BOS metadata)
+    assignment_id: str | None = Field(
+        default=None,
+        max_length=100,
+        description="Optional assignment identifier for CJ-grade calibration",
+    )

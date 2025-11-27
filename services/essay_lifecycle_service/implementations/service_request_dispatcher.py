@@ -289,6 +289,7 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
         correlation_id: UUID,
         session: AsyncSession | None = None,
         student_prompt_ref: StorageReferenceMetadata | None = None,
+        assignment_id: str | None = None,
     ) -> None:
         """Dispatch CJ assessment request to CJ Assessment Service with optional prompt reference."""
         from datetime import UTC, datetime
@@ -334,6 +335,7 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
                 course_code=course_code,
                 student_prompt_ref=student_prompt_ref,
                 llm_config_overrides=None,
+                assignment_id=assignment_id,
                 user_id=user_id,
                 org_id=org_id,
             )

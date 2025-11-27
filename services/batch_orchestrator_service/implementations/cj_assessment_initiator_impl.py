@@ -99,6 +99,8 @@ class DefaultCJAssessmentInitiator(CJAssessmentInitiatorProtocol):
                 # Educational context - determine from class_id presence
                 # Services needing teacher context should query CMS directly
                 class_type="REGULAR" if batch_context.class_id else "GUEST",
+                # Assignment context propagated from pipeline request (if available)
+                assignment_id=getattr(batch_context, "assignment_id", None),
             )
 
             # Create EventEnvelope for CJ command
