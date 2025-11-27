@@ -271,14 +271,16 @@ class EssayResultUpdater:
         self,
         essay_id: str,
         file_upload_id: str,
-        text_storage_id: Optional[str] = None,
+        text_storage_id: str,
+        filename: str,
     ) -> None:
-        """Update essay with file_upload_id for traceability.
+        """Update essay with file_upload_id and filename for traceability.
 
         Args:
             essay_id: Essay identifier
             file_upload_id: File upload identifier for traceability
-            text_storage_id: Optional text storage identifier
+            text_storage_id: Text storage identifier
+            filename: Original filename for result display
         """
         async with self.session_factory() as session:
             # Check if essay exists, if not create it
@@ -290,8 +292,8 @@ class EssayResultUpdater:
             if essay:
                 # Update existing essay
                 essay.file_upload_id = file_upload_id
-                if text_storage_id:
-                    essay.original_text_storage_id = text_storage_id
+                essay.original_text_storage_id = text_storage_id
+                essay.filename = filename
                 essay.updated_at = datetime.now(UTC).replace(tzinfo=None)
             else:
                 # Create new essay record without batch association
@@ -302,6 +304,7 @@ class EssayResultUpdater:
                     # when batch is registered
                     file_upload_id=file_upload_id,
                     original_text_storage_id=text_storage_id,
+                    filename=filename,
                 )
                 session.add(essay)
 
@@ -311,6 +314,7 @@ class EssayResultUpdater:
                 "Updated essay file mapping",
                 essay_id=essay_id,
                 file_upload_id=file_upload_id,
+                filename=filename,
                 is_new=essay is None,
             )
 

@@ -269,3 +269,44 @@ async def test_success_event_includes_both_storage_ids() -> None:
     assert published_event.original_file_name == file_name
     assert published_event.raw_file_storage_id == "raw_storage_id_123"
     assert published_event.text_storage_id == "text_storage_id_456"
+
+
+@pytest.mark.asyncio
+async def test_process_single_file_updates_repository_on_success() -> None:
+    """Ensure repository is updated with storage IDs when provided."""
+    batch_id = str(uuid.uuid4())
+    file_content = b"Valid essay content"
+    file_name = "valid.txt"
+    correlation_id = uuid.uuid4()
+
+    text_extractor = AsyncMock()
+    content_validator = AsyncMock()
+    content_client = AsyncMock()
+    event_publisher = AsyncMock()
+    file_repository = AsyncMock()
+
+    text_extractor.extract_text.return_value = "Valid essay content"
+    content_validator.validate_content.return_value = None
+    content_client.store_content.side_effect = ["raw_storage_id_123", "text_storage_id_456"]
+
+    file_upload_id = str(uuid.uuid4())
+    await process_single_file_upload(
+        batch_id=batch_id,
+        file_upload_id=file_upload_id,
+        file_content=file_content,
+        file_name=file_name,
+        main_correlation_id=correlation_id,
+        text_extractor=text_extractor,
+        content_validator=content_validator,
+        content_client=content_client,
+        event_publisher=event_publisher,
+        file_repository=file_repository,
+    )
+
+    # Two updates: IN_PROGRESS (raw) and COMPLETED (with text_storage_id)
+    assert file_repository.update_file_processing_status.await_count == 2
+    completed_call = file_repository.update_file_processing_status.await_args_list[-1]
+    kwargs = completed_call.kwargs
+    assert kwargs["status"] == ProcessingStatus.COMPLETED
+    assert kwargs["raw_file_storage_id"] == "raw_storage_id_123"
+    assert kwargs["text_storage_id"] == "text_storage_id_456"

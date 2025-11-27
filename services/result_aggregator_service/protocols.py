@@ -123,9 +123,10 @@ class BatchRepositoryProtocol(Protocol):
         self,
         essay_id: str,
         file_upload_id: str,
-        text_storage_id: Optional[str] = None,
+        text_storage_id: str,
+        filename: str,
     ) -> None:
-        """Update essay with file_upload_id for traceability."""
+        """Update essay with file_upload_id and filename for traceability."""
         ...
 
     async def associate_essay_with_batch(

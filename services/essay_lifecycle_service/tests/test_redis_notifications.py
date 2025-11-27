@@ -117,15 +117,13 @@ class TestRedisNotifications:
         """Test BatchLifecyclePublisher interface for slot assignment events."""
         # Arrange - Create proper slot assignment event data
         from common_core.events.essay_lifecycle_events import EssaySlotAssignedV1
-        from common_core.metadata_models import SystemProcessingMetadata
 
         event_data = EssaySlotAssignedV1(
             batch_id="test_batch_123",
             essay_id="essay_123",
             file_upload_id="upload_456",
-            slot_assignment_id="slot_789",
             text_storage_id="storage_abc",
-            metadata=SystemProcessingMetadata(entity_id="essay_123", entity_type="essay"),
+            original_file_name="test_essay.docx",
         )
         correlation_id = uuid4()
 

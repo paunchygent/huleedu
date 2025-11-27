@@ -112,6 +112,7 @@ class ContentAssignmentService(ContentAssignmentProtocol):
             essay_id=final_essay_id,
             file_upload_id=content_metadata.get("file_upload_id", "unknown"),
             text_storage_id=text_storage_id,
+            original_file_name=content_metadata.get("original_file_name", "unknown"),
             correlation_id=correlation_id,
         )
 

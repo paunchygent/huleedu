@@ -292,13 +292,14 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
         self,
         essay_id: str,
         file_upload_id: str,
-        text_storage_id: Optional[str] = None,
+        text_storage_id: str,
+        filename: str,
     ) -> None:
-        """Update essay with file_upload_id for traceability."""
+        """Update essay with file_upload_id and filename for traceability."""
         start_time = time.perf_counter()
         try:
             await self.essay_updater.update_essay_file_mapping(
-                essay_id, file_upload_id, text_storage_id
+                essay_id, file_upload_id, text_storage_id, filename
             )
 
             duration = time.perf_counter() - start_time

@@ -206,6 +206,32 @@ class TestFileRoutesValidation:
         assert "error" in data
         assert "batch_id is required" in data["error"]
 
+    async def test_upload_batch_files_with_assignment_id_forwards_to_repository(
+        self,
+        app_client: QuartTestClient,
+        mock_file_repository: AsyncMock,
+        mock_batch_validator: AsyncMock,
+    ) -> None:
+        """Test assignment_id is forwarded to repository during upload."""
+        mock_batch_validator.can_modify_batch_files.return_value = None
+        file_data = BytesIO(b"Traceable essay content")
+        file_storage = FileStorage(
+            stream=file_data, filename="traceable.txt", content_type="text/plain"
+        )
+        assignment_id = "eng5-assignment-2025"
+
+        response = await app_client.post(
+            "/v1/files/batch",
+            form={"batch_id": "traceable-batch", "assignment_id": assignment_id},
+            files={"files": file_storage},
+            headers={"X-User-ID": "user-123"},
+        )
+
+        assert response.status_code == 202
+        mock_file_repository.create_file_upload.assert_called_once()
+        call_kwargs = mock_file_repository.create_file_upload.call_args.kwargs
+        assert call_kwargs["assignment_id"] == assignment_id
+
     async def test_upload_batch_files_no_files_provided(
         self, app_client: QuartTestClient, mock_batch_validator: AsyncMock
     ) -> None:

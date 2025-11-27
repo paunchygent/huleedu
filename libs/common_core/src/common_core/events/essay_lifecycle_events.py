@@ -32,6 +32,7 @@ class EssaySlotAssignedV1(BaseModel):
     essay_id: str = Field(description="Assigned essay ID from pre-generated slots")
     file_upload_id: str = Field(description="Original upload tracking identifier")
     text_storage_id: str = Field(description="Storage ID of assigned content")
+    original_file_name: str = Field(description="Original filename for result display")
     correlation_id: UUID = Field(default_factory=uuid4, description="Request correlation ID")
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 

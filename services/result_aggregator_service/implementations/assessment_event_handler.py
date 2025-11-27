@@ -54,11 +54,12 @@ class AssessmentEventHandler:
                 file_upload_id=data.file_upload_id,
             )
 
-            # Update the essay record with file_upload_id mapping
+            # Update the essay record with file_upload_id mapping and filename
             await self.batch_repository.update_essay_file_mapping(
                 essay_id=data.essay_id,
                 file_upload_id=data.file_upload_id,
                 text_storage_id=data.text_storage_id,
+                filename=data.original_file_name,
             )
 
             # Invalidate cache to ensure fresh data includes file_upload_id

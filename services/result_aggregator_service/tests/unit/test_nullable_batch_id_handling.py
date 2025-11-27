@@ -177,26 +177,18 @@ def mock_session() -> AsyncMock:
 class TestUpdateEssayFileMapping:
     """Tests for update_essay_file_mapping method handling nullable batch_id."""
 
-    @pytest.mark.parametrize(
-        "text_storage_id,expected_text_storage",
-        [
-            ("storage-123", "storage-123"),
-            (None, None),
-            ("", None),  # Empty string should be treated as None
-        ],
-    )
     @pytest.mark.asyncio
     async def test_creates_essay_with_null_batch_id_when_essay_not_exists(
         self,
         batch_repository: BatchRepositoryProtocol,
         mock_session: AsyncMock,
-        text_storage_id: str | None,
-        expected_text_storage: str | None,
     ) -> None:
         """Test creating essay with null batch_id when essay doesn't exist."""
         # Arrange
         essay_id = "essay-123"
         file_upload_id = "upload-456"
+        text_storage_id = "storage-123"
+        filename = "test_essay.docx"
 
         # Mock SQLAlchemy query to return no existing essay
         mock_result = Mock()
@@ -210,6 +202,7 @@ class TestUpdateEssayFileMapping:
             essay_id=essay_id,
             file_upload_id=file_upload_id,
             text_storage_id=text_storage_id,
+            filename=filename,
         )
 
         # Assert - Verify new essay was created with null batch_id
@@ -219,47 +212,39 @@ class TestUpdateEssayFileMapping:
         assert created_essay.essay_id == essay_id
         assert created_essay.batch_id is None  # Critical: batch_id should be None
         assert created_essay.file_upload_id == file_upload_id
-        if expected_text_storage:
-            assert created_essay.original_text_storage_id == expected_text_storage
+        assert created_essay.original_text_storage_id == text_storage_id
+        assert created_essay.filename == filename
 
         # Verify database operations
         mock_session.execute.assert_called_once()
         mock_session.commit.assert_called_once()
 
     @pytest.mark.parametrize(
-        "existing_batch_id,existing_text_storage,new_text_storage,expected_text_storage",
+        "existing_batch_id",
         [
-            (None, None, "new-storage", "new-storage"),  # Orphaned essay gets text storage
-            ("batch-456", "old-storage", "new-storage", "new-storage"),  # Associated essay updates
-            (None, "old-storage", None, "old-storage"),  # No text storage provided, keep existing
-            (
-                "batch-789",
-                None,
-                "new-storage",
-                "new-storage",
-            ),  # Associated essay gets first text storage
+            None,  # Orphaned essay (slot assignment before batch registration)
+            "batch-456",  # Associated essay (batch registration first)
         ],
     )
     @pytest.mark.asyncio
-    async def test_updates_existing_essay_file_mapping(
+    async def test_updates_existing_essay_file_mapping_preserves_batch_id(
         self,
         batch_repository: BatchRepositoryProtocol,
         mock_session: AsyncMock,
         existing_batch_id: str | None,
-        existing_text_storage: str | None,
-        new_text_storage: str | None,
-        expected_text_storage: str | None,
     ) -> None:
         """Test updating existing essay file mapping preserves batch association."""
         # Arrange
         essay_id = "essay-existing"
         file_upload_id = "upload-new"
+        text_storage_id = "new-storage"
+        filename = "test_essay.docx"
 
         # Create mock existing essay
         mock_essay = Mock(spec=EssayResult)
         mock_essay.essay_id = essay_id
         mock_essay.batch_id = existing_batch_id
-        mock_essay.original_text_storage_id = existing_text_storage
+        mock_essay.original_text_storage_id = "old-storage"
 
         # Mock SQLAlchemy query to return existing essay
         mock_result = Mock()
@@ -272,14 +257,15 @@ class TestUpdateEssayFileMapping:
         await batch_repository.update_essay_file_mapping(
             essay_id=essay_id,
             file_upload_id=file_upload_id,
-            text_storage_id=new_text_storage,
+            text_storage_id=text_storage_id,
+            filename=filename,
         )
 
         # Assert - Verify existing essay was updated
         assert mock_essay.file_upload_id == file_upload_id
         assert mock_essay.batch_id == existing_batch_id  # Preserve existing batch association
-        if new_text_storage:
-            assert mock_essay.original_text_storage_id == expected_text_storage
+        assert mock_essay.original_text_storage_id == text_storage_id
+        assert mock_essay.filename == filename
 
         # Verify no new essay was added
         mock_session.add.assert_not_called()
@@ -298,6 +284,8 @@ class TestUpdateEssayFileMapping:
         # Arrange
         essay_id = "essay-error"
         file_upload_id = "upload-error"
+        text_storage_id = "storage-error"
+        filename = "error_essay.docx"
 
         # Mock database error
         mock_session.execute.side_effect = Exception("Database connection lost")
@@ -317,6 +305,8 @@ class TestUpdateEssayFileMapping:
             await batch_repository.update_essay_file_mapping(
                 essay_id=essay_id,
                 file_upload_id=file_upload_id,
+                text_storage_id=text_storage_id,
+                filename=filename,
             )
 
         # Verify error metrics were recorded

@@ -223,6 +223,7 @@ class FileRepositoryProtocol(Protocol):
         batch_id: str,
         user_id: str,
         filename: str,
+        assignment_id: str | None = None,
         file_size_bytes: int | None = None,
         correlation_id: UUID | None = None,
     ) -> None:
@@ -234,6 +235,7 @@ class FileRepositoryProtocol(Protocol):
             batch_id: Associated batch identifier
             user_id: User who uploaded the file
             filename: Original file name
+            assignment_id: Optional assignment identifier for traceability/anchors
             file_size_bytes: Size of the file in bytes
             correlation_id: Request correlation ID for tracing
         """

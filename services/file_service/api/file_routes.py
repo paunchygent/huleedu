@@ -49,6 +49,7 @@ async def upload_batch_files(
     try:
         form_data = await request.form
         batch_id = form_data.get("batch_id")
+        assignment_id = form_data.get("assignment_id")
         files = await request.files
 
         if not batch_id:
@@ -112,6 +113,7 @@ async def upload_batch_files(
                     batch_id=batch_id,
                     user_id=user_id,
                     filename=file_storage.filename,
+                    assignment_id=assignment_id,
                     file_size_bytes=len(file_content),
                     correlation_id=main_correlation_id,
                 )
@@ -246,6 +248,8 @@ async def add_files_to_batch(
     """
     try:
         files = await request.files
+        form_data = await request.form
+        assignment_id = form_data.get("assignment_id")
 
         # Get user_id from authenticated request (provided by API Gateway)
         user_id = request.headers.get("X-User-ID")
@@ -312,6 +316,7 @@ async def add_files_to_batch(
                     batch_id=batch_id,
                     user_id=user_id,
                     filename=file_storage.filename,
+                    assignment_id=assignment_id,
                     file_size_bytes=len(file_content),
                     correlation_id=main_correlation_id,
                 )

@@ -225,6 +225,7 @@ async def upload_batch_files(
     Content-Type: multipart/form-data
 
     batch_id: string (required) - The batch identifier
+    assignment_id: string (optional) - Assignment identifier for traceability
     files: file[] (required) - Array of files to upload
     ```
 
@@ -275,6 +276,9 @@ async def upload_batch_files(
                 correlation_id=correlation_id,
             )
 
+        assignment_id_value = form.get("assignment_id")
+        assignment_id = assignment_id_value if isinstance(assignment_id_value, str) else None
+
         # Extract and validate files from form
         files: list[UploadFile] = []
 
@@ -311,7 +315,7 @@ async def upload_batch_files(
     endpoint = "/files/batch"
 
     logger.info(
-        f"File upload request: batch_id='{batch_id}', "
+        f"File upload request: batch_id='{batch_id}', assignment_id='{assignment_id}', "
         f"files_count={len(files)}, user_id='{user_id}', org_id='{org_id}', correlation_id='{correlation_id}'"
     )
 
@@ -338,6 +342,8 @@ async def upload_batch_files(
             form_data = {
                 "batch_id": str(batch_id),
             }
+            if assignment_id:
+                form_data["assignment_id"] = assignment_id
 
             # Add authentication header for file service
             # Ensure headers are ASCII-safe per HTTP/1.1 requirements

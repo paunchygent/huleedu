@@ -65,6 +65,7 @@ class FileRepository(FileRepositoryProtocol):
         batch_id: str,
         user_id: str,
         filename: str,
+        assignment_id: str | None = None,
         file_size_bytes: int | None = None,
         correlation_id: UUID | None = None,
     ) -> None:
@@ -76,6 +77,7 @@ class FileRepository(FileRepositoryProtocol):
             batch_id: Associated batch identifier
             user_id: User who uploaded the file
             filename: Original file name
+            assignment_id: Optional assignment identifier for traceability
             file_size_bytes: Size of the file in bytes
             correlation_id: Request correlation ID for tracing
         """
@@ -84,6 +86,7 @@ class FileRepository(FileRepositoryProtocol):
                 file_upload_id=file_upload_id,
                 batch_id=batch_id,
                 user_id=user_id,
+                assignment_id=assignment_id,
                 filename=filename,
                 file_size_bytes=file_size_bytes,
                 correlation_id=correlation_id,
@@ -248,6 +251,7 @@ class MinimalFileRepository(FileRepositoryProtocol):
         batch_id: str,
         user_id: str,
         filename: str,
+        assignment_id: str | None = None,
         file_size_bytes: int | None = None,
         correlation_id: UUID | None = None,
     ) -> None:
@@ -259,6 +263,7 @@ class MinimalFileRepository(FileRepositoryProtocol):
                 "batch_id": batch_id,
                 "user_id": user_id,
                 "filename": filename,
+                "assignment_id": assignment_id,
             },
         )
 

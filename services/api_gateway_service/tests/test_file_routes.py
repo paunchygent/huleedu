@@ -122,12 +122,37 @@ async def test_successful_file_upload(client_with_mocks, mock_http_client):
     call_args = mock_http_client.post.call_args
 
     # Verify URL
-    assert call_args[0][0] == "http://file_service:8000/v1/files/batch"
+    assert call_args[0][0] == "http://file_service:7001/v1/files/batch"
 
     # Verify headers include authentication
     headers = call_args.kwargs["headers"]
     assert headers["X-User-ID"] == "test_user_123"
     assert "X-Correlation-ID" in headers
+
+
+@pytest.mark.asyncio
+async def test_file_upload_forwards_assignment_id(client_with_mocks, mock_http_client):
+    """Ensure assignment_id in form data is forwarded to File Service."""
+    mock_response = Mock()
+    mock_response.status_code = 201
+    mock_response.json.return_value = {
+        "message": "Files uploaded successfully",
+        "batch_id": "batch_with_assignment",
+    }
+    mock_http_client.post.return_value = mock_response
+
+    test_file = create_test_file("essay1.txt", "This is a test essay.")
+    assignment_id = "eng5-assignment-2025"
+
+    response = client_with_mocks.post(
+        "/v1/files/batch",
+        files={"files": test_file},
+        data={"batch_id": "batch_with_assignment", "assignment_id": assignment_id},
+    )
+
+    assert response.status_code == 201
+    call_args = mock_http_client.post.call_args
+    assert call_args.kwargs["data"]["assignment_id"] == assignment_id
 
 
 @pytest.mark.asyncio

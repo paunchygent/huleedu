@@ -233,6 +233,7 @@ class TestEventOrderingIndependence:
             essay_id=essay_id,
             file_upload_id=file_upload_id,
             text_storage_id="storage-123",
+            original_file_name="guest_essay.docx",
             correlation_id=uuid4(),
         )
 
@@ -303,6 +304,7 @@ class TestEventOrderingIndependence:
             essay_id=essay_id,
             file_upload_id=str(uuid4()),
             text_storage_id="storage-123",
+            original_file_name="regular_essay.docx",
             correlation_id=uuid4(),
         )
 
@@ -348,6 +350,7 @@ class TestEventOrderingIndependence:
             essay_id=essay_id_1,
             file_upload_id=str(uuid4()),
             text_storage_id="storage-1",
+            original_file_name="guest_essay_1.docx",
             correlation_id=uuid4(),
         )
 

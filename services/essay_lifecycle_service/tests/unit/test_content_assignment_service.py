@@ -351,6 +351,7 @@ class TestContentAssignmentService:
         assert slot_event.essay_id == assigned_essay_id
         assert slot_event.text_storage_id == text_storage_id
         assert slot_event.file_upload_id == sample_content_metadata["file_upload_id"]
+        assert slot_event.original_file_name == sample_content_metadata["original_file_name"]
         assert slot_event_call.kwargs["correlation_id"] == correlation_id
         assert slot_event_call.kwargs["session"] == mock_session
 

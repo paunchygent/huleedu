@@ -227,6 +227,16 @@ async def process_single_file_upload(
                 batch_id=str(batch_id),
             ).inc()
 
+        # Update repository status for traceability
+        if file_repository:
+            await file_repository.update_file_processing_status(
+                file_upload_id=file_upload_id,
+                status=ProcessingStatus.FAILED,
+                raw_file_storage_id=raw_file_storage_id,
+                validation_error_code=FileValidationErrorCode.TEXT_EXTRACTION_FAILED.value,
+                validation_error_message=str(extraction_error),
+            )
+
         return {
             "file_name": file_name,
             "raw_file_storage_id": raw_file_storage_id,
@@ -281,6 +291,15 @@ async def process_single_file_upload(
                 validation_status=OperationStatus.FAILED.value,
                 batch_id=str(batch_id),
             ).inc()
+
+        if file_repository:
+            await file_repository.update_file_processing_status(
+                file_upload_id=file_upload_id,
+                status=ProcessingStatus.FAILED,
+                raw_file_storage_id=raw_file_storage_id,
+                validation_error_code=validation_error.error_detail.error_code,
+                validation_error_message=validation_error.error_detail.message,
+            )
 
         return {
             "file_name": file_name,
@@ -339,6 +358,14 @@ async def process_single_file_upload(
             validation_status=OperationStatus.SUCCESS.value,
             batch_id=str(batch_id),
         ).inc()
+
+    if file_repository:
+        await file_repository.update_file_processing_status(
+            file_upload_id=file_upload_id,
+            status=ProcessingStatus.COMPLETED,
+            raw_file_storage_id=raw_file_storage_id,
+            text_storage_id=text_storage_id,
+        )
 
     return {
         "file_name": file_name,

@@ -34,6 +34,12 @@ class FileUpload(Base):
     file_upload_id: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     batch_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     user_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    assignment_id: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True,
+        index=True,
+        doc="Optional assignment identifier for traceability and anchor lookups",
+    )
 
     # File metadata
     filename: Mapped[str] = mapped_column(String(500), nullable=False)
@@ -41,7 +47,12 @@ class FileUpload(Base):
 
     # Storage references
     raw_file_storage_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    text_storage_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    text_storage_id: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True,
+        index=True,
+        doc="Storage identifier for extracted plaintext",
+    )
 
     # Processing status
     processing_status: Mapped[str] = mapped_column(

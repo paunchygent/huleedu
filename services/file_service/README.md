@@ -10,6 +10,7 @@ The File Service implements a robust content ingestion and validation workflow:
 2. **Text Extraction**: The service extracts plaintext from the raw file bytes.
 3. **Content Validation**: The extracted text is validated against business rules (e.g., minimum/maximum length).
 4. **Conditional Event Publishing**: Based on the validation result, the service publishes one of two events to Kafka to coordinate with the Essay Lifecycle Service (ELS).
+5. **Traceability Persistence**: The `file_uploads` table now stores `raw_file_storage_id`, `text_storage_id`, and optional `assignment_id` to map CJ outputs back to original files.
 
 ## Architecture
 
