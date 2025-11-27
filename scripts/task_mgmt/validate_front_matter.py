@@ -64,6 +64,7 @@ ALLOWED_TOP_LEVEL_DIRS = {
 EXCLUDED_FILES = {
     "_REORGANIZATION_PROPOSAL.md",
     "INDEX.md",
+    "TASK_INDEX.md",
     "README.md",
     "HUB.md",
 }

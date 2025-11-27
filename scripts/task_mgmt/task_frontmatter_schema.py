@@ -7,6 +7,7 @@ from enum import Enum
 from typing import List, Optional
 
 from pydantic import BaseModel, Field
+from pydantic.config import ConfigDict
 
 
 class TaskStatus(str, Enum):
@@ -55,5 +56,5 @@ class TaskFrontmatter(BaseModel):
     related: List[str] = Field(default_factory=list)
     labels: List[str] = Field(default_factory=list)
 
-    class Config:
-        extra = "allow"  # be tolerant of ancillary fields while providing type hints
+    # Be tolerant of ancillary fields while still validating known keys
+    model_config = ConfigDict(extra="allow")

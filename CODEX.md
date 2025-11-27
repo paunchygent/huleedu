@@ -55,8 +55,10 @@ cross-service task context.
 
 **Validate:**
 ```bash
-python scripts/task_mgmt/validate_front_matter.py --verbose
-python scripts/docs_mgmt/validate_docs_structure.py --verbose
+pdm run python scripts/task_mgmt/validate_front_matter.py --verbose
+pdm run python scripts/task_mgmt/task_frontmatter_schema.py
+pdm run python scripts/task_mgmt/index_tasks.py --root "$(pwd)/TASKS" --out "/tmp/huleedu_tasks_index.md" --fail-on-missing
+pdm run python scripts/docs_mgmt/validate_docs_structure.py --verbose
 ```
 
 **Specs:** `TASKS/_REORGANIZATION_PROPOSAL.md`, `docs/DOCS_STRUCTURE_SPEC.md`, `.claude/CLAUDE_STRUCTURE_SPEC.md`
