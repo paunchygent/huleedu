@@ -29,6 +29,7 @@ from tests.utils.kafka_test_manager import KafkaTestManager
 from tests.utils.service_test_manager import ServiceTestManager
 
 
+@pytest.mark.slow  # uses 180s+ workflow monitors; treat as slow per functional guidance
 class TestClientPipelineResolutionWorkflow:
     """End-to-end tests for complete client pipeline resolution workflow."""
 
@@ -132,7 +133,14 @@ class TestClientPipelineResolutionWorkflow:
             print(f"📊 Full pipeline state: {pipeline_state}")
 
             # Verify the system is correctly waiting for client trigger
-            expected_statuses = ["pending_dependencies", "not_initialized", "not_found"]
+            # CJ is now opt-in at request time (flag removed); BOS may mark the phase
+            # skipped until a client pipeline request arrives.
+            expected_statuses = [
+                "pending_dependencies",
+                "not_initialized",
+                "not_found",
+                "skipped_by_user_config",
+            ]
             assert cj_assessment_status in expected_statuses, (
                 f"Expected cj_assessment to be one of {expected_statuses} "
                 f"(waiting for client trigger), but got: {cj_assessment_status}"

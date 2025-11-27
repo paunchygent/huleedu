@@ -20,6 +20,8 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 - Updated `tests/README.md` with new flow, marker guidance, and timeout/consolidation TODOs.
 - Validated: `docker compose ... --profile functional config` and `python -m py_compile tests/functional/conftest.py`.
 - Timeouts >60s now explicitly marked `@pytest.mark.slow`; `tests/README.md` updated to reflect dev stack only (no functional profile) and dev env vars to source from `.env`.
+- Baseline + fix: `tests/functional/test_e2e_client_pipeline_resolution_workflow.py` failed (CJ status `skipped_by_user_config` after flag removal). Added `@pytest.mark.slow` to class and expanded acceptable pre-trigger statuses to include `skipped_by_user_config`; reran file (`pdm run pytest-root ... -m docker`) → PASS (49s).
+- RED ALERT: CJ rankings cannot be mapped back to filenames in functional runs. `file_uploads` lacks `text_storage_id`, so CJ `text_storage_id` → filename join is impossible. Need ingestion to persist `text_storage_id`/essay id for traceability. Task opened: `TASKS/infrastructure/persist-text_storage_id-on-file-uploads-and-enable-mock-llm-for-functional-cj.md` (also to force mock LLM for functional CJ). Additionally, do not run CJ functional tests until uploads also carry `assignment_id` (needed for grade-projection/anchor pools) and the test essay set matches the ENG5 runner student essay bundle.
 
 ### Deprecate CJ registration flag at batch registration (started)
 - Step 1 done: marked field deprecated in `BatchRegistrationRequestV1` (code + docs) and added AGW warning log when the flag is set.
