@@ -850,6 +850,7 @@ class TestProcessAssessmentResult:
             entity_type="batch",
             batch_id=batch_id,
             cj_assessment_job_id=cj_job_id,
+            assignment_id="assignment-xyz",
             assessment_method="cj_assessment",
             model_used="gpt-4",
             model_provider="openai",
@@ -895,6 +896,10 @@ class TestProcessAssessmentResult:
         await event_processor.process_assessment_result(envelope, data)
 
         # Assert
+        mock_batch_repository.set_batch_assignment_id.assert_awaited_once_with(
+            batch_id=batch_id,
+            assignment_id="assignment-xyz",
+        )
         assert mock_batch_repository.update_essay_cj_assessment_result.call_count == 2
 
         # Check first essay

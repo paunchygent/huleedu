@@ -109,6 +109,11 @@ class AssessmentResultV1(BaseEventData):
     # Batch identification
     batch_id: str
     cj_assessment_job_id: str
+    assignment_id: str | None = Field(
+        default=None,
+        max_length=100,
+        description="Assignment identifier for this assessment batch, if available",
+    )
 
     # Assessment method tracking
     assessment_method: str  # "cj_assessment"
@@ -125,7 +130,8 @@ class AssessmentResultV1(BaseEventData):
     assessment_metadata: dict[str, Any] = Field(
         default_factory=dict,
         # Contains: anchor_essays_used, calibration_method, comparison_count,
-        # processing_duration_seconds, llm_temperature, assignment_id
+        # processing_duration_seconds, llm_temperature,
+        # assignment_id (legacy location; prefer top-level field)
     )
 
     assessed_at: datetime

@@ -238,6 +238,13 @@ class AssessmentResultV1(BaseEventData):
     batch_id: str = Field(description="BOS batch ID")
     cj_assessment_job_id: str = Field(description="Internal CJ batch ID")
 
+    # Assignment context (optional for backwards compatibility)
+    assignment_id: str | None = Field(
+        default=None,
+        max_length=100,
+        description="Assignment identifier for this assessment batch, if available",
+    )
+
     # Assessment method tracking
     assessment_method: str = Field(description="Method used: cj_assessment, nlp_random_forest, etc")
     model_used: str = Field(description="Specific model: claude-3-opus, gpt-4, etc")
@@ -265,7 +272,7 @@ class AssessmentResultV1(BaseEventData):
         # - comparison_count: int
         # - processing_duration_seconds: float
         # - llm_temperature: float
-        # - assignment_id: str | None
+        # - assignment_id: str | None  (legacy location; prefer top-level field)
     )
 
     # Timestamp

@@ -527,6 +527,7 @@ class TestDualEventPublishing:
         assert ras_envelope.data.event_name == ProcessingEvent.ASSESSMENT_RESULT_PUBLISHED
         assert ras_envelope.data.batch_id == "bos_123"
         assert ras_envelope.data.cj_assessment_job_id == "cj_456"
+        assert ras_envelope.data.assignment_id == "assignment_789"
         assert ras_envelope.data.assessment_method == "cj_assessment"
         assert ras_envelope.data.model_used == "gpt-4"
         assert ras_envelope.data.model_provider == "openai"

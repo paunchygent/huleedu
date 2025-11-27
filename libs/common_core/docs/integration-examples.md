@@ -101,6 +101,7 @@ class CJEventPublisher:
         rich_event = AssessmentResultV1(
             batch_id=batch_id,
             cj_assessment_job_id=job_id,
+            assignment_id=request.assignment_id,
             assessment_method="cj_assessment",
             model_used="claude-3-opus",
             model_provider="anthropic",

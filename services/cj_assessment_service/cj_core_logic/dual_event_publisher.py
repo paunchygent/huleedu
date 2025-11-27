@@ -206,6 +206,7 @@ async def publish_dual_assessment_events(
         entity_type="batch",
         batch_id=bos_batch_id,
         cj_assessment_job_id=cj_batch_id,
+        assignment_id=assignment_id,
         assessment_method="cj_assessment",
         model_used=settings.DEFAULT_LLM_MODEL,
         model_provider=settings.DEFAULT_LLM_PROVIDER.value,

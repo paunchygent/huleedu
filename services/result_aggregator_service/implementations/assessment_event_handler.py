@@ -93,6 +93,7 @@ class AssessmentEventHandler:
         """Process rich CJ assessment result event with business data."""
         try:
             batch_id = data.batch_id
+            assignment_id = data.assignment_id
 
             logger.info(
                 "Processing assessment results",
@@ -101,6 +102,13 @@ class AssessmentEventHandler:
                 essay_count=len(data.essay_results),
                 assessment_method=data.assessment_method,
             )
+
+            # Persist assignment context at batch level when available
+            if assignment_id is not None:
+                await self.batch_repository.set_batch_assignment_id(
+                    batch_id=batch_id,
+                    assignment_id=assignment_id,
+                )
 
             # Process each essay result (excluding anchors for student results)
             student_results = [r for r in data.essay_results if not r.is_anchor]
