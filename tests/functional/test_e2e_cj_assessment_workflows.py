@@ -72,6 +72,9 @@ class TestE2ECJAssessmentWorkflows:
         3) Wait for CJ thin completion event (ELS)
         4) Validate rich AssessmentResult event (RAS)
         """
+        # Use stable assignment identifier for CJ pipeline requests
+        assignment_id = os.getenv("FUNCTIONAL_ASSIGNMENT_ID", "test_eng5_writing_2025")
+
         # Managers and harness
         auth_manager = AuthTestManager()
         service_manager = ServiceTestManager(auth_manager=auth_manager)
@@ -91,6 +94,8 @@ class TestE2ECJAssessmentWorkflows:
                 expected_completion_event="cj_assessment.completed",
                 validate_phase_pruning=False,
                 timeout_seconds=240,
+                # Ensure assignment_id is threaded through the client request payload
+                prompt_payload={"assignment_id": assignment_id},
             )
 
             assert result.all_steps_completed, "CJ pipeline did not complete"
@@ -168,6 +173,8 @@ class TestE2ECJAssessmentWorkflows:
 
             # Validate the detailed results from RAS API
             assert detailed_results["batch_id"] == batch_id
+            # assignment_id should round-trip client → BOS → ELS → CJ → RAS
+            assert detailed_results.get("assignment_id") == assignment_id
             assert detailed_results["overall_status"] in [
                 "completed_successfully",
                 "completed_with_failures",
