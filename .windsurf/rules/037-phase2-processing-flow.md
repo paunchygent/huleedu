@@ -111,9 +111,9 @@ ClientBatchPipelineRequestV1:
     requested_services: list[str]  # ["spellcheck", "cj_assessment", "nlp"]
     priority: str = "normal"
 
-# Service initiation commands  
+# Service initiation commands
 BatchServiceSpellcheckInitiateCommandDataV1
-BatchServiceCJAssessmentInitiateCommandDataV1
+BatchServiceCJAssessmentInitiateCommandDataV1  # Includes optional assignment_id field
 BatchServiceNLPInitiateCommandDataV1
 ```
 

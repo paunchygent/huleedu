@@ -2,7 +2,7 @@
 id: "000-rule-index"
 type: "standards"
 created: 2025-05-25
-last_updated: 2025-11-17
+last_updated: 2025-11-27
 scope: "all"
 ---
 # HuleEdu Development Rules: Index
@@ -40,6 +40,8 @@ scope: "all"
 - [035-complete-processing-flow-overview.md](mdc:035-complete-processing-flow-overview.md): Complete processing flow overview
 - [036-phase1-processing-flow.md](mdc:036-phase1-processing-flow.md): Phase 1 processing flow documentation
 - [037-phase2-processing-flow.md](mdc:037-phase2-processing-flow.md): Phase 2 processing flow documentation
+- [038-file-upload-processing-flow.md](mdc:038-file-upload-processing-flow.md): File upload → essay slot assignment flow (FLOW-05)
+- [039-results-retrieval-flow.md](mdc:039-results-retrieval-flow.md): Results retrieval and aggregation flow (FLOW-06)
 
 ## Implementation & Coding Standards
 - [040-service-implementation-guidelines.md](mdc:040-service-implementation-guidelines.md): High-level service implementation principles and stack requirements
