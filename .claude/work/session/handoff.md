@@ -14,46 +14,25 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 
 ## 🎯 ACTIVE WORK (2025-11-27)
 
-### assignment_id Propagation Gap (NEW - high priority)
-**Root Cause Identified**: `assignment_id` passed in pipeline request but never reaches CJ Assessment Service.
+### Documentation Sprint COMPLETE
 
-**Flow Gap Analysis**:
+**Summary:** 3-day documentation sprint completed in single session.
 
-| Boundary | Contract | Status |
-|----------|----------|--------|
-| Client → BOS | `prompt_payload.assignment_id` | ✅ Present |
-| BOS → ELS | `BatchServiceCJAssessmentInitiateCommandDataV1` | ❌ Missing |
-| ELS → CJ | `ELS_CJAssessmentRequestV1` | ⚠️ Field exists, never populated |
-| CJ → RAS | `AssessmentResultV1` | ⚠️ In metadata only |
-| RAS Storage | `BatchResult` model | ❌ No column |
+**Deliverables Created:**
+- **Processing Flows:** 034 (inventory), 038 (file upload), 039 (results retrieval)
+- **ADRs:** 0003-0007 (5 forward-looking decisions) + template
+- **ADRs Archived:** 0008-0010 moved to `docs/decisions/_archive/` (premature drafts based on incorrect assumptions about entitlements, SSO, and RAS query patterns)
+- **Epics:** 4 epic definitions in `docs/product/epics/`
+- **Sprint Schedule:** `docs/product/sprint-schedule-2025-2026.md` (Sprint 1: Dec 2, 2025)
+- **Overview Docs:** Transformed `docs/overview/` with onboarding, architecture diagrams
+- **Documentation Index:** `docs/DOCUMENTATION_INDEX.md` - master navigation
 
-**Impact**:
-- CJ Assessment cannot mix anchor essays for grade calibration
-- RAS cannot show which assignment was processed
+**Validation Updates:**
+- Flow rules 037 and 037.1 updated with assignment_id documentation
+- Hook `enforce-docs-structure.sh` updated to allow root-level docs files + _archive subdirectories
+- `docs/DOCS_STRUCTURE_SPEC.md` updated with Section 3.0.1 (root-level files)
 
-**Tasks Created** (split by service boundary):
-- Phase A: `TASKS/assessment/propagate-assignment-id-from-bos-to-cj-request-phase-a.md`
-- Phase B: `TASKS/assessment/propagate-assignment-id-from-cj-to-ras-storage-phase-b.md`
-
-**Plan File**: `.claude/plans/cuddly-churning-sloth.md`
-
-### Filename Propagation (COMPLETED ✅)
-- Added `original_file_name: str` to `EssaySlotAssignedV1` event contract
-- Updated ELS `content_assignment_service.py` to include filename
-- Updated RAS protocol, handler, repository, and updater
-- Fixed JWT auth bug in `tests/utils/auth_manager.py` (added dotenv support)
-- Functional test `test_complete_cj_assessment_processing_pipeline` passing
-- Filename now populated in RAS results
-
-**Task**: `TASKS/assessment/filename-propagation-from-els-to-ras-for-teacher-result-visibility.md` (mark completed)
-
-### LLM Provider Configuration Hierarchy (COMPLETED)
-- Documented 3-tier override hierarchy
-- Created runbook: `docs/operations/llm-provider-configuration-hierarchy.md`
-
-### JWT Secret Fix (COMPLETED)
-- Fixed hardcoded `JWT_SECRET_KEY` in `docker-compose.dev.yml`
-- Fixed `tests/utils/auth_manager.py` to load from `.env` via `dotenv_values()`
+**Navigation:** See `docs/DOCUMENTATION_INDEX.md` for complete documentation map.
 
 ---
 
@@ -68,13 +47,20 @@ Implement: `TASKS/assessment/propagate-assignment-id-from-bos-to-cj-request-phas
 4. ELS: populate `ELS_CJAssessmentRequestV1.assignment_id`
 
 ### Priority 2: assignment_id Propagation Phase B
-Implement: `TASKS/assessment/propagate-assignment-id-from-cj-to-ras-storage-phase-b.md`
-1. Add `assignment_id` field to `AssessmentResultV1`
-2. CJ: populate in result event
-3. RAS: add column + migration + integration test (per rule 085)
-4. RAS: store in handler
 
+Implement: `TASKS/assessment/propagate-assignment-id-from-cj-to-ras-storage-phase-b.md`
+
+STATUS: COMPLETED (Phase B implemented on 2025-11-27)
+
+1. Added `assignment_id` to `AssessmentResultV1` and wired CJ dual event publisher to populate it.
+
+2. RAS: added `BatchResult.assignment_id` column + Alembic migration + TestContainers migration test.
+
+3. RAS: handler and repository now persist `assignment_id`, and API read models expose it.
 ### Priority 3: Staged Submission for CJ
+- Implement wave-based submission with stability checks (non-batch-API modes)
+- Settings wiring and tests (see CJ runbook § Planned PR)
+- Review note 2025-11-27: core callback-driven stability loop and staged pair generation are already implemented (see comparison_processing.py, workflow_continuation.py, batch_processor.py); pending decisions on MAX_BUNDLES_PER_WAVE semantics and enforce_full_budget behaviour before coding changes.
 - Implement wave-based submission with stability checks (non-batch-API modes)
 - Settings wiring and tests (see CJ runbook § Planned PR)
 
@@ -100,15 +86,21 @@ Implement: `TASKS/assessment/propagate-assignment-id-from-cj-to-ras-storage-phas
 | `test_health_routes.py` (NEW) | /healthz, /metrics endpoints, provider status |
 | `test_comparison_routes.py` (NEW) | /comparison POST, error handling, correlation ID |
 
-### NOT YET Validated
-- Rate limiting behavior under load
-- Circuit breaker state transitions under real failures
-- Kafka consumer reconnection after broker failure
-- LPS queue overflow scenarios
+### NOT YET Validated (CJ/LPS Boundary, Tier-2 Limits)
+- Rate limiting behavior under load using **Anthropic Tier 2** limits for Claude Sonnet 4.x  
+  (current envelope: 10,000 RPM, 450k input tokens/min, 90k output tokens/min; was 50 RPM / 30k ITPM / 8k OTPM).
+- Circuit breaker state transitions under real provider failures at Tier-2 throughput (open/half-open/closed behavior and recovery).
+- Kafka consumer reconnection after broker failure (sustained callback ingestion while LPS is operating at higher Anthropic limits).
+- LPS queue overflow scenarios under Tier-2 limits (queue depth, backpressure, and CJ retry behavior), with updated metrics/alerts reflecting the new capacity.
 
 ---
 
 ## ✅ RECENTLY COMPLETED (Reference Only)
+
+- **2025-11-27 assignment_id Propagation Phase A & B COMPLETE**  
+  - Phase A: Client → BOS → ELS → CJ now threads `assignment_id` via `ClientBatchPipelineRequestV1.prompt_payload.assignment_id`, `BatchServiceCJAssessmentInitiateCommandDataV1.assignment_id`, and `ELS_CJAssessmentRequestV1.assignment_id`.  
+  - Phase B: CJ → RAS path extended so `AssessmentResultV1.assignment_id` is populated by the dual event publisher, RAS persists it on `BatchResult.assignment_id` via Alembic migration `0a6c563e4523_add_assignment_id_to_batch_results`, and `BatchStatusResponse` exposes `assignment_id` for downstream consumers.  
+  - Functional test `test_complete_cj_assessment_processing_pipeline` now asserts the full client → BOS → ELS → CJ → RAS round-trip of `assignment_id` using RAS’ `/internal/v1/batches/{batch_id}/status` API (RAS is the source of truth for ENG5/guest flows).
 
 - **2025-11-26 LLM Provider Service Error Handling Bug FIXED** - Double-jsonify bug in `llm_routes.py:137` resolved:
   - Created `error_handlers.py` with LPS-specific handler using `create_error_response` factory

@@ -73,6 +73,12 @@ pdm run pytest-root tests/integration/  # Cross-service tests
 - **Completion Logic**: Stability-first mode active (callbacks trigger scoring immediately, BatchMonitor is recovery-only)
 - **Cost Safety**: Default `MAX_PAIRWISE_COMPARISONS` reduced to 150 (per-request overrides honored)
 
+### Result Surface for ENG5 Validation (RAS as Source of Truth)
+- **Source of Truth**: Result Aggregator Service (RAS) is the authoritative surface for CJ assessment outputs (including ENG5 validation runs), not the CJ service database.
+- **Assignment Context**: `assignment_id` now propagates end-to-end from client → BOS → ELS → CJ → RAS; RAS persists it on `BatchResult.assignment_id` and exposes it via `BatchStatusResponse.assignment_id`.
+- **Filename + BT-score Mapping**: For GUEST flows where no student IDs are present, use RAS’ `/internal/v1/batches/{batch_id}/status` API (or the `batch_results`/`essay_results` tables) to join essay-level CJ results (`cj_rank`, `cj_score`) with `filename`. CJ’s internal tables (`cj_processed_essays`, `cj_comparison_pairs`) are implementation details and MUST NOT be used as reporting sources.
+- **Functional Guardrail**: `tests/functional/test_e2e_cj_assessment_workflows.py::TestE2ECJAssessmentWorkflows::test_complete_cj_assessment_processing_pipeline` asserts the full `assignment_id` round-trip via RAS to keep ENG5 validation aligned with the production result surface.
+
 ### Next Steps
 - [ ] Complete serial bundle production validation
 - [ ] Finalize ENG5 JSON artefact schema (`Documentation/schemas/eng5_np/assessment_run.schema.json`)
