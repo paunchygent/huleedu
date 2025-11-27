@@ -2,7 +2,7 @@
 id: 'filename-propagation-from-els-to-ras-for-teacher-result-visibility'
 title: 'Filename propagation from ELS to RAS for teacher result visibility'
 type: 'task'
-status: 'in_progress'
+status: 'completed'
 priority: 'high'
 domain: 'assessment'
 service: 'result_aggregator_service'
@@ -180,11 +180,25 @@ async def test_guest_batch_filename_in_results():
 
 ## Success Criteria
 
-1. [ ] `EssaySlotAssignedV1` event includes `original_file_name`
-2. [ ] ELS populates filename from `slot_assignments.original_file_name`
-3. [ ] RAS `essay_results.filename` populated for new batches
-4. [ ] Functional test `test_complete_cj_assessment_processing_pipeline` verifies filename
-5. [ ] No breaking changes to existing consumers (field is additive)
+1. [x] `EssaySlotAssignedV1` event includes `original_file_name`
+2. [x] ELS populates filename from `content_metadata.original_file_name`
+3. [x] RAS `essay_results.filename` populated for new batches
+4. [x] Functional test `test_complete_cj_assessment_processing_pipeline` verifies filename
+5. [x] No breaking changes to existing consumers (field is additive)
+
+## Completion Notes (2025-11-27)
+
+**Implementation completed:**
+- Event contract: `libs/common_core/src/common_core/events/essay_lifecycle_events.py`
+- ELS publisher: `services/essay_lifecycle_service/domain_services/content_assignment_service.py`
+- RAS protocol: `services/result_aggregator_service/protocols.py`
+- RAS handler: `services/result_aggregator_service/implementations/assessment_event_handler.py`
+- RAS repository: `services/result_aggregator_service/implementations/batch_repository_postgres_impl.py`
+- RAS updater: `services/result_aggregator_service/implementations/essay_result_updater.py`
+
+**Additional fix:** `tests/utils/auth_manager.py` - Added `dotenv_values()` to load JWT secret from `.env` file (was falling back to hardcoded value causing 401 errors)
+
+**Verification:** Functional test `test_complete_cj_assessment_processing_pipeline` passes, filename field populated in RAS results.
 
 ## Backfill Strategy (Optional, Post-MVP)
 

@@ -288,3 +288,36 @@ For Docker/database troubleshooting, see `CLAUDE.md` sections on Docker Developm
 - CJ pipeline selection now relies solely on `ClientBatchPipelineRequestV1` resolution. BOS ignores the legacy registration flag (registration logs a deprecation warning and records registration-only metrics). Regression tests guard that requesting CJ after registering without the flag includes CJ, and requesting non-CJ pipelines while it was set does not add CJ.
 - Legacy flag removed from contracts (common_core), AGW/BOS code paths, and tests; pipeline selection is request-time only.
 - Doc cleanup: Removed lingering references to the deprecated flag from TASKS documentation; repository search currently returns zero matches.
+
+## Session Addendum (2025-11-27)
+
+### Filename Propagation Fix (CRITICAL)
+
+Added `original_file_name: str` field to `EssaySlotAssignedV1` event contract. Teachers can now identify students in CJ results via filename (critical for GUEST batches where filename is the ONLY identifier).
+
+**Files changed**: `essay_lifecycle_events.py`, `content_assignment_service.py`, RAS protocol/handler/repository/updater
+
+### JWT Auth Fix for Functional Tests
+
+`tests/utils/auth_manager.py` now loads JWT secret from `.env` via `dotenv_values()`. Previously fell back to hardcoded `"test-secret-key"` causing 401 errors when AGW container used real secret.
+
+**Pattern**: Always use `dotenv_values()` when test utilities need environment variables that aren't set via `os.environ` in subprocess contexts.
+
+### assignment_id Propagation Gap (Active Investigation)
+
+`assignment_id` from pipeline request never reaches CJ Assessment Service:
+- BOS receives in `prompt_payload.assignment_id` ✅
+- BOS → ELS command (`BatchServiceCJAssessmentInitiateCommandDataV1`) ❌ Missing field
+- ELS → CJ (`ELS_CJAssessmentRequestV1`) ⚠️ Field exists but never populated
+
+**Impact**: CJ cannot mix anchor essays for grade calibration. Fix in progress: `TASKS/assessment/propagate-assignment-id-from-bos-to-cj-request-phase-a.md`
+
+### Functional CJ Test Aligned with ENG5 Runner
+
+`test_e2e_cj_assessment_workflows.py` now uses `load_eng5_runner_student_files()` from `tests/utils/eng5_runner_samples.py` to load the same student essay files (docx) used by the ENG5 validation runner. This ensures functional tests exercise the same content pipeline as production validation.
+
+**Usage**: `essay_files = load_eng5_runner_student_files(max_files=4)`
+
+### LLM Provider Configuration Hierarchy
+
+Documented 3-tier override hierarchy. See `docs/operations/llm-provider-configuration-hierarchy.md`. Key insight: `USE_MOCK_LLM=true` is a DI boot-time decision that cannot be bypassed by request-level `provider_override`.

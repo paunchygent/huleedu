@@ -14,74 +14,64 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 
 ## 🎯 ACTIVE WORK (2025-11-27)
 
-### Filename Propagation Gap (NEW - high priority)
-**Root Cause Identified**: `EssaySlotAssignedV1` event missing `original_file_name` field.
-- File Service → ELS: filename included ✅
-- ELS → RAS: filename **MISSING** in event ❌
-- Result: `essay_results.filename` is NULL, teachers can't identify students
+### assignment_id Propagation Gap (NEW - high priority)
+**Root Cause Identified**: `assignment_id` passed in pipeline request but never reaches CJ Assessment Service.
+
+**Flow Gap Analysis**:
+
+| Boundary | Contract | Status |
+|----------|----------|--------|
+| Client → BOS | `prompt_payload.assignment_id` | ✅ Present |
+| BOS → ELS | `BatchServiceCJAssessmentInitiateCommandDataV1` | ❌ Missing |
+| ELS → CJ | `ELS_CJAssessmentRequestV1` | ⚠️ Field exists, never populated |
+| CJ → RAS | `AssessmentResultV1` | ⚠️ In metadata only |
+| RAS Storage | `BatchResult` model | ❌ No column |
 
 **Impact**:
-- GUEST batches: **Critical** - filename is ONLY way to identify students (no class_id)
-- REGULAR batches: filename needed until student matching completes
+- CJ Assessment cannot mix anchor essays for grade calibration
+- RAS cannot show which assignment was processed
 
-**Task Created**: `TASKS/assessment/filename-propagation-from-els-to-ras-for-teacher-result-visibility.md`
-- 6 files to modify (event contract + ELS publisher + RAS handler/protocol/repo/updater)
-- No DB migrations needed (column exists)
-- ~2-3 hours implementation
+**Tasks Created** (split by service boundary):
+- Phase A: `TASKS/assessment/propagate-assignment-id-from-bos-to-cj-request-phase-a.md`
+- Phase B: `TASKS/assessment/propagate-assignment-id-from-cj-to-ras-storage-phase-b.md`
 
-**Investigation Report**: `.claude/work/reports/2025-11-27-filename-propagation-flow-mapping.md`
+**Plan File**: `.claude/plans/cuddly-churning-sloth.md`
+
+### Filename Propagation (COMPLETED ✅)
+- Added `original_file_name: str` to `EssaySlotAssignedV1` event contract
+- Updated ELS `content_assignment_service.py` to include filename
+- Updated RAS protocol, handler, repository, and updater
+- Fixed JWT auth bug in `tests/utils/auth_manager.py` (added dotenv support)
+- Functional test `test_complete_cj_assessment_processing_pipeline` passing
+- Filename now populated in RAS results
+
+**Task**: `TASKS/assessment/filename-propagation-from-els-to-ras-for-teacher-result-visibility.md` (mark completed)
 
 ### LLM Provider Configuration Hierarchy (COMPLETED)
-- Documented 3-tier override hierarchy: `USE_MOCK_LLM` (absolute) → request `provider_override` → service defaults
+- Documented 3-tier override hierarchy
 - Created runbook: `docs/operations/llm-provider-configuration-hierarchy.md`
-- Added rule section: `.claude/rules/020.13-llm-provider-service-architecture.md` § 6.2.1
-- Key insight: request-level overrides CANNOT bypass `USE_MOCK_LLM=true` (DI boot-time decision)
 
 ### JWT Secret Fix (COMPLETED)
-- **Bug**: `docker-compose.dev.yml:177` had hardcoded `JWT_SECRET_KEY=test-secret-key`
-- **Symptom**: Functional tests got 401 Unauthorized (signature mismatch)
-- **Fix**: Changed to `JWT_SECRET_KEY=${JWT_SECRET_KEY}` to use `.env` value
-- CJ functional test now passes: `test_complete_cj_assessment_processing_pipeline`
-
-### CJ Runbook User Stories (COMPLETED)
-- Added User Stories section to `docs/operations/cj-assessment-foundation.md`
-- US-1: Teacher views CJ results with student identification
-- US-2: GUEST batch assessment (no class association)
-- US-3: REGULAR batch assessment (class association)
-- US-4: Optional spellcheck (future)
-- Added data flow requirements table
-
-### Ingestion traceability + mock LLM guard (completed earlier today)
-- Migration `20251127_1200` applied: `assignment_id` column + indexes on `text_storage_id`
-- File uploads now store `assignment_id` for CJ traceability
-- Functional harness enforces mock LLM
-- All targeted unit tests passing
-
-### Functional Test Harness Ergonomics (carry-over)
-- Readiness gate, Kafka topic precreation, Redis cleanup, timeout markers, and dev-stack-only guidance already in place (see notes from 2025-11-26).
-- Functional CJ tests should still wait until assignment_id + ENG5 bundle alignment is verified (see pending above).
-
-### Deprecate CJ registration flag at batch registration (started)
-- Step 1 done: marked field deprecated in `BatchRegistrationRequestV1` (code + docs) and added AGW warning log when the flag is set.
-- Step 2 done: BOS now ignores the flag entirely for pipeline selection (registration metrics record registration only), and pipeline-request flow drives pipeline state; regression tests added to ensure CJ inclusion/exclusion depends solely on `ClientBatchPipelineRequestV1`.
-- Step 3 done (local codebase): field fully removed from contracts, AGW/BOS code, and tests; only pipeline-request–driven selection remains. No runtime monitoring available in non-deployed env.
-- Doc cleanup: Removed remaining references to the deprecated flag from TASKS docs; repository search is now clean.
+- Fixed hardcoded `JWT_SECRET_KEY` in `docker-compose.dev.yml`
+- Fixed `tests/utils/auth_manager.py` to load from `.env` via `dotenv_values()`
 
 ---
 
 ## ➡️ Forward to next agent
 
-### Priority 1: Filename Propagation Fix (HIGH)
-Implement task: `TASKS/assessment/filename-propagation-from-els-to-ras-for-teacher-result-visibility.md`
-1. Add `original_file_name: str` to `EssaySlotAssignedV1` event contract
-2. Update ELS to include filename when publishing slot assignment
-3. Update RAS to consume filename and populate `essay_results.filename`
-4. Add tests (unit + E2E for GUEST batch filename visibility)
+### Priority 1: assignment_id Propagation Phase A (HIGH)
+Implement: `TASKS/assessment/propagate-assignment-id-from-bos-to-cj-request-phase-a.md`
+1. Add `assignment_id` field to `BatchServiceCJAssessmentInitiateCommandDataV1`
+2. BOS: pass `assignment_id` from `batch_metadata` to command
+3. ELS: forward from command to dispatcher
+4. ELS: populate `ELS_CJAssessmentRequestV1.assignment_id`
 
-### Priority 2: Verify CJ Functional Test Suite
-- CJ functional test now passes with JWT fix
-- Verify filename appears in RAS results after propagation fix
-- Align functional essay bundle with ENG5 runner student set
+### Priority 2: assignment_id Propagation Phase B
+Implement: `TASKS/assessment/propagate-assignment-id-from-cj-to-ras-storage-phase-b.md`
+1. Add `assignment_id` field to `AssessmentResultV1`
+2. CJ: populate in result event
+3. RAS: add column + migration + integration test (per rule 085)
+4. RAS: store in handler
 
 ### Priority 3: Staged Submission for CJ
 - Implement wave-based submission with stability checks (non-batch-API modes)
