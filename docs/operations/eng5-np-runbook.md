@@ -153,6 +153,37 @@ docker compose -f docker-compose.yml -f docker-compose.eng5-runner.yml run --rm 
     - Leave `LLM_PROVIDER_SERVICE_BATCH_API_MODE=disabled`
     - Redeploy CJ and LLM Provider; HTTP contracts and callbacks are unchanged across modes.
 
+### Stability & budget recipes (ENG5)
+
+- **Default serial-bundle behaviour (recommended)**  
+  - CJ settings:
+    - `CJ_ASSESSMENT_SERVICE_LLM_BATCHING_MODE=serial_bundle`
+    - `CJ_ASSESSMENT_SERVICE_MAX_PAIRWISE_COMPARISONS` set to a safe cap (e.g. 150)
+    - `CJ_ASSESSMENT_SERVICE_COMPARISONS_PER_STABILITY_CHECK_ITERATION` = wave size (e.g. 10–25)
+    - `CJ_ASSESSMENT_SERVICE_MIN_COMPARISONS_FOR_STABILITY_CHECK` ~ 10
+    - `CJ_ASSESSMENT_SERVICE_SCORE_STABILITY_THRESHOLD` ~ 0.05
+  - Effect: CJ submits comparisons in waves, runs BT stability after each wave, and can stop early
+    when scores stabilize or the cap is reached. `--max-comparisons` from ENG5 is treated as a cap,
+    not an obligation.
+
+- **“Use full cap” serial-bundle runs (no early stop, still waves)**  
+  - CJ settings (per environment, not per batch):
+    - Keep `LLM_BATCHING_MODE=serial_bundle`.
+    - Choose a cap `C` via `MAX_PAIRWISE_COMPARISONS` (or a runner override).
+    - Set `COMPARISONS_PER_STABILITY_CHECK_ITERATION >= C` if you want a single wave, or leave it
+      smaller for multiple waves.
+    - Set `MIN_COMPARISONS_FOR_STABILITY_CHECK > C` so the stability gate never passes.
+  - Effect: CJ will always finalize only after the denominator/cap is reached; stability is
+    effectively disabled without introducing a separate flag.
+
+- **Future “all at once” provider-batch runs (design intent)**  
+  - Runner selects `llm_batching_mode_override=provider_batch_api` and sets a cap via
+    `--max-comparisons`.
+  - CJ generates all required pairs up to the cap in a **single** wave and calls the LLM Provider
+    using its true batch API. Once callbacks for that wave are complete, CJ computes scores once
+    and finalizes, skipping continuation regardless of stability. See ADR-0017 and the CJ
+    assessment runbook for the high-level pattern; implementation will land in a dedicated PR.
+
 ### Structured JSON Logging
 
 - The runner configures `structlog` via `logging_support.configure_cli_logging()` with

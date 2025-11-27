@@ -101,6 +101,15 @@ class CJAssessmentSettings:
    - Deferred: Requires user intent modeling; start with explicit configuration first
    - Could be future enhancement once usage patterns are understood
 
+## CJ / LLM Provider Batching Interplay (Short Summary)
+
+- **CJ-side modes**: CJ Assessment exposes `LLMBatchingMode` (`per_request`, `serial_bundle`, `provider_batch_api`) and persists the effective mode in batch metadata.
+- **LPS queue modes**: LLM Provider Service uses `QUEUE_PROCESSING_MODE` (`per_request`, `serial_bundle`, `batch_api`) plus `cj_llm_batching_mode` hints from `LLMComparisonRequest.metadata` to decide how many queued items are grouped into a single provider call.
+- **Mapping**:
+  - `LLMBatchingMode.SERIAL_BUNDLE` → `QUEUE_PROCESSING_MODE=serial_bundle`: CJ sends comparisons in waves; LPS groups compatible requests into `process_comparison_batch` calls while still emitting one callback per comparison.
+  - `LLMBatchingMode.PROVIDER_BATCH_API` → `QUEUE_PROCESSING_MODE=batch_api` (once native batch endpoints are implemented): CJ generates all comparisons up to the cap in a single wave; LPS uses provider batch APIs to execute the work, but the callback contract (`LLMComparisonResultV1`) remains unchanged.
+- **Contract stability**: All modes use the same 202+callback pattern; batching changes only how many comparison requests are coalesced into a single provider call, not the HTTP or Kafka contracts seen by upstream services.
+
 ## Related ADRs
 - ADR-0006: Pipeline Completion State Management (batch processing coordination)
 

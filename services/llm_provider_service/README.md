@@ -153,10 +153,11 @@ through the comparison processor:
   considered compatible when the resolved provider, model override, and optional
   `cj_llm_batching_mode` hint all match. This keeps provider calls sequential
   while dramatically reducing queue round-trips.
-- `batch_api` (previously labeled `provider_batch_api` in CJ hints): reserved for
-  native provider batch endpoints. Until that lands, it behaves the same as
-  `serial_bundle` but remains separately configurable via
-  `LLM_PROVIDER_SERVICE_BATCH_API_MODE` (disabled/nightly/opportunistic).
+- `batch_api`: reserved for native provider batch endpoints. Until that lands, it
+  behaves the same as `serial_bundle` but remains separately configurable via
+  `LLM_PROVIDER_SERVICE_BATCH_API_MODE` (disabled/nightly/opportunistic). CJ’s
+  `LLMBatchingMode.PROVIDER_BATCH_API` hints map to this queue mode once
+  provider-native batching is fully implemented.
 
 Use `LLM_PROVIDER_SERVICE_SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL` (default `8`, range
 `1-64`) to cap how many compatible queued items can be drained per bundle. Each
@@ -171,7 +172,7 @@ development to validate future batching paths.
 ## Serial bundle observability
 
 When `LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE=serial_bundle` (or
-`provider_batch_api`) is enabled, the queue processor now emits dedicated metrics:
+`batch_api`) is enabled, the queue processor now emits dedicated metrics:
 
 - `llm_provider_queue_depth{queue_type="total"|"queued"}` — instantaneous queue size.
 - `llm_provider_queue_wait_time_seconds{queue_processing_mode="serial_bundle",result="success"|"failure"|"expired"}` — time spent waiting in the queue before a callback is published.
