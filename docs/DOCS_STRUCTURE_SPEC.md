@@ -35,6 +35,15 @@ Allowed top-level subdirectories under `docs/`:
 
 No additional top-level documentation directories MAY be created without updating this specification.
 
+### 3.0.1 Root-Level Files
+
+Root-level markdown files (directly under `docs/`) are permitted for:
+- This specification (`DOCS_STRUCTURE_SPEC.md`)
+- Master navigation/index files (`DOCUMENTATION_INDEX.md`)
+- Other cross-cutting specification documents
+
+Root-level files MUST be clearly scoped to documentation-wide concerns, not category-specific content.
+
 ### 3.1 Directory Semantics
 
 - `overview/`
@@ -55,6 +64,7 @@ No additional top-level documentation directories MAY be created without updatin
   - Architecture Decision Records (ADRs) and similar design records.
 - `product/`
   - PRDs and product-facing flows.
+  - May include subdirectories such as `epics/` for product epic definitions.
 - `research/`
   - Design spikes, experiments, and non-normative exploratory documents.
 
