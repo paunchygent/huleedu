@@ -41,12 +41,17 @@ class BatchingModeService:
         return {"comparison_iteration": iteration_value}
 
     def is_iterative_batching_online(self) -> bool:
+        """Return True when stability-driven, multi-iteration batching is effectively enabled.
+
+        This helper derives its state from core configuration knobs instead of a separate
+        feature flag to keep behaviour aligned with documented convergence settings.
+        """
+
         return (
-            getattr(self.settings, "ENABLE_ITERATIVE_BATCHING_LOOP", False)
+            self.settings.LLM_BATCHING_MODE is not LLMBatchingMode.PER_REQUEST
             and getattr(self.settings, "MAX_ITERATIONS", 1) > 1
             and getattr(self.settings, "MIN_COMPARISONS_FOR_STABILITY_CHECK", 0) > 0
             and getattr(self.settings, "COMPARISONS_PER_STABILITY_CHECK_ITERATION", 0) > 1
-            and self.settings.LLM_BATCHING_MODE is not LLMBatchingMode.PER_REQUEST
         )
 
     def build_metadata_context(

@@ -17,7 +17,7 @@ labels: []
 
 # TASK-CJ-BATCH-STATE-AND-COMPLETION-FIXES – CJ Assessment Service Critical Batch State & Completion Logic Repairs
 
-Related reference: docs/operations/cj-assessment-foundation.md
+Related reference: docs/operations/cj-assessment-runbook.md
 
 This task decomposes the critical bugs discovered during serial_bundle validation testing into focused PRs that fix batch state tracking, completion detection, pair generation bias, and provider error diagnostics.
 

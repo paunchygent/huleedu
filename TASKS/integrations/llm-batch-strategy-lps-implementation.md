@@ -17,7 +17,7 @@ labels: []
 
 # Task: LLM Batching Strategy – LLM Provider Service Implementation
 
-Related reference: docs/operations/cj-assessment-foundation.md
+Related reference: docs/operations/cj-assessment-runbook.md
 
 This task focuses specifically on the LLM Provider Service (LPS) configuration, serial bundling, and
 metrics for the LLM batching strategy. It is a child task of:

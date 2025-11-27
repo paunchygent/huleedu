@@ -310,36 +310,23 @@ async def test_check_continuation_false_when_nothing_submitted() -> None:
 
 
 @pytest.mark.parametrize(
-    "metadata,max_pairs_expected,enforce_full_budget",
+    "metadata,max_pairs_expected",
     [
-        (
-            {"comparison_budget": {"max_pairs_requested": 120, "source": "runner_override"}},
-            120,
-            True,
-        ),
-        (
-            {"comparison_budget": {"max_pairs_requested": 75, "source": "service_default"}},
-            75,
-            False,
-        ),
-        (None, 150, False),
-        (
-            {"comparison_budget": {"max_pairs_requested": 0, "source": "service_default"}},
-            150,
-            False,
-        ),
+        ({"comparison_budget": {"max_pairs_requested": 120, "source": "runner_override"}}, 120),
+        ({"comparison_budget": {"max_pairs_requested": 75, "source": "service_default"}}, 75),
+        (None, 150),
+        ({"comparison_budget": {"max_pairs_requested": 0, "source": "service_default"}}, 150),
     ],
 )
 def test_resolve_comparison_budget(
-    metadata: dict[str, Any] | None, max_pairs_expected: int, enforce_full_budget: bool
+    metadata: dict[str, Any] | None, max_pairs_expected: int
 ) -> None:
     settings = Mock(spec=Settings)
     settings.MAX_PAIRWISE_COMPARISONS = 150
 
-    max_pairs, enforce_budget = wc._resolve_comparison_budget(metadata, settings)
+    max_pairs = wc._resolve_comparison_budget(metadata, settings)
 
     assert max_pairs == max_pairs_expected
-    assert enforce_budget is enforce_full_budget
 
 
 @pytest.mark.asyncio
@@ -610,3 +597,100 @@ async def test_trigger_continuation_requests_more_when_not_finalized(monkeypatch
 
     request_additional.assert_awaited_once()
     finalize_called.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_trigger_continuation_finalizes_on_stability_before_budget(monkeypatch: Any) -> None:
+    """Batch should finalize early on stability even when budget remains."""
+
+    settings = Mock(spec=Settings)
+    settings.MAX_PAIRWISE_COMPARISONS = 20
+    settings.MIN_COMPARISONS_FOR_STABILITY_CHECK = 5
+    settings.SCORE_STABILITY_THRESHOLD = 0.05
+
+    event_publisher = AsyncMock()
+    content_client = AsyncMock()
+    llm_interaction = AsyncMock()
+
+    batch_state = CJBatchState()
+    batch_state.batch_id = 12
+    batch_state.submitted_comparisons = 10
+    batch_state.completed_comparisons = 10
+    batch_state.failed_comparisons = 0
+    batch_state.total_comparisons = 10
+    batch_state.total_budget = 20  # More budget remains
+    batch_state.current_iteration = 2
+    batch_state.processing_metadata = {
+        "comparison_budget": {"max_pairs_requested": 20, "source": "service_default"},
+        "bt_scores": {"a": 0.1, "b": -0.1},
+    }
+    batch_state.batch_upload = _make_upload(expected_count=5)
+
+    essays = [
+        Mock(els_essay_id=str(i), assessment_input_text=f"essay-{i}", current_bt_score=0.0)
+        for i in range(5)
+    ]
+
+    # Recompute scores and report a small max change below threshold
+    new_scores = {"a": 0.11, "b": -0.11}
+    monkeypatch.setattr(
+        wc.scoring_ranking,
+        "record_comparisons_and_update_scores",
+        AsyncMock(return_value=new_scores),
+    )
+    monkeypatch.setattr(
+        wc.scoring_ranking,
+        "check_score_stability",
+        Mock(return_value=0.01),
+    )
+    merge_metadata = AsyncMock()
+    monkeypatch.setattr(wc, "merge_batch_processing_metadata", merge_metadata)
+
+    request_additional = AsyncMock(return_value=True)
+    monkeypatch.setattr(
+        wc.comparison_processing,
+        "request_additional_comparisons_for_batch",
+        request_additional,
+    )
+
+    finalize_called = AsyncMock()
+
+    class _Finalizer:
+        def __init__(self, *_args: Any, **_kwargs: Any) -> None:
+            pass
+
+        async def finalize_scoring(self, *_args: Any, **_kwargs: Any) -> None:
+            await finalize_called()
+
+    monkeypatch.setattr(wc, "BatchFinalizer", _Finalizer)
+
+    @asynccontextmanager
+    async def mock_session_ctx() -> AsyncGenerator[AsyncMock, None]:
+        yield AsyncMock()
+
+    mock_session_provider = AsyncMock()
+    mock_session_provider.session = mock_session_ctx
+    mock_batch_repository = AsyncMock()
+    mock_batch_repository.get_batch_state = AsyncMock(return_value=batch_state)
+    mock_essay_repository = AsyncMock()
+    mock_essay_repository.get_essays_for_cj_batch = AsyncMock(return_value=essays)
+
+    mock_grade_projector = AsyncMock()
+
+    await wc.trigger_existing_workflow_continuation(
+        batch_id=12,
+        session_provider=mock_session_provider,
+        batch_repository=mock_batch_repository,
+        comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
+        essay_repository=mock_essay_repository,
+        instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
+        event_publisher=event_publisher,
+        settings=settings,
+        content_client=content_client,
+        correlation_id=uuid4(),
+        llm_interaction=llm_interaction,
+        grade_projector=mock_grade_projector,
+    )
+
+    finalize_called.assert_awaited_once()
+    request_additional.assert_not_awaited()

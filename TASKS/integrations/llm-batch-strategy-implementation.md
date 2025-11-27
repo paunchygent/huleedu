@@ -17,7 +17,7 @@ labels: []
 
 # Task: LLM Batching Strategy Implementation
 
-Related reference: docs/operations/cj-assessment-foundation.md
+Related reference: docs/operations/cj-assessment-runbook.md
 
 ## Context
 

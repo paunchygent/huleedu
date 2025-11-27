@@ -66,7 +66,7 @@ Purpose: single reference for defaults, reasoning, metrics, and open work across
 | --- | --- | --- | --- |
 | SCORE_STABILITY_THRESHOLD | 0.025 (start) | Force higher agreement before stopping; early experiments should map cost vs convergence. | Sweep with ENG5 Runner across 0.025–0.05 per exam; pick per-assignment default. |
 | MIN_COMPARISONS_FOR_STABILITY_CHECK | = COMPARISONS_PER_STABILITY_CHECK_ITERATION (floor 8) | Check stability once each “round” finishes; BT is cheap, so prefer more frequent checks. | Keep tied to round size; revisit if iterations grow large. |
-| COMPARISONS_PER_STABILITY_CHECK_ITERATION | existing env default | Defines round size; also drives MIN_COMPARISONS_FOR_STABILITY_CHECK. | Adjust per dataset size to balance turnaround vs stability. |
+| COMPARISONS_PER_STABILITY_CHECK_ITERATION | existing env default | Defines wave size (comparisons per wave); also drives MIN_COMPARISONS_FOR_STABILITY_CHECK. | Adjust per dataset size to balance turnaround vs stability. |
 | completion_denominator | min(total_budget or total_comparisons, nC2(expected_essay_count)) | Small batches finalize promptly; cap prevents 6-pair batches from waiting on 350-budget. | Keep; verify nC2 source from batch_upload.expected_essay_count. |
 | BatchMonitor timeout_hours | prod: 4h; dev: 1h | Recovery-only safety net; generous for prod, tight for dev. | Remove 80% heuristic; keep timeout-only once validated. |
 | PROMPT_CACHE_TTL_SECONDS | ad-hoc/dev: 300–600s; assignment_id/batch: 3600s | Short TTL for rapid iteration; longer for stable, repeated prompts in batch runs. | Raise to 4–6h if cache hit rate is high and safety acceptable. |
@@ -74,10 +74,16 @@ Purpose: single reference for defaults, reasoning, metrics, and open work across
 | stop_reason handling | error on max_tokens | Prevent silent truncation. | Keep; add tests for stop_reason and 529. |
 | Retry behavior (Anthropic) | 429 respects Retry-After (bounded); 529/5xx retryable | Align with provider guidance. | Monitor error_type metrics and adjust backoff as needed. |
 
-## How completion now works (callback-first)
+## How completion now works (callback-first, serial bundles)
 1) LLM requests are async; callbacks update completed/failed counters and last_activity_at.
-2) Continuation triggers only when callbacks_received == submitted_comparisons for the current wave.
-3) On trigger: recompute BT scores; persist bt_scores/last_score_change; stop if stability or denominator/budget cap reached; else enqueue next wave if budget remains.
+2) Continuation triggers only when `callbacks_received == submitted_comparisons` for the current wave.
+3) On trigger: recompute BT scores; persist `bt_scores` / `last_score_change`; stop if stability or denominator/budget cap reached; else enqueue the next wave (up to `COMPARISONS_PER_STABILITY_CHECK_ITERATION` new pairs, respecting `MAX_PAIRWISE_COMPARISONS`) if budget remains.
+
+### Stability vs caps
+- `MAX_PAIRWISE_COMPARISONS` (and any runner `max_comparisons` hint) are treated as **caps**, not obligations. Batches may finalize early when BT scores stabilize under `SCORE_STABILITY_THRESHOLD` once `MIN_COMPARISONS_FOR_STABILITY_CHECK` successful comparisons are available.
+- To *intentionally* consume the full cap in serial-bundle mode (no early stop), configure:
+  - `COMPARISONS_PER_STABILITY_CHECK_ITERATION` ≥ desired cap if you want a single wave; or leave it smaller for multiple waves.
+  - `MIN_COMPARISONS_FOR_STABILITY_CHECK` > cap, so the stability gate never passes; finalization then occurs only when callbacks reach the denominator/cap.
 4) Finalization: SCORING -> COMPLETE_STABLE, rankings + projections (only if assignment_id), events out.
 5) BatchMonitor: intended recovery-only; remove 80% heuristic after timeout-only path is validated.
 
@@ -119,7 +125,7 @@ Purpose: single reference for defaults, reasoning, metrics, and open work across
 
 ## Planned PR: staged submission for serial bundles (non-batch-API)
 - Purpose/story: prevent flooding the full comparison budget at once. Submit comparisons in waves (N bundles per wave), wait for callbacks, run stability check (`SCORE_STABILITY_THRESHOLD`, `MIN_COMPARISONS_FOR_STABILITY_CHECK`), then decide whether to enqueue the next wave. Goal: earlier convergence, lower cost/latency, clearer observability.
-- Scope: `cj_core_logic/comparison_processing.py` (wave size surfaced via settings), `workflow_continuation.py` (stability/budget check after each wave), new setting (e.g., `MAX_BUNDLES_PER_WAVE`) wired through DI.
+- Scope: `cj_core_logic/comparison_processing.py` (wave size surfaced via `COMPARISONS_PER_STABILITY_CHECK_ITERATION`), `workflow_continuation.py` (stability/budget check after each wave); no separate `MAX_BUNDLES_PER_WAVE` setting is introduced to keep configuration minimal.
 - Acceptance: early stop when stable/complete; metrics/events stay thin (no per-iteration vectors); integration/functional tests verify staged submission and stability stop.
 
 ## File upload traceability & assignment_id guidance
@@ -133,7 +139,7 @@ Purpose: single reference for defaults, reasoning, metrics, and open work across
 3) Functional runs default to `FUNCTIONAL_ASSIGNMENT_ID` and run with mock LLM; suite skips if mock mode is disabled unless explicitly overridden.
 
 ## Owners/rollout (solo-friendly)
-- Defaults above are starting points; adjust per experiment results. Keep flags: iterative/serial_bundle and prompt cache TTL overridable per env.
+- Defaults above are starting points; adjust per experiment results. Keep batching mode (`per_request`, `serial_bundle`, `provider_batch_api`) and prompt cache TTL overridable per env.
 
 Update guidance: treat this doc like handoff/readme_first—update whenever behavior, defaults, or metrics change in CJ, LLM Provider, ENG5 Runner, or API Gateway integration.
 

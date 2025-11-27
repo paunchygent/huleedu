@@ -116,7 +116,7 @@ class Settings(SecureServiceSettings, JWTValidationSettings):
         description="Default LLM model to use for comparison requests",
     )
     LLM_BATCHING_MODE: LLMBatchingMode = Field(
-        default=LLMBatchingMode.PER_REQUEST,
+        default=LLMBatchingMode.SERIAL_BUNDLE,
         description=(
             "How CJ submits comparisons to LLM Provider: per_request, serial_bundle, "
             "provider_batch_api."
@@ -135,13 +135,6 @@ class Settings(SecureServiceSettings, JWTValidationSettings):
         description=(
             "When true, CJLLMComparisonMetadata emits batching hints such as "
             "cj_llm_batching_mode and comparison_iteration into request_metadata."
-        ),
-    )
-    ENABLE_ITERATIVE_BATCHING_LOOP: bool = Field(
-        default=False,
-        description=(
-            "When true, stability-driven comparison iterations can submit bundled work"
-            " and emit comparison_iteration metadata once batching hints are enabled."
         ),
     )
 

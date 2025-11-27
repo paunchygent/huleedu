@@ -17,7 +17,7 @@ labels: []
 
 # Task: CJ Assessment Service Code Hardening
 
-Related reference: docs/operations/cj-assessment-foundation.md
+Related reference: docs/operations/cj-assessment-runbook.md
 
 > **Autonomous Claude Execution Prompt**
 >

@@ -33,8 +33,8 @@ Implement **cacheable block separation** with TTL-based caching.
 
 | Context | TTL | Rationale |
 |---------|-----|-----------|
-| Assignment/batch runs | 3600s | Stable, repeated prompts |
-| Ad-hoc/dev | 300-600s | Rapid iteration |
+| batch runs | 3600s | only for long running batches |
+| 5-min cache | 300-600s | Default |
 
 ### Warm-up Strategy
 1. Seed once per unique prompt hash before dispatching cohort
@@ -58,5 +58,5 @@ Implement **cacheable block separation** with TTL-based caching.
 - `llm_provider_cache_scope_total{scope,result}`
 
 ## References
-- docs/operations/cj-assessment-foundation.md
+- docs/operations/cj-assessment-runbook.md
 - Anthropic Message Batches API documentation

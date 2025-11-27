@@ -17,7 +17,7 @@ labels: []
 
 # TASK-LLM-BATCH-STRATEGY-IMPLEMENTATION – Developer Checklist
 
-Related canonical reference: docs/operations/cj-assessment-foundation.md
+Related canonical reference: docs/operations/cj-assessment-runbook.md
 
 This checklist is a child document for `TASK-LLM-BATCH-STRATEGY-IMPLEMENTATION.md` and the high-level
 planning task `TASK-LLM-BATCH-STRATEGY.md`.

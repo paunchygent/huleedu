@@ -28,7 +28,7 @@ Implement **wave-based staged submission** for serial bundle mode.
 
 ### Configuration
 ```python
-MAX_BUNDLES_PER_WAVE: int = 10  # Comparisons per wave
+COMPARISONS_PER_STABILITY_CHECK_ITERATION: int = 10  # Comparisons per wave
 ```
 
 ### Callback-First Completion
@@ -55,5 +55,5 @@ MAX_BUNDLES_PER_WAVE: int = 10  # Comparisons per wave
 - Recovery-only safety net (not primary completion trigger)
 
 ## References
-- docs/operations/cj-assessment-foundation.md
+- docs/operations/cj-assessment-runbook.md
 - services/cj_assessment_service/cj_core_logic/workflow_continuation.py

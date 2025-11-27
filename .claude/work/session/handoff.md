@@ -7,7 +7,7 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 - **README_FIRST.md** - Architectural overview, decisions, service status
 - **Service READMEs** - Service-specific patterns, error handling, testing
 - **.claude/rules/** - Implementation standards and requirements
-- **Documentation/OPERATIONS/** - Operational runbooks (see docs/operations/cj-assessment-foundation.md for CJ/LLM defaults & metrics)
+- **Documentation/OPERATIONS/** - Operational runbooks (see docs/operations/cj-assessment-runbook.md for CJ/LLM defaults & metrics)
 - **TASKS/** - Detailed task documentation
 
 ---

@@ -343,18 +343,9 @@ CONTENT_SERVICE_URL=http://localhost:8002
 LLM_PROVIDER_SERVICE_URL=http://llm_provider_service:8090/api/v1
 DATABASE_URL_CJ=sqlite+aiosqlite:///./cj_assessment.db
 
-# LLM Queue Polling Configuration
-LLM_QUEUE_POLLING_ENABLED=true                    # Enable queue polling for 202 responses
-LLM_QUEUE_POLLING_INITIAL_DELAY_SECONDS=2.0       # Initial delay before first poll
-LLM_QUEUE_POLLING_MAX_DELAY_SECONDS=60.0          # Maximum delay between polls
-LLM_QUEUE_POLLING_EXPONENTIAL_BASE=1.5            # Backoff multiplier
-LLM_QUEUE_POLLING_MAX_ATTEMPTS=30                 # Maximum polling attempts
-LLM_QUEUE_TOTAL_TIMEOUT_SECONDS=900               # Total timeout (15 minutes)
-
 # LLM Batching Configuration
-CJ_ASSESSMENT_SERVICE_LLM_BATCHING_MODE=per_request
+CJ_ASSESSMENT_SERVICE_LLM_BATCHING_MODE=serial_bundle
 CJ_ASSESSMENT_SERVICE_ENABLE_LLM_BATCHING_METADATA_HINTS=false
-CJ_ASSESSMENT_SERVICE_ENABLE_ITERATIVE_BATCHING_LOOP=false
 CJ_ASSESSMENT_SERVICE_PAIR_GENERATION_SEED=                  # Optional deterministic randomization seed
 
 # LLM Provider API Keys
@@ -378,19 +369,19 @@ LOG_LEVEL=INFO
 ```
 
 `CJ_ASSESSMENT_SERVICE_LLM_BATCHING_MODE` mirrors
-`LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE`. `per_request` preserves the current
-one-at-a-time behaviour, while `serial_bundle` causes CJ to label requests for the
-batch path (still single-item bundles for now) so the queue processor can call
-`process_comparison_batch`. `provider_batch_api` is wired end-to-end but behaves
-like `serial_bundle` until the provider-native batching work lands. When
+`LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE`. The recommended default is
+`serial_bundle`, which causes CJ to label requests so the LLM Provider queue
+can group compatible comparisons into single provider calls. `per_request`
+preserves one-at-a-time behaviour for legacy/testing, and `provider_batch_api`
+selects the true provider-native batch API mode when available. When
 `CJ_ASSESSMENT_SERVICE_ENABLE_LLM_BATCHING_METADATA_HINTS` is `true`, every
-`LLMComparisonRequest.metadata` payload gains `cj_llm_batching_mode`. Flip
-`CJ_ASSESSMENT_SERVICE_ENABLE_ITERATIVE_BATCHING_LOOP` to `true` once the
-stability-driven loop is actually running (serial bundling enabled, `MAX_ITERATIONS > 1`,
-and `COMPARISONS_PER_STABILITY_CHECK_ITERATION > 1`). With both flags enabled the
-adapter also emits `comparison_iteration`, giving downstream services iteration
-numbers alongside the batching mode. Callbacks echo the metadata verbatim, so the
-flags are safe to toggle provided consumers tolerate additive keys.
+`LLMComparisonRequest.metadata` payload gains `cj_llm_batching_mode`, and when
+the convergence settings indicate a multi-iteration workflow
+(`COMPARISONS_PER_STABILITY_CHECK_ITERATION > 1`, `MIN_COMPARISONS_FOR_STABILITY_CHECK > 0`,
+`MAX_ITERATIONS > 1`, and batching mode != `per_request`), CJ also emits
+`comparison_iteration` so downstream services can distinguish waves. Callbacks
+echo the metadata verbatim, so the hints are safe to toggle provided consumers
+ignore unknown keys.
 
 `CJ_ASSESSMENT_SERVICE_LLM_BATCH_API_ALLOWED_PROVIDERS` (comma-separated list
 matching `LLMProviderType` values) constrains the `provider_batch_api` mode to
@@ -401,23 +392,16 @@ next-safest mode (`serial_bundle`, then `per_request`). The default list covers
 `openai` and `anthropic`.
 
 Per-request overrides live under `batch_config_overrides`. In addition to
-`batch_size`, runners can now set `llm_batching_mode_override` to
-`per_request`, `serial_bundle`, or `provider_batch_api`. The new
+`batch_size`, runners can set `llm_batching_mode_override` to
+`per_request`, `serial_bundle`, or `provider_batch_api`. The
 `resolve_effective_llm_batching_mode()` helper enforces the provider guardrail
 and exposes the final mode for logs, metadata, and downstream observability.
 
-The iterative loop is considered **online** only when all of the following are true:
-
-- `CJ_ASSESSMENT_SERVICE_ENABLE_ITERATIVE_BATCHING_LOOP=true`
-- `CJ_ASSESSMENT_SERVICE_LLM_BATCHING_MODE != per_request`
-- `COMPARISONS_PER_STABILITY_CHECK_ITERATION > 1` and `MIN_COMPARISONS_FOR_STABILITY_CHECK > 0`
-- `MAX_ITERATIONS > 1`
-
-In that state CJ adds `comparison_iteration` to the metadata whenever
-`CJ_ASSESSMENT_SERVICE_ENABLE_LLM_BATCHING_METADATA_HINTS=true`; otherwise the field
-is omitted.
-
-`COMPARISONS_PER_STABILITY_CHECK_ITERATION` defines the number of new pairs generated per stability iteration; `MAX_PAIRWISE_COMPARISONS` is an absolute guardrail on the batch. Both values are applied directly by `pair_generation.generate_comparison_tasks`, so adjust them via environment variables rather than hard-coding limits elsewhere.
+`COMPARISONS_PER_STABILITY_CHECK_ITERATION` defines the number of new pairs
+generated per *wave*; `MAX_PAIRWISE_COMPARISONS` is an absolute guardrail on
+the batch. Both values are applied directly by
+`pair_generation.generate_comparison_tasks`, so adjust them via environment
+variables rather than hard-coding limits elsewhere.
 
 Set `CJ_ASSESSMENT_SERVICE_PAIR_GENERATION_SEED=<int>` only when you need reproducible pair ordering for debugging or deterministic tests. When unset (the default), pair generation randomizes essay A/B positions per pair to eliminate anchor bias while keeping the duplicate-detection logic intact.
 

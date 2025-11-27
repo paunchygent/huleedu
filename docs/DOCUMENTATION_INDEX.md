@@ -56,7 +56,7 @@ Master navigation across all project documentation.
 | Runbook | Service | Severity |
 |---------|---------|----------|
 | [01-grafana-playbook.md](operations/01-grafana-playbook.md) | Global | Medium |
-| [cj-assessment-foundation.md](operations/cj-assessment-foundation.md) | CJ Assessment | High |
+| [cj-assessment-runbook.md](operations/cj-assessment-runbook.md) | CJ Assessment | High |
 | [eng5-np-runbook.md](operations/eng5-np-runbook.md) | ENG5 Runner | High |
 | [ielts-task2-dataset-preparation.md](operations/ielts-task2-dataset-preparation.md) | Assessment | Medium |
 | [llm-provider-configuration-hierarchy.md](operations/llm-provider-configuration-hierarchy.md) | LLM Provider | High |

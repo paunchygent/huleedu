@@ -15,7 +15,7 @@ related: []
 labels: []
 ---
 
-Related reference: docs/operations/cj-assessment-foundation.md
+Related reference: docs/operations/cj-assessment-runbook.md
 
 # TASK-LLM-QUEUE-EXPIRY-METRICS-FIX – Expired Request Metrics & Observability Plan
 

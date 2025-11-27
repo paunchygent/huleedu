@@ -72,7 +72,7 @@ REGULAR: Upload → Student Matching → Spellcheck → CJ Assessment → Rankin
 ### Configuration Points
 - Convergence: SCORE_STABILITY_THRESHOLD, MIN_COMPARISONS_FOR_STABILITY_CHECK
 - Caching: PROMPT_CACHE_TTL_SECONDS, ENABLE_PROMPT_CACHING
-- Submission: MAX_BUNDLES_PER_WAVE
+- Submission: COMPARISONS_PER_STABILITY_CHECK_ITERATION (wave size)
 
 ## Related ADRs
 - ADR-0015: CJ Assessment Convergence Tuning Strategy
@@ -85,6 +85,6 @@ REGULAR: Upload → Student Matching → Spellcheck → CJ Assessment → Rankin
 - Essay Lifecycle Service orchestration
 
 ## Notes
-- Runbook: docs/operations/cj-assessment-foundation.md
+- Runbook: docs/operations/cj-assessment-runbook.md
 - Grade projections require assignment_id and anchors (future scope)
 - Current focus: stabilize existing implementation

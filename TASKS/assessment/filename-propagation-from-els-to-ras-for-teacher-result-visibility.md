@@ -11,7 +11,7 @@ owner: ''
 program: ''
 created: '2025-11-27'
 last_updated: '2025-11-27'
-related: ['docs/operations/cj-assessment-foundation.md', '.claude/work/reports/2025-11-27-filename-propagation-flow-mapping.md']
+related: ['docs/operations/cj-assessment-runbook.md', '.claude/work/reports/2025-11-27-filename-propagation-flow-mapping.md']
 labels: ['cross-service', 'event-contract', 'teacher-ux']
 ---
 
@@ -23,7 +23,7 @@ Add `original_file_name` to `EssaySlotAssignedV1` event contract and propagate t
 
 ## User Stories
 
-See [CJ Assessment Foundation Runbook](../../docs/operations/cj-assessment-foundation.md#user-stories) for complete user story context.
+See [CJ Assessment Runbook](../../docs/operations/cj-assessment-runbook.md#user-stories) for complete user story context.
 
 **Primary**: As a teacher viewing CJ assessment results, I want to see the student name (derived from filename) alongside the CJ rank and score, so I can identify whose work I'm evaluating.
 
@@ -222,7 +222,7 @@ WHERE er.file_upload_id = fu.file_upload_id
 ## Related Documents
 
 - **Investigation Report**: `.claude/work/reports/2025-11-27-filename-propagation-flow-mapping.md`
-- **CJ Runbook**: `docs/operations/cj-assessment-foundation.md`
+- **CJ Runbook**: `docs/operations/cj-assessment-runbook.md`
 - **Event Contracts Rule**: `.claude/rules/052-event-contract-standards.md`
 - **RAS Architecture**: `.claude/rules/020.12-result-aggregator-service-architecture.md`
 

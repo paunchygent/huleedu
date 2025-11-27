@@ -3,7 +3,7 @@
 ## Overview
 This document maps the current state of the CJ Assessment Service, including its internal processing pipeline, state management, and critical integration points with the LLM Provider Service. It serves as the definitive guide for navigating the codebase.
 
-**Reference Foundation**: `docs/operations/cj-assessment-foundation.md`
+**Reference Foundation**: `docs/operations/cj-assessment-runbook.md`
 
 ---
 

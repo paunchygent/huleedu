@@ -81,15 +81,14 @@ async def check_workflow_continuation(
 def _resolve_comparison_budget(
     metadata: dict[str, Any] | None,
     settings: "Settings",
-) -> tuple[int, bool]:
+) -> int:
     budget = metadata.get("comparison_budget") if isinstance(metadata, dict) else None
     max_pairs = budget.get("max_pairs_requested") if budget else None
-    enforce_full_budget = bool(budget and budget.get("source") == "runner_override")
 
     if not isinstance(max_pairs, int) or max_pairs <= 0:
         max_pairs = settings.MAX_PAIRWISE_COMPARISONS
 
-    return max_pairs, enforce_full_budget
+    return max_pairs
 
 
 def _extract_previous_scores(metadata: dict[str, Any] | None) -> dict[str, float]:
@@ -182,7 +181,7 @@ async def trigger_existing_workflow_continuation(
             metadata.get("llm_overrides") if isinstance(metadata, dict) else None
         )
 
-        max_pairs_cap, _ = _resolve_comparison_budget(metadata, settings)
+        max_pairs_cap = _resolve_comparison_budget(metadata, settings)
         pairs_submitted = batch_state.submitted_comparisons or 0
         pairs_remaining = max(0, max_pairs_cap - pairs_submitted)
         budget_exhausted = pairs_remaining <= 0
