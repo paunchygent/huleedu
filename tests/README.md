@@ -84,6 +84,9 @@ for their abstraction level (see Rule 070/075).
    ```bash
    pdm install -G monorepo-tools
    ```
+3. **CJ functional guardrails**
+   - Ensure the LLM Provider runs in mock mode (`USE_MOCK_LLM=true` or `LLM_PROVIDER_SERVICE_USE_MOCK_LLM=true` in `.env`). The functional fixture will skip CJ flows when mock mode is disabled to avoid slow/paid calls.
+   - Set `FUNCTIONAL_ASSIGNMENT_ID` (default used if unset: `test_eng5_writing_2025`) so uploads carry an assignment_id for CJ traceability/grade projection.
 
 ### Running Tests
 
@@ -154,6 +157,8 @@ service_urls = {
 - `KAFKA_BOOTSTRAP_SERVERS` (dev compose exposes `localhost:9093`)
 - `REDIS_URL` (dev compose exposes `redis://localhost:6379`)
 - `INTERNAL_API_KEY` (service-to-service auth; from `.env`)
+- `FUNCTIONAL_ASSIGNMENT_ID` (optional, defaults to `test_eng5_writing_2025`): attached to file uploads for CJ/grade-projection traceability.
+- `USE_MOCK_LLM` / `LLM_PROVIDER_SERVICE_USE_MOCK_LLM` should remain `true` for functional runs to keep CJ fast and deterministic.
 - Always `source .env` in your shell before running functional tests so CLI helpers match the running stack.
 
 ## Technology Stack
