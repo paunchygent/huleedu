@@ -344,3 +344,26 @@ class BatchRepositoryQueries:
                 "completed_count": completed_count,
                 "failed_count": failed_count,
             }
+
+    async def set_batch_assignment_id(
+        self,
+        batch_id: str,
+        assignment_id: Optional[str],
+    ) -> None:
+        """Set assignment identifier for a batch if not already set.
+
+        This method is intentionally idempotent: it only updates the record when
+        a non-null assignment_id is provided and the current value is NULL.
+        """
+        async with self.session_factory() as session:
+            result = await session.execute(
+                select(BatchResult).where(BatchResult.batch_id == batch_id)
+            )
+            batch: Optional[BatchResult] = result.scalars().first()
+
+            if not batch:
+                return
+
+            if assignment_id is not None and batch.assignment_id is None:
+                batch.assignment_id = assignment_id
+                await session.commit()

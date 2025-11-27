@@ -2,7 +2,7 @@
 id: 'propagate-assignment-id-from-cj-to-ras-storage-phase-b'
 title: 'Propagate assignment_id from CJ to RAS storage (Phase B)'
 type: 'task'
-status: 'research'
+status: 'completed'
 priority: 'high'
 domain: 'assessment'
 service: 'result_aggregator_service'
@@ -90,3 +90,11 @@ Per migration standards, create TestContainers-based integration test:
 
 - Phase A: `TASKS/assessment/propagate-assignment_id-from-bos-to-cj-request-phase-a.md`
 - Plan file: `.claude/plans/cuddly-churning-sloth.md`
+
+## Completion Notes (2025-11-27)
+
+- Added `assignment_id: str | None` to `AssessmentResultV1` and wired CJ dual event publisher to populate it from `ELS_CJAssessmentRequestV1.assignment_id`.
+- Extended RAS `BatchResult` with nullable `assignment_id` column plus Alembic migration `0a6c563e4523_add_assignment_id_to_batch_results` (column + `ix_batch_results_assignment_id` index).
+- Added `set_batch_assignment_id` to `BatchRepositoryProtocol` and implementations; `AssessmentEventHandler.process_assessment_result` now persists `data.assignment_id` when present.
+- Updated RAS API model `BatchStatusResponse` to expose `assignment_id` in read models.
+- Tests: updated CJ dual event publishing unit test; added RAS unit test for handler wiring and integration tests for repository persistence and Alembic migration (including idempotency).

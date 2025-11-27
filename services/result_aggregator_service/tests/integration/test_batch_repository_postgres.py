@@ -232,6 +232,27 @@ class TestBatchRepositoryIntegration:
             == "prompt-storage-id"
         )
 
+    async def test_assignment_id_persisted(
+        self,
+        batch_repository: BatchRepositoryPostgresImpl,
+    ) -> None:
+        """Assignment identifier can be stored and retrieved for a batch."""
+        batch_id = "assignment-batch-001"
+        user_id = "teacher-assignment"
+
+        await batch_repository.create_batch(
+            batch_id=batch_id,
+            user_id=user_id,
+            essay_count=1,
+            metadata={"student_prompt_ref": self._make_prompt_metadata("prompt-storage-id")},
+        )
+
+        await batch_repository.set_batch_assignment_id(batch_id, "assignment-123")
+
+        batch = await batch_repository.get_batch(batch_id)
+        assert batch is not None
+        assert batch.assignment_id == "assignment-123"
+
     async def test_batch_with_failures(self, batch_repository: BatchRepositoryPostgresImpl) -> None:
         """Test batch processing with some essay failures."""
         batch_id = "test-batch-002"

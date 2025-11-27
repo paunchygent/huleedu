@@ -190,6 +190,36 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
         """Mark batch as failed."""
         await self.statistics.update_batch_failed(batch_id, error_detail, correlation_id)
 
+    async def set_batch_assignment_id(self, batch_id: str, assignment_id: Optional[str]) -> None:
+        """Set assignment identifier for a batch in persistent storage."""
+        start_time = time.perf_counter()
+        try:
+            await self.queries.set_batch_assignment_id(batch_id, assignment_id)
+
+            duration = time.perf_counter() - start_time
+            self._record_operation_metrics(
+                operation="set_batch_assignment_id",
+                table="batch_results",
+                duration=duration,
+                success=True,
+            )
+        except Exception as e:
+            duration = time.perf_counter() - start_time
+            self._record_operation_metrics(
+                operation="set_batch_assignment_id",
+                table="batch_results",
+                duration=duration,
+                success=False,
+            )
+            self._record_error_metrics(type(e).__name__, "set_batch_assignment_id")
+            self.logger.error(
+                "Failed to set batch assignment_id",
+                batch_id=batch_id,
+                error=str(e),
+                exc_info=True,
+            )
+            raise
+
     async def mark_batch_completed(
         self,
         batch_id: str,

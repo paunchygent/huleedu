@@ -119,6 +119,10 @@ class BatchRepositoryProtocol(Protocol):
         """Mark batch as failed."""
         ...
 
+    async def set_batch_assignment_id(self, batch_id: str, assignment_id: Optional[str]) -> None:
+        """Set assignment identifier for a batch in storage (idempotent)."""
+        ...
+
     async def update_essay_file_mapping(
         self,
         essay_id: str,

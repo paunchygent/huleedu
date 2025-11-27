@@ -38,6 +38,11 @@ class BatchResult(Base):
     # Primary identification
     batch_id: Mapped[str] = mapped_column(String(255), primary_key=True)
     user_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    assignment_id: Mapped[Optional[str]] = mapped_column(
+        String(100),
+        nullable=True,
+        index=True,
+    )
 
     # Status tracking
     overall_status: Mapped[BatchStatus] = mapped_column(

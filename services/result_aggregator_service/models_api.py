@@ -43,6 +43,7 @@ class BatchStatusResponse(BaseModel):
 
     batch_id: str
     user_id: str  # Critical for API Gateway security checks
+    assignment_id: Optional[str] = None
     overall_status: BatchClientStatus
 
     # Counts
@@ -93,6 +94,7 @@ class BatchStatusResponse(BaseModel):
         return cls(
             batch_id=batch_result.batch_id,
             user_id=batch_result.user_id,
+            assignment_id=getattr(batch_result, "assignment_id", None),
             overall_status=api_status,
             essay_count=batch_result.essay_count,
             completed_essay_count=batch_result.completed_essay_count,
