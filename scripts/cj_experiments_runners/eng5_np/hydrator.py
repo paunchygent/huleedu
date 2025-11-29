@@ -205,6 +205,17 @@ class AssessmentRunHydrator:
         envelope: EventEnvelope[LLMComparisonResultV1],
     ) -> dict[str, Any]:
         metadata = envelope.data.request_metadata or {}
+        # DEBUG: Log raw callback metadata for debugging
+        self._logger.warning(
+            "DEBUG_CALLBACK_METADATA",
+            correlation_id=str(envelope.correlation_id),
+            request_metadata=metadata,
+            metadata_keys=list(metadata.keys()) if metadata else [],
+            has_essay_a="essay_a_id" in metadata,
+            has_essay_b="essay_b_id" in metadata,
+            has_prompt_hash="prompt_sha256" in metadata,
+            raw_envelope_data_type=type(envelope.data).__name__,
+        )
         essay_a = metadata.get("essay_a_id")
         essay_b = metadata.get("essay_b_id")
         prompt_hash = metadata.get("prompt_sha256")
