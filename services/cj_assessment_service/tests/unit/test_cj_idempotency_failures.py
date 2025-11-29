@@ -11,7 +11,7 @@ import uuid
 from collections.abc import Callable, Coroutine
 from datetime import UTC, datetime
 from typing import Any
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
 from aiokafka import ConsumerRecord
@@ -26,6 +26,7 @@ from services.cj_assessment_service.protocols import (
     CJBatchRepositoryProtocol,
     CJComparisonRepositoryProtocol,
     CJEssayRepositoryProtocol,
+    PairMatchingStrategyProtocol,
 )
 from services.cj_assessment_service.tests.unit.test_mocks import (
     MockRedisClient,
@@ -147,11 +148,18 @@ def mock_boundary_services() -> dict[str, Any]:
 # --- Test Cases ---
 
 
+@pytest.fixture
+def mock_matching_strategy() -> MagicMock:
+    """Create mock matching strategy protocol."""
+    return MagicMock(spec=PairMatchingStrategyProtocol)
+
+
 @pytest.mark.asyncio
 async def test_processing_failure_keeps_lock(
     sample_cj_request_event: dict,
     mock_boundary_services: dict[str, Any],
     mock_redis_client: MockRedisClient,
+    mock_matching_strategy: MagicMock,
 ) -> None:
     """Test that business logic failures keep Redis lock to prevent infinite retries."""
     from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer
@@ -184,6 +192,7 @@ async def test_processing_failure_keeps_lock(
             content_client=content_client,
             event_publisher=event_publisher,
             llm_interaction=llm_interaction,
+            matching_strategy=mock_matching_strategy,
             grade_projector=Mock(spec=GradeProjector),
             settings_obj=settings,
         )

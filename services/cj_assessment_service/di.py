@@ -35,6 +35,9 @@ from services.cj_assessment_service.cj_core_logic.grade_projection.context_servi
     ProjectionContextService,
 )
 from services.cj_assessment_service.cj_core_logic.grade_projector import GradeProjector
+from services.cj_assessment_service.cj_core_logic.matching_strategies import (
+    OptimalGraphMatchingStrategy,
+)
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.config import settings as service_settings
 from services.cj_assessment_service.implementations.anchor_repository import (
@@ -81,6 +84,7 @@ from services.cj_assessment_service.protocols import (
     GradeProjectionRepositoryProtocol,
     LLMInteractionProtocol,
     LLMProviderProtocol,
+    PairMatchingStrategyProtocol,
     RetryManagerProtocol,
     SessionProviderProtocol,
 )
@@ -364,6 +368,27 @@ class CJAssessmentServiceProvider(Provider):
         )
 
     @provide(scope=Scope.APP)
+    def provide_pair_matching_strategy(
+        self,
+        settings: Settings,
+    ) -> PairMatchingStrategyProtocol:
+        """Provide pair matching strategy based on configuration.
+
+        Supports DI-swappable strategies for CJ experiments.
+        """
+        if settings.PAIR_MATCHING_STRATEGY == "optimal_graph":
+            return OptimalGraphMatchingStrategy(
+                weight_comparison_count=settings.MATCHING_WEIGHT_COMPARISON_COUNT,
+                weight_bt_proximity=settings.MATCHING_WEIGHT_BT_PROXIMITY,
+            )
+        # Future strategies:
+        # elif settings.PAIR_MATCHING_STRATEGY == "random":
+        #     return RandomMatchingStrategy()
+        # elif settings.PAIR_MATCHING_STRATEGY == "d_optimal":
+        #     return DOptimalDesignStrategy()
+        raise ValueError(f"Unknown matching strategy: {settings.PAIR_MATCHING_STRATEGY}")
+
+    @provide(scope=Scope.APP)
     def provide_batch_retry_processor(
         self,
         session_provider: SessionProviderProtocol,
@@ -420,6 +445,7 @@ class CJAssessmentServiceProvider(Provider):
         content_client: ContentClientProtocol,
         event_publisher: CJEventPublisherProtocol,
         llm_interaction: LLMInteractionProtocol,
+        matching_strategy: PairMatchingStrategyProtocol,
         redis_client: AtomicRedisClientProtocol,
         grade_projector: GradeProjector,
         tracer: Tracer,
@@ -436,6 +462,7 @@ class CJAssessmentServiceProvider(Provider):
             content_client=content_client,
             event_publisher=event_publisher,
             llm_interaction=llm_interaction,
+            matching_strategy=matching_strategy,
             redis_client=redis_client,
             grade_projector=grade_projector,
             tracer=tracer,

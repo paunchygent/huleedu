@@ -15,7 +15,7 @@ Tests use:
 
 import uuid
 from typing import TYPE_CHECKING, Any
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from aioresponses import aioresponses
@@ -40,6 +40,9 @@ from services.cj_assessment_service.protocols import (
     ContentClientProtocol,
     LLMInteractionProtocol,
     SessionProviderProtocol,
+)
+from services.cj_assessment_service.tests.helpers.matching_strategies import (
+    make_real_matching_strategy_mock,
 )
 
 pytest_plugins = [
@@ -66,6 +69,7 @@ class TestSystemPromptHierarchyIntegration:
         real_llm_interaction: tuple[LLMInteractionProtocol, aioresponses],
         mock_content_client: ContentClientProtocol,
         mock_event_publisher: CJEventPublisherProtocol,
+        mock_matching_strategy: MagicMock,
         capture_requests_from_mocker: CapturedRequestExtractor,
         test_settings: Settings,
     ) -> None:
@@ -150,6 +154,7 @@ class TestSystemPromptHierarchyIntegration:
             instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
             request_data=request_data,
             llm_interaction=llm_interaction,
+            matching_strategy=mock_matching_strategy,
             settings=test_settings,
             correlation_id=uuid.uuid4(),
             log_extra={"test": "event_override"},
@@ -177,6 +182,7 @@ class TestSystemPromptHierarchyIntegration:
         real_llm_interaction: tuple[LLMInteractionProtocol, aioresponses],
         mock_content_client: ContentClientProtocol,
         mock_event_publisher: CJEventPublisherProtocol,
+        mock_matching_strategy: MagicMock,
         capture_requests_from_mocker: CapturedRequestExtractor,
         test_settings: Settings,
     ) -> None:
@@ -255,6 +261,7 @@ class TestSystemPromptHierarchyIntegration:
             instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
             request_data=request_data,
             llm_interaction=llm_interaction,
+            matching_strategy=mock_matching_strategy,
             settings=test_settings,
             correlation_id=uuid.uuid4(),
             log_extra={"test": "no_override"},
@@ -282,6 +289,7 @@ class TestSystemPromptHierarchyIntegration:
         real_llm_interaction: tuple[LLMInteractionProtocol, aioresponses],
         mock_content_client: ContentClientProtocol,
         mock_event_publisher: CJEventPublisherProtocol,
+        mock_matching_strategy: MagicMock,
         capture_requests_from_mocker: CapturedRequestExtractor,
         test_settings: Settings,
     ) -> None:
@@ -363,6 +371,7 @@ class TestSystemPromptHierarchyIntegration:
             instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
             request_data=request_data,
             llm_interaction=llm_interaction,
+            matching_strategy=mock_matching_strategy,
             settings=test_settings,
             correlation_id=uuid.uuid4(),
             log_extra={"test": "none_override"},
@@ -388,6 +397,7 @@ class TestSystemPromptHierarchyIntegration:
         real_llm_interaction: tuple[LLMInteractionProtocol, aioresponses],
         mock_content_client: ContentClientProtocol,
         mock_event_publisher: CJEventPublisherProtocol,
+        mock_matching_strategy: MagicMock,
         capture_requests_from_mocker: CapturedRequestExtractor,
         test_settings: Settings,
     ) -> None:
@@ -464,6 +474,7 @@ class TestSystemPromptHierarchyIntegration:
             instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
             request_data=request_data,
             llm_interaction=llm_interaction,
+            matching_strategy=mock_matching_strategy,
             settings=test_settings,
             correlation_id=uuid.uuid4(),
             log_extra={"test": "header_structure"},
@@ -512,3 +523,10 @@ class TestSystemPromptHierarchyIntegration:
         print("=" * 80)
         print(user_prompt[:500] + "..." if len(user_prompt) > 500 else user_prompt)
         print("=" * 80)
+
+
+@pytest.fixture
+def mock_matching_strategy() -> MagicMock:
+    """Provide real optimal graph matching strategy wrapped for protocol compliance."""
+
+    return make_real_matching_strategy_mock()

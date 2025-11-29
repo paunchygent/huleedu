@@ -63,14 +63,25 @@ def mock_session_provider() -> MockSessionProvider:
 
 
 @pytest.fixture
-def mock_batch_repo() -> AsyncMock:
-    """Create mock batch repository protocol."""
-    return AsyncMock(spec=CJBatchRepositoryProtocol)
+def mock_batch_repo() -> MagicMock:
+    """Create mock batch repository protocol.
+
+    Uses MagicMock with specific AsyncMock methods to avoid
+    'coroutine never awaited' warnings during introspection.
+    """
+    repo = MagicMock(spec=CJBatchRepositoryProtocol)
+    repo.get_batch_state = AsyncMock()
+    repo.get_batch_state_for_update = AsyncMock()
+    repo.get_cj_batch_upload = AsyncMock()
+    repo.get_stuck_batches = AsyncMock()
+    repo.get_batches_ready_for_completion = AsyncMock()
+    repo.update_batch_state = AsyncMock()
+    return repo
 
 
 @pytest.fixture
 def mock_database(
-    mock_session_provider: MockSessionProvider, mock_batch_repo: AsyncMock
+    mock_session_provider: MockSessionProvider, mock_batch_repo: MagicMock
 ) -> AsyncMock:
     """Create mock database protocol for backward compatibility.
 
@@ -97,15 +108,21 @@ def mock_database(
 
 
 @pytest.fixture
-def mock_llm_interaction() -> LLMInteractionProtocol:
-    """Create mock LLM interaction protocol."""
-    return AsyncMock(spec=LLMInteractionProtocol)
+def mock_llm_interaction() -> MagicMock:
+    """Create mock LLM interaction protocol.
+
+    Uses MagicMock container to avoid introspection warnings.
+    """
+    interaction = MagicMock(spec=LLMInteractionProtocol)
+    interaction.submit_comparison_request = AsyncMock()
+    interaction.submit_comparison_request_batch = AsyncMock()
+    return interaction
 
 
 @pytest.fixture
 def batch_processor(
     mock_session_provider: SessionProviderProtocol,
-    mock_batch_repo: AsyncMock,
+    mock_batch_repo: MagicMock,
     mock_llm_interaction: LLMInteractionProtocol,
     mock_settings: Settings,
 ) -> BatchProcessor:
@@ -121,7 +138,7 @@ def batch_processor(
 @pytest.fixture
 def batch_pool_manager(
     mock_session_provider: SessionProviderProtocol,
-    mock_batch_repo: AsyncMock,
+    mock_batch_repo: MagicMock,
     mock_settings: Settings,
 ) -> BatchPoolManager:
     """Create BatchPoolManager instance with mocks."""
@@ -133,9 +150,14 @@ def batch_pool_manager(
 
 
 @pytest.fixture
-def mock_batch_submitter() -> AsyncMock:
-    """Create mock batch submitter protocol."""
-    return AsyncMock(spec=BatchProcessorProtocol)
+def mock_batch_submitter() -> MagicMock:
+    """Create mock batch submitter protocol.
+
+    Uses MagicMock with AsyncMock method to be safe against introspection.
+    """
+    submitter = MagicMock(spec=BatchProcessorProtocol)
+    submitter.submit_comparison_batch = AsyncMock()
+    return submitter
 
 
 @pytest.fixture

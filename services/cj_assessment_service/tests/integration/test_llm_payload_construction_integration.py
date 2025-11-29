@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import uuid
 from typing import TYPE_CHECKING, Any
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
 import pytest
@@ -33,9 +33,13 @@ from services.cj_assessment_service.protocols import (
     CJBatchRepositoryProtocol,
     CJComparisonRepositoryProtocol,
     LLMInteractionProtocol,
+    PairMatchingStrategyProtocol,
     SessionProviderProtocol,
 )
 from services.cj_assessment_service.tests.fixtures.database_fixtures import PostgresDataAccess
+from services.cj_assessment_service.tests.helpers.matching_strategies import (
+    make_real_matching_strategy_mock,
+)
 
 if TYPE_CHECKING:
     from .llm_payload_fixtures import CapturedRequestExtractor
@@ -58,6 +62,7 @@ class TestLLMPayloadConstructionIntegration:
         postgres_repository: PostgresDataAccess,
         postgres_batch_repository: CJBatchRepositoryProtocol,
         real_llm_interaction: tuple[LLMInteractionProtocol, aioresponses],
+        mock_matching_strategy: MagicMock,
         capture_requests_from_mocker: CapturedRequestExtractor,
         test_settings: Settings,
     ) -> None:
@@ -75,6 +80,7 @@ class TestLLMPayloadConstructionIntegration:
             postgres_repository=postgres_repository,
             postgres_batch_repository=postgres_batch_repository,
             llm_interaction=real_llm_interaction,
+            matching_strategy=mock_matching_strategy,
             capture_requests_from_mocker=capture_requests_from_mocker,
             test_settings=test_settings,
             essays=essays,
@@ -97,6 +103,7 @@ class TestLLMPayloadConstructionIntegration:
         postgres_repository: PostgresDataAccess,
         postgres_batch_repository: CJBatchRepositoryProtocol,
         real_llm_interaction: tuple[LLMInteractionProtocol, aioresponses],
+        mock_matching_strategy: MagicMock,
         capture_requests_from_mocker: CapturedRequestExtractor,
         test_settings: Settings,
     ) -> None:
@@ -123,6 +130,7 @@ class TestLLMPayloadConstructionIntegration:
             postgres_repository=postgres_repository,
             postgres_batch_repository=postgres_batch_repository,
             llm_interaction=real_llm_interaction,
+            matching_strategy=mock_matching_strategy,
             capture_requests_from_mocker=capture_requests_from_mocker,
             test_settings=test_settings,
             essays=essays,
@@ -148,6 +156,7 @@ class TestLLMPayloadConstructionIntegration:
         postgres_repository: PostgresDataAccess,
         postgres_batch_repository: CJBatchRepositoryProtocol,
         real_llm_interaction: tuple[LLMInteractionProtocol, aioresponses],
+        mock_matching_strategy: MagicMock,
         capture_requests_from_mocker: CapturedRequestExtractor,
         test_settings: Settings,
     ) -> None:
@@ -167,6 +176,7 @@ class TestLLMPayloadConstructionIntegration:
             postgres_repository=postgres_repository,
             postgres_batch_repository=postgres_batch_repository,
             llm_interaction=real_llm_interaction,
+            matching_strategy=mock_matching_strategy,
             capture_requests_from_mocker=capture_requests_from_mocker,
             test_settings=test_settings,
             essays=essays,
@@ -188,6 +198,7 @@ class TestLLMPayloadConstructionIntegration:
         postgres_repository: PostgresDataAccess,
         postgres_batch_repository: CJBatchRepositoryProtocol,
         real_llm_interaction: tuple[LLMInteractionProtocol, aioresponses],
+        mock_matching_strategy: MagicMock,
         capture_requests_from_mocker: CapturedRequestExtractor,
         test_settings: Settings,
     ) -> None:
@@ -205,6 +216,7 @@ class TestLLMPayloadConstructionIntegration:
             postgres_repository=postgres_repository,
             postgres_batch_repository=postgres_batch_repository,
             llm_interaction=real_llm_interaction,
+            matching_strategy=mock_matching_strategy,
             capture_requests_from_mocker=capture_requests_from_mocker,
             test_settings=test_settings,
             essays=essays,
@@ -226,6 +238,7 @@ class TestLLMPayloadConstructionIntegration:
         postgres_repository: PostgresDataAccess,
         postgres_batch_repository: CJBatchRepositoryProtocol,
         real_llm_interaction: tuple[LLMInteractionProtocol, aioresponses],
+        mock_matching_strategy: MagicMock,
         capture_requests_from_mocker: CapturedRequestExtractor,
         test_settings: Settings,
     ) -> None:
@@ -246,6 +259,7 @@ class TestLLMPayloadConstructionIntegration:
             postgres_repository=postgres_repository,
             postgres_batch_repository=postgres_batch_repository,
             llm_interaction=real_llm_interaction,
+            matching_strategy=mock_matching_strategy,
             capture_requests_from_mocker=capture_requests_from_mocker,
             test_settings=test_settings,
             essays=essays,
@@ -264,6 +278,7 @@ class TestLLMPayloadConstructionIntegration:
         postgres_repository: PostgresDataAccess,
         postgres_batch_repository: CJBatchRepositoryProtocol,
         real_llm_interaction: tuple[LLMInteractionProtocol, aioresponses],
+        mock_matching_strategy: MagicMock,
         capture_requests_from_mocker: CapturedRequestExtractor,
         test_settings: Settings,
     ) -> None:
@@ -281,6 +296,7 @@ class TestLLMPayloadConstructionIntegration:
             postgres_repository=postgres_repository,
             postgres_batch_repository=postgres_batch_repository,
             llm_interaction=real_llm_interaction,
+            matching_strategy=mock_matching_strategy,
             capture_requests_from_mocker=capture_requests_from_mocker,
             test_settings=test_settings,
             essays=essays,
@@ -312,6 +328,7 @@ class TestLLMPayloadConstructionIntegration:
         postgres_repository: PostgresDataAccess,
         postgres_batch_repository: CJBatchRepositoryProtocol,
         real_llm_interaction: tuple[LLMInteractionProtocol, aioresponses],
+        mock_matching_strategy: MagicMock,
         capture_requests_from_mocker: CapturedRequestExtractor,
         test_settings: Settings,
     ) -> None:
@@ -336,6 +353,7 @@ class TestLLMPayloadConstructionIntegration:
             postgres_repository=postgres_repository,
             postgres_batch_repository=postgres_batch_repository,
             llm_interaction=real_llm_interaction,
+            matching_strategy=mock_matching_strategy,
             capture_requests_from_mocker=capture_requests_from_mocker,
             test_settings=test_settings,
             essays=essays,
@@ -360,6 +378,7 @@ class TestLLMPayloadConstructionIntegration:
         postgres_repository: PostgresDataAccess,
         postgres_batch_repository: CJBatchRepositoryProtocol,
         real_llm_interaction: tuple[LLMInteractionProtocol, aioresponses],
+        mock_matching_strategy: MagicMock,
         capture_requests_from_mocker: CapturedRequestExtractor,
         test_settings: Settings,
     ) -> None:
@@ -378,6 +397,7 @@ class TestLLMPayloadConstructionIntegration:
             postgres_repository=postgres_repository,
             postgres_batch_repository=postgres_batch_repository,
             llm_interaction=real_llm_interaction,
+            matching_strategy=mock_matching_strategy,
             capture_requests_from_mocker=capture_requests_from_mocker,
             test_settings=test_settings,
             essays=essays,
@@ -503,6 +523,7 @@ async def _submit_and_capture_request(
     postgres_repository: PostgresDataAccess,
     postgres_batch_repository: CJBatchRepositoryProtocol,
     llm_interaction: tuple[LLMInteractionProtocol, aioresponses],
+    matching_strategy: PairMatchingStrategyProtocol,
     capture_requests_from_mocker: CapturedRequestExtractor,
     test_settings: Settings,
     essays: list[EssayForComparison],
@@ -538,6 +559,7 @@ async def _submit_and_capture_request(
         instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
         request_data=request_data,
         llm_interaction=llm_interaction_impl,
+        matching_strategy=matching_strategy,
         settings=test_settings,
         correlation_id=correlation_id or uuid.uuid4(),
         log_extra={"test": log_label},
@@ -599,3 +621,10 @@ async def _print_context_records(
                     f"{json.dumps(instruction_summary, indent=2)}\n"
                     "===== end assessment instruction =====\n"
                 )
+
+
+@pytest.fixture
+def mock_matching_strategy() -> MagicMock:
+    """Provide real optimal graph matching strategy wrapped for protocol compliance."""
+
+    return make_real_matching_strategy_mock()

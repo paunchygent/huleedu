@@ -37,6 +37,7 @@ from services.cj_assessment_service.protocols import (
     CJEventPublisherProtocol,
     ContentClientProtocol,
     LLMInteractionProtocol,
+    PairMatchingStrategyProtocol,
     SessionProviderProtocol,
 )
 
@@ -52,6 +53,7 @@ async def handle_llm_comparison_callback(
     event_publisher: CJEventPublisherProtocol,
     content_client: ContentClientProtocol,
     llm_interaction: LLMInteractionProtocol,
+    matching_strategy: PairMatchingStrategyProtocol,
     settings: Settings,
     instruction_repository: AssessmentInstructionRepositoryProtocol,
     grade_projector: GradeProjector,
@@ -68,6 +70,7 @@ async def handle_llm_comparison_callback(
         event_publisher: Event publisher protocol
         content_client: Content client for fetching anchor essays
         llm_interaction: LLM interaction protocol
+        matching_strategy: DI-injected strategy for computing optimal pairs
         settings: Application settings
         instruction_repository: Instruction repository for assessment instructions
         tracer: Optional OpenTelemetry tracer for distributed tracing
@@ -178,6 +181,7 @@ async def handle_llm_comparison_callback(
                         content_client=content_client,
                         llm_interaction=llm_interaction,
                         instruction_repository=instruction_repository,
+                        matching_strategy=matching_strategy,
                         grade_projector=grade_projector,
                     )
         else:
@@ -194,6 +198,7 @@ async def handle_llm_comparison_callback(
                 content_client=content_client,
                 llm_interaction=llm_interaction,
                 instruction_repository=instruction_repository,
+                matching_strategy=matching_strategy,
                 grade_projector=grade_projector,
             )
 

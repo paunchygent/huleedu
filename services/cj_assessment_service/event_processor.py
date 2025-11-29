@@ -43,6 +43,7 @@ from services.cj_assessment_service.protocols import (
     CJEventPublisherProtocol,
     ContentClientProtocol,
     LLMInteractionProtocol,
+    PairMatchingStrategyProtocol,
     SessionProviderProtocol,
 )
 
@@ -98,6 +99,7 @@ async def process_single_message(
     content_client: ContentClientProtocol,
     event_publisher: CJEventPublisherProtocol,
     llm_interaction: LLMInteractionProtocol,
+    matching_strategy: PairMatchingStrategyProtocol,
     settings_obj: Settings,
     grade_projector: GradeProjector,
     tracer: "Tracer | None" = None,
@@ -118,6 +120,7 @@ async def process_single_message(
         content_client: Content client protocol
         event_publisher: Event publisher protocol
         llm_interaction: LLM interaction protocol
+        matching_strategy: DI-injected strategy for computing optimal pairs
         settings_obj: Application settings
         tracer: Optional OpenTelemetry tracer
 
@@ -171,6 +174,7 @@ async def process_single_message(
                     content_client,
                     event_publisher,
                     llm_interaction,
+                    matching_strategy,
                     settings_obj,
                     grade_projector,
                     tracer,
@@ -189,6 +193,7 @@ async def process_single_message(
             content_client,
             event_publisher,
             llm_interaction,
+            matching_strategy,
             settings_obj,
             grade_projector,
             tracer,
@@ -204,6 +209,7 @@ async def process_llm_result(
     event_publisher: CJEventPublisherProtocol,
     content_client: ContentClientProtocol,
     llm_interaction: LLMInteractionProtocol,
+    matching_strategy: PairMatchingStrategyProtocol,
     settings_obj: Settings,
     instruction_repository: AssessmentInstructionRepositoryProtocol,
     grade_projector: GradeProjector,
@@ -222,6 +228,7 @@ async def process_llm_result(
         event_publisher: Event publisher protocol
         content_client: Content client for fetching anchor essays
         llm_interaction: LLM interaction protocol
+        matching_strategy: DI-injected strategy for computing optimal pairs
         settings_obj: Application settings
         instruction_repository: Instruction repository for assessment instructions
         tracer: Optional OpenTelemetry tracer
@@ -238,6 +245,7 @@ async def process_llm_result(
         event_publisher,
         content_client,
         llm_interaction,
+        matching_strategy,
         settings_obj,
         instruction_repository,
         grade_projector,

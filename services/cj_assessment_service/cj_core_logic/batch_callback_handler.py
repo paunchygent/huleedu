@@ -30,6 +30,7 @@ from services.cj_assessment_service.protocols import (
     CJEventPublisherProtocol,
     ContentClientProtocol,
     LLMInteractionProtocol,
+    PairMatchingStrategyProtocol,
     SessionProviderProtocol,
 )
 
@@ -61,6 +62,7 @@ async def continue_cj_assessment_workflow(
     content_client: ContentClientProtocol,
     llm_interaction: LLMInteractionProtocol,
     instruction_repository: AssessmentInstructionRepositoryProtocol,
+    matching_strategy: PairMatchingStrategyProtocol,
     grade_projector: "GradeProjector",
     retry_processor: BatchRetryProcessor | None = None,
 ) -> None:
@@ -81,6 +83,7 @@ async def continue_cj_assessment_workflow(
         content_client: Content client for fetching anchor essays
         llm_interaction: LLM interaction protocol
         instruction_repository: Instruction repository for assessment instructions
+        matching_strategy: DI-injected strategy for computing optimal pairs
         retry_processor: Optional retry processor for failed comparison handling
     """
     # Lazy imports to avoid scipy/coverage conflict at module initialization
@@ -161,6 +164,7 @@ async def continue_cj_assessment_workflow(
                 content_client=content_client,
                 correlation_id=correlation_id,
                 llm_interaction=llm_interaction,
+                matching_strategy=matching_strategy,
                 retry_processor=retry_processor,
                 grade_projector=grade_projector,
             )

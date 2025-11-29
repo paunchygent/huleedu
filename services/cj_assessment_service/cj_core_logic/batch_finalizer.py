@@ -12,11 +12,18 @@ grade projections, and dual event publishing via outbox).
 from __future__ import annotations
 
 import types
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
+from common_core.event_enums import ProcessingEvent
+from common_core.events.cj_assessment_events import CJAssessmentFailedV1
+from common_core.events.envelope import EventEnvelope
+from common_core.metadata_models import SystemProcessingMetadata
+from common_core.status_enums import BatchStatus, ProcessingStage
 from common_core.status_enums import CJBatchStateEnum as CoreCJState
 from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs.observability import inject_trace_context
 
 from services.cj_assessment_service.cj_core_logic.dual_event_publisher import (
     DualEventPublishingData,
@@ -221,6 +228,111 @@ class BatchFinalizer:
                 except Exception:
                     # Best-effort; avoid masking original error
                     pass
+
+    async def finalize_failure(
+        self,
+        batch_id: int,
+        correlation_id: UUID,
+        log_extra: dict[str, Any],
+        *,
+        failure_reason: str,
+        failure_details: dict[str, Any] | None = None,
+    ) -> None:
+        """Finalize a batch in FAILED state for high failure-rate scenarios.
+
+        This path is used by PR-2 semantics when all attempts are exhausted but
+        the success rate is too low (including zero successful comparisons).
+        It marks the batch as ERROR_* in CJBatchUpload, sets the fine-grained
+        CJBatchState to FAILED, and publishes a CJAssessmentFailedV1 event.
+        """
+        async with self._session_provider.session() as session:
+            from services.cj_assessment_service.models_db import CJBatchState, CJBatchUpload
+
+            batch_upload = await session.get(CJBatchUpload, batch_id)
+            if not batch_upload:
+                logger.error(
+                    "Batch upload not found for failure finalization",
+                    extra={**log_extra, "batch_id": batch_id},
+                )
+                return
+
+            status_str = str(batch_upload.status)
+            if status_str.startswith("COMPLETE") or status_str.startswith("ERROR"):
+                logger.info(
+                    "Batch already terminal, skipping failure finalization",
+                    extra={**log_extra, "batch_id": batch_id, "status": status_str},
+                )
+                return
+
+            batch_state = await session.get(CJBatchState, batch_id)
+            if not batch_state:
+                logger.error(
+                    "Batch state not found for failure finalization",
+                    extra={**log_extra, "batch_id": batch_id},
+                )
+                return
+
+            # Update upload status and fine-grained state
+            await self._batch_repo.update_cj_batch_status(
+                session=session,
+                cj_batch_id=batch_id,
+                status=CJBatchStatusEnum.ERROR_PROCESSING,
+            )
+
+            batch_state.state = CoreCJState.FAILED
+            now = datetime.now(UTC)
+            batch_state.last_activity_at = now
+            if batch_state.processing_metadata is None:
+                batch_state.processing_metadata = {}
+            batch_state.processing_metadata.setdefault("failed_reason", {})
+            batch_state.processing_metadata["failed_reason"] = {
+                "reason": failure_reason,
+                "timestamp": now.isoformat(),
+                "details": failure_details or {},
+            }
+
+            await session.commit()
+
+            # Build and publish thin failure event to ELS via outbox
+            failure_event_data = CJAssessmentFailedV1(
+                event_name=ProcessingEvent.CJ_ASSESSMENT_FAILED,
+                entity_id=batch_upload.bos_batch_id,
+                entity_type="batch",
+                parent_id=None,
+                status=BatchStatus.FAILED_CRITICALLY,
+                system_metadata=SystemProcessingMetadata(
+                    entity_id=batch_upload.bos_batch_id,
+                    entity_type="batch",
+                    parent_id=None,
+                    timestamp=datetime.now(UTC),
+                    processing_stage=ProcessingStage.FAILED,
+                    started_at=batch_upload.created_at,
+                    completed_at=datetime.now(UTC),
+                    event=ProcessingEvent.CJ_ASSESSMENT_FAILED.value,
+                    error_info={
+                        "reason": failure_reason,
+                        "details": failure_details or {},
+                    },
+                ),
+                cj_assessment_job_id=str(batch_id),
+            )
+
+            failure_envelope = EventEnvelope[CJAssessmentFailedV1](
+                event_type=self._settings.CJ_ASSESSMENT_FAILED_TOPIC,
+                event_timestamp=datetime.now(UTC),
+                source_service=self._settings.SERVICE_NAME,
+                correlation_id=correlation_id,
+                data=failure_event_data,
+                metadata={},
+            )
+
+            if failure_envelope.metadata is not None:
+                inject_trace_context(failure_envelope.metadata)
+
+            await self._publisher.publish_assessment_failed(
+                failure_data=failure_envelope,
+                correlation_id=correlation_id,
+            )
 
     async def finalize_single_essay(
         self,

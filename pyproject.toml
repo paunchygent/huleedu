@@ -236,6 +236,7 @@ module = [
     "opentelemetry.*",  # OpenTelemetry instrumentation libraries
     "scipy.*",      # SciPy lacks complete type stubs
     "sklearn.*",    # scikit-learn lacks type stubs
+    "networkx.*",   # NetworkX graph library lacks type stubs
 ]
 ignore_missing_imports = true
 

@@ -6,6 +6,7 @@ pairwise comparisons using LLM and updates Bradley-Terry scores.
 
 from __future__ import annotations
 
+from random import Random
 from typing import Any
 from uuid import UUID
 
@@ -41,6 +42,7 @@ from services.cj_assessment_service.protocols import (
     CJComparisonRepositoryProtocol,
     CJEssayRepositoryProtocol,
     LLMInteractionProtocol,
+    PairMatchingStrategyProtocol,
     SessionProviderProtocol,
 )
 
@@ -70,6 +72,7 @@ async def submit_comparisons_for_async_processing(
     comparison_repository: CJComparisonRepositoryProtocol,
     instruction_repository: AssessmentInstructionRepositoryProtocol,
     llm_interaction: LLMInteractionProtocol,
+    matching_strategy: PairMatchingStrategyProtocol,
     request_data: CJAssessmentRequestData,
     settings: Settings,
     correlation_id: UUID,
@@ -85,6 +88,7 @@ async def submit_comparisons_for_async_processing(
         comparison_repository: Repository for comparison pair operations
         instruction_repository: Repository for assessment instruction operations
         llm_interaction: LLM interaction protocol
+        matching_strategy: DI-injected strategy for computing optimal pairs
         request_data: CJ assessment request data
         settings: Application settings
         correlation_id: Request correlation ID
@@ -100,6 +104,7 @@ async def submit_comparisons_for_async_processing(
         comparison_repository=comparison_repository,
         instruction_repository=instruction_repository,
         llm_interaction=llm_interaction,
+        matching_strategy=matching_strategy,
         settings=settings,
         batching_service=batching_service,
         request_normalizer=ComparisonRequestNormalizer(settings),
@@ -118,13 +123,18 @@ async def _load_essays_for_batch(
     session_provider: SessionProviderProtocol,
     essay_repository: CJEssayRepositoryProtocol,
     cj_batch_id: int,
+    settings: Settings,
 ) -> list[EssayForComparison]:
     """Load prepared essays (students + anchors) from the database.
+
+    Sorts essays by comparison_count ascending (fairness) with random shuffling
+    for ties, ensuring under-sampled essays are prioritized for new pairs.
 
     Args:
         session_provider: Session provider for database transactions
         essay_repository: Essay repository for essay operations
         cj_batch_id: The CJ batch identifier
+        settings: Application settings (for random seed)
 
     Returns:
         List of essays prepared for comparison with current BT scores
@@ -134,8 +144,17 @@ async def _load_essays_for_batch(
             session=session, cj_batch_id=cj_batch_id
         )
 
+    # Fairness-aware sorting:
+    # 1. Shuffle the list first to randomize ties (Python sort is stable)
+    # 2. Sort by comparison_count ascending to prioritize under-sampled essays
+    rng = Random(settings.PAIR_GENERATION_SEED)
+    # Convert to list if it's not already, though get_essays_for_cj_batch usually returns list
+    processed_essays_list = list(processed_essays)
+    rng.shuffle(processed_essays_list)
+    processed_essays_list.sort(key=lambda e: e.comparison_count or 0)
+
     essays_for_api_model: list[EssayForComparison] = []
-    for processed in processed_essays:
+    for processed in processed_essays_list:
         essays_for_api_model.append(
             EssayForComparison(
                 id=processed.els_essay_id,
@@ -156,6 +175,7 @@ async def request_additional_comparisons_for_batch(
     comparison_repository: CJComparisonRepositoryProtocol,
     instruction_repository: AssessmentInstructionRepositoryProtocol,
     llm_interaction: LLMInteractionProtocol,
+    matching_strategy: PairMatchingStrategyProtocol,
     settings: Settings,
     correlation_id: UUID,
     log_extra: dict[str, Any],
@@ -173,6 +193,7 @@ async def request_additional_comparisons_for_batch(
         comparison_repository: Repository for comparison pair operations
         instruction_repository: Repository for assessment instruction operations
         llm_interaction: LLM interaction protocol
+        matching_strategy: DI-injected strategy for computing optimal pairs
         settings: Application settings
         correlation_id: Request correlation ID
         log_extra: Logging context
@@ -187,6 +208,7 @@ async def request_additional_comparisons_for_batch(
         session_provider=session_provider,
         essay_repository=essay_repository,
         cj_batch_id=cj_batch_id,
+        settings=settings,
     )
 
     if not essays_for_api_model:
@@ -301,6 +323,7 @@ async def request_additional_comparisons_for_batch(
         comparison_repository=comparison_repository,
         instruction_repository=instruction_repository,
         llm_interaction=llm_interaction,
+        matching_strategy=matching_strategy,
         request_data=request_data,
         settings=settings,
         correlation_id=correlation_id,
@@ -316,6 +339,7 @@ async def _process_comparison_iteration(
     comparison_repository: CJComparisonRepositoryProtocol,
     instruction_repository: AssessmentInstructionRepositoryProtocol,
     llm_interaction: LLMInteractionProtocol,
+    matching_strategy: PairMatchingStrategyProtocol,
     request_data: CJAssessmentRequestData,
     settings: Settings,
     model_override: str | None,
@@ -344,15 +368,16 @@ async def _process_comparison_iteration(
     Returns:
         ComparisonIterationResult or None if no tasks generated
     """
-    # Generate comparison tasks
-    generate_comparison_tasks_coro = pair_generation.generate_comparison_tasks
-    comparison_tasks_for_llm: list[ComparisonTask] = await generate_comparison_tasks_coro(
+    # Generate comparison tasks using injected matching strategy
+    comparison_tasks_for_llm: list[
+        ComparisonTask
+    ] = await pair_generation.generate_comparison_tasks(
         essays_for_comparison=essays_for_api_model,
         session_provider=session_provider,
         comparison_repository=comparison_repository,
         instruction_repository=instruction_repository,
+        matching_strategy=matching_strategy,
         cj_batch_id=cj_batch_id,
-        existing_pairs_threshold=settings.COMPARISONS_PER_STABILITY_CHECK_ITERATION,
         max_pairwise_comparisons=settings.MAX_PAIRWISE_COMPARISONS,
         correlation_id=correlation_id,
         randomization_seed=settings.PAIR_GENERATION_SEED,
@@ -462,13 +487,13 @@ def _check_iteration_stability(
     solely on completion thresholds.
     """
     if (
-        total_comparisons_performed >= getattr(settings, "MIN_COMPARISONS_FOR_STABILITY_CHECK", 10)
+        total_comparisons_performed >= settings.MIN_COMPARISONS_FOR_STABILITY_CHECK
         and previous_bt_scores
     ):
         max_score_change = scoring_ranking.check_score_stability(
             current_bt_scores_dict,
             previous_bt_scores,
-            stability_threshold=getattr(settings, "SCORE_STABILITY_THRESHOLD", 0.05),
+            stability_threshold=settings.SCORE_STABILITY_THRESHOLD,
         )
         logger.info(
             f"Iteration {current_iteration}: Max score change is {max_score_change:.5f}",

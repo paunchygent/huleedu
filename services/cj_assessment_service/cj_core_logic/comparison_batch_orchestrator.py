@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from random import Random
 from typing import Any
 from uuid import UUID
 
@@ -29,6 +30,7 @@ from services.cj_assessment_service.protocols import (
     CJBatchRepositoryProtocol,
     CJComparisonRepositoryProtocol,
     LLMInteractionProtocol,
+    PairMatchingStrategyProtocol,
     SessionProviderProtocol,
 )
 
@@ -46,6 +48,7 @@ class ComparisonBatchOrchestrator:
         comparison_repository: CJComparisonRepositoryProtocol,
         instruction_repository: AssessmentInstructionRepositoryProtocol,
         llm_interaction: LLMInteractionProtocol,
+        matching_strategy: PairMatchingStrategyProtocol,
         settings: Settings,
         batching_service: BatchingModeService,
         request_normalizer: ComparisonRequestNormalizer,
@@ -55,6 +58,7 @@ class ComparisonBatchOrchestrator:
         self.comparison_repository = comparison_repository
         self.instruction_repository = instruction_repository
         self.llm_interaction = llm_interaction
+        self.matching_strategy = matching_strategy
         self.settings = settings
         self.batching_service = batching_service
         self.request_normalizer = request_normalizer
@@ -93,13 +97,19 @@ class ComparisonBatchOrchestrator:
                 correlation_id=correlation_id,
             )
 
+            # Shuffle essays for initial batch to avoid deterministic bias
+            # This ensures the first wave of pairs covers a random subset of essays
+            rng = Random(self.settings.PAIR_GENERATION_SEED)
+            essays_for_task_generation = list(essays_for_api_model)
+            rng.shuffle(essays_for_task_generation)
+
             comparison_tasks = await pair_generation.generate_comparison_tasks(
-                essays_for_comparison=essays_for_api_model,
+                essays_for_comparison=essays_for_task_generation,
                 session_provider=self.session_provider,
                 comparison_repository=self.comparison_repository,
                 instruction_repository=self.instruction_repository,
+                matching_strategy=self.matching_strategy,
                 cj_batch_id=cj_batch_id,
-                existing_pairs_threshold=self.settings.COMPARISONS_PER_STABILITY_CHECK_ITERATION,
                 max_pairwise_comparisons=normalized.max_pairs_cap,
                 correlation_id=correlation_id,
                 randomization_seed=self.settings.PAIR_GENERATION_SEED,

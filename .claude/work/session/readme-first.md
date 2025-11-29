@@ -327,3 +327,9 @@ Added `original_file_name: str` field to `EssaySlotAssignedV1` event contract. T
 ### LLM Provider Configuration Hierarchy
 
 Documented 3-tier override hierarchy. See `docs/operations/llm-provider-configuration-hierarchy.md`. Key insight: `USE_MOCK_LLM=true` is a DI boot-time decision that cannot be bypassed by request-level `provider_override`.
+
+## Session Addendum (2025-11-28)
+
+- CJ Assessment pair matching has been refactored to use a DI-swappable `PairMatchingStrategyProtocol` with `OptimalGraphMatchingStrategy` as the default implementation (NetworkX Blossom-based maximum weight matching).
+- Unit and integration tests for CJ now exercise the real matching strategy where appropriate (pair generation, prompt construction, real DB flows) and use focused protocol-based stubs only when isolating A/B position randomization.
+- The “full batch lifecycle with real database” test now reflects staged, wave-based submission semantics (each essay appears at most once per wave) instead of assuming nC2 comparisons per batch; callback simulation still validates that comparisons are persisted and that the LLM interaction layer is invoked.

@@ -9,7 +9,7 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from types import SimpleNamespace
 from typing import AsyncGenerator
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, MagicMock, Mock
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,7 +23,7 @@ class MockSessionProvider:
 
     def __init__(self) -> None:
         """Initialize with empty session tracking list."""
-        self._sessions: list[AsyncMock] = []
+        self._sessions: list[MagicMock] = []
 
     @asynccontextmanager
     async def session(self) -> AsyncGenerator[AsyncSession, None]:
@@ -31,23 +31,32 @@ class MockSessionProvider:
 
         The returned mock session has:
         - add: Sync method (Mock)
-        - flush, commit, rollback, execute: Async methods (AsyncMock)
+        - flush, commit, rollback, execute, close: Async methods (AsyncMock)
 
         Yields:
-            AsyncMock configured as AsyncSession for testing
+        # Uses MagicMock with attached AsyncMocks to avoid 'coroutine never awaited' warnings
+        # during introspection by test runners.
+            MagicMock configured as AsyncSession for testing
         """
-        mock_session = AsyncMock(spec=AsyncSession)
+        # Use MagicMock container pattern to avoid introspection warnings
+        mock_session = MagicMock(spec=AsyncSession)
         mock_session.add = Mock()  # Sync method
         mock_session.flush = AsyncMock()
         mock_session.commit = AsyncMock()
         mock_session.rollback = AsyncMock()
+        mock_session.close = AsyncMock()
         mock_session.execute = AsyncMock(
             return_value=SimpleNamespace(scalar_one_or_none=Mock(return_value=None))
         )
+
+        # Add get/refresh methods which are often used
+        mock_session.get = AsyncMock()
+        mock_session.refresh = AsyncMock()
+
         self._sessions.append(mock_session)
         yield mock_session
 
-    def get_last_session(self) -> AsyncMock:
+    def get_last_session(self) -> MagicMock:
         """Return the most recently created session for assertions.
 
         Returns:
@@ -58,7 +67,7 @@ class MockSessionProvider:
         """
         return self._sessions[-1]
 
-    def get_all_sessions(self) -> list[AsyncMock]:
+    def get_all_sessions(self) -> list[MagicMock]:
         """Return all sessions created during test execution.
 
         Returns:

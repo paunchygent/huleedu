@@ -82,7 +82,7 @@ class TestE2ECJAssessmentWorkflows:
         harness = PipelineTestHarness(service_manager, kafka_mgr, auth_manager)
 
         # Use ENG5 runner student essays (docx) to align with ENG5 validation set
-        essay_files = load_eng5_runner_student_files(max_files=4)
+        essay_files = load_eng5_runner_student_files(max_files=12)
 
         try:
             # Setup guest batch and run CJ pipeline

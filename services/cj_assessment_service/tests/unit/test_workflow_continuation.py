@@ -30,6 +30,9 @@ from services.cj_assessment_service.protocols import (
     CJComparisonRepositoryProtocol,
     SessionProviderProtocol,
 )
+from services.cj_assessment_service.tests.helpers.matching_strategies import (
+    make_real_matching_strategy_mock,
+)
 from services.cj_assessment_service.tests.unit.test_mocks import AssessmentInstructionStore
 
 
@@ -333,8 +336,6 @@ def test_resolve_comparison_budget(
 async def test_trigger_continuation_finalizes_when_callbacks_hit_cap(monkeypatch: Any) -> None:
     settings = Mock(spec=Settings)
     settings.MAX_PAIRWISE_COMPARISONS = 150
-    settings.MIN_COMPARISONS_FOR_STABILITY_CHECK = 5
-    settings.SCORE_STABILITY_THRESHOLD = 0.05
 
     event_publisher = AsyncMock()
     content_client = AsyncMock()
@@ -353,8 +354,14 @@ async def test_trigger_continuation_finalizes_when_callbacks_hit_cap(monkeypatch
     # Provide essay count for nC2 = 6
     batch_state.batch_upload = _make_upload(expected_count=4)
 
+    # Mock essays with comparison counts that meet fairness criteria
     essays = [
-        Mock(els_essay_id=str(i), assessment_input_text=f"essay-{i}", current_bt_score=0.0)
+        Mock(
+            els_essay_id=str(i),
+            assessment_input_text=f"essay-{i}",
+            current_bt_score=0.0,
+            comparison_count=3,
+        )
         for i in range(4)
     ]
 
@@ -394,6 +401,7 @@ async def test_trigger_continuation_finalizes_when_callbacks_hit_cap(monkeypatch
     mock_essay_repository.get_essays_for_cj_batch = AsyncMock(return_value=essays)
 
     mock_grade_projector = AsyncMock()
+    mock_matching_strategy = make_real_matching_strategy_mock()
 
     await wc.trigger_existing_workflow_continuation(
         batch_id=9,
@@ -407,6 +415,7 @@ async def test_trigger_continuation_finalizes_when_callbacks_hit_cap(monkeypatch
         content_client=content_client,
         correlation_id=uuid4(),
         llm_interaction=llm_interaction,
+        matching_strategy=mock_matching_strategy,
         grade_projector=mock_grade_projector,
     )
 
@@ -442,7 +451,12 @@ async def test_trigger_continuation_metadata_serializable_without_previous_score
     batch_state.batch_upload = _make_upload(expected_count=2)
 
     essays = [
-        Mock(els_essay_id=str(i), assessment_input_text=f"essay-{i}", current_bt_score=0.0)
+        Mock(
+            els_essay_id=str(i),
+            assessment_input_text=f"essay-{i}",
+            current_bt_score=0.0,
+            comparison_count=1,
+        )
         for i in range(2)
     ]
 
@@ -479,6 +493,7 @@ async def test_trigger_continuation_metadata_serializable_without_previous_score
     mock_essay_repository.get_essays_for_cj_batch = AsyncMock(return_value=essays)
 
     mock_grade_projector = AsyncMock()
+    mock_matching_strategy = make_real_matching_strategy_mock()
 
     await wc.trigger_existing_workflow_continuation(
         batch_id=11,
@@ -492,6 +507,7 @@ async def test_trigger_continuation_metadata_serializable_without_previous_score
         content_client=content_client,
         correlation_id=uuid4(),
         llm_interaction=llm_interaction,
+        matching_strategy=mock_matching_strategy,
         grade_projector=mock_grade_projector,
     )
 
@@ -532,7 +548,12 @@ async def test_trigger_continuation_requests_more_when_not_finalized(monkeypatch
     batch_state.batch_upload = _make_upload(expected_count=5)
 
     essays = [
-        Mock(els_essay_id=str(i), assessment_input_text=f"essay-{i}", current_bt_score=0.0)
+        Mock(
+            els_essay_id=str(i),
+            assessment_input_text=f"essay-{i}",
+            current_bt_score=0.0,
+            comparison_count=1,
+        )
         for i in range(5)
     ]
 
@@ -579,6 +600,7 @@ async def test_trigger_continuation_requests_more_when_not_finalized(monkeypatch
     mock_essay_repository.get_essays_for_cj_batch = AsyncMock(return_value=essays)
 
     mock_grade_projector = AsyncMock()
+    mock_matching_strategy = make_real_matching_strategy_mock()
 
     await wc.trigger_existing_workflow_continuation(
         batch_id=10,
@@ -592,11 +614,657 @@ async def test_trigger_continuation_requests_more_when_not_finalized(monkeypatch
         content_client=content_client,
         correlation_id=uuid4(),
         llm_interaction=llm_interaction,
+        matching_strategy=mock_matching_strategy,
         grade_projector=mock_grade_projector,
     )
 
     request_additional.assert_awaited_once()
     finalize_called.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_high_failure_rate_does_not_finalize_with_zero_successes(
+    monkeypatch: Any,
+) -> None:
+    """Zero successful comparisons must not yield COMPLETE_* finalization.
+
+    This is the strictest form of the EPIC-005 / US-005.2 guardrail:
+    when all attempts have failed and callbacks/budget are exhausted, the
+    workflow should not call BatchFinalizer.finalize_scoring(). PR-2 will
+    introduce explicit failure semantics for this case; until then this test
+    is marked xfail and serves as a behavioural spec.
+    """
+
+    settings = Mock(spec=Settings)
+    settings.MAX_PAIRWISE_COMPARISONS = 10
+    settings.MIN_COMPARISONS_FOR_STABILITY_CHECK = 1
+    settings.SCORE_STABILITY_THRESHOLD = 0.05
+    settings.MIN_SUCCESS_RATE_THRESHOLD = 0.8
+
+    event_publisher = AsyncMock()
+    content_client = AsyncMock()
+    llm_interaction = AsyncMock()
+
+    # Simulate 10 attempts, all failed, with budget and denominator both hit.
+    batch_state = CJBatchState()
+    batch_state.batch_id = 42
+    batch_state.submitted_comparisons = 10
+    batch_state.completed_comparisons = 0
+    batch_state.failed_comparisons = 10
+    batch_state.total_comparisons = 10
+    batch_state.total_budget = 10
+    batch_state.current_iteration = 1
+    batch_state.processing_metadata = {
+        "comparison_budget": {"max_pairs_requested": 10, "source": "service_default"},
+        "bt_scores": {},
+    }
+    # expected_essay_count large enough that nC2 >= total_budget → denominator = 10
+    batch_state.batch_upload = _make_upload(expected_count=10)
+
+    essays = [
+        Mock(
+            els_essay_id=str(i),
+            assessment_input_text=f"essay-{i}",
+            current_bt_score=0.0,
+            comparison_count=1,
+        )
+        for i in range(10)
+    ]
+
+    monkeypatch.setattr(
+        wc.scoring_ranking,
+        "record_comparisons_and_update_scores",
+        AsyncMock(return_value={"a": 0.11, "b": -0.09}),
+    )
+    # Keep stability failing so finalization is driven purely by caps.
+    monkeypatch.setattr(
+        wc.scoring_ranking,
+        "check_score_stability",
+        Mock(return_value=0.2),
+    )
+    monkeypatch.setattr(wc, "merge_batch_processing_metadata", AsyncMock())
+
+    request_additional = AsyncMock(return_value=False)
+    monkeypatch.setattr(
+        wc.comparison_processing,
+        "request_additional_comparisons_for_batch",
+        request_additional,
+    )
+
+    finalize_scoring_called = AsyncMock()
+    finalize_failure_called = AsyncMock()
+
+    class _Finalizer:
+        def __init__(self, *_args: Any, **_kwargs: Any) -> None:
+            pass
+
+        async def finalize_scoring(self, *_args: Any, **_kwargs: Any) -> None:
+            await finalize_scoring_called()
+
+        async def finalize_failure(self, *_args: Any, **_kwargs: Any) -> None:
+            await finalize_failure_called()
+
+    monkeypatch.setattr(wc, "BatchFinalizer", _Finalizer)
+
+    @asynccontextmanager
+    async def mock_session_ctx() -> AsyncGenerator[AsyncMock, None]:
+        yield AsyncMock()
+
+    mock_session_provider = AsyncMock()
+    mock_session_provider.session = mock_session_ctx
+    mock_batch_repository = AsyncMock()
+    mock_batch_repository.get_batch_state = AsyncMock(return_value=batch_state)
+    mock_essay_repository = AsyncMock()
+    mock_essay_repository.get_essays_for_cj_batch = AsyncMock(return_value=essays)
+
+    mock_grade_projector = AsyncMock()
+    mock_matching_strategy = make_real_matching_strategy_mock()
+
+    await wc.trigger_existing_workflow_continuation(
+        batch_id=42,
+        session_provider=mock_session_provider,
+        batch_repository=mock_batch_repository,
+        comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
+        essay_repository=mock_essay_repository,
+        instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
+        event_publisher=event_publisher,
+        settings=settings,
+        content_client=content_client,
+        correlation_id=uuid4(),
+        llm_interaction=llm_interaction,
+        matching_strategy=mock_matching_strategy,
+        grade_projector=mock_grade_projector,
+    )
+
+    # PR-2 behaviour: BatchFinalizer.finalize_failure must be invoked
+    # when there are zero successful comparisons and caps are reached.
+    finalize_failure_called.assert_awaited_once()
+    finalize_scoring_called.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_low_success_rate_does_not_finalize_despite_some_successes(
+    monkeypatch: Any,
+) -> None:
+    """Few successes with many failures must not yield COMPLETE_* finalization.
+
+    EPIC-005 / US-005.2 guardrail: when callbacks/budget are exhausted but the
+    success rate is below MIN_SUCCESS_RATE_THRESHOLD, the workflow should not
+    call BatchFinalizer.finalize_scoring(). Instead, PR-2 semantics will route
+    this through an explicit failure path. Until then this test is xfail and
+    serves as a behavioural spec.
+    """
+
+    settings = Mock(spec=Settings)
+    settings.MAX_PAIRWISE_COMPARISONS = 10
+    settings.MIN_COMPARISONS_FOR_STABILITY_CHECK = 1
+    settings.SCORE_STABILITY_THRESHOLD = 0.05
+    settings.MIN_SUCCESS_RATE_THRESHOLD = 0.8
+
+    event_publisher = AsyncMock()
+    content_client = AsyncMock()
+    llm_interaction = AsyncMock()
+
+    # Simulate 10 attempts with a low success rate: 2 successes, 8 failures.
+    batch_state = CJBatchState()
+    batch_state.batch_id = 43
+    batch_state.submitted_comparisons = 10
+    batch_state.completed_comparisons = 2
+    batch_state.failed_comparisons = 8
+    batch_state.total_comparisons = 10
+    batch_state.total_budget = 10
+    batch_state.current_iteration = 1
+    batch_state.processing_metadata = {
+        "comparison_budget": {"max_pairs_requested": 10, "source": "service_default"},
+        "bt_scores": {"a": 0.1, "b": -0.1},
+    }
+    # expected_essay_count large enough that nC2 >= total_budget → denominator = 10
+    batch_state.batch_upload = _make_upload(expected_count=10)
+
+    essays = [
+        Mock(
+            els_essay_id=str(i),
+            assessment_input_text=f"essay-{i}",
+            current_bt_score=0.0,
+            comparison_count=1,
+        )
+        for i in range(10)
+    ]
+
+    # Recompute scores and keep stability failing so that finalization is
+    # driven purely by caps and the success-rate guard.
+    monkeypatch.setattr(
+        wc.scoring_ranking,
+        "record_comparisons_and_update_scores",
+        AsyncMock(return_value={"a": 0.11, "b": -0.09}),
+    )
+    monkeypatch.setattr(
+        wc.scoring_ranking,
+        "check_score_stability",
+        Mock(return_value=0.2),
+    )
+    monkeypatch.setattr(wc, "merge_batch_processing_metadata", AsyncMock())
+
+    request_additional = AsyncMock(return_value=False)
+    monkeypatch.setattr(
+        wc.comparison_processing,
+        "request_additional_comparisons_for_batch",
+        request_additional,
+    )
+
+    finalize_scoring_called = AsyncMock()
+    finalize_failure_called = AsyncMock()
+
+    class _Finalizer:
+        def __init__(self, *_args: Any, **_kwargs: Any) -> None:
+            pass
+
+        async def finalize_scoring(self, *_args: Any, **_kwargs: Any) -> None:
+            await finalize_scoring_called()
+
+        async def finalize_failure(self, *_args: Any, **_kwargs: Any) -> None:
+            await finalize_failure_called()
+
+    monkeypatch.setattr(wc, "BatchFinalizer", _Finalizer)
+
+    @asynccontextmanager
+    async def mock_session_ctx() -> AsyncGenerator[AsyncMock, None]:
+        yield AsyncMock()
+
+    mock_session_provider = AsyncMock()
+    mock_session_provider.session = mock_session_ctx
+    mock_batch_repository = AsyncMock()
+    mock_batch_repository.get_batch_state = AsyncMock(return_value=batch_state)
+    mock_essay_repository = AsyncMock()
+    mock_essay_repository.get_essays_for_cj_batch = AsyncMock(return_value=essays)
+
+    mock_grade_projector = AsyncMock()
+    mock_matching_strategy = make_real_matching_strategy_mock()
+
+    await wc.trigger_existing_workflow_continuation(
+        batch_id=43,
+        session_provider=mock_session_provider,
+        batch_repository=mock_batch_repository,
+        comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
+        essay_repository=mock_essay_repository,
+        instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
+        event_publisher=event_publisher,
+        settings=settings,
+        content_client=content_client,
+        correlation_id=uuid4(),
+        llm_interaction=llm_interaction,
+        matching_strategy=mock_matching_strategy,
+        grade_projector=mock_grade_projector,
+    )
+
+    # PR-2 behaviour: BatchFinalizer.finalize_failure must be invoked
+    # when the success rate is below MIN_SUCCESS_RATE_THRESHOLD and caps
+    # are reached.
+    finalize_failure_called.assert_awaited_once()
+    finalize_scoring_called.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.xfail(reason="PR-7 Phase-2 resampling semantics not yet implemented", strict=False)
+async def test_small_net_phase2_requests_additional_comparisons_before_resampling_cap(
+    monkeypatch: Any,
+) -> None:
+    """Small-net Phase 2 should prefer resampling to immediate finalization.
+
+    Behavioural spec for PR-7 Phase-2 semantics (not PR-2):
+    - For nets with n_essays < MIN_RESAMPLING_NET_SIZE and unique coverage
+      complete (every unordered pair seen at least once), continuation
+      should keep requesting additional comparisons (resampling existing
+      pairs) while:
+        * Stability has not passed
+        * Global budget remains
+        * resampling_pass_count < MAX_RESAMPLING_PASSES_FOR_SMALL_NET
+    - This test encodes that expectation for a 3-essay batch; the metadata
+      fields (successful_pairs_count, max_possible_pairs,
+      unique_coverage_complete, resampling_pass_count) illustrate the
+      future contract.
+    - Under current PR-2 semantics, callbacks reaching
+      completion_denominator() cause immediate finalization instead of
+      resampling, so this assertion fails and the test remains xfail as a
+      forward-looking spec.
+    """
+
+    # Settings including future small-net guards
+    settings = Mock(spec=Settings)
+    settings.MAX_PAIRWISE_COMPARISONS = 100
+    settings.MIN_COMPARISONS_FOR_STABILITY_CHECK = 3
+    settings.SCORE_STABILITY_THRESHOLD = 0.01
+    settings.MIN_SUCCESS_RATE_THRESHOLD = 0.0
+    # Future Phase-2 knobs (not yet used in implementation)
+    settings.MIN_RESAMPLING_NET_SIZE = 5
+    settings.MAX_RESAMPLING_PASSES_FOR_SMALL_NET = 2
+
+    event_publisher = AsyncMock()
+    content_client = AsyncMock()
+    llm_interaction = AsyncMock()
+
+    # Small net: 3 essays, all pairs covered at least once (3 pairs).
+    batch_state = CJBatchState()
+    batch_state.batch_id = 50
+    batch_state.submitted_comparisons = 6  # two rounds of 3 pairs
+    batch_state.completed_comparisons = 6
+    batch_state.failed_comparisons = 0
+    batch_state.total_comparisons = 6
+    batch_state.total_budget = 100
+    batch_state.current_iteration = 2
+    batch_state.processing_metadata = {
+        "comparison_budget": {"max_pairs_requested": 100, "source": "service_default"},
+        "bt_scores": {"e1": 0.1, "e2": -0.1},
+        # Coverage metadata for future semantics
+        "successful_pairs_count": 3,
+        "max_possible_pairs": 3,
+        "unique_coverage_complete": True,
+        "resampling_pass_count": 0,
+    }
+    # expected_count=3 → nC2 = 3 possible pairs
+    batch_state.batch_upload = _make_upload(expected_count=3)
+
+    essays = [
+        Mock(
+            els_essay_id=f"essay-{i}",
+            assessment_input_text=f"essay-{i}",
+            current_bt_score=0.0,
+            comparison_count=2,
+        )
+        for i in range(3)
+    ]
+
+    # Recompute scores; keep stability failing so behaviour is driven by caps
+    # and (future) resampling semantics.
+    monkeypatch.setattr(
+        wc.scoring_ranking,
+        "record_comparisons_and_update_scores",
+        AsyncMock(return_value={"e1": 0.12, "e2": -0.08}),
+    )
+    monkeypatch.setattr(
+        wc.scoring_ranking,
+        "check_score_stability",
+        Mock(return_value=0.05),  # > SCORE_STABILITY_THRESHOLD → not stable
+    )
+    monkeypatch.setattr(wc, "merge_batch_processing_metadata", AsyncMock())
+
+    request_additional = AsyncMock(return_value=True)
+    monkeypatch.setattr(
+        wc.comparison_processing,
+        "request_additional_comparisons_for_batch",
+        request_additional,
+    )
+
+    finalize_called = AsyncMock()
+
+    class _Finalizer:
+        def __init__(self, *_args: Any, **_kwargs: Any) -> None:
+            pass
+
+        async def finalize_scoring(self, *_args: Any, **_kwargs: Any) -> None:
+            await finalize_called()
+
+    monkeypatch.setattr(wc, "BatchFinalizer", _Finalizer)
+
+    @asynccontextmanager
+    async def mock_session_ctx() -> AsyncGenerator[AsyncMock, None]:
+        yield AsyncMock()
+
+    mock_session_provider = AsyncMock()
+    mock_session_provider.session = mock_session_ctx
+    mock_batch_repository = AsyncMock()
+    mock_batch_repository.get_batch_state = AsyncMock(return_value=batch_state)
+    mock_essay_repository = AsyncMock()
+    mock_essay_repository.get_essays_for_cj_batch = AsyncMock(return_value=essays)
+
+    mock_grade_projector = AsyncMock()
+    mock_matching_strategy = make_real_matching_strategy_mock()
+
+    await wc.trigger_existing_workflow_continuation(
+        batch_id=50,
+        session_provider=mock_session_provider,
+        batch_repository=mock_batch_repository,
+        comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
+        essay_repository=mock_essay_repository,
+        instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
+        event_publisher=event_publisher,
+        settings=settings,
+        content_client=content_client,
+        correlation_id=uuid4(),
+        llm_interaction=llm_interaction,
+        matching_strategy=mock_matching_strategy,
+        grade_projector=mock_grade_projector,
+    )
+
+    # Future Phase-2 behaviour: small nets should request additional
+    # comparisons (resampling) before hitting the resampling cap and must
+    # not finalize immediately just because caps are reached.
+    request_additional.assert_awaited_once()
+    finalize_called.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.xfail(reason="PR-7 Phase-2 resampling semantics not yet implemented", strict=False)
+async def test_small_net_phase2_tracks_resampling_pass_count(monkeypatch: Any) -> None:
+    """Small-net Phase 2 should track resampling passes in metadata.
+
+    Forward-looking PR-7 behavioural spec:
+    - Once unique coverage is complete for a small net and continuation
+      chooses to resample, `resampling_pass_count` should be incremented
+      and persisted alongside BT scores for the iteration.
+    - This test uses a simplified 3-essay scenario where coverage metadata
+      indicates `unique_coverage_complete=True` even though the raw
+      counters are not fully aligned; the focus is on the metadata update
+      contract, not on exact pair counts.
+    - Under current PR-2 semantics, continuation recomputes scores and
+      persists only `bt_scores`, `last_scored_iteration`, and
+      `last_score_change`, so the expectation on `resampling_pass_count`
+      fails and the test remains xfail.
+    """
+
+    # Settings including future small-net guards
+    settings = Mock(spec=Settings)
+    settings.MAX_PAIRWISE_COMPARISONS = 100
+    settings.MIN_COMPARISONS_FOR_STABILITY_CHECK = 3
+    settings.SCORE_STABILITY_THRESHOLD = 0.01
+    settings.MIN_SUCCESS_RATE_THRESHOLD = 0.0
+    settings.MIN_RESAMPLING_NET_SIZE = 5
+    settings.MAX_RESAMPLING_PASSES_FOR_SMALL_NET = 2
+
+    event_publisher = AsyncMock()
+    content_client = AsyncMock()
+    llm_interaction = AsyncMock()
+
+    # Small net: 3 essays, coverage metadata says complete, but we keep
+    # callback counters below the completion denominator so that PR-2
+    # semantics still request more comparisons.
+    batch_state = CJBatchState()
+    batch_state.batch_id = 51
+    batch_state.submitted_comparisons = 2
+    batch_state.completed_comparisons = 2
+    batch_state.failed_comparisons = 0
+    batch_state.total_comparisons = 2
+    batch_state.total_budget = 100
+    batch_state.current_iteration = 1
+    batch_state.processing_metadata = {
+        "comparison_budget": {"max_pairs_requested": 100, "source": "service_default"},
+        "bt_scores": {"e1": 0.1, "e2": -0.1},
+        # Coverage metadata for future semantics
+        "successful_pairs_count": 3,
+        "max_possible_pairs": 3,
+        "unique_coverage_complete": True,
+        "resampling_pass_count": 0,
+    }
+    # expected_count=3 -> nC2 = 3 possible pairs; callbacks_received=2 < 3
+    batch_state.batch_upload = _make_upload(expected_count=3)
+
+    essays = [
+        Mock(
+            els_essay_id=f"essay-{i}",
+            assessment_input_text=f"essay-{i}",
+            current_bt_score=0.0,
+            comparison_count=1,
+        )
+        for i in range(3)
+    ]
+
+    monkeypatch.setattr(
+        wc.scoring_ranking,
+        "record_comparisons_and_update_scores",
+        AsyncMock(return_value={"e1": 0.12, "e2": -0.08}),
+    )
+    monkeypatch.setattr(
+        wc.scoring_ranking,
+        "check_score_stability",
+        Mock(return_value=0.05),  # > threshold -> not stable
+    )
+    merge_metadata = AsyncMock()
+    monkeypatch.setattr(wc, "merge_batch_processing_metadata", merge_metadata)
+
+    request_additional = AsyncMock(return_value=True)
+    monkeypatch.setattr(
+        wc.comparison_processing,
+        "request_additional_comparisons_for_batch",
+        request_additional,
+    )
+
+    class _Finalizer:  # pragma: no cover - future Phase-2 semantics
+        def __init__(self, *_args: Any, **_kwargs: Any) -> None:
+            pass
+
+        async def finalize_scoring(self, *_args: Any, **_kwargs: Any) -> None:
+            return None
+
+        async def finalize_failure(self, *_args: Any, **_kwargs: Any) -> None:
+            return None
+
+    monkeypatch.setattr(wc, "BatchFinalizer", _Finalizer)
+
+    @asynccontextmanager
+    async def mock_session_ctx() -> AsyncGenerator[AsyncMock, None]:
+        yield AsyncMock()
+
+    mock_session_provider = AsyncMock()
+    mock_session_provider.session = mock_session_ctx
+    mock_batch_repository = AsyncMock()
+    mock_batch_repository.get_batch_state = AsyncMock(return_value=batch_state)
+    mock_essay_repository = AsyncMock()
+    mock_essay_repository.get_essays_for_cj_batch = AsyncMock(return_value=essays)
+
+    mock_grade_projector = AsyncMock()
+    mock_matching_strategy = make_real_matching_strategy_mock()
+
+    await wc.trigger_existing_workflow_continuation(
+        batch_id=51,
+        session_provider=mock_session_provider,
+        batch_repository=mock_batch_repository,
+        comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
+        essay_repository=mock_essay_repository,
+        instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
+        event_publisher=event_publisher,
+        settings=settings,
+        content_client=content_client,
+        correlation_id=uuid4(),
+        llm_interaction=llm_interaction,
+        matching_strategy=mock_matching_strategy,
+        grade_projector=mock_grade_projector,
+    )
+
+    # PR-7 expectation: metadata should reflect that a resampling pass
+    # occurred when unique coverage was already complete.
+    merge_metadata.assert_awaited_once()
+    await_args = merge_metadata.await_args
+    assert await_args is not None
+    metadata_updates = await_args.kwargs["metadata_updates"]
+    assert metadata_updates.get("resampling_pass_count") == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.xfail(reason="PR-7 Phase-2 resampling semantics not yet implemented", strict=False)
+async def test_small_net_resampling_respects_resampling_pass_cap(monkeypatch: Any) -> None:
+    """Small-net Phase 2 should stop resampling once the pass cap is hit.
+
+    Forward-looking PR-7 spec for small nets:
+    - When `resampling_pass_count` reaches `MAX_RESAMPLING_PASSES_FOR_SMALL_NET`
+      for a net with `n_essays < MIN_RESAMPLING_NET_SIZE`, continuation should
+      *not* request additional comparisons even if stability has not passed.
+    - Instead, it should finalize (either via scoring or failure), relying on
+      the small-net-specific cap rather than continuing to spend budget.
+    - Under current PR-2 semantics, the resampling cap is ignored and the
+      implementation continues to request additional comparisons while budget
+      remains, so this test remains xfail.
+    """
+
+    settings = Mock(spec=Settings)
+    settings.MAX_PAIRWISE_COMPARISONS = 100
+    settings.MIN_COMPARISONS_FOR_STABILITY_CHECK = 3
+    settings.SCORE_STABILITY_THRESHOLD = 0.01
+    settings.MIN_SUCCESS_RATE_THRESHOLD = 0.0
+    settings.MIN_RESAMPLING_NET_SIZE = 5
+    settings.MAX_RESAMPLING_PASSES_FOR_SMALL_NET = 2
+
+    event_publisher = AsyncMock()
+    content_client = AsyncMock()
+    llm_interaction = AsyncMock()
+
+    batch_state = CJBatchState()
+    batch_state.batch_id = 52
+    batch_state.submitted_comparisons = 2
+    batch_state.completed_comparisons = 2
+    batch_state.failed_comparisons = 0
+    batch_state.total_comparisons = 2
+    batch_state.total_budget = 100
+    batch_state.current_iteration = 1
+    batch_state.processing_metadata = {
+        "comparison_budget": {"max_pairs_requested": 100, "source": "service_default"},
+        "bt_scores": {"e1": 0.1, "e2": -0.1},
+        "successful_pairs_count": 3,
+        "max_possible_pairs": 3,
+        "unique_coverage_complete": True,
+        "resampling_pass_count": 2,
+    }
+    batch_state.batch_upload = _make_upload(expected_count=3)
+
+    essays = [
+        Mock(
+            els_essay_id=f"essay-{i}",
+            assessment_input_text=f"essay-{i}",
+            current_bt_score=0.0,
+            comparison_count=1,
+        )
+        for i in range(3)
+    ]
+
+    monkeypatch.setattr(
+        wc.scoring_ranking,
+        "record_comparisons_and_update_scores",
+        AsyncMock(return_value={"e1": 0.12, "e2": -0.08}),
+    )
+    monkeypatch.setattr(
+        wc.scoring_ranking,
+        "check_score_stability",
+        Mock(return_value=0.05),
+    )
+    monkeypatch.setattr(wc, "merge_batch_processing_metadata", AsyncMock())
+
+    request_additional = AsyncMock(return_value=True)
+    monkeypatch.setattr(
+        wc.comparison_processing,
+        "request_additional_comparisons_for_batch",
+        request_additional,
+    )
+
+    finalize_scoring_called = AsyncMock()
+    finalize_failure_called = AsyncMock()
+
+    class _Finalizer:  # pragma: no cover - future Phase-2 semantics
+        def __init__(self, *_args: Any, **_kwargs: Any) -> None:
+            pass
+
+        async def finalize_scoring(self, *_args: Any, **_kwargs: Any) -> None:
+            await finalize_scoring_called()
+
+        async def finalize_failure(self, *_args: Any, **_kwargs: Any) -> None:
+            await finalize_failure_called()
+
+    monkeypatch.setattr(wc, "BatchFinalizer", _Finalizer)
+
+    @asynccontextmanager
+    async def mock_session_ctx() -> AsyncGenerator[AsyncMock, None]:
+        yield AsyncMock()
+
+    mock_session_provider = AsyncMock()
+    mock_session_provider.session = mock_session_ctx
+    mock_batch_repository = AsyncMock()
+    mock_batch_repository.get_batch_state = AsyncMock(return_value=batch_state)
+    mock_essay_repository = AsyncMock()
+    mock_essay_repository.get_essays_for_cj_batch = AsyncMock(return_value=essays)
+
+    mock_grade_projector = AsyncMock()
+    mock_matching_strategy = make_real_matching_strategy_mock()
+
+    await wc.trigger_existing_workflow_continuation(
+        batch_id=52,
+        session_provider=mock_session_provider,
+        batch_repository=mock_batch_repository,
+        comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
+        essay_repository=mock_essay_repository,
+        instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
+        event_publisher=event_publisher,
+        settings=settings,
+        content_client=content_client,
+        correlation_id=uuid4(),
+        llm_interaction=llm_interaction,
+        matching_strategy=mock_matching_strategy,
+        grade_projector=mock_grade_projector,
+    )
+
+    # PR-7 expectation: once the small-net resampling cap is hit, no further
+    # resampling requests should be enqueued and the batch should finalize
+    # via either scoring or failure.
+    assert request_additional.await_count == 0
+    total_finalize_calls = finalize_scoring_called.await_count + finalize_failure_called.await_count
+    assert total_finalize_calls == 1
 
 
 @pytest.mark.asyncio
@@ -627,7 +1295,12 @@ async def test_trigger_continuation_finalizes_on_stability_before_budget(monkeyp
     batch_state.batch_upload = _make_upload(expected_count=5)
 
     essays = [
-        Mock(els_essay_id=str(i), assessment_input_text=f"essay-{i}", current_bt_score=0.0)
+        Mock(
+            els_essay_id=str(i),
+            assessment_input_text=f"essay-{i}",
+            current_bt_score=0.0,
+            comparison_count=3,
+        )
         for i in range(5)
     ]
 
@@ -676,6 +1349,7 @@ async def test_trigger_continuation_finalizes_on_stability_before_budget(monkeyp
     mock_essay_repository.get_essays_for_cj_batch = AsyncMock(return_value=essays)
 
     mock_grade_projector = AsyncMock()
+    mock_matching_strategy = make_real_matching_strategy_mock()
 
     await wc.trigger_existing_workflow_continuation(
         batch_id=12,
@@ -689,8 +1363,117 @@ async def test_trigger_continuation_finalizes_on_stability_before_budget(monkeyp
         content_client=content_client,
         correlation_id=uuid4(),
         llm_interaction=llm_interaction,
+        matching_strategy=mock_matching_strategy,
         grade_projector=mock_grade_projector,
     )
 
+    finalize_called.assert_awaited_once()
+    request_additional.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_trigger_continuation_finalizes_despite_unfairness(monkeypatch: Any) -> None:
+    """Batch SHOULD finalize if stable, even if fairness criteria not met (policy change)."""
+
+    settings = Mock(spec=Settings)
+    settings.MAX_PAIRWISE_COMPARISONS = 20
+    settings.MIN_COMPARISONS_FOR_STABILITY_CHECK = 5
+    settings.SCORE_STABILITY_THRESHOLD = 0.05
+
+    event_publisher = AsyncMock()
+    content_client = AsyncMock()
+    llm_interaction = AsyncMock()
+
+    batch_state = CJBatchState()
+    batch_state.batch_id = 13
+    batch_state.submitted_comparisons = 10
+    batch_state.completed_comparisons = 10
+    batch_state.failed_comparisons = 0
+    batch_state.total_comparisons = 10
+    batch_state.total_budget = 20
+    batch_state.current_iteration = 2
+    batch_state.processing_metadata = {
+        "comparison_budget": {"max_pairs_requested": 20, "source": "service_default"},
+        "bt_scores": {"a": 0.1, "b": -0.1},
+    }
+    # Increase expected count so budget/cap is not hit (5 essays = 10 pairs, 10 submitted = done)
+    # 10 essays = 45 pairs. 10 submitted < 20 budget < 45 cap.
+    batch_state.batch_upload = _make_upload(expected_count=10)
+
+    # Mock essays with insufficient comparison counts (min=3 < req=6)
+    essays = [
+        Mock(
+            els_essay_id=str(i),
+            assessment_input_text=f"essay-{i}",
+            current_bt_score=0.0,
+            comparison_count=3,
+        )
+        for i in range(5)
+    ]
+
+    # Recompute scores and report stable
+    new_scores = {"a": 0.11, "b": -0.11}
+    monkeypatch.setattr(
+        wc.scoring_ranking,
+        "record_comparisons_and_update_scores",
+        AsyncMock(return_value=new_scores),
+    )
+    monkeypatch.setattr(
+        wc.scoring_ranking,
+        "check_score_stability",
+        Mock(return_value=0.01),
+    )
+    merge_metadata = AsyncMock()
+    monkeypatch.setattr(wc, "merge_batch_processing_metadata", merge_metadata)
+
+    request_additional = AsyncMock(return_value=True)
+    monkeypatch.setattr(
+        wc.comparison_processing,
+        "request_additional_comparisons_for_batch",
+        request_additional,
+    )
+
+    finalize_called = AsyncMock()
+
+    class _Finalizer:
+        def __init__(self, *_args: Any, **_kwargs: Any) -> None:
+            pass
+
+        async def finalize_scoring(self, *_args: Any, **_kwargs: Any) -> None:
+            await finalize_called()
+
+    monkeypatch.setattr(wc, "BatchFinalizer", _Finalizer)
+
+    @asynccontextmanager
+    async def mock_session_ctx() -> AsyncGenerator[AsyncMock, None]:
+        yield AsyncMock()
+
+    mock_session_provider = AsyncMock()
+    mock_session_provider.session = mock_session_ctx
+    mock_batch_repository = AsyncMock()
+    mock_batch_repository.get_batch_state = AsyncMock(return_value=batch_state)
+    mock_essay_repository = AsyncMock()
+    mock_essay_repository.get_essays_for_cj_batch = AsyncMock(return_value=essays)
+
+    mock_grade_projector = AsyncMock()
+    mock_matching_strategy = make_real_matching_strategy_mock()
+
+    await wc.trigger_existing_workflow_continuation(
+        batch_id=13,
+        session_provider=mock_session_provider,
+        batch_repository=mock_batch_repository,
+        comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
+        essay_repository=mock_essay_repository,
+        instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
+        event_publisher=event_publisher,
+        settings=settings,
+        content_client=content_client,
+        correlation_id=uuid4(),
+        llm_interaction=llm_interaction,
+        matching_strategy=mock_matching_strategy,
+        grade_projector=mock_grade_projector,
+    )
+
+    # Should finalize now (request_additional NOT called)
     finalize_called.assert_awaited_once()
     request_additional.assert_not_awaited()

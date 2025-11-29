@@ -50,9 +50,15 @@ class TestBatchRetryProcessor:
         return MockSessionProvider()
 
     @pytest.fixture
-    def mock_llm_interaction(self) -> AsyncMock:
-        """Create mock LLM interaction protocol."""
-        return AsyncMock(spec=LLMInteractionProtocol)
+    def mock_llm_interaction(self) -> MagicMock:
+        """Create mock LLM interaction protocol.
+
+        Uses MagicMock container to avoid introspection warnings.
+        """
+        interaction = MagicMock(spec=LLMInteractionProtocol)
+        interaction.submit_comparison_request = AsyncMock()
+        interaction.submit_comparison_request_batch = AsyncMock()
+        return interaction
 
     @pytest.fixture
     def mock_pool_manager(self) -> MagicMock:
@@ -61,6 +67,7 @@ class TestBatchRetryProcessor:
             BatchPoolManager,
         )
 
+        # Use MagicMock with explicit AsyncMock method to avoid introspection warnings
         manager = MagicMock(spec=BatchPoolManager)
         manager.form_retry_batch = AsyncMock()
         return manager

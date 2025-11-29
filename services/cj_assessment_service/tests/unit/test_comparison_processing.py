@@ -5,7 +5,7 @@ Covers per-request budget helpers and continuation submission logic.
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, MagicMock, Mock
 from uuid import uuid4
 
 import pytest
@@ -18,6 +18,7 @@ from services.cj_assessment_service.models_api import (
     EssayForComparison,
     EssayToProcess,
 )
+from services.cj_assessment_service.protocols import PairMatchingStrategyProtocol
 
 
 @pytest.mark.parametrize(
@@ -96,6 +97,7 @@ async def test_request_additional_comparisons_no_essays(
     monkeypatch.setattr(cp, "_load_essays_for_batch", load_mock)
     submit_mock = AsyncMock()
     monkeypatch.setattr(cp, "submit_comparisons_for_async_processing", submit_mock)
+    mock_matching_strategy = MagicMock(spec=PairMatchingStrategyProtocol)
 
     result = await cp.request_additional_comparisons_for_batch(
         cj_batch_id=7,
@@ -105,6 +107,7 @@ async def test_request_additional_comparisons_no_essays(
         comparison_repository=AsyncMock(spec=cp.CJComparisonRepositoryProtocol),
         instruction_repository=AsyncMock(spec=cp.AssessmentInstructionRepositoryProtocol),
         llm_interaction=llm_interaction,
+        matching_strategy=mock_matching_strategy,
         settings=settings,
         correlation_id=uuid4(),
         log_extra={"batch_id": 7},
@@ -115,7 +118,10 @@ async def test_request_additional_comparisons_no_essays(
 
     assert result is False
     load_mock.assert_awaited_once_with(
-        session_provider=mock_session_provider, essay_repository=essay_repository, cj_batch_id=7
+        session_provider=mock_session_provider,
+        essay_repository=essay_repository,
+        cj_batch_id=7,
+        settings=settings,
     )
     submit_mock.assert_not_awaited()
 
@@ -158,6 +164,7 @@ async def test_request_additional_comparisons_submits_new_iteration(
     llm_interaction = AsyncMock()
     settings = Mock(spec=Settings)
     settings.MAX_PAIRWISE_COMPARISONS = 500
+    mock_matching_strategy = MagicMock(spec=PairMatchingStrategyProtocol)
 
     llm_overrides_payload = {
         "model_override": "claude-3-sonnet",
@@ -182,6 +189,7 @@ async def test_request_additional_comparisons_submits_new_iteration(
         comparison_repository=AsyncMock(spec=cp.CJComparisonRepositoryProtocol),
         instruction_repository=AsyncMock(spec=cp.AssessmentInstructionRepositoryProtocol),
         llm_interaction=llm_interaction,
+        matching_strategy=mock_matching_strategy,
         settings=settings,
         correlation_id=uuid4(),
         log_extra={"batch_id": 42},
@@ -192,7 +200,10 @@ async def test_request_additional_comparisons_submits_new_iteration(
 
     assert result is True
     load_mock.assert_awaited_once_with(
-        session_provider=mock_session_provider, essay_repository=essay_repository, cj_batch_id=42
+        session_provider=mock_session_provider,
+        essay_repository=essay_repository,
+        cj_batch_id=42,
+        settings=settings,
     )
     submit_mock.assert_awaited_once()
 

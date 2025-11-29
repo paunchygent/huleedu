@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Any
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, MagicMock, Mock
 from uuid import uuid4
 
 import pytest
@@ -25,6 +25,7 @@ from services.cj_assessment_service.protocols import (
     CJEventPublisherProtocol,
     ContentClientProtocol,
     LLMInteractionProtocol,
+    PairMatchingStrategyProtocol,
 )
 from services.cj_assessment_service.tests.unit.test_mocks import (
     MockInstructionRepository,
@@ -45,6 +46,12 @@ class DummyCounter:
     def labels(self, **labels: str) -> "DummyCounter":
         self.labels_calls.append(labels)
         return self
+
+
+@pytest.fixture
+def mock_matching_strategy() -> MagicMock:
+    """Create mock matching strategy protocol."""
+    return MagicMock(spec=PairMatchingStrategyProtocol)
 
 
 def _create_consumer_record(envelope_data: dict[str, Any]) -> ConsumerRecord:
@@ -152,6 +159,7 @@ async def test_hydrate_prompt_text_result_contract(
 async def test_process_message_increments_prompt_success_metric(
     cj_assessment_request_data_with_overrides: ELS_CJAssessmentRequestV1,
     monkeypatch: pytest.MonkeyPatch,
+    mock_matching_strategy: MagicMock,
 ) -> None:
     """Successful prompt hydration should increment success metric exactly once."""
 
@@ -220,6 +228,7 @@ async def test_process_message_increments_prompt_success_metric(
         content_client=content_client,
         event_publisher=event_publisher,
         llm_interaction=llm_interaction,
+        matching_strategy=mock_matching_strategy,
         grade_projector=Mock(spec=GradeProjector),
         settings_obj=settings,
     )
@@ -237,6 +246,7 @@ async def test_process_message_increments_prompt_success_metric(
 async def test_process_message_hydrates_judge_rubric_text(
     cj_assessment_request_data_with_overrides: ELS_CJAssessmentRequestV1,
     monkeypatch: pytest.MonkeyPatch,
+    mock_matching_strategy: MagicMock,
 ) -> None:
     """Ensure judge rubric storage/text are hydrated and forwarded in request data."""
 
@@ -320,6 +330,7 @@ async def test_process_message_hydrates_judge_rubric_text(
         content_client=content_client,
         event_publisher=event_publisher,
         llm_interaction=llm_interaction,
+        matching_strategy=mock_matching_strategy,
         grade_projector=Mock(spec=GradeProjector),
         settings_obj=settings,
     )

@@ -28,6 +28,7 @@ services:
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - ./test_uploads:/app/test_uploads:ro
       - ./Documentation:/app/Documentation:ro
+      - ./docs:/app/docs:ro
       - ./.claude/research:/app/.claude/research
       # Exclude __pycache__ directories
       - /app/scripts/cj_experiments_runners/__pycache__

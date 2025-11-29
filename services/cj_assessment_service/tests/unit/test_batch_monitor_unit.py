@@ -51,8 +51,15 @@ class TestBatchMonitorRecoveryStrategy:
             async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
                 return None
 
-        # Create the session mock
-        session_mock = AsyncMock(spec=AsyncSession)
+        # Create the session mock as MagicMock to avoid AsyncMock property recursion issues
+        session_mock = MagicMock(spec=AsyncSession)
+        # Explicitly make the async methods AsyncMocks
+        session_mock.commit = AsyncMock()
+        session_mock.rollback = AsyncMock()
+        session_mock.execute = AsyncMock()
+        session_mock.get = AsyncMock()
+        session_mock.close = AsyncMock()
+
         context_manager = MockAsyncContextManager(session_mock)
 
         # IMPORTANT: session() is NOT async - it returns an async context manager
@@ -62,9 +69,18 @@ class TestBatchMonitorRecoveryStrategy:
         return session_provider
 
     @pytest.fixture
-    def mock_batch_repository(self) -> AsyncMock:
-        """Create mock batch repository."""
-        return AsyncMock(spec=CJBatchRepositoryProtocol)
+    def mock_batch_repository(self) -> MagicMock:
+        """Create mock batch repository.
+
+        Uses MagicMock with specific AsyncMock methods to avoid
+        'coroutine never awaited' warnings.
+        """
+        repo = MagicMock(spec=CJBatchRepositoryProtocol)
+        repo.get_batch_state_for_update = AsyncMock()
+        repo.get_stuck_batches = AsyncMock()
+        repo.get_batches_ready_for_completion = AsyncMock()
+        repo.update_cj_batch_status = AsyncMock()
+        return repo
 
     @pytest.fixture
     def mock_event_publisher(self) -> AsyncMock:

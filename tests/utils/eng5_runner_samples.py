@@ -10,7 +10,7 @@ import pytest
 ENG5_RUNNER_STUDENT_DIR = Path("test_uploads/ANCHOR ESSAYS/ROLE_MODELS_ENG5_NP_2016/student_essays")
 
 
-def load_eng5_runner_student_files(max_files: int = 4) -> List[Path]:
+def load_eng5_runner_student_files(max_files: int = 12) -> List[Path]:
     """
     Return up to `max_files` ENG5 runner student essays (docx) in deterministic order.
 

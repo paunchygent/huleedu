@@ -18,6 +18,9 @@ from services.cj_assessment_service.protocols import (
     CJComparisonRepositoryProtocol,
     SessionProviderProtocol,
 )
+from services.cj_assessment_service.tests.helpers.matching_strategies import (
+    make_real_matching_strategy_mock,
+)
 
 
 class FakeResult:
@@ -166,7 +169,6 @@ async def test_generate_comparison_tasks_respects_thresholds_and_global_cap(
 ) -> None:
     """Validate interplay between per-call threshold and global max comparisons."""
 
-    per_call_threshold = 3
     global_cap = 4
     essays = [
         EssayForComparison(id="essay-a", text_content="Essay content A"),
@@ -191,10 +193,13 @@ async def test_generate_comparison_tasks_respects_thresholds_and_global_cap(
 
     monkeypatch.setattr(pair_generation, "_fetch_assessment_context", fake_fetch_context)
     monkeypatch.setattr(
-        pair_generation,
-        "_fetch_existing_comparison_ids",
-        fake_fetch_existing_pairs,
+        pair_generation, "_fetch_existing_comparison_ids", fake_fetch_existing_pairs
     )
+
+    async def fake_fetch_counts(*_: object, **__: object) -> dict[str, int]:
+        return {}
+
+    monkeypatch.setattr(pair_generation, "_fetch_comparison_counts", fake_fetch_counts)
 
     def record_pairs(tasks: list) -> None:
         for task in tasks:
@@ -202,18 +207,20 @@ async def test_generate_comparison_tasks_respects_thresholds_and_global_cap(
 
     AsyncMock(spec=AsyncSession)
     correlation_id = uuid4()
+    matching_strategy = make_real_matching_strategy_mock()
 
     tasks_first_call = await pair_generation.generate_comparison_tasks(
         essays_for_comparison=essays,
         session_provider=AsyncMock(spec=SessionProviderProtocol),
         comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
         instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
+        matching_strategy=matching_strategy,
         cj_batch_id=123,
-        existing_pairs_threshold=per_call_threshold,
         max_pairwise_comparisons=global_cap,
         correlation_id=correlation_id,
     )
-    assert len(tasks_first_call) == per_call_threshold
+    # Optimal matching returns one wave of pairs
+    assert len(tasks_first_call) == len(essays) // 2
     record_pairs(tasks_first_call)
 
     tasks_second_call = await pair_generation.generate_comparison_tasks(
@@ -221,12 +228,13 @@ async def test_generate_comparison_tasks_respects_thresholds_and_global_cap(
         session_provider=AsyncMock(spec=SessionProviderProtocol),
         comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
         instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
+        matching_strategy=matching_strategy,
         cj_batch_id=123,
-        existing_pairs_threshold=per_call_threshold,
         max_pairwise_comparisons=global_cap,
         correlation_id=correlation_id,
     )
-    assert len(tasks_second_call) == 1  # Only remaining global slot should be used
+    # Second call should honour remaining global budget while avoiding duplicates
+    assert len(tasks_second_call) == global_cap - len(tasks_first_call)
     record_pairs(tasks_second_call)
 
     tasks_third_call = await pair_generation.generate_comparison_tasks(
@@ -234,8 +242,8 @@ async def test_generate_comparison_tasks_respects_thresholds_and_global_cap(
         session_provider=AsyncMock(spec=SessionProviderProtocol),
         comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
         instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
+        matching_strategy=matching_strategy,
         cj_batch_id=123,
-        existing_pairs_threshold=per_call_threshold,
         max_pairwise_comparisons=global_cap,
         correlation_id=correlation_id,
     )

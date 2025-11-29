@@ -3,7 +3,7 @@ type: epic-catalog
 id: epic-index
 title: HuleEdu Product Epics
 created: 2025-11-27
-last_updated: 2025-11-27
+last_updated: 2025-11-28
 ---
 
 # HuleEdu Product Epics
@@ -18,6 +18,9 @@ Epic catalog for tracking major product initiatives.
 | EPIC-002 | Teacher Dashboard | draft | high | CJ results display |
 | EPIC-003 | AI Feedback Service | draft | high | From implementation plan |
 | EPIC-004 | CJ Assessment | draft | high | From runbook extraction |
+| EPIC-005 | CJ Stability & Reliability | draft | high | Callback flow, completion gating |
+| EPIC-006 | Grade Projection Quality | draft | high | Anchor calibration, confidence |
+| EPIC-007 | Developer Experience & Testing | draft | medium | Test helpers, dev runner |
 
 ## Epic Status Legend
 
@@ -93,3 +96,52 @@ Epic catalog for tracking major product initiatives.
 **File**: [cj-assessment-epic.md](cj-assessment-epic.md)
 
 **Related ADRs**: ADR-0015, ADR-0016, ADR-0017
+
+---
+
+### EPIC-005: CJ Stability & Reliability
+
+**Status**: Draft
+
+**Scope**:
+- Callback-driven continuation and safe completion gating
+- Score stability semantics and early stopping
+- Retry semantics and end-of-batch fairness
+- Convergence tests for iterative/bundled mode
+
+**Out of Scope**: Grade projection quality (EPIC-006), developer tooling (EPIC-007)
+
+**File**: [cj-stability-and-reliability.md](cj-stability-and-reliability.md)
+
+**Related ADRs**: ADR-0015
+
+---
+
+### EPIC-006: Grade Projection Quality & Anchors
+
+**Status**: Draft
+
+**Scope**:
+- Anchor calibration semantics and isotonic constraints
+- Robust projection with missing/degenerate anchors
+- Confidence semantics and statistics
+
+**Out of Scope**: Stability/reliability (EPIC-005), developer tooling (EPIC-007)
+
+**File**: [cj-grade-projection-quality.md](cj-grade-projection-quality.md)
+
+---
+
+### EPIC-007: Developer Experience & Testing
+
+**Status**: Draft
+
+**Scope**:
+- Matching strategy test helpers and fairness coverage
+- Documentation for matching, budgets, stability cadence
+- Dev runner and Kafka wrapper for CJ workflows
+- Test architecture guardrails and strategy extension guide
+
+**Out of Scope**: Stability/reliability (EPIC-005), grade projection quality (EPIC-006)
+
+**File**: [cj-developer-experience-and-testing.md](cj-developer-experience-and-testing.md)

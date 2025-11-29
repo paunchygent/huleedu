@@ -4,24 +4,29 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import os
 import sys
 from pathlib import Path
 from typing import Any
 
-import psycopg2
-from psycopg2.extras import RealDictCursor
+import asyncpg
 
 
-def connect_to_db() -> psycopg2.extensions.connection:
-    """Connect to CJ assessment database."""
+async def connect_to_db() -> asyncpg.Connection:
+    """Connect to CJ assessment database using asyncpg."""
     db_host = os.getenv("HULEEDU_DB_HOST", "localhost")
-    db_port = os.getenv("HULEEDU_DB_PORT", "5440")
+    db_port_str = os.getenv("HULEEDU_DB_PORT", "5440")
     db_user = os.getenv("HULEEDU_DB_USER", "huleedu_user")
     db_password = os.getenv("HULEEDU_DB_PASSWORD", "huleedu_dev_password")
 
-    return psycopg2.connect(
+    try:
+        db_port = int(db_port_str)
+    except ValueError:
+        db_port = 5440
+
+    return await asyncpg.connect(
         host=db_host,
         port=db_port,
         user=db_user,
@@ -30,72 +35,72 @@ def connect_to_db() -> psycopg2.extensions.connection:
     )
 
 
-def get_batch_info(
-    conn: psycopg2.extensions.connection, batch_identifier: str | int
-) -> dict[str, Any]:
+async def get_batch_info(conn: asyncpg.Connection, batch_identifier: str | int) -> dict[str, Any]:
     """Get batch information by batch ID or BOS batch ID."""
-    with conn.cursor(cursor_factory=RealDictCursor) as cur:
-        if isinstance(batch_identifier, int) or batch_identifier.isdigit():
-            cur.execute("SELECT * FROM cj_batch_uploads WHERE id = %s", (int(batch_identifier),))
-        else:
-            cur.execute(
-                "SELECT * FROM cj_batch_uploads WHERE bos_batch_id = %s", (batch_identifier,)
-            )
+    if isinstance(batch_identifier, int) or (
+        isinstance(batch_identifier, str) and batch_identifier.isdigit()
+    ):
+        row = await conn.fetchrow(
+            "SELECT * FROM cj_batch_uploads WHERE id = $1",
+            int(batch_identifier),
+        )
+    else:
+        row = await conn.fetchrow(
+            "SELECT * FROM cj_batch_uploads WHERE bos_batch_id = $1",
+            batch_identifier,
+        )
 
-        batch = cur.fetchone()
-        if not batch:
-            raise ValueError(f"Batch not found: {batch_identifier}")
+    if row is None:
+        raise ValueError(f"Batch not found: {batch_identifier}")
 
-        return dict(batch)
+    return dict(row)
 
 
-def get_comparison_results(
-    conn: psycopg2.extensions.connection, cj_batch_id: int
+async def get_comparison_results(
+    conn: asyncpg.Connection, cj_batch_id: int
 ) -> list[dict[str, Any]]:
     """Get all comparison results for a batch."""
-    with conn.cursor(cursor_factory=RealDictCursor) as cur:
-        cur.execute(
-            """
-            SELECT
-                id,
-                essay_a_els_id,
-                essay_b_els_id,
-                winner,
-                confidence,
-                justification,
-                request_correlation_id,
-                submitted_at,
-                completed_at,
-                error_code
-            FROM cj_comparison_pairs
-            WHERE cj_batch_id = %s
-            ORDER BY id
-            """,
-            (cj_batch_id,),
-        )
-        return [dict(row) for row in cur.fetchall()]
+    rows = await conn.fetch(
+        """
+        SELECT
+            id,
+            essay_a_els_id,
+            essay_b_els_id,
+            winner,
+            confidence,
+            justification,
+            request_correlation_id,
+            submitted_at,
+            completed_at,
+            error_code
+        FROM cj_comparison_pairs
+        WHERE cj_batch_id = $1
+        ORDER BY id
+        """,
+        cj_batch_id,
+    )
+    return [dict(row) for row in rows]
 
 
-def get_bradley_terry_stats(
-    conn: psycopg2.extensions.connection, cj_batch_id: int
+async def get_bradley_terry_stats(
+    conn: asyncpg.Connection, cj_batch_id: int
 ) -> list[dict[str, Any]]:
     """Get Bradley-Terry statistics for all essays in batch."""
-    with conn.cursor(cursor_factory=RealDictCursor) as cur:
-        cur.execute(
-            """
-            SELECT
-                els_essay_id,
-                current_bt_score,
-                current_bt_se,
-                comparison_count,
-                is_anchor
-            FROM cj_processed_essays
-            WHERE cj_batch_id = %s
-            ORDER BY current_bt_score DESC NULLS LAST
-            """,
-            (cj_batch_id,),
-        )
-        return [dict(row) for row in cur.fetchall()]
+    rows = await conn.fetch(
+        """
+        SELECT
+            els_essay_id,
+            current_bt_score,
+            current_bt_se,
+            comparison_count,
+            is_anchor
+        FROM cj_processed_essays
+        WHERE cj_batch_id = $1
+        ORDER BY current_bt_score DESC NULLS LAST
+        """,
+        cj_batch_id,
+    )
+    return [dict(row) for row in rows]
 
 
 def calculate_wins_losses(comparisons: list[dict[str, Any]]) -> dict[str, dict[str, int]]:
@@ -233,6 +238,45 @@ def format_output(
     return "\n".join(lines)
 
 
+async def main_async(args: argparse.Namespace) -> int:
+    """Async entry point that orchestrates extraction."""
+    conn: asyncpg.Connection | None = None
+    try:
+        conn = await connect_to_db()
+
+        # Get batch info
+        batch_info = await get_batch_info(conn, args.batch_identifier)
+        cj_batch_id = batch_info["id"]
+
+        # Get comparison results
+        comparisons = await get_comparison_results(conn, cj_batch_id)
+
+        # Get Bradley-Terry stats
+        bt_stats = await get_bradley_terry_stats(conn, cj_batch_id)
+
+        # Calculate wins/losses
+        wins_losses = calculate_wins_losses(comparisons)
+
+        # Format output
+        output = format_output(batch_info, comparisons, bt_stats, wins_losses, args.format)
+
+        # Write output
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(output)
+            print(f"Results written to: {args.output}", file=sys.stderr)
+        else:
+            print(output)
+
+        return 0
+    except Exception as e:  # noqa: BLE001
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+    finally:
+        if conn is not None:
+            await conn.close()
+
+
 def main() -> int:
     """Main entry point."""
     parser = argparse.ArgumentParser(
@@ -256,41 +300,7 @@ def main() -> int:
     )
 
     args = parser.parse_args()
-
-    try:
-        # Connect to database
-        conn = connect_to_db()
-
-        # Get batch info
-        batch_info = get_batch_info(conn, args.batch_identifier)
-        cj_batch_id = batch_info["id"]
-
-        # Get comparison results
-        comparisons = get_comparison_results(conn, cj_batch_id)
-
-        # Get Bradley-Terry stats
-        bt_stats = get_bradley_terry_stats(conn, cj_batch_id)
-
-        # Calculate wins/losses
-        wins_losses = calculate_wins_losses(comparisons)
-
-        # Format output
-        output = format_output(batch_info, comparisons, bt_stats, wins_losses, args.format)
-
-        # Write output
-        if args.output:
-            args.output.parent.mkdir(parents=True, exist_ok=True)
-            args.output.write_text(output)
-            print(f"Results written to: {args.output}", file=sys.stderr)
-        else:
-            print(output)
-
-        conn.close()
-        return 0
-
-    except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
-        return 1
+    return asyncio.run(main_async(args))
 
 
 if __name__ == "__main__":

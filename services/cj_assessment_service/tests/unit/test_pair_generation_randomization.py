@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +13,9 @@ from services.cj_assessment_service.protocols import (
     AssessmentInstructionRepositoryProtocol,
     CJComparisonRepositoryProtocol,
     SessionProviderProtocol,
+)
+from services.cj_assessment_service.tests.helpers.matching_strategies import (
+    make_real_matching_strategy_mock,
 )
 
 
@@ -32,6 +35,11 @@ def stub_db_helpers(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(pair_generation, "_fetch_assessment_context", fake_fetch_context)
     monkeypatch.setattr(pair_generation, "_fetch_existing_comparison_ids", fake_fetch_existing)
+    monkeypatch.setattr(
+        pair_generation,
+        "_fetch_comparison_counts",
+        AsyncMock(return_value={}),
+    )
 
 
 @pytest.fixture
@@ -40,17 +48,26 @@ def sample_session() -> AsyncMock:
 
 
 @pytest.fixture
+def mock_matching_strategy() -> MagicMock:
+    """Use real optimal graph matching strategy for tests."""
+    return make_real_matching_strategy_mock()
+
+
+@pytest.fixture
 def sample_essays() -> list[EssayForComparison]:
     return [
         EssayForComparison(id="anchor-1", text_content="Anchor essay", current_bt_score=0.0),
         EssayForComparison(id="student-1", text_content="Student one", current_bt_score=0.0),
         EssayForComparison(id="student-2", text_content="Student two", current_bt_score=0.0),
+        EssayForComparison(id="student-3", text_content="Student three", current_bt_score=0.0),
     ]
 
 
 @pytest.mark.asyncio
 async def test_seed_produces_deterministic_pair_order(
-    sample_session: AsyncMock, sample_essays: list[EssayForComparison]
+    sample_session: AsyncMock,
+    sample_essays: list[EssayForComparison],
+    mock_matching_strategy: MagicMock,
 ) -> None:
     """Generating with the same seed should return identical ordering."""
 
@@ -59,8 +76,8 @@ async def test_seed_produces_deterministic_pair_order(
         session_provider=AsyncMock(spec=SessionProviderProtocol),
         comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
         instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
+        matching_strategy=mock_matching_strategy,
         cj_batch_id=99,
-        existing_pairs_threshold=10,
         correlation_id=None,
         randomization_seed=42,
     )
@@ -70,8 +87,8 @@ async def test_seed_produces_deterministic_pair_order(
         session_provider=AsyncMock(spec=SessionProviderProtocol),
         comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
         instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
+        matching_strategy=mock_matching_strategy,
         cj_batch_id=99,
-        existing_pairs_threshold=10,
         correlation_id=None,
         randomization_seed=42,
     )
@@ -79,7 +96,8 @@ async def test_seed_produces_deterministic_pair_order(
     first_order = [(task.essay_a.id, task.essay_b.id) for task in tasks_first]
     second_order = [(task.essay_a.id, task.essay_b.id) for task in tasks_second]
 
-    assert len(tasks_first) == 3  # nC2 pairs for three essays
+    # With optimal matching, each essay appears once per wave
+    assert len(tasks_first) == len(sample_essays) // 2
     assert first_order == second_order
 
 
@@ -87,39 +105,64 @@ async def test_seed_produces_deterministic_pair_order(
 async def test_randomization_swaps_positions_when_triggered(
     sample_session: AsyncMock,
     sample_essays: list[EssayForComparison],
+    mock_matching_strategy: MagicMock,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Forced swap path should invert the first generated pair."""
 
-    call_counter = {"calls": 0}
+    # First, run with no swapping to capture baseline ordering
+    def never_swap(_randomizer: object) -> bool:
+        return False
 
-    def fake_should_swap(randomizer: object) -> bool:
-        call_counter["calls"] += 1
-        return call_counter["calls"] == 1  # swap the first pair only
+    monkeypatch.setattr(pair_generation, "_should_swap_positions", never_swap)
 
-    monkeypatch.setattr(pair_generation, "_should_swap_positions", fake_should_swap)
-
-    tasks = await pair_generation.generate_comparison_tasks(
+    baseline_tasks = await pair_generation.generate_comparison_tasks(
         essays_for_comparison=sample_essays,
         session_provider=AsyncMock(spec=SessionProviderProtocol),
         comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
         instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
+        matching_strategy=mock_matching_strategy,
         cj_batch_id=1,
-        existing_pairs_threshold=5,
         correlation_id=None,
         randomization_seed=7,
     )
 
-    assert tasks, "Expected at least one comparison task"
-    first_pair = tasks[0]
-    # Original ordering is anchor vs student-1; swapping puts student-1 first
-    assert first_pair.essay_a.id == "student-1"
-    assert first_pair.essay_b.id == "anchor-1"
+    assert baseline_tasks, "Expected at least one comparison task"
+    base_first = baseline_tasks[0]
+
+    # Now force a swap on the first call only
+    call_counter = {"calls": 0}
+
+    def swap_first(_randomizer: object) -> bool:
+        call_counter["calls"] += 1
+        return call_counter["calls"] == 1
+
+    monkeypatch.setattr(pair_generation, "_should_swap_positions", swap_first)
+
+    swapped_tasks = await pair_generation.generate_comparison_tasks(
+        essays_for_comparison=sample_essays,
+        session_provider=AsyncMock(spec=SessionProviderProtocol),
+        comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
+        instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
+        matching_strategy=mock_matching_strategy,
+        cj_batch_id=1,
+        correlation_id=None,
+        randomization_seed=7,
+    )
+
+    assert swapped_tasks, "Expected at least one comparison task"
+    swapped_first = swapped_tasks[0]
+
+    # First pair should be reversed relative to baseline; others unchanged
+    assert swapped_first.essay_a.id == base_first.essay_b.id
+    assert swapped_first.essay_b.id == base_first.essay_a.id
 
 
 @pytest.mark.asyncio
 async def test_anchor_positions_are_balanced(
-    sample_session: AsyncMock, sample_essays: list[EssayForComparison]
+    sample_session: AsyncMock,
+    sample_essays: list[EssayForComparison],
+    mock_matching_strategy: MagicMock,
 ) -> None:
     """Across diverse seeds, anchors should occupy essay_a about half the time."""
 
@@ -132,8 +175,8 @@ async def test_anchor_positions_are_balanced(
             session_provider=AsyncMock(spec=SessionProviderProtocol),
             comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
             instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
+            matching_strategy=mock_matching_strategy,
             cj_batch_id=2,
-            existing_pairs_threshold=10,
             randomization_seed=seed,
         )
         for task in tasks:
@@ -150,7 +193,9 @@ async def test_anchor_positions_are_balanced(
 
 @pytest.mark.asyncio
 async def test_anchor_position_chi_squared(
-    sample_session: AsyncMock, sample_essays: list[EssayForComparison]
+    sample_session: AsyncMock,
+    sample_essays: list[EssayForComparison],
+    mock_matching_strategy: MagicMock,
 ) -> None:
     """Formal statistical test for randomization fairness using Chi-Squared test.
 
@@ -159,19 +204,39 @@ async def test_anchor_position_chi_squared(
     """
     from scipy.stats import chisquare
 
+    # Use a simple, deterministic pairing strategy to isolate the
+    # effects of position randomization from graph matching details.
+    def constant_pairs(
+        *,
+        essays: list[EssayForComparison],
+        existing_pairs: set[tuple[str, str]],
+        comparison_counts: dict[str, int],
+        randomization_seed: int | None = None,
+    ) -> list[tuple[EssayForComparison, EssayForComparison]]:
+        anchor = next(e for e in essays if e.id.startswith("anchor-"))
+        non_anchor = next(e for e in essays if not e.id.startswith("anchor-"))
+        return [(anchor, non_anchor)]
+
+    mock_matching_strategy.handle_odd_count.side_effect = lambda essays, _counts: (
+        list(essays),
+        None,
+    )
+    mock_matching_strategy.compute_wave_pairs.side_effect = constant_pairs
+    mock_matching_strategy.compute_wave_size.side_effect = lambda n_essays: max(0, n_essays // 2)
+
     anchor_a_count = 0
     anchor_b_count = 0
 
     # Generate enough samples for statistical significance
-    # 200 seeds * ~2 anchor pairs per batch = ~400 observations
+    # 200 seeds * 1 anchor pair per batch = ~200 observations
     for seed in range(200):
         tasks = await pair_generation.generate_comparison_tasks(
             essays_for_comparison=sample_essays,
             session_provider=AsyncMock(spec=SessionProviderProtocol),
             comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
             instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
+            matching_strategy=mock_matching_strategy,
             cj_batch_id=seed,
-            existing_pairs_threshold=10,
             randomization_seed=seed,
         )
 

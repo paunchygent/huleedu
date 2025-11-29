@@ -31,6 +31,7 @@ from services.cj_assessment_service.protocols import (
     CJEventPublisherProtocol,
     ContentClientProtocol,
     LLMInteractionProtocol,
+    PairMatchingStrategyProtocol,
     SessionProviderProtocol,
 )
 
@@ -63,6 +64,7 @@ async def run_cj_assessment_workflow(
     comparison_repository: CJComparisonRepositoryProtocol,
     content_client: ContentClientProtocol,
     llm_interaction: LLMInteractionProtocol,
+    matching_strategy: PairMatchingStrategyProtocol,
     event_publisher: CJEventPublisherProtocol,
     settings: Settings,
     grade_projector: GradeProjector,
@@ -80,6 +82,7 @@ async def run_cj_assessment_workflow(
         comparison_repository: Comparison repository for comparison pair operations
         content_client: Content client protocol implementation
         llm_interaction: LLM interaction protocol implementation
+        matching_strategy: DI-injected strategy for computing optimal pairs
         event_publisher: Event publisher protocol implementation
         settings: Application settings
         grade_projector: Grade projector for grade predictions
@@ -153,17 +156,18 @@ async def run_cj_assessment_workflow(
         # ALL LLM calls are async - workflow ALWAYS pauses here
         # Results arrive via Kafka callbacks which trigger completion
         await comparison_processing.submit_comparisons_for_async_processing(
-            essays_for_api_model,
-            cj_batch_id,
-            session_provider,
-            batch_repository,
-            comparison_repository,
-            instruction_repository,
-            llm_interaction,
-            request_data,
-            settings,
-            correlation_id,
-            log_extra,
+            essays_for_api_model=essays_for_api_model,
+            cj_batch_id=cj_batch_id,
+            session_provider=session_provider,
+            batch_repository=batch_repository,
+            comparison_repository=comparison_repository,
+            instruction_repository=instruction_repository,
+            llm_interaction=llm_interaction,
+            matching_strategy=matching_strategy,
+            request_data=request_data,
+            settings=settings,
+            correlation_id=correlation_id,
+            log_extra=log_extra,
         )
 
         # Workflow pauses here - batch is now in WAITING_CALLBACKS state

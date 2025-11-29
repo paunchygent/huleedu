@@ -6,6 +6,7 @@ enabling clean architecture and testability.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import datetime
 from typing import (
     TYPE_CHECKING,
@@ -24,7 +25,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 if TYPE_CHECKING:
     from services.cj_assessment_service.cj_core_logic.batch_submission import BatchSubmissionResult
-    from services.cj_assessment_service.models_api import CJAssessmentRequestData, ComparisonResult
+    from services.cj_assessment_service.models_api import (
+        CJAssessmentRequestData,
+        ComparisonResult,
+        EssayForComparison,
+    )
     from services.cj_assessment_service.models_db import (
         AnchorEssayReference,
         AssessmentInstruction,
@@ -546,4 +551,59 @@ class AtomicRedisClientProtocol(Protocol):
 
     async def lpush(self, key: str, value: str) -> int:
         """Push value to Redis list for relay worker notification."""
+        ...
+
+
+class PairMatchingStrategyProtocol(Protocol):
+    """Strategy for computing comparison pairs per wave.
+
+    Enables DI-swappable matching algorithms for CJ experiments.
+    Default implementation uses graph-based optimal matching (Hungarian algorithm).
+    """
+
+    def compute_wave_pairs(
+        self,
+        essays: Sequence["EssayForComparison"],
+        existing_pairs: set[tuple[str, str]],
+        comparison_counts: dict[str, int],
+        randomization_seed: int | None = None,
+    ) -> list[tuple["EssayForComparison", "EssayForComparison"]]:
+        """Compute pairs for one wave ensuring each essay appears at most once.
+
+        Args:
+            essays: Essays to match (should be even count after handle_odd_count)
+            existing_pairs: Set of (essay_a_id, essay_b_id) tuples already compared
+            comparison_counts: Dict mapping essay_id -> comparison count
+            randomization_seed: Seed for tie-breaking randomization
+
+        Returns:
+            List of (essay_a, essay_b) tuples representing the optimal matching.
+        """
+        ...
+
+    def compute_wave_size(self, n_essays: int) -> int:
+        """Return expected wave size for given essay count.
+
+        Args:
+            n_essays: Total number of essays in batch
+
+        Returns:
+            Number of pairs per wave (typically n_essays // 2)
+        """
+        ...
+
+    def handle_odd_count(
+        self,
+        essays: Sequence["EssayForComparison"],
+        comparison_counts: dict[str, int],
+    ) -> tuple[list["EssayForComparison"], "EssayForComparison | None"]:
+        """Handle odd essay counts by excluding one essay.
+
+        Args:
+            essays: List of essays to filter
+            comparison_counts: Dict mapping essay_id -> comparison count
+
+        Returns:
+            Tuple of (filtered_essays, excluded_essay or None)
+        """
         ...

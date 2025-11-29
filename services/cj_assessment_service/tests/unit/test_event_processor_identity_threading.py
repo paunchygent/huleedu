@@ -29,6 +29,7 @@ from services.cj_assessment_service.protocols import (
     CJEventPublisherProtocol,
     ContentClientProtocol,
     LLMInteractionProtocol,
+    PairMatchingStrategyProtocol,
     SessionProviderProtocol,
 )
 
@@ -95,6 +96,11 @@ class TestEventProcessorIdentityThreading:
         return provider
 
     @pytest.fixture
+    def mock_matching_strategy(self) -> MagicMock:
+        """Create mock matching strategy protocol."""
+        return MagicMock(spec=PairMatchingStrategyProtocol)
+
+    @pytest.fixture
     def test_settings(self) -> Mock:
         """Create test settings."""
         return Mock(
@@ -151,6 +157,7 @@ class TestEventProcessorIdentityThreading:
         mock_workflow_function: AsyncMock,
         test_settings: Mock,
         mock_session_provider: AsyncMock,
+        mock_matching_strategy: MagicMock,
     ) -> None:
         """Test identity extraction from ELS_CJAssessmentRequestV1 events.
 
@@ -185,6 +192,7 @@ class TestEventProcessorIdentityThreading:
             content_client=mock_content_client,
             event_publisher=mock_event_publisher,
             llm_interaction=mock_llm_interaction,
+            matching_strategy=mock_matching_strategy,
             grade_projector=Mock(spec=GradeProjector),
             settings_obj=test_settings,
         )
@@ -217,6 +225,7 @@ class TestEventProcessorIdentityThreading:
         mock_workflow_function: AsyncMock,
         test_settings: Mock,
         mock_session_provider: AsyncMock,
+        mock_matching_strategy: MagicMock,
     ) -> None:
         """Test that converted_request_data contains all required fields including identities.
 
@@ -254,6 +263,7 @@ class TestEventProcessorIdentityThreading:
             content_client=mock_content_client,
             event_publisher=mock_event_publisher,
             llm_interaction=mock_llm_interaction,
+            matching_strategy=mock_matching_strategy,
             grade_projector=Mock(spec=GradeProjector),
             settings_obj=test_settings,
         )
@@ -322,6 +332,7 @@ class TestEventProcessorIdentityThreading:
         mock_workflow_function: AsyncMock,
         test_settings: Mock,
         mock_session_provider: AsyncMock,
+        mock_matching_strategy: MagicMock,
     ) -> None:
         """Test behavior with edge case identity field values.
 
@@ -356,6 +367,7 @@ class TestEventProcessorIdentityThreading:
             content_client=mock_content_client,
             event_publisher=mock_event_publisher,
             llm_interaction=mock_llm_interaction,
+            matching_strategy=mock_matching_strategy,
             grade_projector=Mock(spec=GradeProjector),
             settings_obj=test_settings,
         )
@@ -383,6 +395,7 @@ class TestEventProcessorIdentityThreading:
         test_settings: Mock,
         monkeypatch: pytest.MonkeyPatch,
         mock_session_provider: AsyncMock,
+        mock_matching_strategy: MagicMock,
     ) -> None:
         """Ensure prompt fetch failures increment the dedicated metric."""
 
@@ -435,6 +448,7 @@ class TestEventProcessorIdentityThreading:
             content_client=mock_content_client,
             event_publisher=mock_event_publisher,
             llm_interaction=mock_llm_interaction,
+            matching_strategy=mock_matching_strategy,
             grade_projector=Mock(spec=GradeProjector),
             settings_obj=test_settings,
         )
@@ -461,6 +475,7 @@ class TestEventProcessorIdentityThreading:
         mock_workflow_function: AsyncMock,
         test_settings: Mock,
         mock_session_provider: AsyncMock,
+        mock_matching_strategy: MagicMock,
     ) -> None:
         """Test that correlation_id is preserved through workflow calls with identity data.
 
@@ -499,6 +514,7 @@ class TestEventProcessorIdentityThreading:
             content_client=mock_content_client,
             event_publisher=mock_event_publisher,
             llm_interaction=mock_llm_interaction,
+            matching_strategy=mock_matching_strategy,
             grade_projector=Mock(spec=GradeProjector),
             settings_obj=test_settings,
         )
@@ -542,6 +558,7 @@ class TestEventProcessorIdentityThreading:
         mock_workflow_function: AsyncMock,
         test_settings: Mock,
         mock_session_provider: AsyncMock,
+        mock_matching_strategy: MagicMock,
     ) -> None:
         """Test handling of Swedish characters and special characters in identity fields.
 
@@ -579,6 +596,7 @@ class TestEventProcessorIdentityThreading:
             content_client=mock_content_client,
             event_publisher=mock_event_publisher,
             llm_interaction=mock_llm_interaction,
+            matching_strategy=mock_matching_strategy,
             grade_projector=Mock(spec=GradeProjector),
             settings_obj=test_settings,
         )
@@ -606,6 +624,7 @@ class TestEventProcessorIdentityThreading:
         mock_workflow_function: AsyncMock,
         test_settings: Mock,
         mock_session_provider: AsyncMock,
+        mock_matching_strategy: MagicMock,
     ) -> None:
         """Test identity threading with multiple essays in the batch.
 
@@ -637,6 +656,7 @@ class TestEventProcessorIdentityThreading:
             content_client=mock_content_client,
             event_publisher=mock_event_publisher,
             llm_interaction=mock_llm_interaction,
+            matching_strategy=mock_matching_strategy,
             grade_projector=Mock(spec=GradeProjector),
             settings_obj=test_settings,
         )
@@ -670,6 +690,7 @@ class TestEventProcessorIdentityThreading:
         mock_workflow_function: AsyncMock,
         test_settings: Mock,
         mock_session_provider: AsyncMock,
+        mock_matching_strategy: MagicMock,
     ) -> None:
         """Test that workflow function receives all required parameters including identity context.
 
@@ -708,6 +729,7 @@ class TestEventProcessorIdentityThreading:
             content_client=mock_content_client,
             event_publisher=mock_event_publisher,
             llm_interaction=mock_llm_interaction,
+            matching_strategy=mock_matching_strategy,
             grade_projector=Mock(spec=GradeProjector),
             settings_obj=test_settings,
         )

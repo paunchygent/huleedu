@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
+from huleedu_service_libs.error_handling import HuleEduError
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.cj_assessment_service.cj_core_logic import comparison_processing, scoring_ranking
@@ -26,6 +27,7 @@ from services.cj_assessment_service.protocols import (
     CJEventPublisherProtocol,
     ContentClientProtocol,
     LLMInteractionProtocol,
+    PairMatchingStrategyProtocol,
     SessionProviderProtocol,
 )
 
@@ -119,6 +121,7 @@ async def trigger_existing_workflow_continuation(
     content_client: ContentClientProtocol,
     correlation_id: UUID,
     llm_interaction: LLMInteractionProtocol,
+    matching_strategy: PairMatchingStrategyProtocol,
     retry_processor: "BatchRetryProcessor | None" = None,
     grade_projector: GradeProjector | None = None,
 ) -> None:
@@ -134,12 +137,12 @@ async def trigger_existing_workflow_continuation(
         comparison_repository: Comparison repository for comparison operations
         essay_repository: Essay repository for essay operations
         instruction_repository: Instruction repository for assessment instructions
-        database: CJ repository protocol (deprecated, kept for compatibility)
         event_publisher: Event publisher protocol
         settings: Application settings
         content_client: Content client protocol
         correlation_id: Request correlation ID
         llm_interaction: LLM interaction protocol
+        matching_strategy: DI-injected strategy for computing optimal pairs
         retry_processor: Optional retry processor for failed comparison handling
     """
     log_extra = {"correlation_id": str(correlation_id), "batch_id": batch_id}
@@ -152,7 +155,9 @@ async def trigger_existing_workflow_continuation(
             logger.error("Batch state not found", extra=log_extra)
             return
 
-        callbacks_received = batch_state.completed_comparisons + batch_state.failed_comparisons
+        completed = batch_state.completed_comparisons or 0
+        failed = batch_state.failed_comparisons or 0
+        callbacks_received = completed + failed
         pending_callbacks = max(batch_state.submitted_comparisons - callbacks_received, 0)
 
         if pending_callbacks > 0:
@@ -189,8 +194,29 @@ async def trigger_existing_workflow_continuation(
         denominator = batch_state.completion_denominator()
         callbacks_reached_cap = denominator > 0 and callbacks_received >= denominator
 
+        # Derive success-rate semantics for PR-2 safeguards
+        success_rate: float | None = None
+        success_rate_threshold_raw: Any = getattr(settings, "MIN_SUCCESS_RATE_THRESHOLD", None)
+        success_rate_threshold: float | None
+        if isinstance(success_rate_threshold_raw, (int, float)):
+            success_rate_threshold = float(success_rate_threshold_raw)
+        else:
+            # Disable success-rate guard when settings are not numeric (e.g. loose mocks)
+            success_rate_threshold = None
+
+        if callbacks_received > 0:
+            success_rate = completed / callbacks_received
+
+        zero_successes = callbacks_received > 0 and completed == 0
+        below_success_threshold = (
+            success_rate is not None
+            and success_rate_threshold is not None
+            and success_rate < success_rate_threshold
+        )
+
         essays = await essay_repository.get_essays_for_cj_batch(
-            session=session, cj_batch_id=batch_id
+            session=session,
+            cj_batch_id=batch_id,
         )
         essays_for_api = [
             EssayForComparison(
@@ -216,27 +242,19 @@ async def trigger_existing_workflow_continuation(
                 cj_batch_id=batch_id,
                 correlation_id=correlation_id,
             )
-
-            if previous_scores:
-                max_score_change = scoring_ranking.check_score_stability(
-                    current_scores,
-                    previous_scores,
-                    stability_threshold=getattr(settings, "SCORE_STABILITY_THRESHOLD", 0.05),
-                )
-                stability_passed = callbacks_received >= getattr(
-                    settings, "MIN_COMPARISONS_FOR_STABILITY_CHECK", 0
-                ) and max_score_change <= getattr(settings, "SCORE_STABILITY_THRESHOLD", 0.05)
-
-            await merge_batch_processing_metadata(
-                session_provider=session_provider,
-                cj_batch_id=batch_id,
-                metadata_updates={
-                    "bt_scores": current_scores,
-                    "last_scored_iteration": batch_state.current_iteration,
-                    "last_score_change": max_score_change,
+        except HuleEduError as exc:  # pragma: no cover - domain error, treat as unstable
+            logger.warning(
+                "BT scoring failed while evaluating continuation; treating batch as unstable",
+                extra={
+                    **log_extra,
+                    "error": str(exc),
+                    "error_type": type(exc).__name__,
                 },
-                correlation_id=correlation_id,
             )
+            # Fall back to previous scores (if any) so that metadata remains
+            # consistent; stability_passed stays False so caps/success-rate
+            # semantics drive finalization behaviour.
+            current_scores = previous_scores or {}
         except Exception as exc:  # pragma: no cover - defensive recovery guard
             logger.error(
                 "Failed to recompute scores after callbacks",
@@ -245,7 +263,46 @@ async def trigger_existing_workflow_continuation(
             )
             return
 
+        if previous_scores:
+            max_score_change = scoring_ranking.check_score_stability(
+                current_scores,
+                previous_scores,
+                stability_threshold=settings.SCORE_STABILITY_THRESHOLD,
+            )
+
+            success_rate_ok = (
+                success_rate is None
+                or success_rate_threshold is None
+                or success_rate >= success_rate_threshold
+            )
+
+            stability_passed = (
+                callbacks_received >= settings.MIN_COMPARISONS_FOR_STABILITY_CHECK
+                and max_score_change <= settings.SCORE_STABILITY_THRESHOLD
+                and success_rate_ok
+            )
+
+        await merge_batch_processing_metadata(
+            session_provider=session_provider,
+            cj_batch_id=batch_id,
+            metadata_updates={
+                "bt_scores": current_scores,
+                "last_scored_iteration": batch_state.current_iteration,
+                "last_score_change": max_score_change,
+            },
+            correlation_id=correlation_id,
+        )
+
+        # Only finalize on stability, completion denominator, or global budget exhaustion
         should_finalize = stability_passed or callbacks_reached_cap or budget_exhausted
+
+        # PR-2: when caps are reached but success-rate is too low, route to failure
+        should_fail_due_to_success_rate = (
+            should_finalize
+            and callbacks_received > 0
+            and (callbacks_reached_cap or budget_exhausted)
+            and (zero_successes or below_success_threshold)
+        )
 
         logger.info(
             "Callback iteration complete; evaluated stability",
@@ -259,8 +316,59 @@ async def trigger_existing_workflow_continuation(
                 "pairs_remaining": pairs_remaining,
                 "budget_exhausted": budget_exhausted,
                 "should_finalize": should_finalize,
+                "success_rate": success_rate,
+                "success_rate_threshold": success_rate_threshold,
+                "zero_successes": zero_successes,
+                "should_fail_due_to_success_rate": should_fail_due_to_success_rate,
             },
         )
+
+        if should_fail_due_to_success_rate:
+            logger.warning(
+                "Finalizing batch as FAILED due to low success rate",
+                extra={
+                    **log_extra,
+                    "callbacks_received": callbacks_received,
+                    "completed_comparisons": completed,
+                    "failed_comparisons": failed,
+                    "success_rate": success_rate,
+                    "success_rate_threshold": success_rate_threshold,
+                    "callbacks_reached_cap": callbacks_reached_cap,
+                    "budget_exhausted": budget_exhausted,
+                },
+            )
+            if grade_projector is None:
+                raise ValueError(
+                    "grade_projector is required for failure finalization. "
+                    "Please inject a GradeProjector instance via DI.",
+                )
+
+            finalizer = BatchFinalizer(
+                session_provider=session_provider,
+                batch_repository=batch_repository,
+                comparison_repository=comparison_repository,
+                essay_repository=essay_repository,
+                event_publisher=event_publisher,
+                content_client=content_client,
+                settings=settings,
+                grade_projector=grade_projector,
+            )
+            await finalizer.finalize_failure(
+                batch_id=batch_id,
+                correlation_id=correlation_id,
+                log_extra=log_extra,
+                failure_reason="low_success_rate",
+                failure_details={
+                    "callbacks_received": callbacks_received,
+                    "completed_comparisons": completed,
+                    "failed_comparisons": failed,
+                    "success_rate": success_rate,
+                    "success_rate_threshold": success_rate_threshold,
+                    "callbacks_reached_cap": callbacks_reached_cap,
+                    "budget_exhausted": budget_exhausted,
+                },
+            )
+            return
 
         if should_finalize:
             logger.info("Finalizing batch after stability/budget evaluation", extra=log_extra)
@@ -269,6 +377,12 @@ async def trigger_existing_workflow_continuation(
                     "grade_projector is required for finalization. "
                     "Please inject a GradeProjector instance via DI."
                 )
+            if grade_projector is None:
+                raise ValueError(
+                    "grade_projector is required for failure finalization. "
+                    "Please inject a GradeProjector instance via DI.",
+                )
+
             finalizer = BatchFinalizer(
                 session_provider=session_provider,
                 batch_repository=batch_repository,
@@ -295,6 +409,7 @@ async def trigger_existing_workflow_continuation(
                 comparison_repository=comparison_repository,
                 instruction_repository=instruction_repository,
                 llm_interaction=llm_interaction,
+                matching_strategy=matching_strategy,
                 settings=settings,
                 correlation_id=correlation_id,
                 log_extra=log_extra,

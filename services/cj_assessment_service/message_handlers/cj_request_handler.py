@@ -53,6 +53,7 @@ from services.cj_assessment_service.protocols import (
     CJEventPublisherProtocol,
     ContentClientProtocol,
     LLMInteractionProtocol,
+    PairMatchingStrategyProtocol,
     SessionProviderProtocol,
 )
 
@@ -71,6 +72,7 @@ async def handle_cj_assessment_request(
     content_client: ContentClientProtocol,
     event_publisher: CJEventPublisherProtocol,
     llm_interaction: LLMInteractionProtocol,
+    matching_strategy: PairMatchingStrategyProtocol,
     settings: Settings,
     grade_projector: GradeProjector,
     tracer: "Tracer | None" = None,
@@ -89,6 +91,7 @@ async def handle_cj_assessment_request(
         content_client: Content client for fetching prompts/rubrics
         event_publisher: Event publisher for success/failure events
         llm_interaction: LLM interaction protocol
+        matching_strategy: DI-injected strategy for computing optimal pairs
         settings: Application settings
         grade_projector: Grade projector for grade predictions
         tracer: Optional OpenTelemetry tracer
@@ -232,6 +235,7 @@ async def handle_cj_assessment_request(
             comparison_repository=comparison_repository,
             content_client=content_client,
             llm_interaction=llm_interaction,
+            matching_strategy=matching_strategy,
             event_publisher=event_publisher,
             settings=settings,
             grade_projector=grade_projector,

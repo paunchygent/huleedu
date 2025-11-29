@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
@@ -29,7 +29,10 @@ from services.cj_assessment_service.implementations.assessment_instruction_repos
 from services.cj_assessment_service.implementations.essay_repository import (
     PostgreSQLCJEssayRepository,
 )
-from services.cj_assessment_service.models_api import CJAssessmentRequestData, EssayToProcess
+from services.cj_assessment_service.models_api import (
+    CJAssessmentRequestData,
+    EssayToProcess,
+)
 from services.cj_assessment_service.models_db import CJBatchState, CJBatchUpload
 from services.cj_assessment_service.protocols import (
     AnchorRepositoryProtocol,
@@ -40,6 +43,9 @@ from services.cj_assessment_service.protocols import (
     ContentClientProtocol,
     LLMInteractionProtocol,
     SessionProviderProtocol,
+)
+from services.cj_assessment_service.tests.helpers.matching_strategies import (
+    make_real_matching_strategy_mock,
 )
 
 
@@ -73,6 +79,7 @@ async def test_original_request_metadata_persists_and_rehydrates(
     mock_content_client: ContentClientProtocol,
     mock_event_publisher: CJEventPublisherProtocol,
     mock_llm_interaction_async: LLMInteractionProtocol,
+    mock_matching_strategy: MagicMock,
     test_settings: Settings,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -119,6 +126,7 @@ async def test_original_request_metadata_persists_and_rehydrates(
         content_client=mock_content_client,
         llm_interaction=mock_llm_interaction_async,
         event_publisher=mock_event_publisher,
+        matching_strategy=mock_matching_strategy,
         grade_projector=_make_grade_projector(
             session_provider=postgres_session_provider,
             instruction_repository=postgres_instruction_repository,
@@ -161,6 +169,7 @@ async def test_original_request_metadata_persists_and_rehydrates(
         comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
         instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
         llm_interaction=mock_llm_interaction_async,
+        matching_strategy=mock_matching_strategy,
         settings=test_settings,
         correlation_id=uuid4(),
         log_extra=continuation_log,
@@ -179,3 +188,10 @@ async def test_original_request_metadata_persists_and_rehydrates(
     assert request_args.llm_config_overrides is not None
     assert request_args.llm_config_overrides.model_override == "claude-3-sonnet"
     assert request_args.cj_request_type == "cj_retry"
+
+
+@pytest.fixture
+def mock_matching_strategy() -> MagicMock:
+    """Provide real optimal graph matching strategy wrapped for protocol compliance."""
+
+    return make_real_matching_strategy_mock()

@@ -371,6 +371,13 @@ async def prepare_essays_for_assessment(
             )
             essays_for_api_model.extend(anchors)
 
+            # Net size (n in nC2) for completion gating should reflect the
+            # full CJ graph (students + anchors), not just the original
+            # student cohort. Update expected_essay_count so downstream
+            # completion_denominator() and related logic see the true CJ
+            # node count for this batch.
+            cj_batch.expected_essay_count = len(essays_for_api_model)
+
         # Persist all prepared essays before any cross-session operations use them
         await session.commit()
 

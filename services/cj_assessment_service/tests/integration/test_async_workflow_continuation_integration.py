@@ -523,6 +523,112 @@ class TestAsyncWorkflowContinuation:
         completion_percentage = (2 / 3) * 100  # 66.67%
         assert completion_percentage < 80, "Below default threshold with failures"
 
+    async def test_two_essay_batch_does_not_finalize_until_callback_complete(
+        self,
+        postgres_data_access: PostgresDataAccess,
+        test_settings: Settings,
+        postgres_session_provider: SessionProviderProtocol,
+        postgres_batch_repository: CJBatchRepositoryProtocol,
+        postgres_comparison_repository: CJComparisonRepositoryProtocol,
+    ) -> None:
+        """A 2-essay batch must wait for its single callback.
+
+        This guards US-005.1 by ensuring that even for the smallest
+        non-trivial net (2 essays → 1 comparison), the continuation
+        gating logic does not finalize while callbacks are still
+        pending.
+        """
+
+        batch_id, correlation_ids, total_comparisons = await self._create_batch_with_comparisons(
+            postgres_data_access,
+            essay_count=2,  # 1 comparison
+        )
+        assert total_comparisons == 1
+
+        # With no callbacks processed yet, continuation must not trigger.
+        should_continue = await check_workflow_continuation(
+            batch_id=batch_id,
+            session_provider=postgres_session_provider,
+            batch_repository=postgres_batch_repository,
+            correlation_id=uuid4(),
+        )
+        assert not should_continue
+
+        # Process the single callback and re-check continuation.
+        callback_result = self._create_callback_result(
+            correlation_ids[0], EssayComparisonWinner.ESSAY_A
+        )
+        await update_comparison_result(
+            comparison_result=callback_result,
+            session_provider=postgres_session_provider,
+            comparison_repository=postgres_comparison_repository,
+            batch_repository=postgres_batch_repository,
+            correlation_id=correlation_ids[0],
+            settings=test_settings,
+        )
+
+        async with postgres_data_access.session() as session:
+            state = await session.get(CJBatchState, batch_id)
+            assert state is not None
+            state.completed_comparisons = 1
+            await session.commit()
+
+        should_continue = await check_workflow_continuation(
+            batch_id=batch_id,
+            session_provider=postgres_session_provider,
+            batch_repository=postgres_batch_repository,
+            correlation_id=uuid4(),
+        )
+        assert should_continue
+
+    async def test_large_batch_uses_completion_denominator_and_does_not_finalize_early(
+        self,
+        postgres_data_access: PostgresDataAccess,
+        test_settings: Settings,
+        postgres_session_provider: SessionProviderProtocol,
+        postgres_batch_repository: CJBatchRepositoryProtocol,
+        postgres_comparison_repository: CJComparisonRepositoryProtocol,
+    ) -> None:
+        """Large batches must respect completion_denominator gating.
+
+        For a larger net we ensure that the completion checker and
+        continuation logic do not treat a small number of callbacks as
+        sufficient when the denominator (min(budget, nC2)) is much
+        higher.
+        """
+
+        batch_id, correlation_ids, total_comparisons = await self._create_batch_with_comparisons(
+            postgres_data_access,
+            essay_count=50,
+        )
+
+        # Simulate only a small fraction of callbacks arriving.
+        for corr_id in correlation_ids[:5]:
+            callback_result = self._create_callback_result(corr_id, EssayComparisonWinner.ESSAY_A)
+            await update_comparison_result(
+                comparison_result=callback_result,
+                session_provider=postgres_session_provider,
+                comparison_repository=postgres_comparison_repository,
+                batch_repository=postgres_batch_repository,
+                correlation_id=corr_id,
+                settings=test_settings,
+            )
+
+        async with postgres_data_access.session() as session:
+            state = await session.get(CJBatchState, batch_id)
+            assert state is not None
+            state.completed_comparisons = 5
+            await session.commit()
+
+        # With only a handful of callbacks, continuation should still be gated.
+        should_continue = await check_workflow_continuation(
+            batch_id=batch_id,
+            session_provider=postgres_session_provider,
+            batch_repository=postgres_batch_repository,
+            correlation_id=uuid4(),
+        )
+        assert not should_continue
+
     async def test_idempotent_callback_processing(
         self,
         postgres_data_access: PostgresDataAccess,

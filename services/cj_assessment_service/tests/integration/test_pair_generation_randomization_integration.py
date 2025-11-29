@@ -13,7 +13,7 @@ ComparisonPair rows, not just in-memory tasks.
 from __future__ import annotations
 
 from typing import Any
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
 import pytest
@@ -35,9 +35,13 @@ from services.cj_assessment_service.protocols import (
     CJBatchRepositoryProtocol,
     CJComparisonRepositoryProtocol,
     LLMInteractionProtocol,
+    PairMatchingStrategyProtocol,
     SessionProviderProtocol,
 )
 from services.cj_assessment_service.tests.fixtures.database_fixtures import PostgresDataAccess
+from services.cj_assessment_service.tests.helpers.matching_strategies import (
+    make_deterministic_anchor_student_strategy,
+)
 
 
 @pytest.mark.integration
@@ -161,6 +165,7 @@ class TestPairGenerationRandomizationIntegration:
         session_provider: SessionProviderProtocol,
         batch_repository: CJBatchRepositoryProtocol,
         llm_interaction: LLMInteractionProtocol,
+        matching_strategy: PairMatchingStrategyProtocol,
         settings: Settings,
         essays_for_api_model: list[EssayForComparison],
         request_data: CJAssessmentRequestData,
@@ -180,6 +185,7 @@ class TestPairGenerationRandomizationIntegration:
             comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
             instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
             llm_interaction=llm_interaction,
+            matching_strategy=matching_strategy,
             request_data=request_data,
             settings=settings,
             correlation_id=correlation_id,
@@ -192,6 +198,7 @@ class TestPairGenerationRandomizationIntegration:
         postgres_repository: PostgresDataAccess,
         postgres_batch_repository: CJBatchRepositoryProtocol,
         mock_llm_interaction_async: LLMInteractionProtocol,
+        mock_matching_strategy: MagicMock,
         test_settings: Settings,
     ) -> None:
         """Anchors should occupy essay_a about half the time in persisted pairs.
@@ -237,6 +244,7 @@ class TestPairGenerationRandomizationIntegration:
             session_provider=postgres_session_provider,
             batch_repository=postgres_batch_repository,
             llm_interaction=mock_llm_interaction_async,
+            matching_strategy=mock_matching_strategy,
             settings=test_settings,
             essays_for_api_model=essays_for_api_model,
             request_data=request_data,
@@ -285,3 +293,9 @@ class TestPairGenerationRandomizationIntegration:
             "Anchor essays should appear in essay_a roughly half the time; "
             f"observed ratio={ratio:.3f}"
         )
+
+
+@pytest.fixture
+def mock_matching_strategy() -> MagicMock:
+    """Provide deterministic anchor–student pairing to isolate position randomization."""
+    return make_deterministic_anchor_student_strategy()

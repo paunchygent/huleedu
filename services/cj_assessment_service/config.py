@@ -192,7 +192,7 @@ class Settings(SecureServiceSettings, JWTValidationSettings):
 
     # CJ assessment parameters
     MAX_PAIRWISE_COMPARISONS: int = 150
-    COMPARISONS_PER_STABILITY_CHECK_ITERATION: int = 10
+    COMPARISONS_PER_STABILITY_CHECK_ITERATION: int = 12
 
     # NOTE:
     # These BT convergence parameters are already used in pure math
@@ -201,7 +201,7 @@ class Settings(SecureServiceSettings, JWTValidationSettings):
     # See TASK-LLM-BATCH-STRATEGY-IMPLEMENTATION*.md for the planned
     # bundled, stability-driven workflow that will consume them.
     MIN_COMPARISONS_FOR_STABILITY_CHECK: int = Field(
-        default=10,
+        default=12,
         description="Minimum successful comparisons required before checking score stability",
     )
     SCORE_STABILITY_THRESHOLD: float = 0.05
@@ -213,6 +213,24 @@ class Settings(SecureServiceSettings, JWTValidationSettings):
             "Optional seed for deterministic pair position randomization. "
             "Leave unset in production to preserve unbiased ordering."
         ),
+    )
+
+    # Pair matching strategy configuration (DI-swappable)
+    PAIR_MATCHING_STRATEGY: str = Field(
+        default="optimal_graph",
+        description=(
+            "Matching strategy for pair generation. "
+            "Options: 'optimal_graph' (Hungarian algorithm). "
+            "Future: 'random', 'd_optimal'."
+        ),
+    )
+    MATCHING_WEIGHT_COMPARISON_COUNT: float = Field(
+        default=1.0,
+        description="Weight for comparison count fairness term in optimal matching.",
+    )
+    MATCHING_WEIGHT_BT_PROXIMITY: float = Field(
+        default=0.5,
+        description="Weight for BT score proximity term in optimal matching.",
     )
 
     # Failed Comparison Pool Configuration

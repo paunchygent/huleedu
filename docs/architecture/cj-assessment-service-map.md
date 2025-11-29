@@ -7,6 +7,54 @@ This document maps the current state of the CJ Assessment Service, including its
 
 ---
 
+## Completion & Stability Semantics
+
+The callback-driven workflow applies three distinct gates before a batch is
+considered ready for completion:
+
+- **Callback gate** (per-iteration): `check_workflow_continuation` only returns
+  `True` when `submitted_comparisons > 0` and
+  `submitted_comparisons == completed_comparisons + failed_comparisons`.
+- **Stability gate** (score deltas): `trigger_existing_workflow_continuation`
+  recomputes Bradley–Terry scores using all successful comparisons in the
+  database and compares them to the previously persisted `bt_scores`.
+  Stability is considered passed only when:
+  - `callbacks_received >= MIN_COMPARISONS_FOR_STABILITY_CHECK`, and
+  - `max_score_change <= SCORE_STABILITY_THRESHOLD`.
+- **Success‑rate gate** (PR‑2): a per‑batch success‑rate is computed as
+  `completed_comparisons / callbacks_received` (when callbacks have arrived).
+  If `MIN_SUCCESS_RATE_THRESHOLD` is defined and numeric, the stability
+  condition additionally requires `success_rate >= MIN_SUCCESS_RATE_THRESHOLD`.
+
+When an iteration completes, `trigger_existing_workflow_continuation` decides
+between three paths:
+
+- **Finalize successfully** when stability has passed, or when the callback
+  count has reached the batch’s `completion_denominator()` (which is derived
+  from `min(total_budget, nC2)`), or when the global comparison budget is
+  exhausted.
+- **Finalize as failure** when caps/budgets are hit but the success‑rate gate
+  fails (zero successes, or a success‑rate below `MIN_SUCCESS_RATE_THRESHOLD`).
+  In this case `BatchFinalizer.finalize_failure` marks the upload as
+  `ERROR_PROCESSING`, transitions `CJBatchState` to `FAILED`, and emits a
+  `CJAssessmentFailedV1` thin event to ELS so that downstream batch/essay
+  state reflects a hard failure instead of hanging.
+- **Request additional comparisons** when callbacks for the current iteration
+  are complete, stability has not passed, and comparison budget remains.
+
+`MAX_PAIRWISE_COMPARISONS` and the per‑batch `completion_denominator()` work
+in tandem:
+
+- `MAX_PAIRWISE_COMPARISONS` is a global hard cap on how many comparisons CJ
+  will attempt for a batch (subject to per‑request overrides).
+- `completion_denominator()` computes the effective denominator used for
+  completion math as `min(total_budget, nC2)` where `nC2` is derived from the
+  batch’s expected essay count. Small nets therefore finalize once their
+  small n‑choose‑2 graph is saturated, while large nets are naturally capped
+  by budget.
+
+---
+
 ## 1. Core Processing Pipeline
 The service operates on an asynchronous, callback-driven event loop.
 

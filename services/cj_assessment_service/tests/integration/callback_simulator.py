@@ -36,6 +36,7 @@ if TYPE_CHECKING:
         CJEssayRepositoryProtocol,
         CJEventPublisherProtocol,
         ContentClientProtocol,
+        PairMatchingStrategyProtocol,
         SessionProviderProtocol,
     )
 
@@ -62,6 +63,7 @@ class CallbackSimulator:
         essay_repository: CJEssayRepositoryProtocol,
         comparison_repository: CJComparisonRepositoryProtocol,
         instruction_repository: AssessmentInstructionRepositoryProtocol,
+        matching_strategy: "PairMatchingStrategyProtocol",
         grade_projector: "GradeProjector",
         cj_batch_id: int | None = None,
     ) -> int:
@@ -203,6 +205,7 @@ class CallbackSimulator:
                 content_client=content_client,
                 llm_interaction=mock_llm_interaction,
                 instruction_repository=instruction_repository,
+                matching_strategy=matching_strategy,
                 grade_projector=grade_projector,
                 retry_processor=None,  # Not needed for successful callbacks
             )

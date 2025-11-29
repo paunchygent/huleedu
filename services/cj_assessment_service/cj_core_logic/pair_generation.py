@@ -1,7 +1,7 @@
 """Pair generation logic for comparative judgment.
 
-Adapted from the prototype's pair_generator.py to work with the service architecture,
-using string-based essay IDs and protocol-based database access.
+Uses DI-injected matching strategies to generate optimal comparison pairs
+where each essay appears in exactly one comparison per wave.
 """
 
 from __future__ import annotations
@@ -10,7 +10,7 @@ from random import Random
 from uuid import UUID
 
 from huleedu_service_libs.logging_utils import create_service_logger
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.cj_assessment_service.cj_core_logic.prompt_templates import PromptTemplateBuilder
@@ -19,6 +19,7 @@ from services.cj_assessment_service.models_db import ComparisonPair as CJ_Compar
 from services.cj_assessment_service.protocols import (
     AssessmentInstructionRepositoryProtocol,
     CJComparisonRepositoryProtocol,
+    PairMatchingStrategyProtocol,
     SessionProviderProtocol,
 )
 
@@ -37,21 +38,24 @@ async def generate_comparison_tasks(
     session_provider: SessionProviderProtocol,
     comparison_repository: CJComparisonRepositoryProtocol,
     instruction_repository: AssessmentInstructionRepositoryProtocol,
+    matching_strategy: PairMatchingStrategyProtocol,
     cj_batch_id: int,
-    existing_pairs_threshold: int,
     max_pairwise_comparisons: int | None = None,
     correlation_id: UUID | None = None,
     randomization_seed: int | None = None,
 ) -> list[ComparisonTask]:
-    """Generate comparison tasks for essays, avoiding duplicate comparisons.
+    """Generate comparison tasks using injected matching strategy.
+
+    Each essay appears in exactly one comparison per wave. Uses the
+    matching strategy to compute optimal pairs based on information gain.
 
     Args:
         essays_for_comparison: List of essays to compare (with string IDs)
         session_provider: Session provider for database access
         comparison_repository: Repository for comparison pair operations
         instruction_repository: Repository for assessment instruction operations
+        matching_strategy: DI-injected strategy for computing optimal pairs
         cj_batch_id: Internal CJ batch ID for this comparison batch
-        existing_pairs_threshold: Maximum existing pairs before skipping generation
         max_pairwise_comparisons: Optional global cap on total comparison pairs
         correlation_id: Correlation ID for observability
         randomization_seed: Seed for randomizing essay positions in pairs
@@ -77,9 +81,9 @@ async def generate_comparison_tasks(
         assessment_context = await _fetch_assessment_context(session, cj_batch_id)
 
         # Get existing comparison pairs to avoid duplicates
-        existing_comparison_ids = await _fetch_existing_comparison_ids(session, cj_batch_id)
+        existing_pairs = await _fetch_existing_comparison_ids(session, cj_batch_id)
 
-        existing_count = len(existing_comparison_ids)
+        existing_count = len(existing_pairs)
         logger.debug(f"Found {existing_count} existing comparison pairs")
 
         # Enforce optional global cap on total comparison pairs for this batch
@@ -95,70 +99,77 @@ async def generate_comparison_tasks(
             )
             return []
 
-        # Respect remaining budget under global cap when deciding how many new pairs
-        remaining_budget = (
-            max_pairwise_comparisons - existing_count
-            if max_pairwise_comparisons is not None
-            else existing_pairs_threshold
-        )
-        effective_threshold = min(existing_pairs_threshold, remaining_budget)
+        # Fetch comparison counts for each essay (for fairness weighting)
+        comparison_counts = await _fetch_comparison_counts(session, cj_batch_id)
 
+        # Handle odd essay count via strategy (excludes essay with most comparisons)
+        essays_for_matching, excluded_essay = matching_strategy.handle_odd_count(
+            essays_for_comparison, comparison_counts
+        )
+
+        if excluded_essay:
+            logger.info(
+                "Excluded essay from wave due to odd count",
+                extra={
+                    "cj_batch_id": cj_batch_id,
+                    "excluded_essay_id": excluded_essay.id,
+                    "correlation_id": str(correlation_id) if correlation_id else None,
+                },
+            )
+
+        # Compute optimal pairs via strategy (each essay appears exactly once)
+        matched_pairs = matching_strategy.compute_wave_pairs(
+            essays=essays_for_matching,
+            existing_pairs=existing_pairs,
+            comparison_counts=comparison_counts,
+            randomization_seed=randomization_seed,
+        )
+
+        # Respect global cap
+        if max_pairwise_comparisons is not None:
+            remaining = max_pairwise_comparisons - existing_count
+            if len(matched_pairs) > remaining:
+                matched_pairs = matched_pairs[:remaining]
+                logger.info(
+                    "Truncated pairs to respect global cap",
+                    extra={
+                        "cj_batch_id": cj_batch_id,
+                        "remaining_budget": remaining,
+                        "pairs_truncated_to": len(matched_pairs),
+                    },
+                )
+
+        # Build ComparisonTasks from matched pairs
         comparison_tasks = []
-        new_pairs_count = 0
         randomizer = _build_pair_randomizer(randomization_seed)
 
-        # Generate all possible pairs
-        for i in range(len(essays_for_comparison)):
-            for j in range(i + 1, len(essays_for_comparison)):
-                essay_a = essays_for_comparison[i]
-                essay_b = essays_for_comparison[j]
+        for essay_a, essay_b in matched_pairs:
+            # Randomize position to avoid systematic bias
+            if _should_swap_positions(randomizer):
+                essay_a, essay_b = essay_b, essay_a
 
-                # Create normalized pair ID (sorted to handle bidirectional pairs)
-                current_pair_ids = tuple(sorted((essay_a.id, essay_b.id)))
+            prompt_blocks = PromptTemplateBuilder.assemble_full_prompt(
+                assessment_context=assessment_context,
+                essay_a=essay_a,
+                essay_b=essay_b,
+            )
+            prompt_text = PromptTemplateBuilder.render_prompt_text(prompt_blocks)
 
-                # Skip if this pair already exists
-                if current_pair_ids in existing_comparison_ids:
-                    logger.debug(f"Skipping existing pair: {essay_a.id} vs {essay_b.id}")
-                    continue
-
-                # Stop if we've generated too many new pairs in this round
-                if new_pairs_count >= effective_threshold:
-                    logger.info(
-                        f"Reached new pairs threshold ({effective_threshold}), "
-                        f"stopping pair generation",
-                    )
-                    break
-
-                if _should_swap_positions(randomizer):
-                    essay_a, essay_b = essay_b, essay_a
-
-                prompt_blocks = PromptTemplateBuilder.assemble_full_prompt(
-                    assessment_context=assessment_context,
-                    essay_a=essay_a,
-                    essay_b=essay_b,
-                )
-                prompt_text = PromptTemplateBuilder.render_prompt_text(prompt_blocks)
-
-                task = ComparisonTask(
-                    essay_a=essay_a,
-                    essay_b=essay_b,
-                    prompt=prompt_text,
-                    prompt_blocks=prompt_blocks,
-                )
-
-                comparison_tasks.append(task)
-                new_pairs_count += 1
-
-            # Break outer loop if threshold reached
-            if new_pairs_count >= effective_threshold:
-                break
+            task = ComparisonTask(
+                essay_a=essay_a,
+                essay_b=essay_b,
+                prompt=prompt_text,
+                prompt_blocks=prompt_blocks,
+            )
+            comparison_tasks.append(task)
 
         logger.info(
-            f"Generated {len(comparison_tasks)} new comparison tasks",
+            f"Generated {len(comparison_tasks)} new comparison tasks via optimal matching",
             extra={
                 "correlation_id": correlation_id,
                 "cj_batch_id": cj_batch_id,
                 "task_count": len(comparison_tasks),
+                "wave_size": matching_strategy.compute_wave_size(len(essays_for_matching)),
             },
         )
         return comparison_tasks
@@ -215,6 +226,52 @@ async def _fetch_existing_comparison_ids(
         extra={"cj_batch_id": str(cj_batch_id)},
     )
     return normalized_pairs
+
+
+async def _fetch_comparison_counts(
+    db_session: AsyncSession,
+    cj_batch_id: int,
+) -> dict[str, int]:
+    """Fetch comparison counts for each essay in the batch.
+
+    Counts how many times each essay appears in either essay_a or essay_b position.
+
+    Args:
+        db_session: Database session
+        cj_batch_id: Internal CJ batch ID
+
+    Returns:
+        Dict mapping essay_id -> comparison count
+    """
+    # Count appearances in essay_a position
+    stmt_a = (
+        select(CJ_ComparisonPair.essay_a_els_id, func.count())
+        .where(CJ_ComparisonPair.cj_batch_id == cj_batch_id)
+        .group_by(CJ_ComparisonPair.essay_a_els_id)
+    )
+    result_a = await db_session.execute(stmt_a)
+    counts_a: dict[str, int] = {row[0]: row[1] for row in result_a.all()}
+
+    # Count appearances in essay_b position
+    stmt_b = (
+        select(CJ_ComparisonPair.essay_b_els_id, func.count())
+        .where(CJ_ComparisonPair.cj_batch_id == cj_batch_id)
+        .group_by(CJ_ComparisonPair.essay_b_els_id)
+    )
+    result_b = await db_session.execute(stmt_b)
+    counts_b: dict[str, int] = {row[0]: row[1] for row in result_b.all()}
+
+    # Merge counts
+    comparison_counts: dict[str, int] = {}
+    all_ids = set(counts_a.keys()) | set(counts_b.keys())
+    for essay_id in all_ids:
+        comparison_counts[essay_id] = counts_a.get(essay_id, 0) + counts_b.get(essay_id, 0)
+
+    logger.debug(
+        f"Fetched comparison counts for {len(comparison_counts)} essays",
+        extra={"cj_batch_id": str(cj_batch_id)},
+    )
+    return comparison_counts
 
 
 async def _fetch_assessment_context(
