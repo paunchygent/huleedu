@@ -105,6 +105,10 @@ class LLMConfigOverrides(BaseModel):
         default=None,
         description="System prompt to force for this batch (caller-supplied instructions).",
     )
+    judge_rubric_override: str | None = Field(
+        default=None,
+        description="Judge rubric text to force for this batch (overrides hydrated rubric).",
+    )
 
 
 class ELS_CJAssessmentRequestV1(BaseEventData):

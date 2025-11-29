@@ -38,7 +38,7 @@ def write_stub_artefact(
         },
     }
 
-    grade_map = _load_anchor_grade_map(inventory.anchors_csv)
+    grade_map = load_anchor_grade_map(inventory.anchors_csv)
     artefact = {
         "schema_version": schema.get("schema_version", "1.0.0"),
         "metadata": {
@@ -175,7 +175,15 @@ def _build_student_records(records: Sequence[FileRecord]) -> list[dict[str, Any]
     return entries
 
 
-def _load_anchor_grade_map(record: FileRecord) -> dict[str, str]:
+def load_anchor_grade_map(record: FileRecord) -> dict[str, str]:
+    """Load anchor ID to grade mapping from CSV file.
+
+    Args:
+        record: FileRecord pointing to the anchor grade CSV
+
+    Returns:
+        Mapping of normalized anchor_id to letter grade string
+    """
     if not record.exists:
         return {}
 

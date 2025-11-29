@@ -482,6 +482,7 @@ class BatchMonitor:
                         id=essay.els_essay_id,
                         text_content=essay.assessment_input_text,
                         current_bt_score=essay.current_bt_score,
+                        is_anchor=essay.is_anchor,
                     )
                     for essay in essays
                 ]

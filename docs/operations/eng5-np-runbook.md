@@ -24,6 +24,21 @@ metadata-complete artefacts that power Phase 3.3 confidence analysis.
 5. **Pre-flight validation**: run `bash scripts/eng5_np_preflight.sh` to verify Docker services,
    Kafka connectivity, CJ admin CLI availability, and artefact directories before launching execute mode.
 
+### Retrieve Assignment IDs (no auth required)
+
+List registered instructions and anchors directly from database:
+
+```bash
+source .env
+pdm run python scripts/cj_assessment_service/diagnostics/list_cj_instructions.py
+
+# List anchors for specific assignment:
+pdm run python scripts/cj_assessment_service/diagnostics/list_cj_instructions.py \
+    --anchors 00000000-0000-0000-0000-000000000001
+```
+
+Output includes copy-paste hints for `--assignment-id` and `--course-id` parameters.
+
 ## Execution Steps (one batch)
 
 1. Inspect assets.
@@ -273,6 +288,91 @@ Use `jq` to spot-check the execute artefact after a run:
 
   - *Cause*: Should no longer occur (dedupe guard).
   - *Action*: If observed, clear `.claude/research/data/eng5_np_2016/events` and rerun to isolate offending callback.
+
+## CJ DB Inspection (`scripts/cj_assessment_service/diagnostics/extract_cj_results.py`)
+
+Use this script for **one-off inspection** of a single CJ/ENG5 batch directly from the CJ Assessment database. It is a diagnostic tool for developers/analysts, **not** a user-facing reporting surface (RAS remains the source of truth).
+
+### Prerequisites
+
+- CJ dev stack running (CJ Assessment DB up):
+
+  ```bash
+  pdm run dev-start cj_assessment_service
+  ```
+
+- Environment loaded (DB host/user/password/ports):
+
+  ```bash
+  source .env
+  ```
+
+- Standard dev DB defaults are:
+  - `HULEEDU_DB_HOST=localhost`
+  - `HULEEDU_CJ_DB_PORT=5434` (or `HULEEDU_DB_PORT`)
+  - `HULEEDU_DB_USER=huleedu_user`
+  - `HULEEDU_DB_PASSWORD=huleedu_dev_password`
+  - Database: `huleedu_cj_assessment`
+
+### Basic Usage
+
+From the repo root:
+
+```bash
+pdm run python scripts/cj_assessment_service/diagnostics/extract_cj_results.py <batch_identifier>
+```
+
+- `<batch_identifier>` can be:
+  - Internal CJ batch ID (`cj_batch_uploads.id`), e.g. `5`
+  - BOS batch ID (`cj_batch_uploads.bos_batch_id`), e.g. `eng5-execute-20251129-1200`
+
+### Common Patterns
+
+**1. Human-readable report for ENG5 batch**
+
+```bash
+pdm run python scripts/cj_assessment_service/diagnostics/extract_cj_results.py eng5-execute-20251129-1200
+```
+
+This prints:
+
+- Batch + state summary (`cj_batch_uploads`, `cj_batch_states`)
+- All comparison pairs + winners/justifications (`cj_comparison_pairs`)
+- BT ranking table (score, SE, wins/losses, anchor flag, `known_grade`)
+- Student grade projections (if present)
+- Summary counts (students/anchors, comparisons, failures, projections)
+
+**2. Save text report to file**
+
+```bash
+pdm run python scripts/cj_assessment_service/diagnostics/extract_cj_results.py eng5-execute-20251129-1200 \
+  --format text \
+  --output /tmp/cj_eng5_batch_report.txt
+```
+
+**3. JSON for analysis (e.g. notebooks)**
+
+```bash
+pdm run python scripts/cj_assessment_service/diagnostics/extract_cj_results.py 5 \
+  --format json \
+  --output /tmp/cj_batch_5.json
+```
+
+JSON structure:
+
+- `batch_info` – from `cj_batch_uploads`
+- `batch_state` – from `cj_batch_states`
+- `comparisons` – from `cj_comparison_pairs`
+- `bradley_terry_stats` – from `cj_processed_essays`
+- `grade_projections` – from `grade_projections`
+- `wins_losses` – derived per‑essay `{wins, losses, total}`
+
+### Notes
+
+- This script is for **internal inspection** of CJ data. For any user-facing reports or ENG5 validation outputs, continue to treat **RAS** as the authoritative source.
+- When investigating ENG5 runs, use:
+  - RAS (HTTP/DB) for official results.
+  - `extract_cj_results.py` for low-level CJ diagnostics (BT graph, SEs, comparison coverage, raw justifications).
 
 ## Artefact Locations
 

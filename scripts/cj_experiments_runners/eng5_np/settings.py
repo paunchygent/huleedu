@@ -17,6 +17,7 @@ class RunnerMode(str, Enum):
     PLAN = "plan"
     DRY_RUN = "dry-run"
     EXECUTE = "execute"
+    ANCHOR_ALIGN_TEST = "anchor-align-test"
 
 
 @dataclass
@@ -45,3 +46,8 @@ class RunnerSettings:
     await_completion: bool = False
     completion_timeout: float = 1800.0
     llm_batching_mode_hint: str | None = None
+    # Anchor alignment test mode fields
+    system_prompt_file: Path | None = None
+    rubric_file: Path | None = None
+    system_prompt_text: str | None = None
+    rubric_text: str | None = None

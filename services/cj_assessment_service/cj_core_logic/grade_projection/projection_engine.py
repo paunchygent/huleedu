@@ -53,7 +53,7 @@ class ProjectionEngine:
             )
 
             entropy = self._compute_normalized_entropy(probs)
-            conf_score, conf_label = self._entropy_to_confidence(entropy)
+            conf_score, conf_label = self._entropy_to_confidence(entropy, bt_se)
 
             primary_grades[essay_id] = final_grade
             confidence_labels[essay_id] = conf_label
@@ -161,12 +161,67 @@ class ProjectionEngine:
         max_entropy = math.log(len(probs)) if probs else 1.0
         return entropy / max_entropy if max_entropy > 0 else 0.0
 
-    def _entropy_to_confidence(self, normalized_entropy: float) -> tuple[float, str]:
-        confidence_score = 1.0 - normalized_entropy
-        if normalized_entropy < 0.5:
+    def _entropy_to_confidence(
+        self,
+        normalized_entropy: float,
+        bt_se: float | None = None,
+    ) -> tuple[float, str]:
+        """Calculate confidence incorporating both entropy AND BT standard error.
+
+        Args:
+            normalized_entropy: Entropy of grade probability distribution (0-1)
+            bt_se: Bradley-Terry standard error (uncertainty in score)
+
+        Returns:
+            Tuple of (confidence_score, confidence_label)
+
+        SE thresholds calibrated for essay grading (~1 BT point per grade band):
+        - SE >= 1.5: 95% CI spans ~6 points (entire scale) -> LOW
+        - SE 1.0-1.5: 95% CI spans ~4 points (3-4 bands) -> MID cap
+        - SE 0.5-1.0: 95% CI spans ~2 points (1-2 bands) -> allow HIGH
+        - SE < 0.5: 95% CI spans ~1 point (within band) -> trust entropy
+        """
+        entropy_confidence = 1.0 - normalized_entropy
+
+        if bt_se is None:
+            # Fallback to entropy-only behavior
+            if normalized_entropy < 0.5:
+                label = "HIGH"
+            elif normalized_entropy < 0.75:
+                label = "MID"
+            else:
+                label = "LOW"
+            return entropy_confidence, label
+
+        # SE-based confidence factor and cap
+        if bt_se >= 1.5:
+            se_confidence = 0.3
+            se_cap = "LOW"
+        elif bt_se >= 1.0:
+            se_confidence = 0.6
+            se_cap = "MID"
+        elif bt_se >= 0.5:
+            se_confidence = 0.8
+            se_cap = None
+        else:
+            se_confidence = 1.0
+            se_cap = None
+
+        # Combined confidence: geometric mean weights worse factor appropriately
+        confidence_score = math.sqrt(entropy_confidence * se_confidence)
+
+        # Determine label from combined score
+        if confidence_score >= 0.7:
             label = "HIGH"
-        elif normalized_entropy < 0.75:
+        elif confidence_score >= 0.4:
             label = "MID"
         else:
             label = "LOW"
+
+        # Apply SE cap (high SE overrides entropy-based label)
+        if se_cap == "LOW":
+            label = "LOW"
+        elif se_cap == "MID" and label == "HIGH":
+            label = "MID"
+
         return confidence_score, label

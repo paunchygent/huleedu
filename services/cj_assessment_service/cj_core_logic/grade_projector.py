@@ -104,6 +104,9 @@ class GradeProjector:
         if not rankings:
             return self._empty_projections(available=False)
 
+        # Compute SE diagnostics from rankings for observability/diagnostics
+        bt_se_summary = self._compute_bt_se_summary(rankings)
+
         context = await self.context_service.build_context(
             assignment_id=assignment_id,
             course_code=course_code,
@@ -178,6 +181,7 @@ class GradeProjector:
             scale_config=scale_config,
             anchor_count=len(anchor_resolution.anchors),
             unique_anchor_grades=unique_grades,
+            bt_se_summary=bt_se_summary,
         )
 
     def _split_and_map_anchors(
@@ -254,6 +258,7 @@ class GradeProjector:
         scale_config: ScaleConfiguration,
         anchor_count: int,
         unique_anchor_grades: set[str],
+        bt_se_summary: dict[str, dict[str, Any]],
     ) -> GradeProjectionSummary:
         return GradeProjectionSummary(
             projections_available=True,
@@ -268,9 +273,42 @@ class GradeProjector:
                 "grade_scale": scale_config.scale_id,
                 "anchor_count": anchor_count,
                 "anchor_grades": list(unique_anchor_grades),
+                "bt_se_summary": bt_se_summary,
             },
             bt_stats=projections_data.bt_stats,
         )
+
+    def _compute_bt_se_summary(self, rankings: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+        """Compute SE diagnostics for all essays, anchors, and students.
+
+        This is used only for logging/diagnostics and is intentionally
+        decoupled from any gating or grade decision logic.
+        """
+
+        def _summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
+            if not rows:
+                return {
+                    "mean_se": 0.0,
+                    "max_se": 0.0,
+                    "min_se": 0.0,
+                    "item_count": 0,
+                }
+            ses = [float(row.get("bradley_terry_se") or 0.0) for row in rows]
+            return {
+                "mean_se": sum(ses) / len(ses),
+                "max_se": max(ses),
+                "min_se": min(ses),
+                "item_count": len(ses),
+            }
+
+        anchors = [r for r in rankings if r.get("is_anchor") is True]
+        students = [r for r in rankings if not r.get("is_anchor")]
+
+        return {
+            "all": _summary(rankings),
+            "anchors": _summary(anchors),
+            "students": _summary(students),
+        }
 
     def _empty_projections(self, available: bool = False) -> GradeProjectionSummary:
         return GradeProjectionSummary(

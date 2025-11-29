@@ -139,6 +139,31 @@ Per-essay grade probabilities → Confidence calculation → GradeProjection
 | ≥ 2 unique grades, sparse coverage | Yes | Variance inflation for missing grades |
 | Full coverage (≥3 per grade) | Yes | Pure empirical calibration |
 
+For batch-level diagnostics, CJ reuses the BT SE metadata from EPIC‑005:
+
+- `bt_se_summary` on `CJBatchState.processing_metadata` captures SE and comparison coverage
+  information for the full CJ graph.
+- `bt_quality_flags` exposes lightweight batch quality indicators:
+  - `bt_se_inflated` – BT SE inflated (high uncertainty)
+  - `comparison_coverage_sparse` – sparse comparison coverage (mean comparisons per essay low)
+  - `has_isolated_items` – presence of isolated items in the comparison graph
+
+These indicators are intended for ops/analysis dashboards and grade‑projection diagnostics; they
+do **not** change when or how batches are finalized or how grades are assigned.
+
+## RAS / analytics alignment (forward-looking)
+
+- Result Aggregator Service (RAS) remains the authoritative surface for CJ/ENG5 outputs.
+- When surfacing batch health in RAS or analytics pipelines, prefer:
+  - `bt_se_summary` and `bt_quality_flags` from CJ (or RAS’ copy once threaded) as the canonical
+    BT SE diagnostics and comparison coverage indicators.
+  - Keep these fields **diagnostic-only** in reporting until EPIC‑006 explicitly defines any
+    user-facing semantics.
+- Suggested future work (not implemented in this PR):
+  - Thread `bt_quality_flags` through the existing CJ→RAS result path for internal dashboards.
+  - Add RAS-side reporting views or exports that slice ENG5 runs by `bt_se_inflated`,
+    `comparison_coverage_sparse`, and `has_isolated_items` for exam-level QA.
+
 ## Related ADRs
 - ADR-0015: CJ Assessment Convergence Tuning Strategy (mentions grade projection)
 

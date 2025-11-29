@@ -37,9 +37,7 @@ from services.cj_assessment_service.models_api import (
     EssayForComparison,
     LLMAssessmentResponseSchema,
 )
-from services.cj_assessment_service.models_db import (
-    ProcessedEssay,
-)
+from services.cj_assessment_service.models_db import ProcessedEssay
 from services.cj_assessment_service.tests.fixtures.database_fixtures import (
     PostgresDataAccess,
 )

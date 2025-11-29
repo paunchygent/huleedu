@@ -97,6 +97,88 @@ Purpose: single reference for defaults, reasoning, metrics, and open work across
 - Provider errors: llm_provider_errors_total{provider,model,error_type}; rate_limit/overloaded alerts; stop_reason occurrences.
 - Queue health: processing_timeout_count, orphan_callback_count (pending for PR4).
 
+### BT SE batch quality indicators (diagnostics only)
+
+CJ exposes lightweight batch quality indicators derived from `bt_se_summary`:
+
+- Stored on `CJBatchState.processing_metadata`:
+  - `bt_se_summary`: batch-level BT SE diagnostics (mean/max/min SE, item/comparison counts,
+    items_at_cap, isolated_items, mean/min/max comparisons per item).
+  - `bt_quality_flags`:
+    - `bt_se_inflated` – True when mean or max BT SE exceeds diagnostic thresholds
+      (`BT_MEAN_SE_WARN_THRESHOLD`, `BT_MAX_SE_WARN_THRESHOLD`).
+    - `comparison_coverage_sparse` – True when mean comparisons per essay falls below
+      `BT_MIN_MEAN_COMPARISONS_PER_ITEM`.
+    - `has_isolated_items` – True when any essays are isolated in the comparison graph.
+- Exposed as Prometheus counters (diagnostic only, no gating semantics):
+  - `cj_bt_se_inflated_batches_total`
+  - `cj_bt_sparse_coverage_batches_total`
+
+Operational usage:
+- Treat these as **gauges on the dashboard**, not steering wheels:
+  - Rising `cj_bt_se_inflated_batches_total` → investigate anchor coverage / comparison budgets.
+  - Rising `cj_bt_sparse_coverage_batches_total` or frequent `has_isolated_items=True` →
+    investigate matching/budget configuration for nets with sparse coverage.
+- These flags and counters do **not** change:
+  - Completion denominator semantics.
+  - Stability thresholds (`MIN_COMPARISONS_FOR_STABILITY_CHECK`, `SCORE_STABILITY_THRESHOLD`).
+  - Success-rate guard behaviour (`MIN_SUCCESS_RATE_THRESHOLD` and finalize_failure paths).
+
+Grafana panel JSON examples (per environment; assumes an `environment` label on the metric):
+
+```json
+{
+  "title": "CJ BT SE Inflated Batches (rate by environment)",
+  "type": "timeseries",
+  "datasource": {
+    "type": "prometheus",
+    "uid": "PROM_DS_UID"
+  },
+  "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+  "targets": [
+    {
+      "refId": "A",
+      "expr": "sum by (environment) (rate(cj_bt_se_inflated_batches_total[5m]))",
+      "legendFormat": "{{environment}}"
+    }
+  ],
+  "fieldConfig": {
+    "defaults": { "unit": "1/s" },
+    "overrides": []
+  },
+  "options": {
+    "legend": { "showLegend": true },
+    "tooltip": { "mode": "single" }
+  }
+}
+```
+
+For sparse coverage:
+
+```json
+{
+  "title": "CJ BT Sparse Coverage Batches (rate by environment)",
+  "type": "timeseries",
+  "datasource": {
+    "type": "prometheus",
+    "uid": "PROM_DS_UID"
+  },
+  "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+  "targets": [
+    {
+      "refId": "A",
+      "expr": "sum by (environment) (rate(cj_bt_sparse_coverage_batches_total[5m]))",
+      "legendFormat": "{{environment}}"
+    }
+  ]
+}
+```
+
+Alert idea (Grafana managed alert, configured via UI rather than raw JSON):
+- Query: `sum by (environment) (rate(cj_bt_se_inflated_batches_total[5m]))`
+- Condition: last value `> 0.1` for `10m`
+- Labels: `service="cj_assessment_service"`, `severity="warning"`
+
 ## Experiments to run (ENG5 Runner)
 1) Stability sweep: vary SCORE_STABILITY_THRESHOLD (0.025–0.05) and measure cost vs agreement vs iterations; choose per-assignment default.
 2) Cache TTL sweep: compare 600s vs 3600s vs 14400s on repeated prompts; record hit rate and token savings.

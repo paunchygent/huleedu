@@ -6,7 +6,7 @@ status: draft
 phase: 1
 sprint_target: TBD
 created: 2025-11-28
-last_updated: 2025-11-28
+last_updated: 2025-11-29
 ---
 
 # EPIC-005: CJ Stability & Reliability
@@ -20,6 +20,11 @@ Harden the CJ Assessment callback and completion flow to ensure safe finalizatio
 **Scope Boundaries**:
 - **In Scope**: Callback-driven continuation, completion gating, score stability semantics, retry processor integration, convergence testing
 - **Out of Scope**: Grade projection quality (EPIC-006), developer tooling (EPIC-007)
+
+**Implementation Status (2025‑11‑29)**:
+- PR‑1 (test harness & fixtures for CJ) and PR‑2 (stability semantics & completion safety)
+  are implemented and merged into `main`. PR‑7 remains planned for Phase‑2 resampling and
+  small‑net semantics.
 
 ## User Stories
 
@@ -81,8 +86,92 @@ Harden the CJ Assessment callback and completion flow to ensure safe finalizatio
     - Wave size = `compute_wave_size(n) ≈ n // 2` after odd-count handling
     - `MAX_PAIRWISE_COMPARISONS` = global hard cap
     - `COMPARISONS_PER_STABILITY_CHECK_ITERATION` = approximate number of new comparisons between stability checks
+    - Bradley-Terry standard errors are computed analytically in `bt_inference.compute_bt_standard_errors` and capped at `BT_STANDARD_ERROR_MAX = 2.0` for numerical safety and observability only (no change to completion or gating semantics)
+
+---
+
+### PR-3 Notes: BT Standard Error Diagnostics (Observability Only)
+
+- Batch-level BT SE diagnostics are now computed in `record_comparisons_and_update_scores`
+  and emitted in structured logs:
+  - `mean_se`, `max_se`, `min_se`
+  - `item_count`, `comparison_count`
+  - `items_at_cap`, `isolated_items`
+  - `mean_comparisons_per_item`, `min_comparisons_per_item`, `max_comparisons_per_item`
+- Grade projection summaries expose SE diagnostics under
+  `GradeProjectionSummary.calibration_info["bt_se_summary"]` with separate aggregates for:
+  - `"all"` essays
+  - `"anchors"` only
+  - `"students"` only
+- Workflow continuation persists both:
+  - `bt_se_summary` (batch-level BT SE diagnostics), and
+  - `bt_quality_flags` – a small set of **observability-only** batch quality indicators:
+    - `bt_se_inflated`: True when mean or max BT SE exceeds diagnostic thresholds
+    - `comparison_coverage_sparse`: True when mean comparisons per essay falls below a diagnostic floor
+    - `has_isolated_items`: True when any essays are isolated in the comparison graph
+- These diagnostics are intended for future EPIC-006 quality/health indicators and external
+  tooling; they do **not** alter:
+  - Completion denominator semantics
+  - Stability thresholds (`MIN_COMPARISONS_FOR_STABILITY_CHECK`, `SCORE_STABILITY_THRESHOLD`)
+  - Success-rate guard semantics or thresholds
 
 **Task**: `TASKS/assessment/cj-us-005-2-score-stability-and-early-stopping.md`
+
+---
+
+### PR-4: Scoring Core Refactor (BT Inference Robustness)
+
+**Purpose:** Make the Bradley–Terry scoring core easier to reason about and safer to extend
+for EPIC‑005/EPIC‑006, without changing PR‑2’s completion, stability, or success‑rate
+semantics.
+
+- Introduce a domain-level result object in `scoring_ranking.py`:
+  - `BTScoringResult` with:
+    - `scores: dict[str, float]` – BT scores (mean-centred) keyed by `els_essay_id`
+    - `ses: dict[str, float]` – per‑essay BT standard errors (capped at `BT_STANDARD_ERROR_MAX`)
+    - `per_essay_counts: dict[str, int]` – comparison coverage per essay
+    - `se_summary: dict[str, float | int]` – batch‑level SE diagnostics (same fields as PR‑3 logs)
+- Extract a pure helper:
+  - `compute_bt_scores_and_se(all_essays, comparisons) -> BTScoringResult`
+  - Responsibilities:
+    - Build the BT graph (`choix_comparison_data`, `per_essay_counts`)
+    - Call `choix.ilsr_pairwise` + `bt_inference.compute_bt_standard_errors`
+    - Mean‑centre scores and assemble `BTScoringResult`
+    - Raise the same `raise_cj_insufficient_comparisons` /
+      `raise_cj_score_convergence_failed` conditions as the current implementation
+  - No session management, no `CJBatchState` writes.
+- Refactor `record_comparisons_and_update_scores` so that it:
+  - Uses a single `SessionProviderProtocol` session to:
+    - Persist new `CJ_ComparisonPair` rows for the current wave
+    - Load all valid comparisons for the batch
+    - Update `CJ_ProcessedEssay` scores/SEs/counts via `_update_essay_scores_in_database`
+  - Delegates BT math to `compute_bt_scores_and_se` and logs `se_summary`
+  - Returns `scores` as today so existing callers (including PR‑2) remain unchanged.
+- Workflow integration (no behaviour change):
+  - `trigger_existing_workflow_continuation` continues to:
+    - Recompute scores via `record_comparisons_and_update_scores(...)`
+    - Compute `max_score_change` with `check_score_stability`
+    - Enforce `MIN_COMPARISONS_FOR_STABILITY_CHECK` and `SCORE_STABILITY_THRESHOLD`
+    - Apply the success‑rate guard (`MIN_SUCCESS_RATE_THRESHOLD`) for routing to
+      `finalize_scoring` vs `finalize_failure`
+    - Persist `bt_scores`, `last_scored_iteration`, and `last_score_change` into
+      `CJBatchState.processing_metadata` using its own session.
+  - `BatchFinalizer.finalize_scoring` continues to:
+    - Call `record_comparisons_and_update_scores(...)` once
+    - Build rankings via `get_essay_rankings`
+    - Invoke `GradeProjector.calculate_projections` and publish events as before.
+- Ownership of batch state:
+  - All writes to `CJBatchState` remain in workflow / finalizer / monitor code that already
+    owns the transaction; the scoring core no longer issues its own `CJBatchState` updates.
+- Forward-looking (EPIC‑006/PR‑7):
+  - Orchestrators may later use `BTScoringResult.se_summary` to:
+    - Persist SE/coverage metadata on `CJBatchState` in a controlled fashion, or
+    - Drive higher-level “batch quality” indicators,
+    without changing gating or stability semantics.
+
+**Tasks:**
+- `TASKS/assessment/us-0052-score-stability-semantics-and-early-stopping.md`
+- `TASKS/assessment/cj-assessment-code-hardening.md`
 
 ---
 

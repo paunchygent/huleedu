@@ -18,6 +18,8 @@ from services.cj_assessment_service.cj_core_logic.batch_submission import (
     merge_batch_processing_metadata,
 )
 from services.cj_assessment_service.cj_core_logic.grade_projector import GradeProjector
+from services.cj_assessment_service.cj_core_logic.scoring_ranking import BTScoringResult
+from services.cj_assessment_service.metrics import get_business_metrics
 from services.cj_assessment_service.models_api import EssayForComparison
 from services.cj_assessment_service.protocols import (
     AssessmentInstructionRepositoryProtocol,
@@ -38,6 +40,19 @@ if TYPE_CHECKING:
     from services.cj_assessment_service.config import Settings
 
 logger = create_service_logger("cj_assessment_service.workflow_continuation")
+
+
+def _get_numeric_setting(settings: "Settings", name: str, default: float) -> float:
+    """Safely extract a numeric settings value with a defensive fallback.
+
+    Tests often pass a Mock(spec=Settings); when the attribute is not explicitly
+    set it will be a non-numeric Mock object. This helper ensures we fall back
+    to a sensible default instead of propagating Mock instances into diagnostics.
+    """
+    raw_value = getattr(settings, name, default)
+    if isinstance(raw_value, (int, float)):
+        return float(raw_value)
+    return default
 
 
 async def check_workflow_continuation(
@@ -223,6 +238,7 @@ async def trigger_existing_workflow_continuation(
                 id=essay.els_essay_id,
                 text_content=essay.assessment_input_text,
                 current_bt_score=essay.current_bt_score,
+                is_anchor=essay.is_anchor,
             )
             for essay in essays
         ]
@@ -231,6 +247,11 @@ async def trigger_existing_workflow_continuation(
 
         max_score_change = None  # Use None instead of float("inf") for JSON compatibility
         stability_passed = False
+        bt_se_summary: dict[str, float | int] | None = None
+        bt_se_inflated = False
+        comparison_coverage_sparse = False
+        has_isolated_items = False
+        bt_scoring_results: list[BTScoringResult] = []
 
         try:
             current_scores = await scoring_ranking.record_comparisons_and_update_scores(
@@ -241,7 +262,10 @@ async def trigger_existing_workflow_continuation(
                 essay_repository=essay_repository,
                 cj_batch_id=batch_id,
                 correlation_id=correlation_id,
+                scoring_result_container=bt_scoring_results,
             )
+            if bt_scoring_results:
+                bt_se_summary = bt_scoring_results[0].se_summary
         except HuleEduError as exc:  # pragma: no cover - domain error, treat as unstable
             logger.warning(
                 "BT scoring failed while evaluating continuation; treating batch as unstable",
@@ -282,14 +306,51 @@ async def trigger_existing_workflow_continuation(
                 and success_rate_ok
             )
 
+        metadata_updates: dict[str, Any] = {
+            "bt_scores": current_scores,
+            "last_scored_iteration": batch_state.current_iteration,
+            "last_score_change": max_score_change,
+        }
+
+        if bt_se_summary is not None:
+            metadata_updates["bt_se_summary"] = bt_se_summary
+            mean_se = float(bt_se_summary.get("mean_se", 0.0))
+            max_se = float(bt_se_summary.get("max_se", 0.0))
+            mean_comparisons_per_item = float(bt_se_summary.get("mean_comparisons_per_item", 0.0))
+            isolated_items = int(bt_se_summary.get("isolated_items", 0))
+
+            mean_se_threshold = _get_numeric_setting(settings, "BT_MEAN_SE_WARN_THRESHOLD", 0.4)
+            max_se_threshold = _get_numeric_setting(settings, "BT_MAX_SE_WARN_THRESHOLD", 0.8)
+            min_mean_comparisons_threshold = _get_numeric_setting(
+                settings,
+                "BT_MIN_MEAN_COMPARISONS_PER_ITEM",
+                1.0,
+            )
+
+            bt_se_inflated = mean_se > mean_se_threshold or max_se > max_se_threshold
+            comparison_coverage_sparse = mean_comparisons_per_item < min_mean_comparisons_threshold
+            has_isolated_items = isolated_items > 0
+
+            metadata_updates["bt_quality_flags"] = {
+                "bt_se_inflated": bt_se_inflated,
+                "comparison_coverage_sparse": comparison_coverage_sparse,
+                "has_isolated_items": has_isolated_items,
+            }
+
+            # Record diagnostic-only Prometheus counters for batch quality indicators.
+            business_metrics = get_business_metrics()
+            se_inflated_counter = business_metrics.get("cj_bt_se_inflated_batches_total")
+            sparse_coverage_counter = business_metrics.get("cj_bt_sparse_coverage_batches_total")
+
+            if bt_se_inflated and se_inflated_counter is not None:
+                se_inflated_counter.inc()
+            if comparison_coverage_sparse and sparse_coverage_counter is not None:
+                sparse_coverage_counter.inc()
+
         await merge_batch_processing_metadata(
             session_provider=session_provider,
             cj_batch_id=batch_id,
-            metadata_updates={
-                "bt_scores": current_scores,
-                "last_scored_iteration": batch_state.current_iteration,
-                "last_score_change": max_score_change,
-            },
+            metadata_updates=metadata_updates,
             correlation_id=correlation_id,
         )
 
@@ -317,6 +378,9 @@ async def trigger_existing_workflow_continuation(
                 "budget_exhausted": budget_exhausted,
                 "should_finalize": should_finalize,
                 "success_rate": success_rate,
+                "bt_se_inflated": bt_se_inflated,
+                "comparison_coverage_sparse": comparison_coverage_sparse,
+                "has_isolated_items": has_isolated_items,
                 "success_rate_threshold": success_rate_threshold,
                 "zero_successes": zero_successes,
                 "should_fail_due_to_success_rate": should_fail_due_to_success_rate,

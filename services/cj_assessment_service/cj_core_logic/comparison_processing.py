@@ -160,6 +160,7 @@ async def _load_essays_for_batch(
                 id=processed.els_essay_id,
                 text_content=processed.assessment_input_text,
                 current_bt_score=processed.current_bt_score or 0.0,
+                is_anchor=processed.is_anchor,
             )
         )
 

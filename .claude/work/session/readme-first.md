@@ -49,154 +49,57 @@ pdm run pytest-root services/<service>/tests/
 pdm run pytest-root tests/integration/  # Cross-service tests
 ```
 
-## CJ Assessment POC Validation (Sprint Focus)
+## CJ Assessment – Sprint-Critical Validation & Patterns
 
-### Validation Objectives
-1. Anchor creation system (human-AI interface) using Bayesian model
-2. ENG5 Runner validation with full observability
-3. Serial bundle batching mode for cost efficiency
-4. Main pipeline compatibility (BOS → ELS → RAS) preserved
+### Current Sprint Focus
+1. Stable CJ completion semantics (PR‑2) under high callback failure rates.
+2. Robust BT scoring core (PR‑4) with clear transaction ownership and SE diagnostics.
+3. ENG5 validation runs that use RAS as the source of truth and respect assignment_id propagation.
 
-### Critical Fixes Applied (2025-11-19 to 2025-11-23)
-- ✅ **Batch state tracking**: `total_budget` field, cumulative counters across iterations
-- ✅ **Completion logic**: Stability-first, denominator capping (min(budget, nC2))
-- ✅ **Error exclusion**: Only valid comparisons count toward completion threshold
-- ✅ **Position randomization**: Eliminates 86% anchor bias → ~50% balanced distribution
-- ✅ **API failure diagnostics**: Prometheus metrics + detailed HTTP status/error classification
-- ✅ **2025-11-24**: Callback persistence and batch completion policies now call `CJRepositoryProtocol` (`get_comparison_pair_by_correlation_id`, `get_batch_state`) instead of raw `AsyncSession` selects; unit tests updated to AsyncMock sessions to drop casts/monkeypatching.
+### Critical Fixes & Patterns (carry forward)
+- **Batch state tracking** (2025‑11‑19): `total_budget` and cumulative comparison counters live on `CJBatchState`; always use `completion_denominator()` as the single source of truth for completion math.
+- **Completion logic** (PR‑2): stability‑first behaviour:
+  - Recompute BT scores only when a callback iteration is fully complete.
+  - Gate early stopping with `MIN_COMPARISONS_FOR_STABILITY_CHECK` and `SCORE_STABILITY_THRESHOLD`.
+  - Apply success‑rate guards (`MIN_SUCCESS_RATE_THRESHOLD`) when caps/budgets fire; low/zero‑success batches finalize via `finalize_failure`, not `finalize_scoring`.
+- **Error exclusion**: only successful comparisons (`winner in {"essay_a","essay_b"}`) contribute to completion and BT inference; error comparisons are stored but excluded from the BT graph.
+- **Batch state access**: callback persistence, completion checks, and monitor logic go through repository protocols with `for_update=True` where needed; no raw `AsyncSession` selects or cross‑service imports against `CJBatchState`.
+- **Position randomization**: per‑pair A/B randomization is required to avoid anchor bias; use the shared matching‑strategy helpers and respect `CJ_ASSESSMENT_SERVICE_PAIR_GENERATION_SEED` in tests.
 
-### Validation Status
-- **ENG5 Runner**: Execute mode operational, persistent logs at `.claude/research/data/eng5_np_2016/logs/eng5-{batch_id}-{timestamp}.log`
-- **Grade Projections**: 12/12 anchor grades resolved, BT-scores valid (no degenerate values)
-- **Serial Bundle**: Infrastructure complete (Phases 1-3), awaiting production rollout validation
-- **Main Pipeline**: BOS → ELS → RAS flow preserved, no breaking changes
-- **Completion Logic**: Stability-first mode active (callbacks trigger scoring immediately, BatchMonitor is recovery-only)
-- **Cost Safety**: Default `MAX_PAIRWISE_COMPARISONS` reduced to 150 (per-request overrides honored)
+### PR‑4: CJ Scoring Core Refactor (BT inference robustness)
+- Introduced `BTScoringResult` and `compute_bt_scores_and_se(...)` as pure BT domain logic:
+  - Builds the CJ graph from `EssayForComparison` + `CJ_ComparisonPair`.
+  - Delegates to `choix.ilsr_pairwise` + `bt_inference.compute_bt_standard_errors` using `BT_STANDARD_ERROR_MAX`.
+  - Returns scores, per‑essay SEs, comparison counts, and a batch‑level SE diagnostics summary.
+- `record_comparisons_and_update_scores(...)` is the single scoring entry point that:
+  - Uses one `SessionProviderProtocol` session to persist new `CJ_ComparisonPair` rows, reload valid comparisons, update `CJ_ProcessedEssay` scores/SEs/counts, and commit once.
+  - Delegates BT math to `compute_bt_scores_and_se` and emits structured SE diagnostics logs (`mean_se`, `max_se`, `min_se`, `item_count`, `comparison_count`, `items_at_cap`, `isolated_items`, comparison‑per‑item stats).
+  - Returns `dict[str, float]` BT scores so PR‑2 stability/success‑rate gating in `workflow_continuation` and `BatchFinalizer` remains unchanged.
+- `trigger_existing_workflow_continuation` now also persists `bt_se_summary` into `CJBatchState.processing_metadata` using its existing session, keeping BT SE diagnostics available for EPIC‑006 without introducing nested `CJBatchState` writes from scoring helpers.
 
-### Result Surface for ENG5 Validation (RAS as Source of Truth)
-- **Source of Truth**: Result Aggregator Service (RAS) is the authoritative surface for CJ assessment outputs (including ENG5 validation runs), not the CJ service database.
-- **Assignment Context**: `assignment_id` now propagates end-to-end from client → BOS → ELS → CJ → RAS; RAS persists it on `BatchResult.assignment_id` and exposes it via `BatchStatusResponse.assignment_id`.
-- **Filename + BT-score Mapping**: For GUEST flows where no student IDs are present, use RAS’ `/internal/v1/batches/{batch_id}/status` API (or the `batch_results`/`essay_results` tables) to join essay-level CJ results (`cj_rank`, `cj_score`) with `filename`. CJ’s internal tables (`cj_processed_essays`, `cj_comparison_pairs`) are implementation details and MUST NOT be used as reporting sources.
-- **Functional Guardrail**: `tests/functional/test_e2e_cj_assessment_workflows.py::TestE2ECJAssessmentWorkflows::test_complete_cj_assessment_processing_pipeline` asserts the full `assignment_id` round-trip via RAS to keep ENG5 validation aligned with the production result surface.
-
-### Next Steps
-- [ ] Complete serial bundle production validation
-- [ ] Finalize ENG5 JSON artefact schema (`Documentation/schemas/eng5_np/assessment_run.schema.json`)
-- [ ] Prepare reproducible research bundles for empirical validation
+### ENG5 & RAS Alignment (Sprint-Critical)
+- **Result surface**: Result Aggregator Service (RAS) is the authoritative surface for CJ/ENG5 outputs; use RAS APIs or tables for reporting, never CJ service tables directly.
+- **Assignment context**: `assignment_id` propagates end‑to‑end (client → BOS → ELS → CJ → RAS); RAS persists it on `BatchResult.assignment_id` and exposes it via `BatchStatusResponse.assignment_id`.
+- **Guest flows**: For runs without student IDs, join filenames to CJ metrics (`cj_rank`, `cj_score`) via RAS (`/internal/v1/batches/{batch_id}/status`), not by querying CJ’s internal tables.
 
 ## Critical Development Info
 
 ### CJ Assessment & LLM Provider Integration
 
-**Status (2025-11-17)**: Production-ready with serial bundle infrastructure
+- All CJ↔LLM interactions must use `common_core.api_models.llm_provider` contracts; cross‑service imports from `services.<name>.api_models` are forbidden.
+- Metadata contract between CJ and LLM Provider is documented and guarded by tests; see:
+  - `docs/operations/eng5-np-runbook.md` for ENG5 runner usage and metadata expectations.
+  - `tests/integration/test_cj_lps_metadata_roundtrip.py` for round‑trip coverage.
+- LLM batching behaviour (per‑request vs serial‑bundle vs future batch‑API modes) is controlled via settings and metadata hints; treat those as part of the stability/throughput tuning toolkit for EPIC‑005/EPIC‑006 rather than ad‑hoc decisions in code.
 
-#### HTTP API Contracts (common_core.api_models.llm_provider)
-- `LLMConfigOverridesHTTP` - Strict enum-based config for HTTP validation
-- `LLMComparisonRequest` - Comparison request with callback topic
-- `LLMComparisonResponse` - Comparison result with metrics
-- `LLMQueuedResponse` - Async queue acknowledgment
+### Grade Projection & Phase 3
 
-**Import Pattern**: Always use `from common_core import LLMConfigOverridesHTTP`
-
-#### Metadata Contract (CJ ↔ LPS)
-
-**Required Fields** (must be preserved through round-trip):
-- `essay_a_id`, `essay_b_id` - Essay identifiers
-- `bos_batch_id` - Batch tracking (optional but preserved if present)
-- `correlation_id` - Distributed tracing
-
-**Additive Fields** (LPS adds, CJ preserves):
-- `prompt_sha256` - Prompt hash for deduplication
-- `cj_llm_batching_mode` - Batching hint (when `CJ_ASSESSMENT_SERVICE_ENABLE_LLM_BATCHING_METADATA_HINTS=true`)
-- `comparison_iteration` - Stability loop iteration (when iterative batching enabled)
-- `cj_batch_id`, `cj_source`, `cj_request_type` - emitted by CJ for every request so retries and ENG5 tooling can correlate callbacks with CJ batches and upstream workflows without scraping logs.
-- Prompt cache usage (when available): `cache_read_input_tokens`, `cache_creation_input_tokens`, and raw `usage` dict are appended by LPS without overwriting caller metadata.
-
-**Validation**: See `tests/integration/test_cj_lps_metadata_roundtrip.py`
-
-#### LLM Batching Configuration
-
-**CJ Assessment Service**:
-```bash
-CJ_ASSESSMENT_SERVICE_LLM_BATCHING_MODE=per_request  # or serial_bundle
-CJ_ASSESSMENT_SERVICE_ENABLE_LLM_BATCHING_METADATA_HINTS=false  # emit cj_llm_batching_mode
-CJ_ASSESSMENT_SERVICE_ENABLE_ITERATIVE_BATCHING_LOOP=false  # emit comparison_iteration
-CJ_ASSESSMENT_SERVICE_LLM_BATCH_API_ALLOWED_PROVIDERS="openai,anthropic"  # guardrail provider_batch_api fallback
-```
-
-`batch_config_overrides` now accepts `llm_batching_mode_override`, enabling ENG5 runner and admin tooling to request `per_request`, `serial_bundle`, or `provider_batch_api` per batch. CJ enforces `LLM_BATCH_API_ALLOWED_PROVIDERS` when resolving the effective mode and downgrades automatically when the provider is not approved.
-
-**LLM Provider Service**:
-```bash
-LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE=per_request  # QueueProcessingMode: per_request|serial_bundle|batch_api
-LLM_PROVIDER_SERVICE_SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL=8  # clamp to 1-64
-LLM_PROVIDER_SERVICE_BATCH_API_MODE=disabled  # BatchApiMode: disabled|nightly|opportunistic
-```
-The new enums live inside LPS so CJ's `LLMBatchingMode` remains an external hint. Serial bundling is now active when non-`per_request` modes are enabled: the queue processor drains compatible requests (same provider/model + optional CJ hint) up to the configured per-call limit and processes them in a single queue-loop iteration.
-
-**Observability**: Queue metrics available via Prometheus:
-- `llm_provider_queue_depth` - Current queue size
-- `llm_provider_queue_wait_time_seconds` - Request wait time
-- `llm_provider_comparison_callbacks_total` - Callback success/failure
-
-### ENG5 Runner
-
-**Location**: `scripts/cj_experiments_runners/eng5_np/cli.py`
-
-**Modes**:
-- `plan` - Inspect dataset without processing
-- `dry-run` - Generate artefact stubs (no Kafka)
-- `execute` - Full pipeline with optional `--await-completion`
-
-**LLM Overrides**:
-```bash
-pdm run python -m scripts.cj_experiments_runners.eng5_np.cli \
-  --mode execute \
-  --assignment-id <uuid> \
-  --llm-provider anthropic \
-  --llm-model claude-sonnet-4-5-20250929 \
-  --llm-temperature 0.3
-```
-
-**Validation**: All artefacts are schema-compliant (see `Documentation/schemas/eng5_np/`)
-
-### Bayesian Consensus Model
-
-**Location**: `scripts/bayesian_consensus_model/`
-
-**Key Features**:
-- Ordinal kernel with feature flags (argmax, leave-one-out, precision-aware weighting)
-- D-optimal pair scheduling with Fisher information maximization
-- Rater bias estimation with empirical Bayes
-- Continuation-aware design (baseline comparisons locked across sessions)
-
-**CLI**: `python -m scripts.bayesian_consensus_model.redistribute_pairs optimize-pairs`
-**TUI**: `python -m scripts.bayesian_consensus_model.redistribute_tui`
-
-### Phase 3: Grade Projection Data Pipeline (Ongoing)
-
-**Purpose**: Generate high-quality CJ comparison data to train and validate the Bayesian grade projection model for accurate student essay grading.
-
-**Status** (2025-11-17):
-- ✅ Phase 3.1: Grade scale foundations (Swedish + ENG5 NP scales, anchor filtering)
-- ✅ Phase 3.2: Service integration (admin endpoints, JWT auth, CLI tooling)
-- 🔄 Phase 3.3: Batch tooling & data capture (ENG5 runner validation, artefact schema)
-
-**Workflow**: ENG5 Runner → CJ Comparisons → BT-Scores → Grade Projections → Validation
-
-#### Grade Projection Mechanism
-
-**4-Tier Anchor Grade Fallback** (`grade_projector.py`):
-1. Direct `anchor_grade` field in anchor dict or metadata
-2. `known_grade` in processing_metadata
-3. Lookup by `text_storage_id` in anchor references
-4. Lookup by `anchor_ref_id` in anchor references
-
-**Technical Stack**:
-- **BT-Score Calculation**: choix.ilsr_pairwise with alpha=0.01 regularization, mean-centered
-- **Standard Errors**: Fisher Information matrix via Moore-Penrose pseudoinverse
-- **Grade Projection**: Gaussian mixture calibration with resolved anchor grades
-- **Storage**: Anchors (known grades) and students (projected grades) separated by design
+- Grade projection quality and anchor calibration semantics are owned by EPIC‑006:
+  - `docs/product/epics/cj-grade-projection-quality.md`
+  - `TASKS/phase3_cj_confidence/PHASE3_CJ_CONFIDENCE_HUB.md`
+- The Phase 3 grade‑projection data pipeline (ENG5 runner → CJ comparisons → BT scores → projections) is tracked in:
+  - `TASKS/phase3_cj_confidence/TASK-CJ-CONFIDENCE-PHASE3-GRADE-SCALE-DATA-PIPELINE.md`
+- When touching grade projection or ENG5 flows, prefer updating those docs/tasks rather than expanding this README; keep this file focused on sprint‑critical patterns and lessons learned.
 
 #### Validation Results (Batch a93253f7)
 
@@ -280,56 +183,11 @@ For Docker/database troubleshooting, see `CLAUDE.md` sections on Docker Developm
 - **`docs/operations/`** - Operational runbooks and playbooks
 - **`TASKS/`** - Detailed task documentation with frontmatter tracking
 
-## Session Addendum (2025-11-24)
+## Recent Sprint Lessons (Cross-Service Patterns)
 
-- PostgresDataAccess now wraps `session_provider.session()` with `@asynccontextmanager` so the integration fixtures expose a proper async context manager and align with the new typing expectations.
-- BatchMonitor unit fixtures drop the obsolete `repository` argument and the multi-round batch state integration test now types `postgres_session_provider` as `CJSessionProviderImpl` per the updated API surface.
-- System prompt hierarchy, metadata persistence, pair generation, real database, and async workflow continuation integration suites now call the refactored APIs (no `database=` arguments) and the callback simulator/continuation helpers use the session_provider/repo contracts directly.
-- Callback simulator now builds comparison pairs and correlation mappings directly via the shared `SessionProviderProtocol`, fully dropping the legacy `CJRepositoryProtocol` dependency from that helper.
-- Additional unit/integration suites (`test_llm_callback_processing`, `test_event_processor_*`, `test_comparison_processing`, `test_workflow_continuation`, `test_cj_idempotency_failures`) have been updated to pass the new session_provider + repo keywords instead of the deprecated `database=` argument.
-- Fixed the remaining typecheck blockers for workflow_continuation/callback_state_manager tests, wired the identity-threading fixture and integration suites to the reshaped session_provider/repo APIs, and reran `pdm run typecheck-all` (now reports zero errors).
-
-## Session Addendum (2025-11-26)
-
-- CJ pipeline selection now relies solely on `ClientBatchPipelineRequestV1` resolution. BOS ignores the legacy registration flag (registration logs a deprecation warning and records registration-only metrics). Regression tests guard that requesting CJ after registering without the flag includes CJ, and requesting non-CJ pipelines while it was set does not add CJ.
-- Legacy flag removed from contracts (common_core), AGW/BOS code paths, and tests; pipeline selection is request-time only.
-- Doc cleanup: Removed lingering references to the deprecated flag from TASKS documentation; repository search currently returns zero matches.
-
-## Session Addendum (2025-11-27)
-
-### Filename Propagation Fix (CRITICAL)
-
-Added `original_file_name: str` field to `EssaySlotAssignedV1` event contract. Teachers can now identify students in CJ results via filename (critical for GUEST batches where filename is the ONLY identifier).
-
-**Files changed**: `essay_lifecycle_events.py`, `content_assignment_service.py`, RAS protocol/handler/repository/updater
-
-### JWT Auth Fix for Functional Tests
-
-`tests/utils/auth_manager.py` now loads JWT secret from `.env` via `dotenv_values()`. Previously fell back to hardcoded `"test-secret-key"` causing 401 errors when AGW container used real secret.
-
-**Pattern**: Always use `dotenv_values()` when test utilities need environment variables that aren't set via `os.environ` in subprocess contexts.
-
-### assignment_id Propagation Gap (Active Investigation)
-
-`assignment_id` from pipeline request never reaches CJ Assessment Service:
-- BOS receives in `prompt_payload.assignment_id` ✅
-- BOS → ELS command (`BatchServiceCJAssessmentInitiateCommandDataV1`) ❌ Missing field
-- ELS → CJ (`ELS_CJAssessmentRequestV1`) ⚠️ Field exists but never populated
-
-**Impact**: CJ cannot mix anchor essays for grade calibration. Fix in progress: `TASKS/assessment/propagate-assignment-id-from-bos-to-cj-request-phase-a.md`
-
-### Functional CJ Test Aligned with ENG5 Runner
-
-`test_e2e_cj_assessment_workflows.py` now uses `load_eng5_runner_student_files()` from `tests/utils/eng5_runner_samples.py` to load the same student essay files (docx) used by the ENG5 validation runner. This ensures functional tests exercise the same content pipeline as production validation.
-
-**Usage**: `essay_files = load_eng5_runner_student_files(max_files=4)`
-
-### LLM Provider Configuration Hierarchy
-
-Documented 3-tier override hierarchy. See `docs/operations/llm-provider-configuration-hierarchy.md`. Key insight: `USE_MOCK_LLM=true` is a DI boot-time decision that cannot be bypassed by request-level `provider_override`.
-
-## Session Addendum (2025-11-28)
-
-- CJ Assessment pair matching has been refactored to use a DI-swappable `PairMatchingStrategyProtocol` with `OptimalGraphMatchingStrategy` as the default implementation (NetworkX Blossom-based maximum weight matching).
-- Unit and integration tests for CJ now exercise the real matching strategy where appropriate (pair generation, prompt construction, real DB flows) and use focused protocol-based stubs only when isolating A/B position randomization.
-- The “full batch lifecycle with real database” test now reflects staged, wave-based submission semantics (each essay appears at most once per wave) instead of assuming nC2 comparisons per batch; callback simulation still validates that comparisons are persisted and that the LLM interaction layer is invoked.
+- **SessionProvider + repos as the default boundary**: All new data‑access code and tests should use `SessionProviderProtocol.session()` (async context manager) plus per‑aggregate repository protocols, not raw `AsyncSession` or `database=` parameters. Integration helpers (callback simulator, workflow continuation, etc.) have been updated to follow this pattern.
+- **CJ pipeline selection via request contracts only**: BOS now relies solely on `ClientBatchPipelineRequestV1` to decide whether CJ runs for a batch. The legacy “CJ registration flag” is removed from contracts and code paths; pipeline selection is a request‑time decision, not a registration‑time toggle.
+- **Filename propagation for guest flows**: `EssaySlotAssignedV1` includes `original_file_name`. Downstream services (especially RAS) must preserve this so teachers can interpret results for GUEST batches where filename is the only identifier.
+- **JWT secrets in tests**: Test utilities that need JWT secrets (e.g. `tests/utils/auth_manager.py`) must load them via `dotenv_values()` or the environment, never hard‑code fallback secrets. This keeps functional tests aligned with container configuration.
+- **LLM Provider configuration hierarchy**: `USE_MOCK_LLM=true` is a DI boot‑time decision; request‑level overrides cannot bypass it. See `docs/operations/llm-provider-configuration-hierarchy.md` when changing LLM provider behaviour.
+- **Pair matching strategy via DI**: CJ uses a DI‑swappable `PairMatchingStrategyProtocol` with `OptimalGraphMatchingStrategy` as the default implementation. Tests that care about comparison graph structure should use the real strategy via the shared helpers; only A/B position randomization tests should stub the strategy.

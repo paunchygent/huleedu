@@ -1,4 +1,9 @@
-"""Typer CLI entrypoint for the ENG5 NP batch runner."""
+"""Typer CLI entrypoint for the ENG5 NP batch runner.
+
+Implements a handler-based architecture where each runner mode (PLAN, DRY_RUN,
+ANCHOR_ALIGN_TEST, EXECUTE) has a dedicated handler class. This keeps the CLI
+thin (~350 lines) while mode-specific logic lives in handlers/ (~100-350 lines each).
+"""
 
 from __future__ import annotations
 
@@ -10,53 +15,45 @@ from pathlib import Path
 import typer
 from common_core import LLMProviderType
 from common_core.domain_enums import CourseCode, Language
-from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.cj_assessment_events import LLMConfigOverrides
 
 from scripts.cj_experiments_runners.eng5_np import __version__
-from scripts.cj_experiments_runners.eng5_np.artefact_io import write_stub_artefact
 from scripts.cj_experiments_runners.eng5_np.cj_client import (
     AnchorRegistrationError,
     register_anchor_essays,
 )
-from scripts.cj_experiments_runners.eng5_np.content_upload import upload_essays_parallel
 from scripts.cj_experiments_runners.eng5_np.environment import (
     gather_git_sha,
     repo_root_from_package,
 )
-from scripts.cj_experiments_runners.eng5_np.hydrator import AssessmentRunHydrator
+from scripts.cj_experiments_runners.eng5_np.handlers import (
+    AnchorAlignHandler,
+    DryRunHandler,
+    ExecuteHandler,
+    PlanHandler,
+)
 from scripts.cj_experiments_runners.eng5_np.inventory import (
     ComparisonValidationError,
-    FileRecord,
-    build_essay_refs,
     collect_inventory,
     ensure_comparison_capacity,
-    ensure_execute_requirements,
-    print_inventory,
     snapshot_directory,
-)
-from scripts.cj_experiments_runners.eng5_np.kafka_flow import (
-    publish_envelope_to_kafka,
-    run_publish_and_capture,
 )
 from scripts.cj_experiments_runners.eng5_np.logging_support import (
     configure_cli_logging,
     configure_execute_logging,
-    load_artefact_data,
-    log_validation_state,
-    print_batching_metrics_hints,
-    print_run_summary,
     setup_cli_logger,
 )
 from scripts.cj_experiments_runners.eng5_np.paths import RunnerPaths
-from scripts.cj_experiments_runners.eng5_np.requests import (
-    build_prompt_reference,
-    compose_cj_assessment_request,
-    write_cj_request_envelope,
-)
-from scripts.cj_experiments_runners.eng5_np.schema import ensure_schema_available
 from scripts.cj_experiments_runners.eng5_np.settings import RunnerMode, RunnerSettings
 from scripts.cj_experiments_runners.eng5_np.system_prompt import build_cj_system_prompt
+
+# Handler dispatch map - each mode has a dedicated handler class
+HANDLER_MAP: dict[RunnerMode, type] = {
+    RunnerMode.PLAN: PlanHandler,
+    RunnerMode.DRY_RUN: DryRunHandler,
+    RunnerMode.ANCHOR_ALIGN_TEST: AnchorAlignHandler,
+    RunnerMode.EXECUTE: ExecuteHandler,
+}
 
 app = typer.Typer(
     help="ENG5 NP batch runner tooling (plan, dry-run, execute)\n\n"
@@ -302,14 +299,14 @@ def main(
         help="Runner mode: plan (preview only), dry_run (stub creation), execute (full run with "
         "persistent file logging enabled at .claude/research/data/eng5_np_2016/logs/)",
     ),
-    assignment_id: uuid.UUID = typer.Option(
-        ...,
-        help="Assignment ID (REQUIRED). Must exist in CJ service assessment_instructions table. "
+    assignment_id: uuid.UUID | None = typer.Option(
+        None,
+        help="Assignment ID. Required for execute mode. "
         "Create via: POST /admin/v1/assessment-instructions",
     ),
-    course_id: uuid.UUID = typer.Option(
-        ...,
-        help="Course ID (REQUIRED). Used for metadata and scope context.",
+    course_id: uuid.UUID | None = typer.Option(
+        None,
+        help="Course ID. Required for execute mode. Used for metadata and scope context.",
     ),
     grade_scale: str = typer.Option(
         "eng5_np_legacy_9_step",
@@ -413,9 +410,34 @@ def main(
             "or changing this mode."
         ),
     ),
+    # Anchor alignment test mode options
+    system_prompt_file: Path | None = typer.Option(
+        None,
+        "--system-prompt",
+        help="Path to custom system prompt file (anchor-align-test mode)",
+    ),
+    rubric_file: Path | None = typer.Option(
+        None,
+        "--rubric",
+        help="Path to custom judge rubric file (anchor-align-test mode)",
+    ),
 ) -> None:
     if ctx.invoked_subcommand is not None:
         return
+
+    # Validate required options based on mode
+    if mode is RunnerMode.EXECUTE:
+        if assignment_id is None:
+            raise typer.BadParameter(
+                "--assignment-id is required for execute mode",
+                param_hint="'--assignment-id'",
+            )
+        if course_id is None:
+            raise typer.BadParameter(
+                "--course-id is required for execute mode",
+                param_hint="'--course-id'",
+            )
+
     repo_root = repo_root_from_package()
     paths = RunnerPaths.from_repo_root(repo_root)
 
@@ -470,6 +492,8 @@ def main(
         await_completion=await_completion,
         completion_timeout=completion_timeout,
         llm_batching_mode_hint=llm_batching_mode,
+        system_prompt_file=system_prompt_file,
+        rubric_file=rubric_file,
     )
 
     # Reconfigure logging for execute mode to enable file persistence
@@ -531,228 +555,14 @@ def main(
             max_comparisons=settings.max_comparisons,
         )
 
-    if mode is RunnerMode.PLAN:
-        logger.info(
-            "runner_plan_inventory",
-            anchor_count=inventory.anchor_docs.count,
-            student_count=inventory.student_docs.count,
-            prompt_path=str(inventory.prompt.path),
-        )
-        print_inventory(inventory)
-        plan_snapshot = {
-            "validation": {
-                "manifest": [],
-                "artefact_checksum": None,
-                "runner_status": {
-                    "mode": RunnerMode.PLAN.value,
-                    "partial_data": False,
-                    "timeout_seconds": 0.0,
-                    "observed_events": {
-                        "llm_comparisons": 0,
-                        "assessment_results": 0,
-                        "completions": 0,
-                    },
-                    "inventory": {
-                        "anchors": inventory.anchor_docs.count,
-                        "students": inventory.student_docs.count,
-                        "prompt_path": str(inventory.prompt.path),
-                    },
-                },
-            }
-        }
-        log_validation_state(
-            logger=logger,
-            artefact_path=settings.output_dir / f"assessment_run.{RunnerMode.PLAN.value}.json",
-            artefact_data=plan_snapshot,
-        )
-        return
+    # Dispatch to mode-specific handler
+    handler_class = HANDLER_MAP.get(mode)
+    if handler_class is None:
+        raise typer.BadParameter(f"Unknown mode: {mode}")
 
-    schema = ensure_schema_available(paths.schema_path)
-
-    artefact_path = write_stub_artefact(settings=settings, inventory=inventory, schema=schema)
-    hydrator: AssessmentRunHydrator | None = None
-    if settings.await_completion and settings.use_kafka:
-        hydrator = AssessmentRunHydrator(
-            artefact_path=artefact_path,
-            output_dir=settings.output_dir,
-            grade_scale=settings.grade_scale,
-            batch_id=settings.batch_id,
-            batch_uuid=settings.batch_uuid,
-        )
-
-    if mode is RunnerMode.DRY_RUN:
-        logger.info(
-            "runner_dry_run_stub_created",
-            artefact_path=str(artefact_path),
-        )
-        log_validation_state(
-            logger=logger,
-            artefact_path=artefact_path,
-            artefact_data=load_artefact_data(artefact_path),
-        )
-        return
-
-    if mode is RunnerMode.EXECUTE:
-        ensure_execute_requirements(inventory)
-        anchors_for_registration = list(inventory.anchor_docs.files)
-        students_for_upload = list(inventory.student_docs.files)
-        if not anchors_for_registration:
-            raise RuntimeError(
-                "Anchor essays are required for ENG5 execute runs; populate anchors directory."
-            )
-        if not settings.cj_service_url:
-            raise RuntimeError(
-                "CJ service URL is required to register anchors in EXECUTE mode. "
-                "Set --cj-service-url or CJ_SERVICE_URL env var."
-            )
-
-        try:
-            registration_results = asyncio.run(
-                register_anchor_essays(
-                    anchors=anchors_for_registration,
-                    assignment_id=settings.assignment_id,
-                    cj_service_url=settings.cj_service_url,
-                )
-            )
-        except AnchorRegistrationError as exc:
-            logger.error("anchor_registration_failed", error=str(exc))
-            raise RuntimeError(
-                "Anchor registration failed; aborting EXECUTE run so CJ only uses DB-owned anchors."
-            ) from exc
-
-        if not registration_results:
-            raise RuntimeError("Anchor registration returned no results; aborting EXECUTE run.")
-
-        typer.echo(
-            f"Registered {len(registration_results)} anchors via CJ service",
-            err=True,
-        )
-        logger.info(
-            "anchor_registration_succeeded",
-            registered=len(registration_results),
-        )
-
-        upload_targets = students_for_upload
-        if not upload_targets:
-            raise RuntimeError("No essays available for upload; ensure dataset is populated")
-        typer.echo(
-            (
-                f"Uploading {len(upload_targets)} essays to Content Service at "
-                f"{settings.content_service_url}"
-            ),
-            err=True,
-        )
-        storage_id_map = asyncio.run(
-            upload_essays_parallel(
-                records=upload_targets,
-                content_service_url=settings.content_service_url,
-            )
-        )
-        essay_ref_anchors: list[FileRecord] = []
-        essay_ref_students = students_for_upload
-
-        essay_refs = build_essay_refs(
-            anchors=essay_ref_anchors,
-            students=essay_ref_students,
-            max_comparisons=None,
-            storage_id_map=storage_id_map,
-        )
-
-        # Upload prompt file if it exists
-        prompt_storage_id: str | None = None
-        if inventory.prompt.exists:
-            import aiohttp
-
-            from scripts.cj_experiments_runners.eng5_np.content_upload import (
-                upload_essay_content,
-            )
-
-            async def _upload_prompt() -> str:
-                timeout = aiohttp.ClientTimeout(total=300)
-                async with aiohttp.ClientSession(timeout=timeout) as session:
-                    return await upload_essay_content(
-                        inventory.prompt.path,
-                        content_service_url=settings.content_service_url,
-                        session=session,
-                    )
-
-            prompt_storage_id = asyncio.run(_upload_prompt())
-            logger.info(
-                "prompt_uploaded",
-                storage_id=prompt_storage_id,
-                path=str(inventory.prompt.path),
-            )
-
-        prompt_ref = build_prompt_reference(inventory.prompt, storage_id=prompt_storage_id)
-        envelope = compose_cj_assessment_request(
-            settings=settings,
-            essay_refs=essay_refs,
-            prompt_reference=prompt_ref,
-        )
-        request_path = write_cj_request_envelope(
-            envelope=envelope,
-            output_dir=settings.output_dir,
-        )
-        typer.echo(f"CJ request envelope written to {request_path}")
-        if settings.await_completion and not settings.use_kafka:
-            typer.echo("--await-completion ignored because Kafka publishing is disabled.", err=True)
-            logger.warning("await_completion_ignored", reason="no_kafka")
-
-        if settings.use_kafka:
-            try:
-                if settings.await_completion:
-                    asyncio.run(
-                        run_publish_and_capture(
-                            envelope=envelope,
-                            settings=settings,
-                            hydrator=hydrator,
-                        )
-                    )
-                    summary = print_run_summary(artefact_path)
-                    print_batching_metrics_hints(
-                        llm_batching_mode_hint=settings.llm_batching_mode_hint,
-                    )
-                    logger.info(
-                        "runner_execution_complete",
-                        artefact_path=str(artefact_path),
-                        runner_status=hydrator.runner_status() if hydrator else None,
-                    )
-                    log_validation_state(
-                        logger=logger,
-                        artefact_path=artefact_path,
-                        artefact_data=summary,
-                    )
-                else:
-                    asyncio.run(publish_envelope_to_kafka(envelope=envelope, settings=settings))
-                    typer.echo(
-                        "Kafka publish succeeded -> topic "
-                        f"{topic_name(ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED)}"
-                    )
-                    logger.info(
-                        "runner_request_published",
-                        topic=topic_name(ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED),
-                        await_completion=settings.await_completion,
-                    )
-            except Exception as exc:  # pragma: no cover - side effect only
-                typer.echo(
-                    f"Kafka publish failed ({exc.__class__.__name__}: {exc}). "
-                    "Use --no-kafka to skip publishing.",
-                    err=True,
-                )
-                logger.exception(
-                    "runner_publish_failed",
-                    error_type=exc.__class__.__name__,
-                )
-                raise
-        else:
-            typer.echo("Kafka disabled; request not published.")
-            logger.info("runner_request_skipped", reason="no_kafka")
-
-    log_validation_state(
-        logger=logger,
-        artefact_path=artefact_path,
-        artefact_data=load_artefact_data(artefact_path),
-    )
+    handler = handler_class()
+    exit_code = handler.execute(settings=settings, inventory=inventory, paths=paths)
+    raise typer.Exit(code=exit_code)
 
 
 if __name__ == "__main__":

@@ -31,6 +31,7 @@ class EssayForComparison(BaseModel):
     id: str  # Changed from int to str for ELS integration
     text_content: str
     current_bt_score: float | None = None
+    is_anchor: bool = False  # For BT reference selection
 
 
 class LLMAssessmentResponseSchema(BaseModel):

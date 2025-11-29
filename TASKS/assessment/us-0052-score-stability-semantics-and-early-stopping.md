@@ -65,3 +65,55 @@ Key files to modify:
 - Guardrail tests for zero-success and low-success-rate batches now assert failure finalization (`finalize_failure`) and are passing.
 - Integration coverage has been added for small (2-essay) and larger batches to ensure `completion_denominator()` and pending callback logic behave correctly.
 - Phase-2 resampling and small-net caps remain out of scope for PR-2 and will be delivered in PR-7.
+
+## PR-4 Plan: Scoring Core Refactor (BT Inference)
+
+To support EPIC-005 and EPIC-006 without altering PR-2 semantics, PR-4 will:
+
+- Introduce a `BTScoringResult` domain object in `scoring_ranking.py` capturing:
+  - Per-essay BT scores (mean-centred)
+  - Per-essay BT standard errors (respecting `BT_STANDARD_ERROR_MAX`)
+  - Per-essay comparison counts
+  - A batch-level SE summary for observability
+- Extract a pure helper `compute_bt_scores_and_se(...) -> BTScoringResult` that:
+  - Builds the BT graph from `EssayForComparison` + `CJ_ComparisonPair` rows
+  - Delegates to `choix.ilsr_pairwise` and `bt_inference.compute_bt_standard_errors`
+  - Raises the same HuleEdu errors (`raise_cj_insufficient_comparisons`, `raise_cj_score_convergence_failed`) as the current implementation.
+- Refactor `record_comparisons_and_update_scores(...)` so that it:
+  - Owns a single `SessionProviderProtocol` session per call
+  - Persists new `CJ_ComparisonPair` rows, loads all valid comparisons, and updates
+    `CJ_ProcessedEssay` scores/SEs/counts in one transaction
+  - Logs SE diagnostics from `BTScoringResult.se_summary`
+  - Returns scores with the same signature used by PR-2.
+- Keep all PR-2 stability and completion semantics intact:
+  - `trigger_existing_workflow_continuation` remains the only place that:
+    - Computes `max_score_change` with `check_score_stability`
+    - Applies `MIN_COMPARISONS_FOR_STABILITY_CHECK` and `SCORE_STABILITY_THRESHOLD`
+    - Applies the success-rate guard and routes to `finalize_scoring` vs `finalize_failure`
+    - Persists `bt_scores`, `last_scored_iteration`, and `last_score_change` into
+      `CJBatchState.processing_metadata` via its own session.
+
+This refactor is a precondition for later Phase-2 resampling work (PR-7) and confidence
+semantics (EPIC-006), ensuring the scoring core has clear layering and no hidden cross-session
+side effects.
+
+## PR-4 Implementation Status (2025-11-29)
+
+- ✅ `BTScoringResult` dataclass added to `scoring_ranking.py` capturing scores, SEs, per-essay counts, and `se_summary`.
+- ✅ Pure helper `compute_bt_scores_and_se(all_essays, comparisons) -> BTScoringResult` implemented, delegating to `choix.ilsr_pairwise` and `bt_inference.compute_bt_standard_errors` and raising the existing CJ domain errors on insufficient data or BT convergence failures.
+- ✅ `record_comparisons_and_update_scores(...)` now:
+  - Uses a single `SessionProviderProtocol` session per call.
+  - Persists new `CJ_ComparisonPair` rows, reloads all valid comparisons, and updates `CJ_ProcessedEssay` scores/SEs/counts in one transaction.
+  - Delegates all BT math to `compute_bt_scores_and_se` and logs the batch-level SE diagnostics from `BTScoringResult.se_summary`.
+  - Returns `dict[str, float]` BT scores with unchanged PR-2 semantics.
+- ✅ Workflow and finalizer callers (`trigger_existing_workflow_continuation`, `BatchFinalizer.finalize_scoring`, `batch_monitor`) continue to use `record_comparisons_and_update_scores` as the sole scoring entry point; PR-2 stability and success-rate gating behaviour is unchanged and guarded by existing tests.
+- ✅ Tests and quality gates run from repo root:
+  - `pdm run pytest-root services/cj_assessment_service/tests/unit/test_bt_inference.py`
+  - `pdm run pytest-root services/cj_assessment_service/tests/unit/test_scoring_ranking_bt_helper.py`
+  - `pdm run pytest-root services/cj_assessment_service/tests/integration/test_bt_scoring_integration.py`
+  - `pdm run pytest-root 'services/cj_assessment_service/tests/integration/test_incremental_scoring_integration.py' -k 'progressive_score_refinement or stability_detection_mechanism or callback_processing_mechanism or batch_completion_at_threshold'`
+  - `pdm run pytest-root services/cj_assessment_service/tests`
+  - `pdm run format-all`, `pdm run lint-fix --unsafe-fixes`, `pdm run typecheck-all`
+- 🔄 Remaining (tracked for PR-7 / EPIC-006, not implemented in PR-4):
+  - Persisting SE coverage metadata (`se_summary`) onto `CJBatchState.processing_metadata` from the workflow layer using its existing session.
+  - Phase-2 resampling and small-net semantics, convergence harness wiring, and any batch-quality indicators derived from SE diagnostics.

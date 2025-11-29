@@ -12,29 +12,41 @@ from numpy.linalg import pinv
 
 logger = create_service_logger("cj_assessment.bt_inference")
 
+# Standard error values can become numerically unstable in degenerate graphs
+# (for example, sparse or nearly disconnected comparison networks). To keep
+# downstream diagnostics interpretable without affecting decision logic, we
+# cap reported SEs at a conservative upper bound.
+BT_STANDARD_ERROR_MAX: float = 2.0
+
 
 def compute_bt_standard_errors(
     n_items: int,
     pairs: list[tuple[int, int]],  # (winner_idx, loser_idx)
     theta: np.ndarray,
+    anchor_indices: list[int] | None = None,
 ) -> np.ndarray:
     """Compute analytical standard errors for Bradley-Terry abilities.
 
-    Uses Fisher Information matrix (negative Hessian of log-likelihood).
-    Employs a reference parameter for identifiability and Moore-Penrose
+    Uses the Fisher Information matrix (negative Hessian of the log-likelihood)
+    with a reference parameter for identifiability and Moore-Penrose
     pseudoinverse for numerical stability.
 
     Args:
-        n_items: Number of items (essays) being compared
-        pairs: List of comparison outcomes as (winner_idx, loser_idx) tuples
-        theta: Bradley-Terry ability parameters from choix
+        n_items: Number of items (essays) being compared.
+        pairs: List of comparison outcomes as (winner_idx, loser_idx) tuples.
+        theta: Bradley-Terry ability parameters from ``choix`` (shape: (n_items,)).
+        anchor_indices: Optional list of indices that are anchor essays. If provided,
+            the last anchor will be used as reference instead of the last item.
 
     Returns:
-        Array of standard errors for each item
+        Array of standard errors for each item (length ``n_items``).
 
-    Note:
-        The last item is used as reference (SE = 0) for identifiability.
-        This matches choix's parameterization approach.
+    Notes:
+        * An anchor item is preferred as reference (SE = 0) for identifiability.
+        * Falls back to last item if no anchors provided.
+        * Reported SE values are capped at ``BT_STANDARD_ERROR_MAX`` purely for
+          numerical safety and observability. This cap does **not** feed into
+          any completion, stability, or success-rate gating logic.
     """
     assert theta.shape == (n_items,), f"Theta shape {theta.shape} doesn't match n_items {n_items}"
 
@@ -45,8 +57,14 @@ def compute_bt_standard_errors(
         logger.warning("No comparison pairs provided, returning default SEs")
         return np.ones(n_items) * 0.5  # Default uncertainty when no comparisons
 
-    # Use last item as reference for identifiability
-    ref = n_items - 1
+    # Select reference: prefer anchors over student essays
+    if anchor_indices:
+        ref = anchor_indices[-1]  # Use last anchor as reference
+    else:
+        ref = n_items - 1
+        logger.warning(
+            "No anchor indices provided for BT SE computation, using last item as reference"
+        )
     active = [i for i in range(n_items) if i != ref]
 
     # Initialize Fisher Information matrix (Hessian)
@@ -61,7 +79,7 @@ def compute_bt_standard_errors(
         tw, tl = theta[winner], theta[loser]
 
         # Bradley-Terry probability: P(w > l) = exp(tw) / (exp(tw) + exp(tl))
-        # For numerical stability, use log-space computation
+        # For numerical stability, use log-space computation.
         diff = tw - tl
         if abs(diff) > 10:  # Prevent overflow
             p = 1.0 if diff > 0 else 0.0
@@ -97,7 +115,7 @@ def compute_bt_standard_errors(
     # Compute covariance matrix using pseudoinverse (robust to near-singular matrices)
     try:
         cov_active = pinv(H, rcond=1e-10)
-    except Exception as e:
+    except Exception as e:  # pragma: no cover - defensive fallback
         logger.error(f"Failed to compute pseudoinverse: {e}")
         # Fallback to identity-like covariance
         cov_active = np.eye(len(active)) * 0.25
@@ -113,11 +131,12 @@ def compute_bt_standard_errors(
     se[ref] = 0.0
 
     # Validate and cap extreme values
-    max_reasonable_se = 2.0  # Cap at 2.0 for stability
     for i in range(n_items):
-        if se[i] > max_reasonable_se:
-            logger.warning(f"Capping extreme SE for item {i}: {se[i]:.3f} -> {max_reasonable_se}")
-            se[i] = max_reasonable_se
+        if se[i] > BT_STANDARD_ERROR_MAX:
+            logger.warning(
+                f"Capping extreme SE for item {i}: {se[i]:.3f} -> {BT_STANDARD_ERROR_MAX}",
+            )
+            se[i] = BT_STANDARD_ERROR_MAX
 
     return se
 

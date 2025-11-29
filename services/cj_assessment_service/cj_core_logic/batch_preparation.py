@@ -195,6 +195,20 @@ async def create_cj_batch(
                             exc_info=True,
                         )
 
+        # Apply judge_rubric_override from llm_config_overrides if present
+        if (
+            request_data.llm_config_overrides
+            and request_data.llm_config_overrides.judge_rubric_override
+        ):
+            judge_rubric_text = request_data.llm_config_overrides.judge_rubric_override
+            logger.info(
+                "Applied judge_rubric_override from llm_config_overrides",
+                extra={
+                    **log_extra,
+                    "override_length": len(judge_rubric_text),
+                },
+            )
+
         # Use typed metadata with merge helpers
         typed_metadata = CJProcessingMetadata(
             student_prompt_storage_id=prompt_storage_id,
@@ -499,6 +513,7 @@ async def _fetch_and_add_anchors(
                 id=synthetic_id,
                 text_content=content,
                 current_bt_score=0.0,
+                is_anchor=True,
             )
             anchors.append(anchor_for_api)
 

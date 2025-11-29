@@ -19,7 +19,7 @@
 2. **Select Mode**: Use `.claude/rules/110-ai-agent-interaction-modes.md` to choose mode (Planning, Coding, Debugging)
 3. **Rule Reference**: Consult `.claude/rules/000-rule-index.md` for relevant rules
 cross-service task context.
-4. **Update**: After each task phase, Always stop to update 1. **active task documents** 2.`.claude/work/session/handoff.md` and `.claude/work/session/readme-first.md` with any new information + ask user any clarifying questions to retain alignment with user's intent.
+4. **Update**: After each task phase, Always stop to update 1. **active task documents** 2. short-term critical updates live in `.claude/work/session/handoff.md`. 3. compact and move to sprint-critical updates in `.claude/work/session/readme-first.md` as soon as PR or Task is completed. Always ask user any clarifying questions to retain alignment with user's intent.
 ```
 
 ### 3. Error Resolution Protocol

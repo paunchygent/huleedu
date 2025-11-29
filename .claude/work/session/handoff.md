@@ -12,9 +12,165 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 
 ---
 
-## 🎯 ACTIVE WORK (2025-11-28)
+## 🎯 ACTIVE WORK (2025-11-29)
 
-### CJ Matching Strategy & Test Alignment (feature/cj-di-swappable-matching-strategy)
+### PR-3: BT Standard Error Diagnostics & Observability (IN PROGRESS)
+
+- Implemented a named constant `BT_STANDARD_ERROR_MAX = 2.0` in
+  `services/cj_assessment_service/cj_core_logic/bt_inference.py` and updated
+  `compute_bt_standard_errors` to:
+  - Keep existing Fisher Information / pseudoinverse behaviour intact.
+  - Cap reported SE values at the constant purely for numerical safety and
+    observability (no change to completion, stability, or success-rate guards).
+- Extended `record_comparisons_and_update_scores` in
+  `services/cj_assessment_service/cj_core_logic/scoring_ranking.py` to compute
+  a batch-level SE diagnostics summary after BT scores/SEs are computed:
+  - `mean_se`, `max_se`, `min_se`
+  - `item_count`, `comparison_count`
+  - `items_at_cap`, `isolated_items`
+  - `mean_comparisons_per_item`, `min_comparisons_per_item`,
+    `max_comparisons_per_item`
+  - Logs these fields alongside `cj_batch_id` and `correlation_id` for
+    observability, without introducing additional writes or locks on
+    `CJBatchState` (to avoid interfering with existing transaction patterns in
+    callback/incremental-scoring flows).
+- Updated `GradeProjector` in
+  `services/cj_assessment_service/cj_core_logic/grade_projector.py` to compute
+  a rankings-based SE summary split by cohort:
+  - `"all"`, `"anchors"`, `"students"` each expose `mean_se`, `max_se`,
+    `min_se`, `item_count`.
+  - Threaded this summary into `GradeProjectionSummary.calibration_info` under
+    `bt_se_summary` for downstream diagnostics (RAS/EPIC‑006) without changing
+    grade assignment or completion behaviour.
+- Added tests:
+  - `services/cj_assessment_service/tests/unit/test_bt_inference.py` to assert
+    that `compute_bt_standard_errors` respects `BT_STANDARD_ERROR_MAX`.
+  - Extended `test_bt_standard_errors` in
+    `services/cj_assessment_service/tests/integration/test_bt_scoring_integration.py`
+    to verify `CJBatchState.processing_metadata["bt_se_summary"]` is present
+    with the expected keys.
+  - Extended `services/cj_assessment_service/tests/unit/test_grade_projector_system.py`
+    to assert that `GradeProjectionSummary.calibration_info["bt_se_summary"]`
+    exposes `all/anchors/students` aggregates.
+- Documentation:
+  - `docs/product/epics/cj-stability-and-reliability.md` updated with a PR‑3
+    notes section describing:
+    - Where BT SE caps are defined (`BT_STANDARD_ERROR_MAX`).
+    - What SE metadata is now logged and persisted at batch level and in grade
+      projection summaries.
+    - Explicit statement that PR‑3 is observability-only (no change to PR‑2
+      gating semantics or planned PR‑7 resampling behaviour).
+
+Follow-ups for EPIC‑006 / future PRs (not implemented in PR‑3):
+- Introduce health/quality indicators that consume `bt_se_summary` (e.g.,
+  surface “low coverage / high SE” warnings in CJ/RAS surfaces).
+- Consider exposing a lightweight batch-quality metric to ENG5 runners based
+  on `items_at_cap`, `isolated_items`, and per-item comparison counts.
+
+### PR-4: CJ Scoring Core Refactor (BT inference robustness) (IMPLEMENTATION COMPLETE, AWAITING REVIEW)
+
+- Added `BTScoringResult` domain dataclass in `scoring_ranking.py` to capture BT scores, per‑essay SEs (capped at `BT_STANDARD_ERROR_MAX`), per‑essay comparison counts, and a batch‑level SE diagnostics summary.
+- Introduced pure helper `compute_bt_scores_and_se(all_essays, comparisons) -> BTScoringResult` that:
+  - Builds the BT graph from `EssayForComparison` + `CJ_ComparisonPair` rows.
+  - Delegates to `choix.ilsr_pairwise` + `bt_inference.compute_bt_standard_errors`.
+  - Mean‑centres scores and raises the existing CJ domain errors (`raise_cj_insufficient_comparisons`, `raise_cj_score_convergence_failed`) on insufficient data or numerical BT failures.
+- Refactored `record_comparisons_and_update_scores(...)` to:
+  - Use a single `SessionProviderProtocol` session to persist new `CJ_ComparisonPair` rows, reload all valid comparisons, update `CJ_ProcessedEssay` scores/SEs/counts via `_update_essay_scores_in_database(...)`, and commit once.
+  - Delegate BT math to `compute_bt_scores_and_se` and emit PR‑3 style SE diagnostics logs (`mean_se`, `max_se`, `min_se`, `item_count`, `comparison_count`, `items_at_cap`, `isolated_items`, comparison‑per‑item stats) with `cj_batch_id` and `correlation_id`.
+  - Return `dict[str, float]` BT scores so PR‑2 stability/success‑rate gating in `workflow_continuation` and `BatchFinalizer` remains unchanged.
+- Confirmed no `CJBatchState` writes or nested sessions occur inside `scoring_ranking` (all state writes remain owned by workflow/finalizer/monitor code), eliminating the PR‑3 deadlock pattern from nested `merge_batch_processing_metadata` calls.
+- Threaded `BTScoringResult.se_summary` into `CJBatchState.processing_metadata["bt_se_summary"]` from `trigger_existing_workflow_continuation` (same session owner), keeping BT SE diagnostics available for EPIC‑006 without changing completion/stability semantics.
+- Added focused unit coverage for the helper and workflow metadata wiring:
+  - `services/cj_assessment_service/tests/unit/test_scoring_ranking_bt_helper.py`
+  - `services/cj_assessment_service/tests/unit/test_workflow_continuation.py::test_trigger_continuation_metadata_serializable_without_previous_scores`
+- Re‑ran full CJ service tests plus repo‑wide quality gates:
+  - `pdm run pytest-root services/cj_assessment_service/tests`
+  - `pdm run format-all`, `pdm run lint-fix --unsafe-fixes`, `pdm run typecheck-all` (all green).
+
+### BT SE Batch Quality Indicators (EPIC‑005/EPIC‑006 bridge) (IN PROGRESS)
+
+- Added CJ service settings for **diagnostic-only** BT SE and coverage thresholds in
+  `services/cj_assessment_service/config.py`:
+  - `BT_MEAN_SE_WARN_THRESHOLD`, `BT_MAX_SE_WARN_THRESHOLD`
+  - `BT_MIN_MEAN_COMPARISONS_PER_ITEM`
+- Extended `trigger_existing_workflow_continuation` to derive batch-level **BT SE diagnostics**
+  from `BTScoringResult.se_summary` without changing PR‑2 gating semantics:
+  - `bt_se_inflated` – mean or max BT SE above diagnostic thresholds
+  - `comparison_coverage_sparse` – mean comparisons per essay below a diagnostic floor
+  - `has_isolated_items` – one or more isolated essays in the comparison graph
+- Persist these as `bt_quality_flags` alongside `bt_se_summary` on
+  `CJBatchState.processing_metadata` via `merge_batch_processing_metadata`, keeping ownership
+  of `CJBatchState` writes in the workflow layer (scoring core remains pure/DB‑free).
+- Updated the “Callback iteration complete; evaluated stability” log in
+  `workflow_continuation.py` to include the three batch quality flags for observability:
+  `bt_se_inflated`, `comparison_coverage_sparse`, `has_isolated_items`.
+- Added focused unit coverage in
+  `services/cj_assessment_service/tests/unit/test_workflow_continuation.py::test_bt_quality_flags_derived_from_bt_se_summary`
+  to assert:
+  - Flags are derived correctly for normal vs inflated SE, sparse coverage, and isolated items.
+  - `metadata_updates` (including `bt_se_summary` and `bt_quality_flags`) is JSON-serializable
+    (no NaN/Inf) using `json.dumps`.
+- Documentation updates:
+  - `docs/product/epics/cj-stability-and-reliability.md` now documents `bt_quality_flags` as
+    observability-only BT SE diagnostics.
+  - `docs/product/epics/cj-grade-projection-quality.md` references `bt_se_summary` and
+    `bt_quality_flags` as the canonical batch-level SE/coverage indicators for grade
+    projection quality analysis, without changing finalization or grade assignment rules.
+  - `docs/operations/cj-assessment-runbook.md` now includes an ops-facing section on interpreting
+    `bt_se_summary` / `bt_quality_flags` and the new Prometheus counters
+    (`cj_bt_se_inflated_batches_total`, `cj_bt_sparse_coverage_batches_total`) as diagnostics
+    only (no new gating).
+
+### ENG5 Runner Refactoring (Anchor Alignment Experiment) (2025-11-29, COMPLETE)
+
+**Context:** `cli.py` grew to 926 lines, violating 400-500 LoC limit. Refactored to handler-based architecture.
+
+**Completed:**
+- cli.py reduced from 926 → 569 lines (handler dispatch pattern)
+- `--assignment-id` now optional (required only for EXECUTE mode)
+- Test infrastructure: `tests/test_helpers/` with fixtures.py, builders.py
+- 51 unit tests for `alignment_report.py` (all passing)
+- Protocol definitions: `protocols.py` with `ModeHandlerProtocol`
+- Handler dispatch via `HANDLER_MAP` constant
+- Handler implementations:
+  - `plan_handler.py` (103 lines) ✓
+  - `dry_run_handler.py` (73 lines) ✓
+  - `anchor_align_handler.py` (251 lines) - Over 200 limit (future improvement)
+  - `execute_handler.py` (342 lines) - Over 200 limit (future improvement)
+- typecheck-all passes ✓
+- lint passes ✓
+
+**Outstanding (lower priority):**
+- Handler unit tests
+- CLI integration tests with Typer CliRunner
+- Split large handlers to meet 200-line target
+
+**READY FOR BASELINE EXPERIMENT**
+
+**Task Document:** `TASKS/assessment/anchor-alignment-prompt-tuning-experiment.md`
+
+### ENG5-NP Runner Debug Complete (2025-11-29)
+
+**Issue:** `ValueError: Comparison callback missing essay identifiers; correlation=7fd9e895-94e3-480b-b06d-906f6167c2fb`
+
+**Root Cause:** Stale orphaned Kafka callbacks from prior test runs (Nov 28) contained incomplete metadata—only `resolved_provider`, `queue_processing_mode`, `prompt_sha256` but no `essay_a_id`/`essay_b_id`.
+
+**Fix Applied:**
+1. Deleted and recreated Kafka topics to clear stale events
+2. Restarted all services to reset consumer group offsets (consumer groups pointed to invalid offsets after topic recreation)
+
+**Verification:** Fresh test with `--max-comparisons 2` completed successfully:
+- 2 LLM comparisons received and hydrated
+- 1 `CJAssessmentCompletedV1` event received
+- 1 `AssessmentResultV1` event received
+- Runner completed in ~16 seconds (no timeout)
+- Old batch events correctly filtered via `bos_batch_id` metadata
+
+**Lesson Learned:** When Kafka topics are deleted/recreated, service consumer groups must be restarted to re-establish valid offsets—otherwise consumers silently fail to receive new messages.
+
+---
+
+### CJ Matching Strategy & Test Alignment (feature/cj-di-swappable-matching-strategy, PR-1 COMPLETE)
 
 **Summary:** Reviewed the new DI-swappable PairMatchingStrategyProtocol wiring for the CJ
 Assessment Service and aligned unit/integration tests with the OptimalGraphMatchingStrategy
@@ -48,7 +204,7 @@ comparison budgets, and metadata propagation).
     simulation; instead they validate essay persistence, batch state presence, and that
     the LLM interaction layer was exercised at least once.
 
-**Validation:**
+**Validation (PR‑1 COMPLETE):**
 - `pdm run format-all`
 - `pdm run lint-fix --unsafe-fixes`
 - `pdm run pytest-root services/cj_assessment_service/tests/unit`
@@ -152,6 +308,30 @@ STATUS: COMPLETED (Phase B implemented on 2025-11-27)
   - `services/cj_assessment_service/tests/integration/test_real_database_integration.py::TestRealDatabaseIntegration::test_all_failed_comparisons_move_batch_to_error_state`
   - Both remain `xfail` and run cleanly against the new semantics, confirming
     they are ahead of current behavior without destabilizing CI.
+
+## Session Addendum (2025-11-29, PR-2 Implementation COMPLETE)
+
+- Finalized and validated PR‑2 semantics for zero-success / low-success-rate batches:
+  - `workflow_continuation.trigger_existing_workflow_continuation` now routes capped,
+    low-success batches through `BatchFinalizer.finalize_failure` with a thin
+    `CJAssessmentFailedV1` event instead of `finalize_scoring`.
+  - `CJBatchUpload.expected_essay_count` is updated after anchors are hydrated so
+    completion gating (n‑choose‑2 and `completion_denominator()`) reflects the full
+    CJ graph (students + anchors), avoiding small-batch instability due to anchors
+    being ignored in net size.
+- Updated and un‑xfail’d PR‑2 guardrail tests:
+  - Unit: zero-success and low-success-rate tests in
+    `test_workflow_continuation.py` now assert `finalize_failure` vs
+    `finalize_scoring` and pass against current semantics.
+  - Integration: `test_all_failed_comparisons_move_batch_to_error_state` now passes
+    with real repositories and asserts CJ batch status = ERROR_* and state = FAILED.
+- Added forward-looking PR‑7 xfail specs:
+  - Small‑net Phase‑2 resampling behaviour (including `resampling_pass_count` and
+    small‑net caps) in `test_workflow_continuation.py`.
+  - Convergence harness placeholders in `test_convergence_harness.py`.
+- All CJ tests, format, lint, and `typecheck-all` are green on `main`; PR‑2 is
+  implementation‑complete and merged. PR‑7 remains planned for Phase‑2 resampling
+  semantics and convergence harness work.
 
 ## Session Addendum (2025-11-28, Phase-2 Comparisons Plan)
 

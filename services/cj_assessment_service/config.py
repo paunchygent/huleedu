@@ -191,7 +191,7 @@ class Settings(SecureServiceSettings, JWTValidationSettings):
     ]  # Explicit defaults for transient network/API issues
 
     # CJ assessment parameters
-    MAX_PAIRWISE_COMPARISONS: int = 150
+    MAX_PAIRWISE_COMPARISONS: int = 300
     COMPARISONS_PER_STABILITY_CHECK_ITERATION: int = 12
 
     # NOTE:
@@ -205,6 +205,29 @@ class Settings(SecureServiceSettings, JWTValidationSettings):
         description="Minimum successful comparisons required before checking score stability",
     )
     SCORE_STABILITY_THRESHOLD: float = 0.05
+
+    # BT SE diagnostics (observability-only; no gating semantics)
+    BT_MEAN_SE_WARN_THRESHOLD: float = Field(
+        default=0.4,
+        description=(
+            "Diagnostic threshold for batch-level mean BT standard error. "
+            "Used only for BT SE inflated batch quality indicators."
+        ),
+    )
+    BT_MAX_SE_WARN_THRESHOLD: float = Field(
+        default=0.8,
+        description=(
+            "Diagnostic threshold for maximum BT standard error across essays. "
+            "Used only for BT SE inflated batch quality indicators."
+        ),
+    )
+    BT_MIN_MEAN_COMPARISONS_PER_ITEM: float = Field(
+        default=1.0,
+        description=(
+            "Minimum mean comparisons per essay before marking comparison coverage as sparse. "
+            "Used only for comparison coverage sparse batch quality indicators."
+        ),
+    )
 
     # Pair generation configuration
     PAIR_GENERATION_SEED: int | None = Field(
