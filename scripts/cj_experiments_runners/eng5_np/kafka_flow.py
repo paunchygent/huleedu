@@ -241,18 +241,27 @@ class AssessmentEventCollector:
         target_batch = str(self.settings.batch_uuid)
 
         if topic == topic_name(ProcessingEvent.LLM_COMPARISON_RESULT):
-            envelope = EventEnvelope[LLMComparisonResultV1].model_validate_json(payload)
-            result_data = LLMComparisonResultV1.model_validate(envelope.data)
+            try:
+                envelope = EventEnvelope[LLMComparisonResultV1].model_validate_json(payload)
+                result_data = LLMComparisonResultV1.model_validate(envelope.data)
+            except Exception as exc:  # pragma: no cover - defensive guard
+                self._logger.warning(
+                    "collector_llm_comparison_deserialization_failed",
+                    error_type=exc.__class__.__name__,
+                )
+                return True
+
             envelope.data = result_data  # Update envelope with validated model
             metadata = result_data.request_metadata or {}
             batch_hint = metadata.get("batch_id") or metadata.get("bos_batch_id")
-            if batch_hint and batch_hint != target_batch:
+            if not batch_hint or batch_hint != target_batch:
                 self._logger.debug(
                     "comparison_event_skipped",
                     request_id=result_data.request_id,
                     comparison_batch=batch_hint,
                 )
-                return False
+                return True
+
             self.hydrator.apply_llm_comparison(envelope)
             self._observed_counts["llm_comparisons"] += 1
             log_event_processing(
@@ -264,15 +273,24 @@ class AssessmentEventCollector:
             return True
 
         if topic == topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED):
-            envelope = EventEnvelope[CJAssessmentCompletedV1].model_validate_json(payload)
-            completion_data = CJAssessmentCompletedV1.model_validate(envelope.data)
+            try:
+                envelope = EventEnvelope[CJAssessmentCompletedV1].model_validate_json(payload)
+                completion_data = CJAssessmentCompletedV1.model_validate(envelope.data)
+            except Exception as exc:  # pragma: no cover - defensive guard
+                self._logger.warning(
+                    "collector_completion_deserialization_failed",
+                    error_type=exc.__class__.__name__,
+                )
+                return True
+
             envelope.data = completion_data  # Update envelope with validated model
             if completion_data.entity_id != target_batch:
                 self._logger.debug(
                     "completion_event_skipped",
                     event_batch=completion_data.entity_id,
                 )
-                return False
+                return True
+
             write_completion_event(envelope=envelope, output_dir=self.settings.output_dir)
             self._completion_observed = True
             self.hydrator.record_completion_seen()
@@ -286,15 +304,24 @@ class AssessmentEventCollector:
             return True
 
         if topic == topic_name(ProcessingEvent.ASSESSMENT_RESULT_PUBLISHED):
-            envelope = EventEnvelope[AssessmentResultV1].model_validate_json(payload)
-            result_data = AssessmentResultV1.model_validate(envelope.data)
+            try:
+                envelope = EventEnvelope[AssessmentResultV1].model_validate_json(payload)
+                result_data = AssessmentResultV1.model_validate(envelope.data)
+            except Exception as exc:  # pragma: no cover - defensive guard
+                self._logger.warning(
+                    "collector_assessment_result_deserialization_failed",
+                    error_type=exc.__class__.__name__,
+                )
+                return True
+
             envelope.data = result_data  # Update envelope with validated model
             if result_data.batch_id != target_batch:
                 self._logger.debug(
                     "assessment_result_skipped",
                     event_batch=result_data.batch_id,
                 )
-                return False
+                return True
+
             self.hydrator.apply_assessment_result(envelope)
             self._rich_observed = True
             self._observed_counts["assessment_results"] += 1

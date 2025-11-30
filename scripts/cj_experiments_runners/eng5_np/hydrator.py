@@ -109,7 +109,7 @@ class AssessmentRunHydrator:
 
         metadata = envelope.data.request_metadata or {}
         batch_hint = metadata.get("batch_id") or metadata.get("bos_batch_id")
-        if batch_hint and batch_hint != self.batch_uuid:
+        if not batch_hint or batch_hint != self.batch_uuid:
             self._logger.debug(
                 "comparison_batch_mismatch_skipped",
                 request_id=request_id,
@@ -157,6 +157,11 @@ class AssessmentRunHydrator:
             envelope=envelope,
             event_count=self._runner_status["observed_events"]["assessment_results"],
         )
+
+    def get_run_artefact(self) -> dict[str, Any]:
+        """Return the current hydrated artefact for reporting."""
+
+        return self._load_artefact()
 
     def _load_artefact(self) -> dict[str, Any]:
         return json.loads(self.artefact_path.read_text(encoding="utf-8"))

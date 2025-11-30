@@ -5,12 +5,23 @@ severity: medium
 last_reviewed: 2025-11-21
 ---
 
-# ENG5 NP Runner – Execute Mode Runbook
+# ENG5 NP Runner – Execute & Alignment Runbook
 
 ## Purpose
 
-Document the end-to-end steps for running `pdm run eng5-np-run --mode execute` with
-metadata-complete artefacts that power Phase 3.3 confidence analysis.
+Document the end-to-end steps for running the ENG5 NP runner in all modes:
+
+- `plan` – inventory and validation preview
+- `dry-run` – schema-only stub artefact
+- `execute` – full CJ run with DB-owned anchors
+- `anchor-align-test` – isolated anchor-only prompt-tuning experiments
+
+The runner is implemented as a handler-based Typer CLI, where each mode
+delegates to its own handler class under
+`scripts/cj_experiments_runners/eng5_np/handlers/`. The CLI is responsible
+for argument parsing and basic validation; handlers own the mode-specific
+behavior and call into lower-level helpers (inventory, artefact I/O, Kafka
+publish, hydrator, etc.).
 
 ## Prerequisites
 
@@ -39,7 +50,7 @@ pdm run python scripts/cj_assessment_service/diagnostics/list_cj_instructions.py
 
 Output includes copy-paste hints for `--assignment-id` and `--course-id` parameters.
 
-## Execution Steps (one batch)
+## Execution Steps (one batch – EXECUTE)
 
 1. Inspect assets.
 
@@ -128,6 +139,97 @@ docker compose -f docker-compose.yml -f docker-compose.eng5-runner.yml run --rm 
 > `tee` so logs persist locally for audits:
 > `pdm run eng5-np-run --mode execute ... | tee eng5_runner.log`
 
+## Anchor Alignment Prompt-Tuning (`anchor-align-test`)
+
+### Purpose
+
+`anchor-align-test` mode runs CJ on **anchor essays only** (no student essays)
+to measure how well LLM comparative judgments align with expert anchor grades.
+It uses GUEST semantics (`assignment_id=None` in the request), so no DB-owned
+anchors or grade projections are involved and no production state is affected.
+
+### Prerequisites
+
+1. **Assets**: Same ENG5 role model assets as EXECUTE:
+   - Role model instructions and prompt
+   - Anchor essays directory
+   - `ANCHOR_ESSAYS_BAYESIAN_INFERENCE_DATA.(csv|xlsx)` with expert grades
+2. **Services**: CJ Assessment + LLM Provider running and reachable.
+3. **Kafka**:
+   - For `--await-completion`, Kafka must be up and reachable via
+     `KAFKA_BOOTSTRAP_SERVERS`.
+   - For quick dry testing, you may use `--no-kafka` to skip publish.
+4. **Prompt files**:
+   - System prompt variants under
+     `scripts/cj_experiments_runners/eng5_np/prompts/system/`
+   - Rubric variants under
+     `scripts/cj_experiments_runners/eng5_np/prompts/rubric/`
+
+### CLI Usage
+
+Baseline run with explicit prompt/rubric and alignment report generation:
+
+```bash
+pdm run eng5-runner \
+  --mode anchor-align-test \
+  --system-prompt scripts/cj_experiments_runners/eng5_np/prompts/system/001_baseline.txt \
+  --rubric scripts/cj_experiments_runners/eng5_np/prompts/rubric/001_baseline.txt \
+  --batch-id "anchor-align-baseline-$(date +%Y%m%d-%H%M%S)" \
+  --await-completion
+```
+
+Key notes:
+
+- `--assignment-id` is **optional** in this mode. The handler explicitly sets
+  `assignment_id=None` before composing the CJ request to trigger GUEST
+  behavior (no DB anchors, no grade projection).
+- All anchor essays are treated as **students** in the CJ request; this keeps
+  the experiment fully isolated from production anchor calibration logic.
+- `--system-prompt` and `--rubric` are file paths; the handler loads their
+  contents and threads them via `LLMConfigOverrides` so they are visible to CJ
+  and LLM Provider.
+
+### Alignment Report Output
+
+When `--await-completion` is set and Kafka callbacks complete, the handler:
+
+1. Hydrates CJ results into the ENG5 artefact.
+2. Generates a markdown alignment report:
+
+   - Location: `.claude/research/data/eng5_np_2016/anchor_align_{batch_id}_{timestamp}.md`
+   - Contents:
+     - Per-anchor BT scores, ranks, expert grades, wins/losses, win rate.
+     - **Direct inversions**: lower-grade anchors beating higher-grade anchors.
+     - **Zero-win anchors**: anchors that never win a comparison.
+     - **Kendall's tau** between expected (expert) and actual (BT) ranks.
+     - Embedded system prompt and judge rubric text for reproducibility.
+
+Baseline acceptance targets (from batch 108 analysis):
+
+| Metric            | Baseline (Batch 108) | Target |
+|-------------------|----------------------|--------|
+| Direct inversions | 5                    | ≤1     |
+| Zero-win anchors  | 1 (ANCHOR_7)         | 0      |
+| Kendall's tau     | ~0.82                | ≥0.90  |
+| A/B regression    | 0                    | 0      |
+
+These metrics should be monitored when iterating on prompt/rubric variants.
+
+### Background Job Caveat (Batch IDs)
+
+When launching ENG5 runs as **background tasks** via Bash tooling, avoid
+relying on intermediate shell variables for `--batch-id`. Use inline command
+substitutions instead:
+
+```bash
+# Recommended: inline substitution (works in background tasks)
+pdm run eng5-runner --batch-id "eng5-full-$(date +%Y%m%d-%H%M%S)" --mode anchor-align-test ...
+```
+
+Patterns that assign to `BATCH_ID` and then reference it within a wrapped
+background command can expand to an empty string, leading to ambiguous batch
+labels in logs and reports.
+
 ## Monitoring & Observability
 
 - **Kafka**: `pdm run dev-logs cj_assessment_service` to ensure callbacks stream without lag.
@@ -198,6 +300,63 @@ docker compose -f docker-compose.yml -f docker-compose.eng5-runner.yml run --rm 
     using its true batch API. Once callbacks for that wave are complete, CJ computes scores once
     and finalizes, skipping continuation regardless of stability. See ADR-0017 and the CJ
     assessment runbook for the high-level pattern; implementation will land in a dedicated PR.
+
+### BT SE Diagnostics Interpretation
+
+BT (Bradley-Terry) Standard Error diagnostics provide insight into comparison graph quality. These are **diagnostic-only** fields that do NOT gate completion, stability checks, or success-rate guards.
+
+#### Available Fields (from `CJBatchState.processing_metadata`)
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `bt_se_summary.mean_se` | float | Average SE across all essays |
+| `bt_se_summary.max_se` | float | Maximum SE value (capped at 2.0) |
+| `bt_se_summary.min_se` | float | Minimum SE value |
+| `bt_se_summary.items_at_cap` | int | Essays with SE >= 2.0 (poorly constrained) |
+| `bt_se_summary.isolated_items` | int | Essays with 0 comparisons |
+| `bt_se_summary.mean_comparisons_per_item` | float | Average comparisons per essay |
+| `bt_quality_flags.bt_se_inflated` | bool | True if mean_se > 0.4 OR max_se > 0.8 |
+| `bt_quality_flags.comparison_coverage_sparse` | bool | True if mean_comparisons_per_item < 1.0 |
+| `bt_quality_flags.has_isolated_items` | bool | True if isolated_items > 0 |
+
+#### Interpretation Guide
+
+**Normal Operation:**
+- `mean_se` < 0.4 and `max_se` < 0.8
+- `items_at_cap` = 0
+- `isolated_items` = 0
+- All quality flags = false
+
+**When `bt_se_inflated = true`:**
+- Investigate anchor coverage - are anchors getting enough comparisons?
+- Check if total budget is sufficient for essay count
+- Review if callback failures are reducing effective comparisons
+- NOT a failure state - grade projections may still be reliable
+
+**When `comparison_coverage_sparse = true`:**
+- Essays are averaging < 1 comparison each
+- May indicate early batch termination or budget exhaustion
+- Check `items_at_cap` to see how many essays are poorly constrained
+- Consider increasing `total_budget` for future batches
+
+**When `has_isolated_items = true`:**
+- Some essays have zero comparisons (no BT score possible)
+- Check pair matching strategy and anchor distribution
+- Isolated items will have capped SE (2.0) and neutral scores
+- May affect grade projection quality for those specific essays
+
+#### Key Principle
+
+These diagnostics are **gauges on the dashboard, not steering wheels**. They inform operator awareness but do not change:
+- Completion threshold semantics
+- Stability check behaviour
+- Success-rate guard logic
+
+Use them to:
+1. Monitor batch health trends over time
+2. Tune budgets and comparison strategies for future batches
+3. Investigate anomalies when quality appears degraded
+4. Correlate with grade projection confidence in downstream analysis
 
 ### Structured JSON Logging
 
