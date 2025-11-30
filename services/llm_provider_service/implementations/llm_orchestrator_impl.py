@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 from uuid import UUID
 
-from common_core import LLMComparisonRequest, LLMProviderType
+from common_core import LLMComparisonRequest, LLMConfigOverridesHTTP, LLMProviderType
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.llm_provider_service.config import Settings
@@ -203,6 +203,22 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
             f"correlation_id: {correlation_id}"
         )
 
+        # Build configuration overrides for queued request so that provider/model
+        # selection and other overrides are preserved through queue processing.
+        config_overrides: LLMConfigOverridesHTTP | None = None
+        if overrides:
+            config_overrides = LLMConfigOverridesHTTP(
+                provider_override=overrides.get("provider_override") or provider,
+                model_override=overrides.get("model_override"),
+                temperature_override=overrides.get("temperature_override"),
+                system_prompt_override=overrides.get("system_prompt_override"),
+                max_tokens_override=overrides.get("max_tokens_override"),
+            )
+        else:
+            # Even when no explicit overrides dict is provided, persist the
+            # resolved provider so queue processing can use it.
+            config_overrides = LLMConfigOverridesHTTP(provider_override=provider)
+
         # Create queued request
         request_data = LLMComparisonRequest(
             user_prompt=user_prompt,
@@ -210,6 +226,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
             callback_topic=callback_topic,
             correlation_id=correlation_id,
             metadata=request_metadata or {},
+            llm_config_overrides=config_overrides,
         )
 
         # Capture current trace context for queue processing

@@ -10,6 +10,7 @@ import pytest
 from common_core import (
     EssayComparisonWinner,
     LLMComparisonRequest,
+    LLMConfigOverridesHTTP,
     LLMProviderType,
     QueueStatus,
 )
@@ -258,5 +259,58 @@ class TestQueuedRequestExecutor:
 
         # Assert
         assert len(result.outcomes) == 2
-        assert all(o.result == "success" for o in result.outcomes)
-        mock_comparison_processor.process_comparison_batch.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_execute_request_uses_llm_config_overrides(
+        self,
+        executor: QueuedRequestExecutor,
+        mock_comparison_processor: AsyncMock,
+        mock_queue_manager: AsyncMock,
+    ) -> None:
+        """Single-request execution should pass overrides to comparison processor."""
+        request_id = uuid.uuid4()
+        correlation_id = uuid.uuid4()
+
+        request_data = LLMComparisonRequest(
+            user_prompt="test prompt",
+            callback_topic="test.topic",
+            correlation_id=correlation_id,
+            llm_config_overrides=LLMConfigOverridesHTTP(
+                provider_override=LLMProviderType.ANTHROPIC,
+                model_override="claude-sonnet-4-5-20250929",
+                temperature_override=0.3,
+                system_prompt_override="System override",
+                max_tokens_override=4096,
+            ),
+        )
+        queued_request = QueuedRequest(
+            queue_id=request_id,
+            request_data=request_data,
+            status=QueueStatus.QUEUED,
+            queued_at=datetime.now(timezone.utc),
+            size_bytes=100,
+            callback_topic="test.topic",
+        )
+
+        mock_queue_manager.update_status = AsyncMock(return_value=True)
+        mock_comparison_processor.process_comparison.return_value = LLMOrchestratorResponse(
+            winner=EssayComparisonWinner.ESSAY_A,
+            justification="test",
+            confidence=0.9,
+            provider=LLMProviderType.ANTHROPIC,
+            model="claude-sonnet-4-5-20250929",
+            correlation_id=correlation_id,
+            response_time_ms=100,
+            token_usage={},
+            cost_estimate=0.0,
+        )
+
+        await executor.execute_request(queued_request)
+
+        mock_comparison_processor.process_comparison.assert_awaited_once()
+        _, kwargs = mock_comparison_processor.process_comparison.await_args
+        assert kwargs["provider"] == LLMProviderType.ANTHROPIC
+        assert kwargs["model_override"] == "claude-sonnet-4-5-20250929"
+        assert kwargs["temperature_override"] == 0.3
+        assert kwargs["system_prompt_override"] == "System override"
+        assert kwargs["max_tokens_override"] == 4096

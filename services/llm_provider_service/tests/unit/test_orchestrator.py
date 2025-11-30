@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
-from common_core import LLMProviderType
+from common_core import LLMConfigOverridesHTTP, LLMProviderType
 from common_core.domain_enums import EssayComparisonWinner
 from common_core.error_enums import ErrorCode
 
@@ -390,3 +390,46 @@ B""",
     assert result.correlation_id == correlation_id
 
     # Note: Provider is not called immediately - overrides will be applied during async processing
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_persists_llm_config_overrides_on_queued_request(
+    orchestrator: LLMOrchestratorImpl,
+    mock_queue_manager: AsyncMock,
+    callback_topic_factory: Callable[[str], str],
+) -> None:
+    """Queued requests should carry llm_config_overrides for downstream processing."""
+
+    correlation_id = uuid4()
+    callback_topic = callback_topic_factory("persist_overrides")
+
+    await orchestrator.perform_comparison(
+        provider=LLMProviderType.MOCK,
+        user_prompt="""Compare
+
+**Essay A (ID: test_a):**
+A
+
+**Essay B (ID: test_b):**
+B""",
+        correlation_id=correlation_id,
+        callback_topic=callback_topic,
+        model_override="claude-sonnet-4-5-20250929",
+        temperature_override=0.3,
+        system_prompt_override="Custom system prompt",
+        max_tokens_override=2048,
+    )
+
+    # Enqueued request should include matching LLMConfigOverridesHTTP payload
+    mock_queue_manager.enqueue.assert_called_once()
+    queued_request = mock_queue_manager.enqueue.call_args.args[0]
+
+    config_overrides: LLMConfigOverridesHTTP | None = (
+        queued_request.request_data.llm_config_overrides
+    )
+    assert config_overrides is not None
+    assert config_overrides.provider_override == LLMProviderType.MOCK
+    assert config_overrides.model_override == "claude-sonnet-4-5-20250929"
+    assert config_overrides.temperature_override == 0.3
+    assert config_overrides.system_prompt_override == "Custom system prompt"
+    assert config_overrides.max_tokens_override == 2048
