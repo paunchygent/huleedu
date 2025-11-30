@@ -63,14 +63,15 @@ class TestEng5CliValidation:
             )
 
     def test_apply_comparison_limit_rejects_when_no_pairs_possible(self) -> None:
-        """Configurations with anchors×students < 1 should fail fast.
+        """Configurations with no students should fail fast.
 
-        For example: no anchors or no students should result in a clear
-        validation error before we attempt to publish a batch.
+        This guards clearly invalid configurations before we attempt to
+        publish a batch. Cases with zero anchors are validated at a higher
+        layer via ensure_comparison_capacity().
         """
 
-        anchors = _make_files(0)
-        students = _make_files(5)
+        anchors = _make_files(5)
+        students = _make_files(0)
 
         with pytest.raises(ComparisonValidationError):
             apply_comparison_limit(
@@ -102,6 +103,30 @@ class TestEng5CliValidation:
         assert len(limited_students) >= 1
         assert actual is not None
         assert actual >= 1
+
+    def test_apply_comparison_limit_allows_anchorless_slicing_for_guest_flows(self) -> None:
+        """Anchorless local slicing is allowed for guest/anchor-align flows.
+
+        When anchors are managed by CJ (or all items are treated as students),
+        apply_comparison_limit should still be able to limit the cohort based
+        solely on the student dimension.
+        """
+
+        anchors = _make_files(0)
+        students = _make_files(12)
+
+        limited_anchors, limited_students, actual = apply_comparison_limit(
+            anchors=anchors,
+            students=students,
+            max_comparisons=12,
+            emit_notice=False,
+        )
+
+        assert len(limited_anchors) == 0
+        assert 0 < len(limited_students) <= len(students)
+        # No anchor×student pairs in this mode; caller cares about the
+        # limited cohort, not the cross-product count.
+        assert actual == 0
 
     def test_runner_settings_includes_canonical_batch_uuid(self) -> None:
         """RunnerSettings should expose a canonical batch_uuid alongside batch_id.

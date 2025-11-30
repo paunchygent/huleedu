@@ -224,11 +224,22 @@ class AssessmentRunHydrator:
             )
 
         winner = envelope.data.winner
-        if winner and winner.value.lower() == "essay_a":
+        # LLMComparisonResultV1.winner may be an enum (with .value) or a raw
+        # string like "Essay A"/"Essay B". Normalize to match the CJ-side
+        # EssayComparisonWinner semantics.
+        normalized_winner = ""
+        if winner is not None:
+            raw = getattr(winner, "value", winner)
+            normalized_winner = str(raw).strip().replace(" ", "_").lower()
+
+        if normalized_winner in {"essay_a", "a"}:
             winner_id, loser_id = essay_a, essay_b
-        elif winner and winner.value.lower() == "essay_b":
+        elif normalized_winner in {"essay_b", "b"}:
             winner_id, loser_id = essay_b, essay_a
         else:
+            # Treat unknown/ERROR/tie winners as a failed comparison; keep
+            # essay_a/essay_b for traceability but mark status="failed"
+            # below so reporting can filter them out.
             winner_id, loser_id = essay_a, essay_b
 
         sequence = len(artefact.get("llm_comparisons", [])) + 1
@@ -250,6 +261,8 @@ class AssessmentRunHydrator:
             "started_at": envelope.data.requested_at.isoformat(),
             "completed_at": envelope.data.completed_at.isoformat(),
             "status": status,
+            "confidence": envelope.data.confidence,
+            "justification": envelope.data.justification,
         }
 
         if envelope.data.is_error and envelope.data.error_detail:

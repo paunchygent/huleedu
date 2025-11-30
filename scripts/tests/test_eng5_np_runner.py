@@ -331,6 +331,28 @@ def test_build_essay_refs_prefers_uploaded_storage_ids(tmp_path: Path) -> None:
     assert refs[1].text_storage_id == "storage-student-456"
 
 
+def test_build_essay_refs_uses_student_id_factory(tmp_path: Path) -> None:
+    anchor_file = tmp_path / "anchor.docx"
+    student_file = tmp_path / "student.docx"
+    anchor_file.write_text("anchor essay", encoding="utf-8")
+    student_file.write_text("student essay", encoding="utf-8")
+
+    anchor_record = FileRecord.from_path(anchor_file)
+    student_record = FileRecord.from_path(student_file)
+
+    def student_id_factory(record: FileRecord) -> str:
+        return f"student::{record.path.stem}"
+
+    refs = build_essay_refs(
+        anchors=[anchor_record],
+        students=[student_record],
+        storage_id_map=None,
+        student_id_factory=student_id_factory,
+    )
+
+    assert refs[1].essay_id == "student::student"
+
+
 def test_hydrator_appends_llm_comparison_and_manifest(tmp_path: Path) -> None:
     artefact_path = _write_base_artefact(tmp_path)
     batch_uuid = uuid.uuid4()

@@ -62,3 +62,21 @@ def generate_essay_id(filename_stem: str, max_length: int = 36) -> str:
     # Truncate base and append hash
     base = sanitized[:base_max_length]
     return f"{base}_{name_hash.upper()}"
+
+
+def make_anchor_key(raw_anchor_id: str, max_length: int = 27) -> str:
+    """Normalize anchor IDs for grade maps and essay IDs.
+
+    The returned key is:
+    - Uppercase and sanitized via `sanitize_identifier`
+    - No longer than *max_length* characters (deterministic truncation + hash)
+
+    The default *max_length* of 27 is chosen so that IDs of the form
+    ``student::<anchor_key>`` always fit within the CJ `els_essay_id`
+    column limit of 36 characters.
+    """
+    sanitized = sanitize_identifier(raw_anchor_id)
+    if len(sanitized) <= max_length:
+        return sanitized
+    # Reuse essay ID helper to apply deterministic truncation + hash
+    return generate_essay_id(sanitized, max_length=max_length)

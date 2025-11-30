@@ -196,6 +196,7 @@ class TestDetectInversions:
             ComparisonRecordBuilder()
             .with_winner("student::unknown_anchor")
             .with_loser("student::anchor_a")
+            .with_confidence(3.0)
             .build()
         ]
         grade_map = {"anchor_a": "A"}  # unknown_anchor not in map
@@ -214,6 +215,7 @@ class TestDetectInversions:
                 "loser_id": "student::anchor_a",
                 "confidence": None,
                 "justification": None,
+                "status": "succeeded",
             }
         ]
         grade_map = {"anchor_f": "F", "anchor_a": "A"}
@@ -222,6 +224,49 @@ class TestDetectInversions:
 
         assert len(inversions) == 1
         assert inversions[0].confidence == 0.0
+
+    def test_ignores_failed_comparisons(self):
+        """Failed comparisons do not contribute to inversions."""
+        comparisons = [
+            {
+                "winner_id": "student::anchor_e",
+                "loser_id": "student::anchor_a",
+                "confidence": 3.5,
+                "justification": "Should be ignored",
+                "status": "failed",
+            }
+        ]
+        grade_map = {"anchor_e": "E-", "anchor_a": "A"}
+
+        inversions = _detect_inversions(comparisons, grade_map)
+
+        assert len(inversions) == 0
+
+    def test_deduplicates_inversions_to_unique_pairs(self):
+        """Multiple events for same anchor pair counted once."""
+        comparisons = [
+            {
+                "winner_id": "student::anchor_e",
+                "loser_id": "student::anchor_a",
+                "confidence": 3.0,
+                "justification": "First event",
+                "status": "succeeded",
+            },
+            {
+                "winner_id": "student::anchor_e",
+                "loser_id": "student::anchor_a",
+                "confidence": 4.0,
+                "justification": "Second event",
+                "status": "succeeded",
+            },
+        ]
+        grade_map = {"anchor_e": "E-", "anchor_a": "A"}
+
+        inversions = _detect_inversions(comparisons, grade_map)
+
+        assert len(inversions) == 1
+        assert inversions[0].higher_grade_anchor == "anchor_a"
+        assert inversions[0].lower_grade_anchor == "anchor_e"
 
 
 class TestBuildAnchorResults:
@@ -243,8 +288,9 @@ class TestBuildAnchorResults:
         ]
         comparisons: list[dict] = []
         grade_map = {"anchor_001": "A", "anchor_002": "C"}
+        filename_map = {"anchor_001": "anchor_001_A.docx", "anchor_002": "anchor_002_C.docx"}
 
-        results = _build_anchor_results(bt_summary, comparisons, grade_map)
+        results = _build_anchor_results(bt_summary, comparisons, grade_map, filename_map)
 
         assert len(results) == 2
         # Results sorted by expected grade
@@ -271,8 +317,9 @@ class TestBuildAnchorResults:
             .build(),
         ]
         grade_map = {"anchor_001": "A", "anchor_002": "C"}
+        filename_map = {"anchor_001": "anchor_001_A.docx", "anchor_002": "anchor_002_C.docx"}
 
-        results = _build_anchor_results(bt_summary, comparisons, grade_map)
+        results = _build_anchor_results(bt_summary, comparisons, grade_map, filename_map)
 
         # anchor_001 won twice
         anchor_001_result = next(r for r in results if r.anchor_id == "anchor_001")
@@ -292,8 +339,9 @@ class TestBuildAnchorResults:
         ]
         comparisons: list[dict] = []
         grade_map = {"anchor_a": "A", "anchor_c": "C"}
+        filename_map = {"anchor_a": "anchor_a_A.docx", "anchor_c": "anchor_c_C.docx"}
 
-        results = _build_anchor_results(bt_summary, comparisons, grade_map)
+        results = _build_anchor_results(bt_summary, comparisons, grade_map, filename_map)
 
         # Sorted by expected grade: A should be first
         assert results[0].anchor_id == "anchor_a"
@@ -308,8 +356,9 @@ class TestBuildAnchorResults:
         ]
         comparisons: list[dict] = []
         grade_map = {}  # Empty map
+        filename_map: dict[str, str] = {}
 
-        results = _build_anchor_results(bt_summary, comparisons, grade_map)
+        results = _build_anchor_results(bt_summary, comparisons, grade_map, filename_map)
 
         assert len(results) == 1
         assert results[0].expected_grade == "UNKNOWN"
@@ -330,12 +379,46 @@ class TestBuildAnchorResults:
             .build(),
         ]
         grade_map = {"anchor_001": "A"}
+        filename_map = {"anchor_001": "anchor_001_A.docx"}
 
-        results = _build_anchor_results(bt_summary, comparisons, grade_map)
+        results = _build_anchor_results(bt_summary, comparisons, grade_map, filename_map)
 
         assert results[0].wins == 1
         assert results[0].losses == 1
         assert results[0].win_rate == 0.5
+
+    def test_ignores_failed_comparisons_for_win_loss(self):
+        """Failed comparisons must not affect win/loss tallies."""
+        bt_summary = [
+            BTSummaryBuilder().with_essay_id("student::anchor_001").with_rank(1).build(),
+            BTSummaryBuilder().with_essay_id("student::anchor_002").with_rank(2).build(),
+        ]
+        comparisons = [
+            {
+                "winner_id": "student::anchor_001",
+                "loser_id": "student::anchor_002",
+                "status": "failed",
+            },
+            {
+                "winner_id": "student::anchor_002",
+                "loser_id": "student::anchor_001",
+                "status": "failed",
+            },
+        ]
+        grade_map = {"anchor_001": "A", "anchor_002": "C"}
+        filename_map = {"anchor_001": "anchor_001_A.docx", "anchor_002": "anchor_002_C.docx"}
+
+        results = _build_anchor_results(bt_summary, comparisons, grade_map, filename_map)
+
+        anchor_001 = next(r for r in results if r.anchor_id == "anchor_001")
+        anchor_002 = next(r for r in results if r.anchor_id == "anchor_002")
+
+        assert anchor_001.wins == 0
+        assert anchor_001.losses == 0
+        assert anchor_001.win_rate == 0.0
+        assert anchor_002.wins == 0
+        assert anchor_002.losses == 0
+        assert anchor_002.win_rate == 0.0
 
     def test_handles_zero_total_comparisons(self):
         """Win rate is 0.0 when anchor has no comparisons."""
@@ -344,8 +427,9 @@ class TestBuildAnchorResults:
         ]
         comparisons: list[dict] = []  # No comparisons
         grade_map = {"anchor_001": "A"}
+        filename_map = {"anchor_001": "anchor_001_A.docx"}
 
-        results = _build_anchor_results(bt_summary, comparisons, grade_map)
+        results = _build_anchor_results(bt_summary, comparisons, grade_map, filename_map)
 
         assert results[0].wins == 0
         assert results[0].losses == 0
@@ -371,8 +455,8 @@ class TestFormatReport:
         )
 
         assert "## Summary Metrics" in report
-        assert "| Total comparisons | 10 |" in report
-        assert "| Direct inversions | 2 |" in report
+        assert "| Total comparisons (successful) | 10 |" in report
+        assert "| Direct inversions (unique pairs) | 2 |" in report
         assert "| Kendall's tau | 0.850 |" in report
         assert "| Zero-win anchors | 1 |" in report
 
@@ -388,6 +472,7 @@ class TestFormatReport:
                 wins=5,
                 losses=1,
                 win_rate=0.833,
+                source_file_name="anchor_essay_eng_5_17_vt_001_A.docx",
             )
         ]
 
@@ -407,6 +492,7 @@ class TestFormatReport:
         assert "## Per-Anchor Results" in report
         assert "anchor_001" in report
         assert "| A |" in report
+        assert "anchor_essay_eng_5_17_vt_001_A.docx" in report
 
     def test_includes_inversions_section_when_present(self):
         """Inversions section appears only when inversions exist."""
@@ -542,7 +628,7 @@ class TestGenerateAlignmentReport:
 
         assert report_path.exists()
         content = report_path.read_text()
-        assert "| Total comparisons | 0 |" in content
+        assert "| Total comparisons (successful) | 0 |" in content
 
     def test_writes_utf8_encoded_content(self, tmp_path: Path):
         """Report written with UTF-8 encoding."""
@@ -560,3 +646,60 @@ class TestGenerateAlignmentReport:
         content = report_path.read_text(encoding="utf-8")
         assert "🎯" in content
         assert "été" in content
+
+    def test_filters_failed_comparisons_in_report_metrics(self, tmp_path: Path):
+        """Report metrics use only successful comparisons."""
+
+        class DummyHydrator:
+            def __init__(self) -> None:
+                self._artefact = {
+                    "bt_summary": [
+                        BTSummaryBuilder()
+                        .with_essay_id("student::anchor_001")
+                        .with_theta(1.0)
+                        .with_rank(1)
+                        .build(),
+                        BTSummaryBuilder()
+                        .with_essay_id("student::anchor_002")
+                        .with_theta(-1.0)
+                        .with_rank(2)
+                        .build(),
+                    ],
+                    "llm_comparisons": [
+                        {
+                            "winner_id": "student::anchor_001",
+                            "loser_id": "student::anchor_002",
+                            "status": "succeeded",
+                            "confidence": 3.0,
+                        },
+                        {
+                            "winner_id": "student::anchor_002",
+                            "loser_id": "student::anchor_001",
+                            "status": "failed",
+                            "confidence": 3.0,
+                        },
+                    ],
+                }
+
+            def get_run_artefact(self) -> dict:
+                return self._artefact
+
+        hydrator = DummyHydrator()
+        grade_map = {"anchor_001": "A", "anchor_002": "C"}
+
+        report_path = generate_alignment_report(
+            hydrator=hydrator,  # type: ignore[arg-type]
+            anchor_grade_map=grade_map,
+            system_prompt_text=None,
+            rubric_text=None,
+            batch_id="metrics-filter-test",
+            output_dir=tmp_path,
+        )
+
+        content = report_path.read_text(encoding="utf-8")
+
+        # Only one successful comparison should be counted
+        assert "| Total comparisons (successful) | 1 |" in content
+        # anchor_001 should have 1 win, 0 losses; anchor_002 the inverse
+        assert "| anchor_001 | A |" in content
+        assert "| anchor_002 | C |" in content

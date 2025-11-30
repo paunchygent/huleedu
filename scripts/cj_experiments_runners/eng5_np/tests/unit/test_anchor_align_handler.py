@@ -117,6 +117,26 @@ class TestAnchorAlignHandlerExecute:
     def test_execute_requires_anchor_files(self, tmp_path: Path) -> None:
         """Handler raises when no anchor essays are present."""
         settings = _make_settings(tmp_path)
+        # Seed existing LLM overrides to verify they are preserved
+        from common_core import LLMProviderType
+        from common_core.events.cj_assessment_events import LLMConfigOverrides
+
+        settings.llm_overrides = LLMConfigOverrides(
+            provider_override=LLMProviderType.ANTHROPIC,
+            model_override="claude-sonnet-4-5-20250929",
+            temperature_override=0.1,
+            max_tokens_override=2048,
+        )
+        # Seed existing LLM overrides to verify they are preserved
+        from common_core import LLMProviderType
+        from common_core.events.cj_assessment_events import LLMConfigOverrides
+
+        settings.llm_overrides = LLMConfigOverrides(
+            provider_override=LLMProviderType.ANTHROPIC,
+            model_override="claude-sonnet-4-5-20250929",
+            temperature_override=0.1,
+            max_tokens_override=2048,
+        )
 
         # Inventory with zero anchors
         inventory = _make_inventory_with_anchors(tmp_path, anchor_count=0)
@@ -144,6 +164,16 @@ class TestAnchorAlignHandlerExecute:
     ) -> None:
         """Happy-path anchor-align-test run uploads anchors and generates a report."""
         settings = _make_settings(tmp_path)
+        # Seed existing LLM overrides to verify they are preserved
+        from common_core import LLMProviderType
+        from common_core.events.cj_assessment_events import LLMConfigOverrides
+
+        settings.llm_overrides = LLMConfigOverrides(
+            provider_override=LLMProviderType.ANTHROPIC,
+            model_override="claude-sonnet-4-5-20250929",
+            temperature_override=0.1,
+            max_tokens_override=2048,
+        )
         settings.await_completion = True
         settings.use_kafka = True
         original_assignment_id = settings.assignment_id
@@ -182,6 +212,7 @@ class TestAnchorAlignHandlerExecute:
             students,
             max_comparisons,
             storage_id_map,
+            student_id_factory=None,
         ):
             calls["essay_refs_anchors"] = anchors
             calls["essay_refs_students"] = students
@@ -198,6 +229,7 @@ class TestAnchorAlignHandlerExecute:
             calls["compose_assignment_id"] = settings.assignment_id
             calls["compose_essay_refs"] = essay_refs
             calls["compose_prompt_ref"] = prompt_reference
+            calls["compose_llm_overrides"] = settings.llm_overrides
             return {"type": "ELS_CJAssessmentRequestV1"}
 
         def fake_write_cj_request_envelope(
@@ -345,6 +377,22 @@ class TestAnchorAlignHandlerExecute:
         assert calls["report_batch_id"] == settings.batch_id
         assert calls["report_output_dir"] == settings.output_dir
         assert calls["report_anchor_grade_map"] == {"anchor_001": "A", "anchor_002": "C"}
+        # Custom prompts are passed through to report generator when provided
+        # (in this test we did not supply prompt files, so they may be None)
+        assert "report_system_prompt_text" in calls
+        assert "report_rubric_text" in calls
+
+        # LLM overrides from CLI (provider/model/etc.) are preserved when
+        # AnchorAlignHandler adds prompt/rubric overrides.
+        overrides = calls["compose_llm_overrides"]
+        assert overrides is not None
+        # Provider override preserved (string or enum)
+        assert overrides.provider_override is not None
+        assert "anthropic" in str(overrides.provider_override).lower()
+        # Model + other overrides preserved
+        assert overrides.model_override == "claude-sonnet-4-5-20250929"
+        assert overrides.temperature_override == 0.1
+        assert overrides.max_tokens_override == 2048
 
         # Validation logging uses artefact_path from stub writer
         assert calls["logged_artefact_path"] == artefact_path

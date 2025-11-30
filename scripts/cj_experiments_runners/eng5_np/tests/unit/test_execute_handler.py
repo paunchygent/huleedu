@@ -248,6 +248,7 @@ class TestExecuteHandlerExecute:
             students,
             max_comparisons,
             storage_id_map,
+            student_id_factory=None,
         ):
             calls["essay_refs_anchors"] = anchors
             calls["essay_refs_students"] = students

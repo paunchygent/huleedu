@@ -61,6 +61,7 @@ class ComparisonRecordBuilder:
     loser_id: str = "student::essay_b"
     confidence: float = 3.0
     justification: str = "Winner demonstrates better quality."
+    status: str = "succeeded"
 
     def with_winner(self, winner_id: str) -> ComparisonRecordBuilder:
         """Set the winner essay ID."""
@@ -89,6 +90,7 @@ class ComparisonRecordBuilder:
             "loser_id": self.loser_id,
             "confidence": self.confidence,
             "justification": self.justification,
+            "status": self.status,
         }
 
 

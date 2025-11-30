@@ -16,13 +16,18 @@ from common_core.events.cj_assessment_events import LLMConfigOverrides
 from scripts.cj_experiments_runners.eng5_np.alignment_report import (
     generate_alignment_report,
 )
+from scripts.cj_experiments_runners.eng5_np.anchor_utils import extract_grade_from_filename
 from scripts.cj_experiments_runners.eng5_np.artefact_io import (
     load_anchor_grade_map,
+    load_anchor_id_lookup,
     write_stub_artefact,
 )
 from scripts.cj_experiments_runners.eng5_np.content_upload import upload_essays_parallel
 from scripts.cj_experiments_runners.eng5_np.hydrator import AssessmentRunHydrator
-from scripts.cj_experiments_runners.eng5_np.inventory import build_essay_refs
+from scripts.cj_experiments_runners.eng5_np.inventory import (
+    FileRecord,
+    build_essay_refs,
+)
 from scripts.cj_experiments_runners.eng5_np.kafka_flow import (
     publish_envelope_to_kafka,
     run_publish_and_capture,
@@ -36,6 +41,7 @@ from scripts.cj_experiments_runners.eng5_np.requests import (
     write_cj_request_envelope,
 )
 from scripts.cj_experiments_runners.eng5_np.schema import ensure_schema_available
+from scripts.cj_experiments_runners.eng5_np.utils import make_anchor_key
 
 if TYPE_CHECKING:
     from scripts.cj_experiments_runners.eng5_np.inventory import RunnerInventory
@@ -113,8 +119,14 @@ class AnchorAlignHandler:
         settings.rubric_text = rubric_content
         settings.system_prompt_text = system_prompt_content
 
-        # Build LLMConfigOverrides with custom prompts
+        # Build LLMConfigOverrides with custom prompts, preserving any
+        # provider/model overrides that were already configured via the CLI.
+        existing_overrides = settings.llm_overrides
         llm_overrides = LLMConfigOverrides(
+            provider_override=getattr(existing_overrides, "provider_override", None),
+            model_override=getattr(existing_overrides, "model_override", None),
+            temperature_override=getattr(existing_overrides, "temperature_override", None),
+            max_tokens_override=getattr(existing_overrides, "max_tokens_override", None),
             system_prompt_override=system_prompt_content,
             judge_rubric_override=rubric_content,
         )
@@ -138,6 +150,9 @@ class AnchorAlignHandler:
                 batch_uuid=settings.batch_uuid,
             )
 
+        # Build mapping from anchor file name to normalized anchor ID for essay IDs
+        anchor_id_lookup = load_anchor_id_lookup(inventory.anchors_csv)
+
         # Upload anchor essays to Content Service (treat as students)
         typer.echo(
             f"Uploading {len(anchor_files)} anchor essays to Content Service",
@@ -151,11 +166,32 @@ class AnchorAlignHandler:
         )
 
         # Build essay refs - all anchors treated as students (no is_anchor flag)
+        def _anchor_align_student_id_factory(record: FileRecord) -> str:
+            """Generate essay_id for anchor-align-test student records.
+
+            Uses the normalized anchor ID from the grade CSV when available and
+            falls back to a generic anchor key derived from the filename.
+            IDs are prefixed with ``student::`` so CJ treats them as students
+            (not DB anchors) while still fitting within the 36-char limit.
+            """
+            raw_anchor_id = anchor_id_lookup.get(record.path.name) or record.path.stem
+            anchor_key = make_anchor_key(raw_anchor_id)
+            essay_id = f"student::{anchor_key}"
+            # Safety guard to respect CJ els_essay_id String(36) limit
+            if len(essay_id) > 36:  # pragma: no cover - defensive guard
+                # Fall back to a truncated deterministic ID while preserving prefix
+                from scripts.cj_experiments_runners.eng5_np.utils import generate_essay_id
+
+                suffix = generate_essay_id(anchor_key, max_length=36 - len("student::"))
+                essay_id = f"student::{suffix}"
+            return essay_id
+
         essay_refs = build_essay_refs(
             anchors=[],  # No anchors in request - all treated as students
             students=anchor_files,
             max_comparisons=settings.max_comparisons,
             storage_id_map=storage_id_map,
+            student_id_factory=_anchor_align_student_id_factory,
         )
 
         # Compose request with assignment_id=None to trigger "GUEST" behavior
@@ -229,7 +265,23 @@ class AnchorAlignHandler:
             )
 
             # Generate alignment report
+            # Prefer explicit grade map from anchors CSV when provided.
             anchor_grade_map = load_anchor_grade_map(inventory.anchors_csv)
+
+            # Fallback: derive expert grades directly from anchor filenames when
+            # the CSV does not describe the current anchors (ENG5 vt_2017 set).
+            if not anchor_grade_map:
+                local_anchor_id_lookup = load_anchor_id_lookup(inventory.anchors_csv)
+                derived_map: dict[str, str] = {}
+                for record in inventory.anchor_docs.files:
+                    if not record.exists:
+                        continue
+                    raw_anchor_id = local_anchor_id_lookup.get(record.path.name) or record.path.stem
+                    anchor_key = make_anchor_key(raw_anchor_id)
+                    grade = extract_grade_from_filename(record.path.name)
+                    derived_map[anchor_key] = grade
+                anchor_grade_map = derived_map
+
             report_path = generate_alignment_report(
                 hydrator=hydrator,
                 anchor_grade_map=anchor_grade_map,

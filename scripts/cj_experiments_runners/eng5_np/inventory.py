@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Mapping, Sequence
+from typing import Callable, Iterable, Mapping, Sequence
 
 import typer
 
@@ -171,6 +171,7 @@ def build_essay_refs(
     students: Sequence[FileRecord],
     max_comparisons: int | None = None,
     storage_id_map: Mapping[str, str] | None = None,
+    student_id_factory: Callable[[FileRecord], str] | None = None,
 ) -> list:
     """Create essay refs combining anchor and student files.
 
@@ -198,6 +199,7 @@ def build_essay_refs(
             limited_anchors,
             prefix="anchor",
             storage_id_map=storage_id_map,
+            id_factory=None,
         )
     )
     refs.extend(
@@ -205,6 +207,7 @@ def build_essay_refs(
             limited_students,
             prefix="student",
             storage_id_map=storage_id_map,
+            id_factory=student_id_factory,
         )
     )
     return refs
@@ -215,6 +218,7 @@ def _records_to_refs(
     *,
     prefix: str,
     storage_id_map: Mapping[str, str] | None,
+    id_factory: Callable[[FileRecord], str] | None = None,
 ) -> list:
     from common_core.metadata_models import EssayProcessingInputRefV1
 
@@ -222,7 +226,10 @@ def _records_to_refs(
     for record in records:
         if not record.exists:
             continue
-        essay_id = generate_essay_id(record.path.stem, max_length=36)
+        if id_factory is not None:
+            essay_id = id_factory(record)
+        else:
+            essay_id = generate_essay_id(record.path.stem, max_length=36)
         checksum = record.checksum or sha256_of_file(record.path)
         if storage_id_map is None:
             text_storage_id = f"{prefix}::{checksum}"
@@ -255,11 +262,6 @@ def apply_comparison_limit(
     # In this case, empty anchors list is expected since CJ pulls them from the database
     if not students:
         raise ComparisonValidationError("At least one student essay is required.")
-
-    if max_comparisons is not None and not anchors:
-        raise ComparisonValidationError(
-            "At least one anchor essay is required when using --max-comparisons with local slicing."
-        )
 
     if max_comparisons is None:
         return list(anchors), list(students), None

@@ -11,6 +11,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from scripts.cj_experiments_runners.eng5_np.utils import make_anchor_key, sanitize_identifier
+
 if TYPE_CHECKING:
     from scripts.cj_experiments_runners.eng5_np.hydrator import AssessmentRunHydrator
 
@@ -62,6 +64,7 @@ class AnchorResult:
     wins: int
     losses: int
     win_rate: float
+    source_file_name: str | None = None
 
 
 @dataclass
@@ -75,6 +78,17 @@ class Inversion:
     winner: str
     confidence: float
     justification: str
+
+
+def _build_successful_comparisons(
+    llm_comparisons: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Return only successful comparison records.
+
+    ENG5 reporting semantics must match CJ: only successful comparisons
+    (those that contributed to BT scoring) are included in metrics.
+    """
+    return [c for c in llm_comparisons if c.get("status") == "succeeded"]
 
 
 def compute_kendall_tau(actual_ranks: list[int], expected_ranks: list[int]) -> float:
@@ -114,6 +128,7 @@ def _build_anchor_results(
     bt_summary: list[dict[str, Any]],
     llm_comparisons: list[dict[str, Any]],
     anchor_grade_map: dict[str, str],
+    anchor_filename_map: dict[str, str],
 ) -> list[AnchorResult]:
     """Build structured anchor results from BT summary.
 
@@ -125,11 +140,13 @@ def _build_anchor_results(
     Returns:
         List of AnchorResult objects sorted by expected rank
     """
-    # Build win/loss counts from comparisons
+    # Build win/loss counts from successful comparisons only
     wins: dict[str, int] = {}
     losses: dict[str, int] = {}
 
     for comp in llm_comparisons:
+        if comp.get("status") != "succeeded":
+            continue
         winner = comp.get("winner_id", "")
         loser = comp.get("loser_id", "")
         if winner:
@@ -142,9 +159,16 @@ def _build_anchor_results(
     for entry in bt_summary:
         essay_id = entry.get("essay_id", "")
         # Extract anchor ID from essay_id (format: "student::anchor_xxx" or similar)
-        anchor_id = essay_id.replace("student::", "").replace("anchor::", "")
+        raw_anchor_id = essay_id.replace("student::", "").replace("anchor::", "")
+        normalized_anchor_id = sanitize_identifier(raw_anchor_id) if raw_anchor_id else ""
+        anchor_key = make_anchor_key(normalized_anchor_id or raw_anchor_id) if raw_anchor_id else ""
 
-        expected_grade = anchor_grade_map.get(anchor_id, "UNKNOWN")
+        expected_grade = (
+            anchor_grade_map.get(anchor_key)
+            or anchor_grade_map.get(normalized_anchor_id)
+            or anchor_grade_map.get(raw_anchor_id)
+            or "UNKNOWN"
+        )
         bt_score = entry.get("theta", 0.0)
         actual_rank = entry.get("rank", 0)
 
@@ -153,9 +177,15 @@ def _build_anchor_results(
         total = essay_wins + essay_losses
         win_rate = essay_wins / total if total > 0 else 0.0
 
+        source_file_name = (
+            anchor_filename_map.get(anchor_key)
+            or anchor_filename_map.get(normalized_anchor_id)
+            or anchor_filename_map.get(raw_anchor_id)
+        )
+
         results.append(
             AnchorResult(
-                anchor_id=anchor_id,
+                anchor_id=raw_anchor_id,
                 expected_grade=expected_grade,
                 bt_score=bt_score,
                 actual_rank=actual_rank,
@@ -163,6 +193,7 @@ def _build_anchor_results(
                 wins=essay_wins,
                 losses=essay_losses,
                 win_rate=win_rate,
+                source_file_name=source_file_name,
             )
         )
 
@@ -191,8 +222,11 @@ def _detect_inversions(
         List of Inversion objects
     """
     inversions: list[Inversion] = []
+    seen_pairs: set[tuple[str, str]] = set()
 
     for comp in llm_comparisons:
+        if comp.get("status") != "succeeded":
+            continue
         winner_id = comp.get("winner_id", "")
         loser_id = comp.get("loser_id", "")
         confidence = comp.get("confidence", 0.0) or 0.0
@@ -202,14 +236,35 @@ def _detect_inversions(
         winner_anchor = winner_id.replace("student::", "").replace("anchor::", "")
         loser_anchor = loser_id.replace("student::", "").replace("anchor::", "")
 
-        winner_grade = anchor_grade_map.get(winner_anchor, "UNKNOWN")
-        loser_grade = anchor_grade_map.get(loser_anchor, "UNKNOWN")
+        winner_norm = sanitize_identifier(winner_anchor) if winner_anchor else ""
+        loser_norm = sanitize_identifier(loser_anchor) if loser_anchor else ""
+        winner_key = make_anchor_key(winner_norm or winner_anchor) if winner_anchor else ""
+        loser_key = make_anchor_key(loser_norm or loser_anchor) if loser_anchor else ""
+
+        winner_grade = (
+            anchor_grade_map.get(winner_key)
+            or anchor_grade_map.get(winner_norm)
+            or anchor_grade_map.get(winner_anchor)
+            or "UNKNOWN"
+        )
+        loser_grade = (
+            anchor_grade_map.get(loser_key)
+            or anchor_grade_map.get(loser_norm)
+            or anchor_grade_map.get(loser_anchor)
+            or "UNKNOWN"
+        )
 
         winner_rank = grade_to_rank(winner_grade)
         loser_rank = grade_to_rank(loser_grade)
 
         # Inversion: winner has worse (higher number) expected rank than loser
         if winner_rank > loser_rank:
+            # Use a normalized pair key so that multiple events for the same
+            # higher/lower grade anchors are counted once.
+            pair_key = (loser_anchor, winner_anchor)
+            if pair_key in seen_pairs:
+                continue
+            seen_pairs.add(pair_key)
             inversions.append(
                 Inversion(
                     higher_grade_anchor=loser_anchor,
@@ -264,21 +319,23 @@ def _format_report(
         "",
         "| Metric | Value |",
         "|--------|-------|",
-        f"| Total comparisons | {total_comparisons} |",
-        f"| Direct inversions | {inversion_count} |",
+        f"| Total comparisons (successful) | {total_comparisons} |",
+        f"| Direct inversions (unique pairs) | {inversion_count} |",
         f"| Zero-win anchors | {zero_win_count} |",
         f"| Kendall's tau | {kendall_tau:.3f} |",
         "",
         "## Per-Anchor Results",
         "",
-        "| Anchor | Grade | BT Score | Rank | Expected | Wins | Losses | Win Rate |",
-        "|--------|-------|----------|------|----------|------|--------|----------|",
+        "| Anchor ID | Grade | BT Score | Rank | Expected | Wins | Losses | Win Rate | Source |",
+        "|-----------|-------|----------|------|----------|------|--------|----------|--------|",
     ]
 
     for r in sorted(anchor_results, key=lambda x: x.expected_rank):
+        source_file = r.source_file_name or ""
         lines.append(
             f"| {r.anchor_id} | {r.expected_grade} | {r.bt_score:.3f} | "
-            f"{r.actual_rank} | {r.expected_rank} | {r.wins} | {r.losses} | {r.win_rate:.0%} |"
+            f"{r.actual_rank} | {r.expected_rank} | {r.wins} | {r.losses} | {r.win_rate:.0%} | "
+            f"{source_file} |"
         )
 
     if inversions:
@@ -365,13 +422,43 @@ def generate_alignment_report(
     else:
         artefact = hydrator.get_run_artefact()
         bt_summary = artefact.get("bt_summary", [])
-        llm_comparisons = artefact.get("llm_comparisons", [])
+        llm_comparisons_raw = artefact.get("llm_comparisons", [])
+        successful_comparisons = _build_successful_comparisons(llm_comparisons_raw)
+
+        # Build mapping from anchor identifiers to original filenames using
+        # the artefact inputs. This allows the report to show exactly which
+        # original anchor essay each CJ ID corresponds to, even when IDs are
+        # truncated/hashed for CJ length limits.
+        anchor_filename_map: dict[str, str] = {}
+        inputs = artefact.get("inputs", {}) or {}
+        for anchor in inputs.get("anchors", []):
+            anchor_id = str(anchor.get("anchor_id") or "").strip()
+            file_name = str(anchor.get("file_name") or "").strip()
+            if not anchor_id or not file_name:
+                continue
+
+            stem = Path(file_name).stem
+            candidates = {
+                anchor_id,
+                sanitize_identifier(anchor_id),
+                make_anchor_key(anchor_id),
+                stem,
+                sanitize_identifier(stem),
+                make_anchor_key(stem),
+            }
+            for key in candidates:
+                anchor_filename_map.setdefault(key, file_name)
 
         # Build anchor results
-        anchor_results = _build_anchor_results(bt_summary, llm_comparisons, anchor_grade_map)
+        anchor_results = _build_anchor_results(
+            bt_summary,
+            successful_comparisons,
+            anchor_grade_map,
+            anchor_filename_map,
+        )
 
         # Detect inversions
-        inversions = _detect_inversions(llm_comparisons, anchor_grade_map)
+        inversions = _detect_inversions(successful_comparisons, anchor_grade_map)
 
         # Compute metrics
         actual_ranks = [r.actual_rank for r in anchor_results]
@@ -386,7 +473,7 @@ def generate_alignment_report(
             timestamp=timestamp,
             system_prompt_text=system_prompt_text,
             rubric_text=rubric_text,
-            total_comparisons=len(llm_comparisons),
+            total_comparisons=len(successful_comparisons),
             inversion_count=len(inversions),
             kendall_tau=kendall_tau,
             zero_win_count=zero_win_count,

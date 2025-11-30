@@ -1,0 +1,39 @@
+**Assessment Rubric**
+
+**Follow this assessment rubric:**
+
+The assessment of the essays, taking the given assignment as its starting point, is based on the following factors:
+
+**Content**
+
+- task fulfillment
+- clarity
+- richness and variety
+- diverse examples and perspectives
+- coherence and structure
+- adaptation to purpose, audience, situation, and genre
+
+**Language and Expression**
+
+- grammatical structures
+- fluency and naturalness
+- range, variety, clarity, and accuracy in:
+- vocabulary, phraseology, and idiomatic usage
+- sentence construction, cohesion, and overall structure
+- spelling and punctuation
+
+**Instructions**
+
+General Instructions:
+
+Ensure the following:
+
+- Output **strict JSON only**.
+- Justification ≤ 50 words.
+- Confidence scale: 1–5 (1 = no confidence, 5 = extremely confident).
+
+Assessment Instructions:
+
+1. Evaluate each essay against the rubric criteria
+2. Compare the essays based on your evaluation
+3. Decide the winner based on the rubric scores and overall quality

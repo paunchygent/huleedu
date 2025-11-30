@@ -14,7 +14,11 @@ import typer
 
 from scripts.cj_experiments_runners.eng5_np.inventory import FileRecord, RunnerInventory
 from scripts.cj_experiments_runners.eng5_np.settings import RunnerSettings
-from scripts.cj_experiments_runners.eng5_np.utils import sanitize_identifier, sha256_of_file
+from scripts.cj_experiments_runners.eng5_np.utils import (
+    make_anchor_key,
+    sanitize_identifier,
+    sha256_of_file,
+)
 
 _EMPTY_HASH = "0" * 64
 
@@ -39,6 +43,7 @@ def write_stub_artefact(
     }
 
     grade_map = load_anchor_grade_map(inventory.anchors_csv)
+    anchor_id_lookup = load_anchor_id_lookup(inventory.anchors_csv)
     artefact = {
         "schema_version": schema.get("schema_version", "1.0.0"),
         "metadata": {
@@ -59,7 +64,11 @@ def write_stub_artefact(
         "inputs": {
             "instructions": _document_blob("Instructions", inventory.instructions),
             "prompt_reference": _document_blob("Prompt reference", inventory.prompt),
-            "anchors": _build_anchor_records(inventory.anchor_docs.files, grade_map),
+            "anchors": _build_anchor_records(
+                inventory.anchor_docs.files,
+                grade_map,
+                anchor_id_lookup,
+            ),
             "students": _build_student_records(inventory.student_docs.files),
         },
         "llm_comparisons": [],
@@ -116,13 +125,20 @@ def _document_blob(label: str, record: FileRecord) -> dict[str, Any]:
 
 
 def _build_anchor_records(
-    records: Sequence[FileRecord], grade_map: dict[str, str]
+    records: Sequence[FileRecord],
+    grade_map: dict[str, str],
+    anchor_id_lookup: dict[str, str] | None = None,
 ) -> list[dict[str, Any]]:
     entries: list[dict[str, Any]] = []
     for record in records:
         if not record.exists:
             continue
-        anchor_id = sanitize_identifier(record.path.stem)
+        if anchor_id_lookup:
+            anchor_id = anchor_id_lookup.get(record.path.name) or sanitize_identifier(
+                record.path.stem
+            )
+        else:
+            anchor_id = sanitize_identifier(record.path.stem)
         checksum = record.checksum or sha256_of_file(record.path)
         entries.append(
             {
@@ -184,15 +200,36 @@ def load_anchor_grade_map(record: FileRecord) -> dict[str, str]:
     Returns:
         Mapping of normalized anchor_id to letter grade string
     """
-    if not record.exists:
-        return {}
+    grade_map, _ = _parse_anchor_grade_csv(record)
+    return grade_map
 
+
+def load_anchor_id_lookup(record: FileRecord) -> dict[str, str]:
+    """Load mapping from anchor FILE-NAME to normalized anchor_id key."""
+
+    _, anchor_ids_by_filename = _parse_anchor_grade_csv(record)
+    return anchor_ids_by_filename
+
+
+def _parse_anchor_grade_csv(
+    record: FileRecord,
+) -> tuple[dict[str, str], dict[str, str]]:
+    """Parse anchor grade CSV into grade map and filename lookup.
+
+    Returns:
+        (grade_map, anchor_ids_by_filename)
+    """
     grade_map: dict[str, str] = {}
+    anchor_ids_by_filename: dict[str, str] = {}
+
+    if not record.exists:
+        return grade_map, anchor_ids_by_filename
+
     try:
         with record.path.open("r", encoding="utf-8") as handle:
             reader = csv.DictReader(handle)
             if not reader.fieldnames:
-                return {}
+                return grade_map, anchor_ids_by_filename
 
             lookup_fields = [
                 field
@@ -200,15 +237,20 @@ def load_anchor_grade_map(record: FileRecord) -> dict[str, str]:
                 if field.lower() in {"grade", "pred_mode_grade"}
             ]
             for row in reader:
-                anchor_id = row.get("ANCHOR-ID") or row.get("anchor_id")
-                if not anchor_id:
+                raw_anchor_id = row.get("ANCHOR-ID") or row.get("anchor_id")
+                file_name = row.get("FILE-NAME") or row.get("file_name")
+                if not raw_anchor_id:
                     continue
-                normalized_id = sanitize_identifier(anchor_id)
+
+                anchor_key = make_anchor_key(raw_anchor_id)
+                if file_name:
+                    anchor_ids_by_filename[file_name] = anchor_key
+
                 grade = next((row.get(field) for field in lookup_fields if row.get(field)), None)
                 if grade:
-                    grade_map[normalized_id] = str(grade)
+                    grade_map[anchor_key] = str(grade)
     except FileNotFoundError:
-        return {}
+        return {}, {}
     except Exception as exc:  # pragma: no cover - defensive guard
         typer.echo(f"⚠️  Failed to parse anchor grade map: {exc}", err=True)
-    return grade_map
+    return grade_map, anchor_ids_by_filename
