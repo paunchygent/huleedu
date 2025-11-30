@@ -301,7 +301,7 @@ consult a human operator before deciding or changing batching modes.
 
 The runner now exposes `--cj-system-prompt/--no-cj-system-prompt`. Keep the default (`--cj-system-prompt`) to inject the canonical Comparative Judgement system instructions defined in `scripts/cj_experiments_runners/eng5_np/system_prompt.py`. Disable it only if you plan to supply a different override downstream; otherwise the provider falls back to the generic “LLM comparison engine” prompt.
 
-`--max-comparisons` is forwarded to CJ as envelope metadata for observability/cost control. It no longer slices essays locally; CJ configuration (`COMPARISONS_PER_STABILITY_CHECK_ITERATION` / `MAX_PAIRWISE_COMPARISONS`) determines actual comparison counts.
+`--max-comparisons` is forwarded to CJ as envelope metadata for observability/cost control. It no longer slices essays locally; CJ configuration (`MAX_PAIRWISE_COMPARISONS` and stability thresholds) determines actual comparison counts.
 
 ## What Happens During Execution
 
@@ -490,7 +490,7 @@ pdm run python -m scripts.cj_experiments_runners.eng5_np.cli \
 - 4 student essays uploaded to Content Service
 - 12 anchor essays loaded from database (no re-upload)
 - Total: 16 essays in comparison pool
-- Envelope metadata includes `max_comparisons=2`; CJ uses `COMPARISONS_PER_STABILITY_CHECK_ITERATION` / `MAX_PAIRWISE_COMPARISONS` to determine actual pair counts
+- Envelope metadata includes `max_comparisons=2`; CJ uses `MAX_PAIRWISE_COMPARISONS` (plus batch size and the matching strategy) to determine actual pair counts
 - All comparison tasks queued to LLM Provider Service (HTTP 202)
 - LLM callbacks received via Kafka
 - Grade projections calculated

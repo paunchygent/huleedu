@@ -6,7 +6,7 @@ status: draft
 phase: 1
 sprint_target: TBD
 created: 2025-11-29
-last_updated: 2025-11-29
+last_updated: 2025-11-30
 ---
 
 # EPIC-008: ENG5 NP Runner Refactor & Prompt Tuning
@@ -103,6 +103,30 @@ surface for future CJ experiments.
         key failure modes with mocked dependencies).
   - [ ] Typer CLI integration for at least PLAN, DRY_RUN, and argument
         validation in EXECUTE.
+
+### US-008.4: Controlled Grade Boundary Testing
+
+**As a** researcher tuning ENG5 prompts
+**I want** to run repeated comparisons of specific grade boundary pairs with position control
+**So that** I can measure prompt discrimination at critical grade boundaries with statistical confidence.
+
+**Acceptance Criteria**
+- [ ] CJ service accepts `pre_specified_comparisons` field (bypasses pair generation).
+  - [ ] New `PreSpecifiedComparison` model in event contract.
+  - [ ] Pair generation bypass logic in `pair_generation.py`.
+  - [ ] No position randomization when pre-specified (caller controls).
+- [ ] BOUNDARY_TEST mode in runner:
+  - [ ] `--boundary-pairs` CLI option (format: `HIGHER:LOWER,HIGHER:LOWER`).
+  - [ ] `--boundary-iterations` CLI option (default: 10).
+  - [ ] Builds `pre_specified_comparisons` list with position swapping.
+  - [ ] Single CJ batch submission for all comparisons.
+- [ ] Statistical report includes:
+  - [ ] Win rate (% times higher-grade essay wins).
+  - [ ] Mean confidence with 95% CI.
+  - [ ] Position bias (A-position win rate vs 50%).
+  - [ ] Agreement rate across iterations.
+
+**Related ADR**: ADR-0018 (CJ Pre-Specified Comparisons)
 
 ## Success Metrics (Experiment Outcomes)
 

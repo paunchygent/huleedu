@@ -274,6 +274,12 @@ class CJComparisonRepositoryProtocol(Protocol):
         batch_id: int,
     ) -> list["ComparisonPair"]: ...
 
+    async def get_coverage_metrics_for_batch(
+        self,
+        session: AsyncSession,
+        batch_id: int,
+    ) -> tuple[int, int]: ...
+
 
 class AssessmentInstructionRepositoryProtocol(Protocol):
     """Assessment instruction persistence operations."""

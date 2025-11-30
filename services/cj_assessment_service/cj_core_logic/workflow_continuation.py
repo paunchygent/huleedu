@@ -18,8 +18,18 @@ from services.cj_assessment_service.cj_core_logic.batch_submission import (
     merge_batch_processing_metadata,
 )
 from services.cj_assessment_service.cj_core_logic.grade_projector import GradeProjector
+from services.cj_assessment_service.cj_core_logic.pair_generation import PairGenerationMode
 from services.cj_assessment_service.cj_core_logic.scoring_ranking import BTScoringResult
-from services.cj_assessment_service.metrics import get_business_metrics
+from services.cj_assessment_service.cj_core_logic.workflow_decision import (
+    ContinuationDecision,
+    _build_continuation_context,
+    _can_attempt_small_net_resampling,
+    _compute_success_metrics,
+    decide,
+)
+from services.cj_assessment_service.cj_core_logic.workflow_diagnostics import (
+    record_workflow_decision,
+)
 from services.cj_assessment_service.models_api import EssayForComparison
 from services.cj_assessment_service.protocols import (
     AssessmentInstructionRepositoryProtocol,
@@ -40,19 +50,6 @@ if TYPE_CHECKING:
     from services.cj_assessment_service.config import Settings
 
 logger = create_service_logger("cj_assessment_service.workflow_continuation")
-
-
-def _get_numeric_setting(settings: "Settings", name: str, default: float) -> float:
-    """Safely extract a numeric settings value with a defensive fallback.
-
-    Tests often pass a Mock(spec=Settings); when the attribute is not explicitly
-    set it will be a non-numeric Mock object. This helper ensures we fall back
-    to a sensible default instead of propagating Mock instances into diagnostics.
-    """
-    raw_value = getattr(settings, name, default)
-    if isinstance(raw_value, (int, float)):
-        return float(raw_value)
-    return default
 
 
 async def check_workflow_continuation(
@@ -99,6 +96,7 @@ def _resolve_comparison_budget(
     metadata: dict[str, Any] | None,
     settings: "Settings",
 ) -> int:
+    """Resolve effective comparison budget from metadata or settings."""
     budget = metadata.get("comparison_budget") if isinstance(metadata, dict) else None
     max_pairs = budget.get("max_pairs_requested") if budget else None
 
@@ -142,23 +140,8 @@ async def trigger_existing_workflow_continuation(
 ) -> None:
     """Continue workflow after callback if conditions allow.
 
-    - Applies fairness retry if near completion and retry processor provided
     - Checks completion thresholds and triggers finalization via BatchFinalizer
-
-    Args:
-        batch_id: The CJ batch identifier
-        session_provider: Session provider for database transactions
-        batch_repository: Batch repository for batch operations
-        comparison_repository: Comparison repository for comparison operations
-        essay_repository: Essay repository for essay operations
-        instruction_repository: Instruction repository for assessment instructions
-        event_publisher: Event publisher protocol
-        settings: Application settings
-        content_client: Content client protocol
-        correlation_id: Request correlation ID
-        llm_interaction: LLM interaction protocol
-        matching_strategy: DI-injected strategy for computing optimal pairs
-        retry_processor: Optional retry processor for failed comparison handling
+    - Requests additional comparisons when budget remains and stability not reached
     """
     log_extra = {"correlation_id": str(correlation_id), "batch_id": batch_id}
     logger.info("Triggering workflow continuation", extra=log_extra)
@@ -196,9 +179,11 @@ async def trigger_existing_workflow_continuation(
         config_overrides_payload = (
             metadata.get("config_overrides") if isinstance(metadata, dict) else None
         )
-
         llm_overrides_payload = (
             metadata.get("llm_overrides") if isinstance(metadata, dict) else None
+        )
+        original_request_payload = (
+            metadata.get("original_request") if isinstance(metadata, dict) else None
         )
 
         max_pairs_cap = _resolve_comparison_budget(metadata, settings)
@@ -209,24 +194,16 @@ async def trigger_existing_workflow_continuation(
         denominator = batch_state.completion_denominator()
         callbacks_reached_cap = denominator > 0 and callbacks_received >= denominator
 
-        # Derive success-rate semantics for PR-2 safeguards
-        success_rate: float | None = None
-        success_rate_threshold_raw: Any = getattr(settings, "MIN_SUCCESS_RATE_THRESHOLD", None)
-        success_rate_threshold: float | None
-        if isinstance(success_rate_threshold_raw, (int, float)):
-            success_rate_threshold = float(success_rate_threshold_raw)
-        else:
-            # Disable success-rate guard when settings are not numeric (e.g. loose mocks)
-            success_rate_threshold = None
-
-        if callbacks_received > 0:
-            success_rate = completed / callbacks_received
-
-        zero_successes = callbacks_received > 0 and completed == 0
-        below_success_threshold = (
-            success_rate is not None
-            and success_rate_threshold is not None
-            and success_rate < success_rate_threshold
+        (
+            success_rate,
+            zero_successes,
+            below_success_threshold,
+            success_rate_threshold,
+        ) = _compute_success_metrics(
+            completed=completed,
+            failed=failed,
+            callbacks_received=callbacks_received,
+            settings=settings,
         )
 
         essays = await essay_repository.get_essays_for_cj_batch(
@@ -238,20 +215,15 @@ async def trigger_existing_workflow_continuation(
                 id=essay.els_essay_id,
                 text_content=essay.assessment_input_text,
                 current_bt_score=essay.current_bt_score,
-                is_anchor=essay.is_anchor,
+                is_anchor=bool(getattr(essay, "is_anchor", False)),
             )
             for essay in essays
         ]
 
         previous_scores = _extract_previous_scores(metadata)
 
-        max_score_change = None  # Use None instead of float("inf") for JSON compatibility
-        stability_passed = False
-        bt_se_summary: dict[str, float | int] | None = None
-        bt_se_inflated = False
-        comparison_coverage_sparse = False
-        has_isolated_items = False
         bt_scoring_results: list[BTScoringResult] = []
+        bt_se_summary: dict[str, float | int] | None = None
 
         try:
             current_scores = await scoring_ranking.record_comparisons_and_update_scores(
@@ -287,66 +259,125 @@ async def trigger_existing_workflow_continuation(
             )
             return
 
-        if previous_scores:
-            max_score_change = scoring_ranking.check_score_stability(
-                current_scores,
-                previous_scores,
-                stability_threshold=settings.SCORE_STABILITY_THRESHOLD,
-            )
+        ctx = await _build_continuation_context(
+            batch_id=batch_id,
+            batch_state=batch_state,
+            metadata=metadata,
+            settings=settings,
+            current_scores=current_scores,
+            previous_scores=previous_scores,
+            callbacks_received=callbacks_received,
+            pending_callbacks=pending_callbacks,
+            completed=completed,
+            failed=failed,
+            denominator=denominator,
+            max_pairs_cap=max_pairs_cap,
+            pairs_submitted=pairs_submitted,
+            pairs_remaining=pairs_remaining,
+            budget_exhausted=budget_exhausted,
+            callbacks_reached_cap=callbacks_reached_cap,
+            success_rate=success_rate,
+            success_rate_threshold=success_rate_threshold,
+            zero_successes=zero_successes,
+            below_success_threshold=below_success_threshold,
+            bt_se_summary=bt_se_summary,
+            comparison_repository=comparison_repository,
+            session=session,
+            log_extra=log_extra,
+        )
 
-            success_rate_ok = (
-                success_rate is None
-                or success_rate_threshold is None
-                or success_rate >= success_rate_threshold
-            )
+    # Outside the DB session: persist metadata and drive actions.
+    metadata_already_merged = False
 
-            stability_passed = (
-                callbacks_received >= settings.MIN_COMPARISONS_FOR_STABILITY_CHECK
-                and max_score_change <= settings.SCORE_STABILITY_THRESHOLD
-                and success_rate_ok
-            )
-
-        metadata_updates: dict[str, Any] = {
-            "bt_scores": current_scores,
-            "last_scored_iteration": batch_state.current_iteration,
-            "last_score_change": max_score_change,
-        }
-
-        if bt_se_summary is not None:
-            metadata_updates["bt_se_summary"] = bt_se_summary
-            mean_se = float(bt_se_summary.get("mean_se", 0.0))
-            max_se = float(bt_se_summary.get("max_se", 0.0))
-            mean_comparisons_per_item = float(bt_se_summary.get("mean_comparisons_per_item", 0.0))
-            isolated_items = int(bt_se_summary.get("isolated_items", 0))
-
-            mean_se_threshold = _get_numeric_setting(settings, "BT_MEAN_SE_WARN_THRESHOLD", 0.4)
-            max_se_threshold = _get_numeric_setting(settings, "BT_MAX_SE_WARN_THRESHOLD", 0.8)
-            min_mean_comparisons_threshold = _get_numeric_setting(
-                settings,
-                "BT_MIN_MEAN_COMPARISONS_PER_ITEM",
-                1.0,
-            )
-
-            bt_se_inflated = mean_se > mean_se_threshold or max_se > max_se_threshold
-            comparison_coverage_sparse = mean_comparisons_per_item < min_mean_comparisons_threshold
-            has_isolated_items = isolated_items > 0
-
-            metadata_updates["bt_quality_flags"] = {
-                "bt_se_inflated": bt_se_inflated,
-                "comparison_coverage_sparse": comparison_coverage_sparse,
-                "has_isolated_items": has_isolated_items,
+    can_attempt_resampling = _can_attempt_small_net_resampling(ctx)
+    if can_attempt_resampling and ctx.resampling_pass_count < ctx.small_net_resampling_cap:
+        metadata_updates = dict(ctx.metadata_updates)
+        metadata_updates.update(
+            {
+                "max_possible_pairs": ctx.max_possible_pairs,
+                "successful_pairs_count": ctx.successful_pairs_count,
+                "unique_coverage_complete": ctx.unique_coverage_complete,
+                "resampling_pass_count": ctx.resampling_pass_count + 1,
             }
+        )
+        await merge_batch_processing_metadata(
+            session_provider=session_provider,
+            cj_batch_id=batch_id,
+            metadata_updates=metadata_updates,
+            correlation_id=correlation_id,
+        )
+        metadata_already_merged = True
 
-            # Record diagnostic-only Prometheus counters for batch quality indicators.
-            business_metrics = get_business_metrics()
-            se_inflated_counter = business_metrics.get("cj_bt_se_inflated_batches_total")
-            sparse_coverage_counter = business_metrics.get("cj_bt_sparse_coverage_batches_total")
+        submitted = await comparison_processing.request_additional_comparisons_for_batch(
+            cj_batch_id=batch_id,
+            session_provider=session_provider,
+            batch_repository=batch_repository,
+            essay_repository=essay_repository,
+            comparison_repository=comparison_repository,
+            instruction_repository=instruction_repository,
+            llm_interaction=llm_interaction,
+            matching_strategy=matching_strategy,
+            settings=settings,
+            correlation_id=correlation_id,
+            log_extra=log_extra,
+            llm_overrides_payload=llm_overrides_payload,
+            config_overrides_payload=config_overrides_payload,
+            original_request_payload=original_request_payload,
+            mode=PairGenerationMode.RESAMPLING,
+        )
+        if submitted:
+            return
+        logger.info(
+            "No additional comparisons enqueued during small-net Phase-2 resampling",
+            extra={**log_extra, "pairs_remaining": ctx.pairs_remaining},
+        )
 
-            if bt_se_inflated and se_inflated_counter is not None:
-                se_inflated_counter.inc()
-            if comparison_coverage_sparse and sparse_coverage_counter is not None:
-                sparse_coverage_counter.inc()
+    decision = decide(ctx)
 
+    record_workflow_decision(ctx, decision)
+
+    logger.info(
+        "Continuation decision evaluated",
+        extra={
+            **log_extra,
+            "decision": decision.value,
+            "callbacks_received": ctx.callbacks_received,
+            "denominator": ctx.denominator,
+            "max_score_change": ctx.max_score_change,
+            "success_rate": ctx.success_rate,
+            "success_rate_threshold": ctx.success_rate_threshold,
+            "callbacks_reached_cap": ctx.callbacks_reached_cap,
+            "budget_exhausted": ctx.budget_exhausted,
+            "pairs_remaining": ctx.pairs_remaining,
+            "is_small_net": ctx.is_small_net,
+            "small_net_cap_reached": ctx.small_net_cap_reached,
+            "bt_se_inflated": ctx.bt_se_inflated,
+            "comparison_coverage_sparse": ctx.comparison_coverage_sparse,
+            "has_isolated_items": ctx.has_isolated_items,
+        },
+    )
+
+    if not metadata_already_merged:
+        if can_attempt_resampling and ctx.resampling_pass_count >= ctx.small_net_resampling_cap:
+            logger.info(
+                "Small-net Phase-2 resampling cap reached; falling back to finalization",
+                extra={
+                    **log_extra,
+                    "expected_essay_count": ctx.expected_essay_count,
+                    "resampling_pass_count": ctx.resampling_pass_count,
+                    "small_net_phase2_entered": True,
+                },
+            )
+
+        metadata_updates = dict(ctx.metadata_updates)
+        metadata_updates.update(
+            {
+                "max_possible_pairs": ctx.max_possible_pairs,
+                "successful_pairs_count": ctx.successful_pairs_count,
+                "unique_coverage_complete": ctx.unique_coverage_complete,
+                "resampling_pass_count": ctx.resampling_pass_count,
+            }
+        )
         await merge_batch_processing_metadata(
             session_provider=session_provider,
             cj_batch_id=batch_id,
@@ -354,138 +385,99 @@ async def trigger_existing_workflow_continuation(
             correlation_id=correlation_id,
         )
 
-        # Only finalize on stability, completion denominator, or global budget exhaustion
-        should_finalize = stability_passed or callbacks_reached_cap or budget_exhausted
-
-        # PR-2: when caps are reached but success-rate is too low, route to failure
-        should_fail_due_to_success_rate = (
-            should_finalize
-            and callbacks_received > 0
-            and (callbacks_reached_cap or budget_exhausted)
-            and (zero_successes or below_success_threshold)
-        )
-
-        logger.info(
-            "Callback iteration complete; evaluated stability",
+    if decision is ContinuationDecision.FINALIZE_FAILURE:
+        logger.warning(
+            "Finalizing batch as FAILED due to low success rate",
             extra={
                 **log_extra,
-                "callbacks_received": callbacks_received,
-                "callbacks_reached_cap": callbacks_reached_cap,
-                "denominator": denominator,
-                "stability_passed": stability_passed,
-                "max_score_change": max_score_change,
-                "pairs_remaining": pairs_remaining,
-                "budget_exhausted": budget_exhausted,
-                "should_finalize": should_finalize,
-                "success_rate": success_rate,
-                "bt_se_inflated": bt_se_inflated,
-                "comparison_coverage_sparse": comparison_coverage_sparse,
-                "has_isolated_items": has_isolated_items,
-                "success_rate_threshold": success_rate_threshold,
-                "zero_successes": zero_successes,
-                "should_fail_due_to_success_rate": should_fail_due_to_success_rate,
+                "callbacks_received": ctx.callbacks_received,
+                "completed_comparisons": ctx.completed,
+                "failed_comparisons": ctx.failed,
+                "success_rate": ctx.success_rate,
+                "success_rate_threshold": ctx.success_rate_threshold,
+                "callbacks_reached_cap": ctx.callbacks_reached_cap,
+                "budget_exhausted": ctx.budget_exhausted,
             },
         )
+        if grade_projector is None:
+            raise ValueError(
+                "grade_projector is required for failure finalization. "
+                "Please inject a GradeProjector instance via DI.",
+            )
 
-        if should_fail_due_to_success_rate:
-            logger.warning(
-                "Finalizing batch as FAILED due to low success rate",
-                extra={
-                    **log_extra,
-                    "callbacks_received": callbacks_received,
-                    "completed_comparisons": completed,
-                    "failed_comparisons": failed,
-                    "success_rate": success_rate,
-                    "success_rate_threshold": success_rate_threshold,
-                    "callbacks_reached_cap": callbacks_reached_cap,
-                    "budget_exhausted": budget_exhausted,
-                },
-            )
-            if grade_projector is None:
-                raise ValueError(
-                    "grade_projector is required for failure finalization. "
-                    "Please inject a GradeProjector instance via DI.",
-                )
+        finalizer = BatchFinalizer(
+            session_provider=session_provider,
+            batch_repository=batch_repository,
+            comparison_repository=comparison_repository,
+            essay_repository=essay_repository,
+            event_publisher=event_publisher,
+            content_client=content_client,
+            settings=settings,
+            grade_projector=grade_projector,
+        )
+        await finalizer.finalize_failure(
+            batch_id=batch_id,
+            correlation_id=correlation_id,
+            log_extra=log_extra,
+            failure_reason="low_success_rate",
+            failure_details={
+                "callbacks_received": ctx.callbacks_received,
+                "completed_comparisons": ctx.completed,
+                "failed_comparisons": ctx.failed,
+                "success_rate": ctx.success_rate,
+                "success_rate_threshold": ctx.success_rate_threshold,
+                "callbacks_reached_cap": ctx.callbacks_reached_cap,
+                "budget_exhausted": ctx.budget_exhausted,
+            },
+        )
+        return
 
-            finalizer = BatchFinalizer(
-                session_provider=session_provider,
-                batch_repository=batch_repository,
-                comparison_repository=comparison_repository,
-                essay_repository=essay_repository,
-                event_publisher=event_publisher,
-                content_client=content_client,
-                settings=settings,
-                grade_projector=grade_projector,
+    if decision is ContinuationDecision.FINALIZE_SCORING:
+        logger.info("Finalizing batch after stability/budget evaluation", extra=log_extra)
+        if grade_projector is None:
+            raise ValueError(
+                "grade_projector is required for finalization. "
+                "Please inject a GradeProjector instance via DI.",
             )
-            await finalizer.finalize_failure(
-                batch_id=batch_id,
-                correlation_id=correlation_id,
-                log_extra=log_extra,
-                failure_reason="low_success_rate",
-                failure_details={
-                    "callbacks_received": callbacks_received,
-                    "completed_comparisons": completed,
-                    "failed_comparisons": failed,
-                    "success_rate": success_rate,
-                    "success_rate_threshold": success_rate_threshold,
-                    "callbacks_reached_cap": callbacks_reached_cap,
-                    "budget_exhausted": budget_exhausted,
-                },
-            )
+
+        finalizer = BatchFinalizer(
+            session_provider=session_provider,
+            batch_repository=batch_repository,
+            comparison_repository=comparison_repository,
+            essay_repository=essay_repository,
+            event_publisher=event_publisher,
+            content_client=content_client,
+            settings=settings,
+            grade_projector=grade_projector,
+        )
+        await finalizer.finalize_scoring(
+            batch_id=batch_id,
+            correlation_id=correlation_id,
+            log_extra=log_extra,
+        )
+        return
+
+    if decision is ContinuationDecision.REQUEST_MORE_COMPARISONS:
+        submitted = await comparison_processing.request_additional_comparisons_for_batch(
+            cj_batch_id=batch_id,
+            session_provider=session_provider,
+            batch_repository=batch_repository,
+            essay_repository=essay_repository,
+            comparison_repository=comparison_repository,
+            instruction_repository=instruction_repository,
+            llm_interaction=llm_interaction,
+            matching_strategy=matching_strategy,
+            settings=settings,
+            correlation_id=correlation_id,
+            log_extra=log_extra,
+            llm_overrides_payload=llm_overrides_payload,
+            config_overrides_payload=config_overrides_payload,
+            original_request_payload=original_request_payload,
+            mode=PairGenerationMode.COVERAGE,
+        )
+        if submitted:
             return
-
-        if should_finalize:
-            logger.info("Finalizing batch after stability/budget evaluation", extra=log_extra)
-            if grade_projector is None:
-                raise ValueError(
-                    "grade_projector is required for finalization. "
-                    "Please inject a GradeProjector instance via DI."
-                )
-            if grade_projector is None:
-                raise ValueError(
-                    "grade_projector is required for failure finalization. "
-                    "Please inject a GradeProjector instance via DI.",
-                )
-
-            finalizer = BatchFinalizer(
-                session_provider=session_provider,
-                batch_repository=batch_repository,
-                comparison_repository=comparison_repository,
-                essay_repository=essay_repository,
-                event_publisher=event_publisher,
-                content_client=content_client,
-                settings=settings,
-                grade_projector=grade_projector,
-            )
-            await finalizer.finalize_scoring(
-                batch_id=batch_id,
-                correlation_id=correlation_id,
-                log_extra=log_extra,
-            )
-            return
-
-        if pairs_remaining > 0:
-            submitted = await comparison_processing.request_additional_comparisons_for_batch(
-                cj_batch_id=batch_id,
-                session_provider=session_provider,
-                batch_repository=batch_repository,
-                essay_repository=essay_repository,
-                comparison_repository=comparison_repository,
-                instruction_repository=instruction_repository,
-                llm_interaction=llm_interaction,
-                matching_strategy=matching_strategy,
-                settings=settings,
-                correlation_id=correlation_id,
-                log_extra=log_extra,
-                llm_overrides_payload=llm_overrides_payload,
-                config_overrides_payload=config_overrides_payload,
-                original_request_payload=metadata.get("original_request")
-                if isinstance(metadata, dict)
-                else None,
-            )
-            if submitted:
-                return
-            logger.info(
-                "No additional comparisons enqueued despite remaining budget after stability check",
-                extra={**log_extra, "pairs_remaining": pairs_remaining},
-            )
+        logger.info(
+            "No additional comparisons enqueued despite remaining budget after stability check",
+            extra={**log_extra, "pairs_remaining": ctx.pairs_remaining},
+        )

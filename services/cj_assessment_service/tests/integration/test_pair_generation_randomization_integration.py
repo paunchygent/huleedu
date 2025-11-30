@@ -219,7 +219,6 @@ class TestPairGenerationRandomizationIntegration:
         test_settings.PAIR_GENERATION_SEED = 42
         # Allow generation of all pairwise comparisons for this batch
         test_settings.MAX_PAIRWISE_COMPARISONS = 1000
-        test_settings.COMPARISONS_PER_STABILITY_CHECK_ITERATION = 300
 
         # Step 1: Create a CJ batch with 12 anchors and 12 students
         cj_batch_id, bos_batch_id = await self._create_12x12_batch(

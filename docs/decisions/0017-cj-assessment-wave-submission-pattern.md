@@ -17,7 +17,7 @@ CJ Assessment must submit comparison tasks to LLM Provider. Options:
 2. Submit in waves with stability checks between
 
 ## Decision
-Implement **wave-based staged submission** for serial bundle mode.
+Implement **wave-based staged submission** for serial bundle mode using the existing callback-first continuation path (no separate iterative helper in `comparison_processing`).
 
 ### Wave Pattern
 1. Submit N comparisons (wave size configurable)
@@ -27,15 +27,20 @@ Implement **wave-based staged submission** for serial bundle mode.
 5. Else: dispatch next wave
 
 ### Configuration
-```python
-COMPARISONS_PER_STABILITY_CHECK_ITERATION: int = 10  # Comparisons per wave
-```
+
+Wave size (comparisons per callback iteration) is emergent from batch size,
+the matching strategy, and `MAX_PAIRWISE_COMPARISONS`; there is no dedicated
+per-wave cap. Stability is governed by:
+
+- `MIN_COMPARISONS_FOR_STABILITY_CHECK`
+- `SCORE_STABILITY_THRESHOLD`
+- `MAX_PAIRWISE_COMPARISONS`
 
 ### Callback-First Completion
 1. LLM requests are async
 2. Callbacks update completed/failed counters + last_activity_at
-3. Continuation triggers when callbacks_received == submitted_comparisons
-4. Recompute BT scores, check stability, decide next action
+3. Continuation triggers when `callbacks_received == submitted_comparisons` via `workflow_continuation.trigger_existing_workflow_continuation`
+4. `trigger_existing_workflow_continuation` recomputes BT scores, checks stability, and decides whether to request additional comparisons via `comparison_processing.request_additional_comparisons_for_batch` or finalize
 
 ## Consequences
 

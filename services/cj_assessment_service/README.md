@@ -169,9 +169,18 @@ prompt storage references end-to-end:
 
 ### Observability
 
-- Metric: `cj_admin_instruction_operations_total{operation,status}` increments on every CRUD call.
-  - Example success panel: `sum(rate(cj_admin_instruction_operations_total{status="success"}[5m])) by (operation)`
-  - Example failure alert: fire if `sum(rate(cj_admin_instruction_operations_total{status="failure"}[5m])) > 0.05`
+- Admin metrics:
+  - `cj_admin_instruction_operations_total{operation,status}` increments on every CRUD call.
+    - Example success panel: `sum(rate(cj_admin_instruction_operations_total{status="success"}[5m])) by (operation)`
+    - Example failure alert: fire if `sum(rate(cj_admin_instruction_operations_total{status="failure"}[5m])) > 0.05`
+- Workflow continuation / BT diagnostics:
+  - `cj_bt_se_inflated_batches_total` and `cj_bt_sparse_coverage_batches_total`:
+    - Driven by `cj_core_logic/workflow_diagnostics.record_bt_batch_quality(ctx)` from `ContinuationContext.bt_se_summary` and BT quality flags.
+    - Diagnostic-only indicators of BT SE inflation or sparse coverage; they do not change convergence thresholds.
+  - `cj_workflow_decisions_total{decision=...}`:
+    - Driven by `cj_core_logic/workflow_diagnostics.record_workflow_decision(ctx, decision)` from `workflow_continuation.trigger_existing_workflow_continuation`.
+    - Uses `ContinuationDecision` enum values as the `decision` label (`WAIT_FOR_CALLBACKS`, `FINALIZE_SCORING`, `FINALIZE_FAILURE`, `REQUEST_MORE_COMPARISONS`, `NO_OP`) and matches the `“Continuation decision evaluated”` structured log line.
+  - See `docs/operations/cj-assessment-runbook.md` and the CJ deep‑dive Grafana dashboard (`observability/grafana/dashboards/cj-assessment/HuleEdu_CJ_Assessment_Deep_Dive.json`) for example queries and panels.
 - Logs: structured via Rule 048 factories. Find auth failures with
   `{service="cj_assessment_service"} | json | request_path="/admin/v1/assessment-instructions"`
 - Traces: every request carries `CorrelationContext.uuid` so you can stitch admin activity to downstream anchor/grade actions.
@@ -354,9 +363,11 @@ ANTHROPIC_API_KEY=sk-ant-...
 GOOGLE_API_KEY=...
 
 # CJ Assessment Parameters
-MAX_PAIRWISE_COMPARISONS=150
+MAX_PAIRWISE_COMPARISONS=300
 SCORE_STABILITY_THRESHOLD=0.05
-COMPARISONS_PER_STABILITY_CHECK_ITERATION=10
+MIN_COMPARISONS_FOR_STABILITY_CHECK=12
+MIN_RESAMPLING_NET_SIZE=10
+MAX_RESAMPLING_PASSES_FOR_SMALL_NET=2
 
 # HTTP API Configuration
 HTTP_PORT=9090             # Port for health and metrics endpoints
@@ -377,8 +388,8 @@ selects the true provider-native batch API mode when available. When
 `CJ_ASSESSMENT_SERVICE_ENABLE_LLM_BATCHING_METADATA_HINTS` is `true`, every
 `LLMComparisonRequest.metadata` payload gains `cj_llm_batching_mode`, and when
 the convergence settings indicate a multi-iteration workflow
-(`COMPARISONS_PER_STABILITY_CHECK_ITERATION > 1`, `MIN_COMPARISONS_FOR_STABILITY_CHECK > 0`,
-`MAX_ITERATIONS > 1`, and batching mode != `per_request`), CJ also emits
+(`MIN_COMPARISONS_FOR_STABILITY_CHECK > 0`, `MAX_ITERATIONS > 1`, and batching
+mode != `per_request`), CJ also emits
 `comparison_iteration` so downstream services can distinguish waves. Callbacks
 echo the metadata verbatim, so the hints are safe to toggle provided consumers
 ignore unknown keys.
@@ -397,18 +408,18 @@ Per-request overrides live under `batch_config_overrides`. In addition to
 `resolve_effective_llm_batching_mode()` helper enforces the provider guardrail
 and exposes the final mode for logs, metadata, and downstream observability.
 
-`COMPARISONS_PER_STABILITY_CHECK_ITERATION` defines the number of new pairs
-generated per *wave*; `MAX_PAIRWISE_COMPARISONS` is an absolute guardrail on
-the batch. Both values are applied directly by
-`pair_generation.generate_comparison_tasks`, so adjust them via environment
-variables rather than hard-coding limits elsewhere.
+`MAX_PAIRWISE_COMPARISONS` is an absolute guardrail on the batch, and
+`MIN_COMPARISONS_FOR_STABILITY_CHECK`/`SCORE_STABILITY_THRESHOLD` determine
+when BT scores are considered stable enough to stop. Wave size (comparisons
+per callback iteration) emerges from batch size, the matching strategy, and
+budget rather than a dedicated per-wave cap.
 
 Set `CJ_ASSESSMENT_SERVICE_PAIR_GENERATION_SEED=<int>` only when you need reproducible pair ordering for debugging or deterministic tests. When unset (the default), pair generation randomizes essay A/B positions per pair to eliminate anchor bias while keeping the duplicate-detection logic intact.
 
 ### Completion & scoring triggers (stability-first)
 - Scoring now runs as soon as `completed_comparisons + failed_comparisons == submitted_comparisons`; no more waiting for the 5‑minute monitor sweep.
 - A batch finalizes when either BT scores are stable (`SCORE_STABILITY_THRESHOLD`, gated by `MIN_COMPARISONS_FOR_STABILITY_CHECK`) or total callbacks hit the comparison cap.
-- The completion denominator is `min(total_budget, nC2)` so small batches (e.g., 4 essays → 6 pairs) complete immediately after their callbacks instead of being judged against large global budgets.
+- The completion denominator is `min(total_budget or total_comparisons, nC2(actual_processed_essays))` so small batches (e.g., 4 essays → 6 pairs) complete immediately after their callbacks instead of being judged against large global budgets, and anchors are always included in the n‑choose‑2 calculation.
 - BatchMonitor remains recovery-only; healthy batches should finish via callback-driven scoring.
 
 ## Database Schema

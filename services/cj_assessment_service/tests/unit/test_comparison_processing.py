@@ -212,6 +212,10 @@ async def test_request_additional_comparisons_submits_new_iteration(
     assert submit_kwargs["cj_batch_id"] == 42
     assert submit_kwargs["session_provider"] is mock_session_provider
     assert submit_kwargs["llm_interaction"] is llm_interaction
+    # Continuation path defaults to COVERAGE mode for large-net / Phase-1 flows.
+    assert (
+        submit_kwargs["mode"] == cp.pair_generation.PairGenerationMode.COVERAGE  # type: ignore[attr-defined]
+    )
 
     request_data = submit_kwargs["request_data"]
     assert (

@@ -6,11 +6,11 @@ from uuid import UUID
 
 from common_core.models.error_models import ErrorDetail as CanonicalErrorDetail
 from huleedu_service_libs.logging_utils import create_service_logger
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.cj_assessment_service.models_api import ComparisonResult
-from services.cj_assessment_service.models_db import ComparisonPair
+from services.cj_assessment_service.models_db import ComparisonPair, ProcessedEssay
 from services.cj_assessment_service.protocols import CJComparisonRepositoryProtocol
 
 logger = create_service_logger("cj_assessment_service.repositories.comparison")
@@ -177,3 +177,62 @@ class PostgreSQLCJComparisonRepository(CJComparisonRepositoryProtocol):
         )
         result = await session.execute(stmt)
         return list(result.scalars().all())
+
+    async def get_coverage_metrics_for_batch(
+        self,
+        session: AsyncSession,
+        batch_id: int,
+    ) -> tuple[int, int]:
+        """Return (max_possible_pairs, successful_pairs_count) for the batch.
+
+        max_possible_pairs:
+            n-choose-2 over all ProcessedEssay nodes participating in this batch,
+            including anchors.
+
+        successful_pairs_count:
+            Number of unordered essay pairs with at least one successful comparison
+            (winner in {"essay_a", "essay_b"}) and no error_code set.
+        """
+        # Count distinct essays in the CJ graph for this batch.
+        stmt_n = select(func.count(func.distinct(ProcessedEssay.els_essay_id))).where(
+            ProcessedEssay.cj_batch_id == batch_id,
+        )
+        n_raw = await session.execute(stmt_n)
+        n_val = n_raw.scalar_one()
+        n = int(n_val or 0)
+        max_possible_pairs = (n * (n - 1)) // 2 if n > 1 else 0
+
+        # Build a subquery of normalized successful pairs to avoid double counting.
+        normalized_a = func.least(ComparisonPair.essay_a_els_id, ComparisonPair.essay_b_els_id)
+        normalized_b = func.greatest(ComparisonPair.essay_a_els_id, ComparisonPair.essay_b_els_id)
+
+        successful_pairs_subq = (
+            select(
+                normalized_a.label("essay_a_els_id"),
+                normalized_b.label("essay_b_els_id"),
+            )
+            .where(
+                ComparisonPair.cj_batch_id == batch_id,
+                ComparisonPair.error_code.is_(None),
+                ComparisonPair.winner.in_(("essay_a", "essay_b")),
+            )
+            .distinct()
+            .subquery()
+        )
+
+        stmt_success = select(func.count()).select_from(successful_pairs_subq)
+        success_raw = await session.execute(stmt_success)
+        success_val = success_raw.scalar_one()
+        successful_pairs_count = int(success_val or 0)
+
+        logger.debug(
+            "Computed coverage metrics for batch",
+            extra={
+                "cj_batch_id": batch_id,
+                "essay_count": n,
+                "max_possible_pairs": max_possible_pairs,
+                "successful_pairs_count": successful_pairs_count,
+            },
+        )
+
+        return max_possible_pairs, successful_pairs_count

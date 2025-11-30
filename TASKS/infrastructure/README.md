@@ -1,3 +1,19 @@
+---
+id: 'infrastructure-readme'
+title: 'Infrastructure & Orchestration Tasks README'
+type: 'doc'
+status: 'completed'
+priority: 'medium'
+domain: 'infrastructure'
+service: ''
+owner_team: 'infrastructure'
+owner: ''
+program: ''
+created: '2025-11-13'
+last_updated: '2025-11-13'
+related: []
+labels: []
+---
 # Infrastructure & Orchestration Tasks
 
 This directory contains task documents related to platform infrastructure, service orchestration, CI/CD, and cross-cutting operational concerns.

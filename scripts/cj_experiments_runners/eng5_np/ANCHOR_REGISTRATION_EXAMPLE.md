@@ -194,7 +194,7 @@ docker compose -f docker-compose.yml -f docker-compose.eng5-runner.yml run --rm 
 
 4. **Comparative Judgment**:
    - LLM performs pairwise comparisons across student-student, student-anchor, and anchor-anchor pairs.
-   - `COMPARISONS_PER_STABILITY_CHECK_ITERATION` and `MAX_PAIRWISE_COMPARISONS` from CJ’s settings determine how many pairs are generated per iteration and globally.
+   - `MAX_PAIRWISE_COMPARISONS` from CJ’s settings determines the global comparison budget; per-wave size emerges from batch size and the matching strategy.
 
 5. **Grade Projection**:
    - Bradley-Terry modelling uses the registered anchors for calibration.

@@ -51,7 +51,6 @@ class BatchingModeService:
             self.settings.LLM_BATCHING_MODE is not LLMBatchingMode.PER_REQUEST
             and getattr(self.settings, "MAX_ITERATIONS", 1) > 1
             and getattr(self.settings, "MIN_COMPARISONS_FOR_STABILITY_CHECK", 0) > 0
-            and getattr(self.settings, "COMPARISONS_PER_STABILITY_CHECK_ITERATION", 0) > 1
         )
 
     def build_metadata_context(

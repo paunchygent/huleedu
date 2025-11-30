@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from types import SimpleNamespace
+from typing import Any, cast
 from unittest.mock import AsyncMock, Mock
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from common_core.events.cj_assessment_events import GradeProjectionSummary
@@ -36,8 +37,18 @@ async def test_finalize_scoring_transitions_state(monkeypatch: pytest.MonkeyPatc
     essay_repo = AsyncMock(spec=CJEssayRepositoryProtocol)
 
     essay_repo.get_essays_for_cj_batch.return_value = [
-        SimpleNamespace(els_essay_id="ANCHOR_A", assessment_input_text="A", current_bt_score=0.0),
-        SimpleNamespace(els_essay_id="student-1", assessment_input_text="S1", current_bt_score=0.0),
+        SimpleNamespace(
+            els_essay_id="ANCHOR_A",
+            assessment_input_text="A",
+            current_bt_score=0.0,
+            is_anchor=True,
+        ),
+        SimpleNamespace(
+            els_essay_id="student-1",
+            assessment_input_text="S1",
+            current_bt_score=0.0,
+            is_anchor=False,
+        ),
     ]
     batch_repo.update_cj_batch_status = AsyncMock()
     batch_repo.update_batch_state = AsyncMock()
@@ -134,7 +145,26 @@ async def test_finalize_scoring_transitions_state(monkeypatch: pytest.MonkeyPatc
         log_extra=log_extra,
     )
 
-    assert publish_mock.await_count == 1
+    publish_mock.assert_awaited_once()
+
+    publish_call = cast(Any, publish_mock.await_args)
+    publish_kwargs = publish_call.kwargs
+
+    # Rankings and projections should be passed through, along with a rich publishing DTO
+    assert isinstance(publish_kwargs["rankings"], list)
+    assert publish_kwargs["grade_projections"] is not None
+
+    publishing_data = publish_kwargs["publishing_data"]
+    assert isinstance(publishing_data, bf.DualEventPublishingData)
+    assert publishing_data.bos_batch_id == batch.bos_batch_id
+    assert publishing_data.cj_batch_id == str(batch.id)
+    assert publishing_data.assignment_id == batch.assignment_id
+    assert publishing_data.course_code == batch.course_code
+    assert publishing_data.user_id == batch.user_id
+    assert publishing_data.org_id == batch.org_id
+
+    # Correlation ID used for publishing should match the original BOS correlation threading
+    assert publish_kwargs["correlation_id"] == UUID(batch.event_correlation_id)
     assert batch_repo.update_batch_state.await_count == 2
     batch_repo.update_batch_state.assert_any_await(
         session=session,

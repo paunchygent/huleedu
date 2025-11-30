@@ -305,7 +305,6 @@ labels in logs and reports.
   - CJ settings:
     - `CJ_ASSESSMENT_SERVICE_LLM_BATCHING_MODE=serial_bundle`
     - `CJ_ASSESSMENT_SERVICE_MAX_PAIRWISE_COMPARISONS` set to a safe cap (e.g. 150)
-    - `CJ_ASSESSMENT_SERVICE_COMPARISONS_PER_STABILITY_CHECK_ITERATION` = wave size (e.g. 10–25)
     - `CJ_ASSESSMENT_SERVICE_MIN_COMPARISONS_FOR_STABILITY_CHECK` ~ 10
     - `CJ_ASSESSMENT_SERVICE_SCORE_STABILITY_THRESHOLD` ~ 0.05
   - Effect: CJ submits comparisons in waves, runs BT stability after each wave, and can stop early
@@ -316,8 +315,10 @@ labels in logs and reports.
   - CJ settings (per environment, not per batch):
     - Keep `LLM_BATCHING_MODE=serial_bundle`.
     - Choose a cap `C` via `MAX_PAIRWISE_COMPARISONS` (or a runner override).
-    - Set `COMPARISONS_PER_STABILITY_CHECK_ITERATION >= C` if you want a single wave, or leave it
-      smaller for multiple waves.
+    - Wave size (comparisons per callback iteration) emerges from batch size,
+      matching strategy, and CJ’s comparison budget; tune stability via
+      `MIN_COMPARISONS_FOR_STABILITY_CHECK` / `SCORE_STABILITY_THRESHOLD` and cost
+      via `MAX_PAIRWISE_COMPARISONS`.
     - Set `MIN_COMPARISONS_FOR_STABILITY_CHECK > C` so the stability gate never passes.
   - Effect: CJ will always finalize only after the denominator/cap is reached; stability is
     effectively disabled without introducing a separate flag.

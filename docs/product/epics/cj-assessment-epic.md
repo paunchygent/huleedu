@@ -72,7 +72,7 @@ REGULAR: Upload → Student Matching → Spellcheck → CJ Assessment → Rankin
 ### Configuration Points
 - Convergence: SCORE_STABILITY_THRESHOLD, MIN_COMPARISONS_FOR_STABILITY_CHECK
 - Caching: PROMPT_CACHE_TTL_SECONDS, ENABLE_PROMPT_CACHING
-- Submission: COMPARISONS_PER_STABILITY_CHECK_ITERATION (wave size)
+- Submission: wave size emerges from batch size, matching strategy, and CJ comparison budget; stability thresholds and caps decide when to stop.
 
 ## Related ADRs
 - ADR-0015: CJ Assessment Convergence Tuning Strategy

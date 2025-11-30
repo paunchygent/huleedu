@@ -254,6 +254,14 @@ class LocalMockComparisonRepository(CJComparisonRepositoryProtocol):
         """Stub implementation."""
         return []
 
+    async def get_coverage_metrics_for_batch(
+        self,
+        session: AsyncSession,
+        batch_id: int,
+    ) -> tuple[int, int]:
+        """Stub implementation for coverage metrics."""
+        return (0, 0)
+
 
 def create_comparison_pair(
     cj_batch_id: int = 1,

@@ -24,7 +24,6 @@ architecture and Rules 070 / 075.
   - Governed by:
     - `MAX_PAIRWISE_COMPARISONS` (hard global cap)
     - `MIN_COMPARISONS_FOR_STABILITY_CHECK`
-    - `COMPARISONS_PER_STABILITY_CHECK_ITERATION` (stability cadence hint)
     - `SCORE_STABILITY_THRESHOLD`, `TARGET_MEAN_SE`
     - `MIN_SUCCESS_RATE_THRESHOLD`, `MAX_ITERATIONS`
 
@@ -111,8 +110,9 @@ flow) and a simpler pairing pattern improves clarity.
   - `compute_wave_size(n)` should remain strategy-driven (e.g. `n // 2` for a
     perfect matching) and used for logging/metrics.
   - Per-iteration budgets and stability cadence belong in the orchestration
-    layer; tests should treat `COMPARISONS_PER_STABILITY_CHECK_ITERATION` as a
-    *hint* for when stability is reevaluated, not a hard per-wave cap.
+    layer; tests should rely on `MIN_COMPARISONS_FOR_STABILITY_CHECK`,
+    `SCORE_STABILITY_THRESHOLD`, and `MAX_PAIRWISE_COMPARISONS` and treat wave
+    size as emergent, not hard-coded.
 
 ## 4. Fairness Counts and Error Handling (Alignment with PR 4)
 

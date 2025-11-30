@@ -1,6 +1,8 @@
 # HuleEdu TASKS Structure Specification
 
-This document is **normative**. All `TASKS/` files MUST comply.
+> NOTE: The canonical human-facing overview for `TASKS/` lives in `TASKS/README.md`.
+> This specification is the machine-oriented, detailed version of the same rules
+> and should not diverge from the README.
 
 ## 1. Purpose
 
@@ -95,16 +97,16 @@ Every task or programme-related file under `TASKS/` (excluding this spec and gen
 
 ```yaml
 ---
-id: TASK-XXXX                  # Globally unique identifier
+id: task-id-or-hub-id          # Globally unique identifier (kebab-case, matches filename)
 title: Short, factual title
-type: task                     # Optional: task | spike | doc | programme
-status: research               # One of: research|blocked|in_progress|completed|paused|archived
-priority: medium               # One of: low|medium|high|critical
-domain: assessment             # One of: assessment|content|identity|frontend|infrastructure|security|integrations|architecture|programs
+type: task                     # One of: task | story | doc | programme
+status: research               # One of: research | blocked | in_progress | completed | paused | archived
+priority: medium               # One of: low | medium | high | critical
+domain: assessment             # One of: assessment | content | identity | frontend | infrastructure | security | integrations | architecture | programs
 service: ""                    # Optional: service name (e.g. cj_assessment_service)
 owner_team: agents             # Default: agents (AI + automation). May be another team.
 owner: ""                      # Optional: human owner handle (e.g. "@username")
-program: ""                   # Optional: program key (e.g. "cj_confidence")
+program: ""                    # Optional: program key (e.g. "cj_confidence")
 created: YYYY-MM-DD            # Creation date
 last_updated: YYYY-MM-DD       # Last meaningful content or status change
 related: []                    # Optional: list of related task IDs or doc paths

@@ -14,12 +14,8 @@ from common_core.events.cj_assessment_events import LLMConfigOverrides
 from huleedu_service_libs.logging_utils import create_service_logger
 from pydantic import BaseModel, Field
 
-from services.cj_assessment_service.cj_core_logic import pair_generation, scoring_ranking
+from services.cj_assessment_service.cj_core_logic import pair_generation
 from services.cj_assessment_service.cj_core_logic.batch_config import BatchConfigOverrides
-from services.cj_assessment_service.cj_core_logic.batch_processor import BatchProcessor
-from services.cj_assessment_service.cj_core_logic.batch_submission import (
-    merge_batch_processing_metadata,
-)
 from services.cj_assessment_service.cj_core_logic.comparison_batch_orchestrator import (
     ComparisonBatchOrchestrator,
 )
@@ -32,7 +28,6 @@ from services.cj_assessment_service.cj_core_logic.llm_batching_service import (
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.models_api import (
     CJAssessmentRequestData,
-    ComparisonTask,
     EssayForComparison,
     OriginalCJRequestMetadata,
 )
@@ -77,6 +72,7 @@ async def submit_comparisons_for_async_processing(
     settings: Settings,
     correlation_id: UUID,
     log_extra: dict[str, Any],
+    mode: pair_generation.PairGenerationMode = pair_generation.PairGenerationMode.COVERAGE,
 ) -> bool:
     """Submit initial comparison batch for async LLM processing.
 
@@ -93,6 +89,7 @@ async def submit_comparisons_for_async_processing(
         settings: Application settings
         correlation_id: Request correlation ID
         log_extra: Logging context
+        mode: Pair generation mode (COVERAGE or RESAMPLING)
 
     Returns:
         True if submission successful, False otherwise
@@ -116,6 +113,7 @@ async def submit_comparisons_for_async_processing(
         request_data=request_data,
         correlation_id=correlation_id,
         log_extra=log_extra,
+        pair_generation_mode=mode,
     )
 
 
@@ -183,6 +181,7 @@ async def request_additional_comparisons_for_batch(
     llm_overrides_payload: dict[str, Any] | None,
     config_overrides_payload: dict[str, Any] | None,
     original_request_payload: dict[str, Any] | None,
+    mode: pair_generation.PairGenerationMode = pair_generation.PairGenerationMode.COVERAGE,
 ) -> bool:
     """Enqueue another comparison iteration using stored essays.
 
@@ -201,6 +200,7 @@ async def request_additional_comparisons_for_batch(
         llm_overrides_payload: LLM config overrides payload
         config_overrides_payload: Batch config overrides payload
         original_request_payload: Original request metadata payload
+        mode: Pair generation mode (COVERAGE or RESAMPLING)
 
     Returns:
         True if submission successful, False otherwise
@@ -329,182 +329,8 @@ async def request_additional_comparisons_for_batch(
         settings=settings,
         correlation_id=correlation_id,
         log_extra={**log_extra, "iteration": "continuation"},
+        mode=mode,
     )
-
-
-async def _process_comparison_iteration(
-    essays_for_api_model: list[EssayForComparison],
-    cj_batch_id: int,
-    session_provider: SessionProviderProtocol,
-    batch_repository: CJBatchRepositoryProtocol,
-    comparison_repository: CJComparisonRepositoryProtocol,
-    instruction_repository: AssessmentInstructionRepositoryProtocol,
-    llm_interaction: LLMInteractionProtocol,
-    matching_strategy: PairMatchingStrategyProtocol,
-    request_data: CJAssessmentRequestData,
-    settings: Settings,
-    model_override: str | None,
-    temperature_override: float | None,
-    max_tokens_override: int | None,
-    current_iteration: int,
-    correlation_id: UUID,
-    log_extra: dict[str, Any],
-) -> ComparisonIterationResult | None:
-    """Submit one bundled comparison iteration for a CJ batch.
-
-    NOTE:
-    - Prepared infrastructure for bundled, stability-driven BT convergence.
-    - Currently **unused** and not wired into workflow_continuation; it does
-      submission only (no score recomputation or stability decision yet).
-    - Target behavior is defined in
-      .claude/tasks/TASK-LLM-BATCH-STRATEGY-IMPLEMENTATION*.md
-      under the "bundled (iterative, stability-driven)" mode.
-
-    TODO[TASK-LLM-BATCH-STRATEGY-IMPLEMENTATION]:
-    Wire this into the callback/continuation path so that each bundle:
-      1) recomputes BT scores,
-      2) runs a stability check, and
-      3) decides whether to request another bundle or finalize.
-
-    Returns:
-        ComparisonIterationResult or None if no tasks generated
-    """
-    # Generate comparison tasks using injected matching strategy
-    comparison_tasks_for_llm: list[
-        ComparisonTask
-    ] = await pair_generation.generate_comparison_tasks(
-        essays_for_comparison=essays_for_api_model,
-        session_provider=session_provider,
-        comparison_repository=comparison_repository,
-        instruction_repository=instruction_repository,
-        matching_strategy=matching_strategy,
-        cj_batch_id=cj_batch_id,
-        max_pairwise_comparisons=settings.MAX_PAIRWISE_COMPARISONS,
-        correlation_id=correlation_id,
-        randomization_seed=settings.PAIR_GENERATION_SEED,
-    )
-
-    if not comparison_tasks_for_llm:
-        return None
-
-    batching_service = BatchingModeService(settings)
-    request_normalizer = ComparisonRequestNormalizer(settings)
-    normalized = request_normalizer.normalize(request_data)
-
-    effective_batching_mode = batching_service.resolve_effective_mode(
-        batch_config_overrides=normalized.batch_config_overrides,
-        provider_override=normalized.provider_override,
-    )
-
-    batching_service.record_metrics(
-        effective_mode=effective_batching_mode,
-        request_count=len(comparison_tasks_for_llm),
-        request_type=request_data.cj_request_type,
-    )
-
-    # Create batch processor and submit batch for async processing
-    batch_processor = BatchProcessor(
-        session_provider=session_provider,
-        llm_interaction=llm_interaction,
-        settings=settings,
-        batch_repository=batch_repository,
-    )
-
-    iteration_metadata_context = batching_service.build_iteration_metadata_context(
-        current_iteration=current_iteration
-    )
-
-    metadata_context = batching_service.build_metadata_context(
-        cj_batch_id=cj_batch_id,
-        cj_source=request_data.cj_source or "",
-        cj_request_type=request_data.cj_request_type or "",
-        effective_mode=effective_batching_mode,
-        iteration_metadata_context=iteration_metadata_context,
-    )
-
-    await merge_batch_processing_metadata(
-        session_provider=session_provider,
-        cj_batch_id=cj_batch_id,
-        metadata_updates={
-            "llm_overrides": normalized.llm_config_overrides.model_dump(exclude_none=True)
-        }
-        if normalized.llm_config_overrides
-        else {},
-        correlation_id=correlation_id,
-    )
-
-    # Submit batch and update state to WAITING_CALLBACKS
-    submission_result = await batch_processor.submit_comparison_batch(
-        cj_batch_id=cj_batch_id,
-        comparison_tasks=comparison_tasks_for_llm,
-        correlation_id=correlation_id,
-        config_overrides=normalized.batch_config_overrides,
-        model_override=model_override,
-        temperature_override=temperature_override,
-        max_tokens_override=max_tokens_override,
-        system_prompt_override=normalized.system_prompt_override,
-        provider_override=normalized.provider_override,
-        metadata_context=metadata_context,
-    )
-
-    logger.info(
-        f"Batch submitted for async processing: {submission_result.total_submitted} tasks",
-        extra={
-            **log_extra,
-            "cj_batch_id": cj_batch_id,
-            "total_submitted": submission_result.total_submitted,
-            "all_submitted": submission_result.all_submitted,
-            "current_iteration": current_iteration,
-        },
-    )
-
-    # Return None to indicate async processing - workflow continues via callbacks
-    return None
-
-
-def _check_iteration_stability(
-    total_comparisons_performed: int,
-    current_bt_scores_dict: dict[str, float],
-    previous_bt_scores: dict[str, float],
-    settings: Settings,
-    current_iteration: int,
-    log_extra: dict[str, Any],
-) -> bool:
-    """Evaluate BT score stability between iterations.
-
-    Uses MIN_COMPARISONS_FOR_STABILITY_CHECK and
-    SCORE_STABILITY_THRESHOLD from Settings to determine whether the
-    Bradley-Terry scores have 'converged enough' to stop requesting
-    more comparisons.
-
-    NOTE:
-    - Prepared for the iterative bundled mode described in
-      TASK-LLM-BATCH-STRATEGY-IMPLEMENTATION*.md.
-    - Not currently called from any production workflow.
-
-    TODO[TASK-LLM-BATCH-STRATEGY-IMPLEMENTATION]:
-    Call this from the continuation/iteration loop once iterative
-    convergence is wired into workflow_continuation instead of relying
-    solely on completion thresholds.
-    """
-    if (
-        total_comparisons_performed >= settings.MIN_COMPARISONS_FOR_STABILITY_CHECK
-        and previous_bt_scores
-    ):
-        max_score_change = scoring_ranking.check_score_stability(
-            current_bt_scores_dict,
-            previous_bt_scores,
-            stability_threshold=settings.SCORE_STABILITY_THRESHOLD,
-        )
-        logger.info(
-            f"Iteration {current_iteration}: Max score change is {max_score_change:.5f}",
-            extra=log_extra,
-        )
-        if max_score_change < getattr(settings, "SCORE_STABILITY_THRESHOLD", 0.05):
-            logger.info("Score stability reached. Ending comparison loop.", extra=log_extra)
-            return True
-
-    return False
 
 
 def _resolve_requested_max_pairs(settings: Settings, request_data: CJAssessmentRequestData) -> int:

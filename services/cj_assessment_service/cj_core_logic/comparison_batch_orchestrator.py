@@ -19,6 +19,7 @@ from services.cj_assessment_service.cj_core_logic.comparison_request_normalizer 
 from services.cj_assessment_service.cj_core_logic.llm_batching_service import (
     BatchingModeService,
 )
+from services.cj_assessment_service.cj_core_logic.pair_generation import PairGenerationMode
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
 from services.cj_assessment_service.models_api import (
@@ -70,6 +71,7 @@ class ComparisonBatchOrchestrator:
         request_data: CJAssessmentRequestData,
         correlation_id: UUID,
         log_extra: dict[str, Any],
+        pair_generation_mode: PairGenerationMode = PairGenerationMode.COVERAGE,
     ) -> bool:
         normalized = self.request_normalizer.normalize(request_data)
         effective_batching_mode = self.batching_service.resolve_effective_mode(
@@ -113,6 +115,7 @@ class ComparisonBatchOrchestrator:
                 max_pairwise_comparisons=normalized.max_pairs_cap,
                 correlation_id=correlation_id,
                 randomization_seed=self.settings.PAIR_GENERATION_SEED,
+                mode=pair_generation_mode,
             )
             if not comparison_tasks:
                 logger.warning(

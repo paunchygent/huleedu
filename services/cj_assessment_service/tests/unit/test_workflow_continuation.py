@@ -857,6 +857,10 @@ async def test_trigger_continuation_requests_more_when_not_finalized(monkeypatch
     )
 
     request_additional.assert_awaited_once()
+    # Phase-1 / large-net semantics should continue using COVERAGE mode.
+    await_args = request_additional.await_args
+    assert await_args is not None
+    assert await_args.kwargs["mode"] == wc.PairGenerationMode.COVERAGE
     finalize_called.assert_not_awaited()
 
 
@@ -1103,7 +1107,6 @@ async def test_low_success_rate_does_not_finalize_despite_some_successes(
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="PR-7 Phase-2 resampling semantics not yet implemented", strict=False)
 async def test_small_net_phase2_requests_additional_comparisons_before_resampling_cap(
     monkeypatch: Any,
 ) -> None:
@@ -1168,6 +1171,7 @@ async def test_small_net_phase2_requests_additional_comparisons_before_resamplin
             assessment_input_text=f"essay-{i}",
             current_bt_score=0.0,
             comparison_count=2,
+            is_anchor=False,
         )
         for i in range(3)
     ]
@@ -1242,7 +1246,6 @@ async def test_small_net_phase2_requests_additional_comparisons_before_resamplin
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="PR-7 Phase-2 resampling semantics not yet implemented", strict=False)
 async def test_small_net_phase2_tracks_resampling_pass_count(monkeypatch: Any) -> None:
     """Small-net Phase 2 should track resampling passes in metadata.
 
@@ -1302,6 +1305,7 @@ async def test_small_net_phase2_tracks_resampling_pass_count(monkeypatch: Any) -
             assessment_input_text=f"essay-{i}",
             current_bt_score=0.0,
             comparison_count=1,
+            is_anchor=False,
         )
         for i in range(3)
     ]
@@ -1371,14 +1375,18 @@ async def test_small_net_phase2_tracks_resampling_pass_count(monkeypatch: Any) -
     # PR-7 expectation: metadata should reflect that a resampling pass
     # occurred when unique coverage was already complete.
     merge_metadata.assert_awaited_once()
-    await_args = merge_metadata.await_args
-    assert await_args is not None
-    metadata_updates = await_args.kwargs["metadata_updates"]
+    merge_args = merge_metadata.await_args
+    assert merge_args is not None
+    metadata_updates = merge_args.kwargs["metadata_updates"]
     assert metadata_updates.get("resampling_pass_count") == 1
+    # Small-net Phase-2 semantics must call continuation in RESAMPLING mode.
+    request_additional.assert_awaited_once()
+    cont_args = request_additional.await_args
+    assert cont_args is not None
+    assert cont_args.kwargs["mode"] == wc.PairGenerationMode.RESAMPLING
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="PR-7 Phase-2 resampling semantics not yet implemented", strict=False)
 async def test_small_net_resampling_respects_resampling_pass_cap(monkeypatch: Any) -> None:
     """Small-net Phase 2 should stop resampling once the pass cap is hit.
 
@@ -1429,6 +1437,7 @@ async def test_small_net_resampling_respects_resampling_pass_cap(monkeypatch: An
             assessment_input_text=f"essay-{i}",
             current_bt_score=0.0,
             comparison_count=1,
+            is_anchor=False,
         )
         for i in range(3)
     ]

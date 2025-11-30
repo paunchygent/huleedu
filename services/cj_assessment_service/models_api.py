@@ -14,7 +14,6 @@ from typing import Any
 from uuid import UUID
 
 from common_core import EssayComparisonWinner
-from common_core.error_enums import ErrorCode
 from common_core.events.cj_assessment_events import LLMConfigOverrides
 from common_core.models.error_models import ErrorDetail as CanonicalErrorDetail
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -131,23 +130,8 @@ class ComparisonResult(BaseModel):
 
     task: ComparisonTask
     llm_assessment: LLMAssessmentResponseSchema | None = None
-    error_detail: ErrorDetail | None = None
+    error_detail: CanonicalErrorDetail | None = None
     raw_llm_response_content: str | None = None
-
-
-class ErrorDetail(BaseModel):
-    """Detailed error information for API responses.
-
-    This model provides structured error information including error codes,
-    correlation IDs, and additional context for effective debugging and monitoring.
-    """
-
-    error_code: ErrorCode
-    message: str
-    correlation_id: UUID
-    timestamp: datetime
-    service: str = "cj_assessment_service"
-    details: dict = Field(default_factory=dict)
 
 
 class ErrorResponse(BaseModel):

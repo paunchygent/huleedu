@@ -220,6 +220,12 @@ def _create_metrics(database_metrics: Optional[DatabaseMetrics] = None) -> dict[
                 ["batching_mode"],
                 registry=REGISTRY,
             ),
+            "cj_workflow_decisions_total": Counter(
+                "cj_workflow_decisions_total",
+                "Total CJ workflow continuation decisions by decision type",
+                ["decision"],
+                registry=REGISTRY,
+            ),
             # BT SE batch quality indicators (diagnostic only; no gating semantics)
             "cj_bt_se_inflated_batches_total": Counter(
                 "cj_bt_se_inflated_batches_total",
@@ -301,6 +307,7 @@ def _get_existing_metrics() -> dict[str, Any]:
         "prompt_fetch_success": "huleedu_cj_prompt_fetch_success_total",
         "cj_llm_requests_total": "cj_llm_requests_total",
         "cj_llm_batches_started_total": "cj_llm_batches_started_total",
+        "cj_workflow_decisions_total": "cj_workflow_decisions_total",
         "cj_bt_se_inflated_batches_total": "cj_bt_se_inflated_batches_total",
         "cj_bt_sparse_coverage_batches_total": "cj_bt_sparse_coverage_batches_total",
     }
@@ -369,6 +376,7 @@ def get_business_metrics() -> dict[str, Any]:
         "cj_failed_pool_size": all_metrics.get("cj_failed_pool_size"),
         "prompt_fetch_failures": all_metrics.get("prompt_fetch_failures"),
         "prompt_fetch_success": all_metrics.get("prompt_fetch_success"),
+        "cj_workflow_decisions_total": all_metrics.get("cj_workflow_decisions_total"),
         "cj_bt_se_inflated_batches_total": all_metrics.get("cj_bt_se_inflated_batches_total"),
         "cj_bt_sparse_coverage_batches_total": all_metrics.get(
             "cj_bt_sparse_coverage_batches_total"

@@ -61,9 +61,17 @@ class TestBradleyTerryScoring:
         data_access: PostgresDataAccess,
         session: AsyncSession,
         essay_count: int,
-        batch_id: str = "test-batch",
+        batch_id: str | None = None,
     ) -> tuple[int, list[EssayForComparison]]:
-        """Create a test batch with essays."""
+        """Create a test batch with essays.
+
+        A unique BOS batch_id is generated when none is provided to avoid
+        cross-test reuse of the same BOS identifier in the shared test
+        container database.
+        """
+        if batch_id is None:
+            batch_id = str(uuid4())
+
         # Create batch
         cj_batch = await data_access.create_new_cj_batch(
             session=session,
@@ -421,7 +429,7 @@ class TestBradleyTerryScoring:
         """Test Bradley-Terry scoring with edge cases."""
         from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
 
-        # Create batch and essays
+        # Create batch and essays (unique BOS batch_id is generated internally)
         batch_id, essays = await self._create_test_batch(
             postgres_data_access,
             postgres_session,

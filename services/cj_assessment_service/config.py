@@ -192,14 +192,12 @@ class Settings(SecureServiceSettings, JWTValidationSettings):
 
     # CJ assessment parameters
     MAX_PAIRWISE_COMPARISONS: int = 300
-    COMPARISONS_PER_STABILITY_CHECK_ITERATION: int = 12
 
     # NOTE:
     # These BT convergence parameters are already used in pure math
-    # helpers (e.g. scoring_ranking.check_score_stability) but are
-    # **not yet** part of a full iterative convergence loop.
-    # See TASK-LLM-BATCH-STRATEGY-IMPLEMENTATION*.md for the planned
-    # bundled, stability-driven workflow that will consume them.
+    # helpers (e.g. scoring_ranking.check_score_stability) and in the
+    # callback-driven continuation loop to decide when scores are
+    # stable enough to stop requesting more comparisons.
     MIN_COMPARISONS_FOR_STABILITY_CHECK: int = Field(
         default=12,
         description="Minimum successful comparisons required before checking score stability",
@@ -226,6 +224,22 @@ class Settings(SecureServiceSettings, JWTValidationSettings):
         description=(
             "Minimum mean comparisons per essay before marking comparison coverage as sparse. "
             "Used only for comparison coverage sparse batch quality indicators."
+        ),
+    )
+
+    # Small-net Phase-2 resampling controls (PR-7)
+    MIN_RESAMPLING_NET_SIZE: int = Field(
+        default=10,
+        description=(
+            "Nets with expected_essay_count below this threshold are treated as small and "
+            "eligible for limited Phase-2 resampling semantics."
+        ),
+    )
+    MAX_RESAMPLING_PASSES_FOR_SMALL_NET: int = Field(
+        default=2,
+        description=(
+            "Maximum number of Phase-2 resampling passes allowed for small nets once "
+            "unique pairwise coverage is complete."
         ),
     )
 

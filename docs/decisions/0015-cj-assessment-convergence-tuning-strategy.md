@@ -1,9 +1,9 @@
 ---
 type: decision
 id: ADR-0015
-status: proposed
+status: accepted
 created: 2025-11-27
-last_updated: 2025-11-27
+last_updated: 2025-11-30
 ---
 
 # ADR-0015: CJ Assessment Convergence Tuning Strategy
@@ -21,11 +21,13 @@ Implement **dynamic stability-based convergence** with tunable thresholds.
 
 ### Key Settings
 
+Current defaults (wired into `services/cj_assessment_service.config.Settings`) are:
+
 | Setting | Default | Purpose |
 |---------|---------|---------|
-| SCORE_STABILITY_THRESHOLD | 0.025 | Max score change to consider stable |
-| MIN_COMPARISONS_FOR_STABILITY_CHECK | 8 | Minimum before checking stability |
-| COMPARISONS_PER_STABILITY_CHECK_ITERATION | 8 | Round size between checks |
+| SCORE_STABILITY_THRESHOLD | 0.05 | Max BT score change between iterations to consider the batch stable; used by both the production continuation path and the convergence harness. |
+| MIN_COMPARISONS_FOR_STABILITY_CHECK | 12 | Global floor on successful comparisons before running a stability check; prevents noisy early BT estimates from triggering premature convergence. |
+| MAX_ITERATIONS | 5 | Upper bound on how many full callback iterations we are willing to perform before forcing finalization via caps. |
 
 ### Convergence Logic
 1. After each round of comparisons, recompute BT scores
@@ -37,7 +39,7 @@ Implement **dynamic stability-based convergence** with tunable thresholds.
 ```python
 completion_denominator = min(
     total_budget or total_comparisons,
-    nC2(expected_essay_count)  # n*(n-1)/2
+    nC2(actual_processed_essays),  # n*(n-1)/2 over ProcessedEssay nodes (students + anchors)
 )
 ```
 

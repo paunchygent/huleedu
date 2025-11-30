@@ -10,7 +10,10 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.cj_assessment_service.cj_core_logic import pair_generation
-from services.cj_assessment_service.cj_core_logic.pair_generation import _fetch_assessment_context
+from services.cj_assessment_service.cj_core_logic.pair_generation import (
+    PairGenerationMode,
+    _fetch_assessment_context,
+)
 from services.cj_assessment_service.cj_core_logic.prompt_templates import PromptTemplateBuilder
 from services.cj_assessment_service.models_api import EssayForComparison
 from services.cj_assessment_service.protocols import (
@@ -249,3 +252,90 @@ async def test_generate_comparison_tasks_respects_thresholds_and_global_cap(
     )
     assert tasks_third_call == []
     assert len(existing_pairs_store) == global_cap
+
+
+@pytest.mark.asyncio
+async def test_resampling_mode_uses_existing_pairs_and_balances_counts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """RESAMPLING mode should only use existing pairs and keep essay counts balanced.
+
+    This simulates multiple resampling waves where all essays should receive
+    a comparable number of additional comparisons over time.
+    """
+
+    essays = [
+        EssayForComparison(id="essay-a", text_content="Essay content A"),
+        EssayForComparison(id="essay-b", text_content="Essay content B"),
+        EssayForComparison(id="essay-c", text_content="Essay content C"),
+    ]
+    essay_ids = {essay.id for essay in essays}
+
+    # Simulate Phase-1 coverage having produced all unordered pairs.
+    existing_pairs_store: set[tuple[str, str]] = set()
+    for i, essay_a in enumerate(essays):
+        for essay_b in essays[i + 1 :]:
+            normalized_pair: tuple[str, str] = tuple(sorted((essay_a.id, essay_b.id)))  # type: ignore[assignment]
+            existing_pairs_store.add(normalized_pair)
+
+    # Track comparison counts across resampling waves (per essay).
+    comparison_counts_store: dict[str, int] = {essay_id: 0 for essay_id in essay_ids}
+
+    async def fake_fetch_context(*_: object, **__: object) -> dict[str, str | None]:
+        return {
+            "assessment_instructions": "Assess clarity and structure.",
+            "student_prompt_text": "Explain your argument.",
+            "judge_rubric_text": None,
+        }
+
+    async def fake_fetch_existing_pairs(
+        *_: object,
+        **__: object,
+    ) -> set[tuple[str, str]]:
+        # Always resample from the same existing Phase-1 pairs.
+        return set(existing_pairs_store)
+
+    async def fake_fetch_counts(*_: object, **__: object) -> dict[str, int]:
+        # Return the evolving comparison counts for fairness scoring.
+        return dict(comparison_counts_store)
+
+    monkeypatch.setattr(pair_generation, "_fetch_assessment_context", fake_fetch_context)
+    monkeypatch.setattr(
+        pair_generation, "_fetch_existing_comparison_ids", fake_fetch_existing_pairs
+    )
+    monkeypatch.setattr(pair_generation, "_fetch_comparison_counts", fake_fetch_counts)
+
+    AsyncMock(spec=AsyncSession)
+    matching_strategy = make_real_matching_strategy_mock()
+
+    # Run several resampling waves and ensure counts stay balanced.
+    num_waves = 5
+    for _ in range(num_waves):
+        tasks = await pair_generation.generate_comparison_tasks(
+            essays_for_comparison=essays,
+            session_provider=AsyncMock(spec=SessionProviderProtocol),
+            comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
+            instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
+            matching_strategy=matching_strategy,
+            cj_batch_id=999,
+            # No explicit cap here; we are testing fairness of resampling selection.
+            max_pairwise_comparisons=None,
+            correlation_id=None,
+            randomization_seed=123,
+            mode=PairGenerationMode.RESAMPLING,
+        )
+
+        # All pairs must involve only the original essay IDs.
+        assert tasks, "Expected RESAMPLING to yield comparison tasks"
+        for task in tasks:
+            assert task.essay_a.id in essay_ids
+            assert task.essay_b.id in essay_ids
+
+            comparison_counts_store[task.essay_a.id] += 1
+            comparison_counts_store[task.essay_b.id] += 1
+
+    counts = list(comparison_counts_store.values())
+    # Every essay should have been sampled at least once.
+    assert min(counts) > 0
+    # Fairness guardrail: RESAMPLING should not starve any essay.
+    assert max(counts) - min(counts) <= 2

@@ -78,14 +78,11 @@ Harden the CJ Assessment callback and completion flow to ensure safe finalizatio
   - Phase 2: once unique coverage is complete and stability has not passed, additional budget is spent on **resampling the same pairwise graph** (re-judging existing pairs) until:
     - Stability is achieved, or
     - Global budget or `MAX_ITERATIONS` is reached, with success-rate constraints still enforced.
-- [ ] `COMPARISONS_PER_STABILITY_CHECK_ITERATION` is treated as a **cadence hint** (how often we re-check stability), not as a hard per-wave cap:
-  - Code does **not** use it to slice or truncate the wave returned by `compute_wave_pairs`
-  - Settings docstrings and service docs are updated to reflect this interpretation
+- [ ] Wave size is treated as emergent (from batch size, matching strategy, and caps) rather than a dedicated per-wave setting; stability is controlled via thresholds and caps instead of a fixed comparisons-per-iteration parameter.
 - [ ] Docs:
   - `docs/services/cj-assessment-service.md` (or existing service doc) clearly explains:
     - Wave size = `compute_wave_size(n) ≈ n // 2` after odd-count handling
     - `MAX_PAIRWISE_COMPARISONS` = global hard cap
-    - `COMPARISONS_PER_STABILITY_CHECK_ITERATION` = approximate number of new comparisons between stability checks
     - Bradley-Terry standard errors are computed analytically in `bt_inference.compute_bt_standard_errors` and capped at `BT_STANDARD_ERROR_MAX = 2.0` for numerical safety and observability only (no change to completion or gating semantics)
 
 ---
@@ -203,31 +200,45 @@ semantics. This work is **merged and in production** as of 2025‑11‑29.
 
 ---
 
-### US-005.4: Convergence Tests for Iterative/Bundled Mode
+### US-005.4: Convergence Tests for Iterative/Bundled Mode ✅ PR‑7 HARNESS IMPLEMENTED
 
 **As a** developer
 **I want** a test harness that validates convergence behavior under configurable parameters
 **So that** I can verify stability checks and iteration limits work correctly.
 
 **Acceptance Criteria**:
-- [ ] A test harness wires `_process_comparison_iteration` + `_check_iteration_stability` with configurable:
-  - `COMPARISONS_PER_STABILITY_CHECK_ITERATION`
+- [x] A test harness wires the BT scoring helper and stability check into a configurable loop over synthetic nets with:
   - `MIN_COMPARISONS_FOR_STABILITY_CHECK`
   - `MAX_ITERATIONS`
   - `MAX_PAIRWISE_COMPARISONS`
-- [ ] Tests assert that:
+- [x] Tests assert that:
   - Stability checks only run after `MIN_COMPARISONS_FOR_STABILITY_CHECK` successful comparisons
   - Additional iterations stop when either:
     - Stability is achieved, or
     - `MAX_PAIRWISE_COMPARISONS` or `MAX_ITERATIONS` is reached
-- [ ] Convergence harness explicitly models **two phases**:
+- [x] Convergence harness explicitly models **two phases**:
   - Phase 1 (unique coverage): waves/batches add new edges until coverage of the n-choose-2 graph is complete or capped by budget.
   - Phase 2 (resampling): waves/batches re-use the same n-choose-2 bundle to add additional judgments on existing pairs until stability or caps are reached.
-- [ ] Small-net behaviour is guarded:
+- [x] Small-net behaviour is guarded:
   - For batches with fewer than `MIN_RESAMPLING_NET_SIZE` essays, Phase-2 resampling is limited by a dedicated cap (e.g. `MAX_RESAMPLING_PASSES_FOR_SMALL_NET`) to prevent tiny nets from consuming all remaining budget when stability cannot be reliably detected.
-- [ ] The behaviour and intended future wiring for bundled iterative mode is documented in the epic doc
+- [x] The behaviour for bundled/wave-style convergence is documented in the epic doc and backed by unit tests, with convergence owned by `workflow_continuation` + `BatchFinalizer` in production and the convergence harness remaining a synthetic, test-only loop.
 
-**Task**: `TASKS/assessment/cj-us-005-4-iterative-convergence-tests.md`
+**Implementation Notes (PR‑7 snapshot)**:
+- Harness module: `services/cj_assessment_service/cj_core_logic/convergence_harness.py`
+  - Uses `compute_bt_scores_and_se(...)` and `check_score_stability(...)` over in‑memory `EssayForComparison` nets and synthetic `CJ_ComparisonPair` objects.
+  - Encodes Phase‑1 vs Phase‑2 behaviour directly:
+    - Phase‑1: only previously unseen pairs are scheduled until n‑choose‑2 coverage or `MAX_PAIRWISE_COMPARISONS` is hit.
+    - Phase‑2: once coverage completes, subsequent iterations resample from the full pair set subject to budget and iteration caps.
+  - Surfaces convergence outcome via a typed `HarnessResult`:
+    - `final_scores`, `stability_achieved`, `cap_reason` (`stability`, `iterations`, `budget`), `iterations_run`, `total_comparisons`, and final SE diagnostics.
+- Tests: `services/cj_assessment_service/tests/unit/test_convergence_harness.py`
+  - `test_convergence_harness_stops_on_stability_before_max_iterations`:
+    - Synthetic 4‑essay net with easily separable “true” scores and permissive stability threshold; asserts early stop on stability.
+  - `test_convergence_harness_stops_after_max_iterations_or_budget`:
+    - Same net but with `MIN_COMPARISONS_FOR_STABILITY_CHECK` set above any reachable comparison count; asserts stop on iteration caps.
+  - These tests complement the small‑net Phase‑2 semantics in `test_workflow_continuation.py` by exercising the pure convergence loop.
+
+**Task**: `TASKS/assessment/pr-7-phase-2-resampling-and-convergence-harness.md`
 
 ## PR-2 Completion Notes
 
@@ -248,14 +259,15 @@ behaviour into the CJ Assessment Service:
   an indeterminate pending state.
 
 Phase‑2 resampling semantics and small‑net caps remain **out of scope** for
-PR‑2 and are tracked for PR‑7; existing xfail tests document the intended
-future behaviour but do not change pair‑generation in this PR.
+PR‑2 and are delivered in PR‑7. The original xfail tests documenting the intended
+behaviour have been replaced with passing tests once the implementation matched
+the design.
 
 ## PR-7 Phase-2 Resampling Plan (Design Sketch)
 
 PR-7 extends the PR-2 stability and success-rate semantics with explicit
 Phase-2 behaviour for small nets and a convergence harness. The key design
-decisions are:
+decisions (now implemented) are:
 
 - **New settings** (CJ Assessment `Settings`):
   - `MIN_RESAMPLING_NET_SIZE`: Nets with `expected_essay_count` below this are
@@ -308,19 +320,13 @@ decisions are:
       resampling and finalize using the existing success-rate guard
       (`finalize_scoring` vs `finalize_failure`).
 - **Convergence harness (US-005.4)**:
-  - A dedicated harness will wire the existing BT scoring routines into a
+  - A dedicated harness wires the existing BT scoring routines into a
     configurable loop over synthetic nets, with knobs for:
-    `COMPARISONS_PER_STABILITY_CHECK_ITERATION`,
-    `MIN_COMPARISONS_FOR_STABILITY_CHECK`, `MAX_ITERATIONS`, and
-    `MAX_PAIRWISE_COMPARISONS`.
-  - The harness will stop either when stability is achieved (BT deltas below
+    `MIN_COMPARISONS_FOR_STABILITY_CHECK`, `MAX_ITERATIONS`,
+    `MAX_PAIRWISE_COMPARISONS`, and `SCORE_STABILITY_THRESHOLD`.
+  - The harness stops either when stability is achieved (BT deltas below
     threshold) or when iteration/budget caps are reached, and will surface
     which cap fired for diagnostics.
-
-Existing PR-7 xfail tests in `test_workflow_continuation.py` and
-`test_convergence_harness.py` encode these behaviours as forward-looking
-specs; they will be flipped to passing tests once the implementation matches
-this design.
 
 ## Technical Architecture
 

@@ -14,7 +14,6 @@ from uuid import UUID
 
 from common_core import Environment, LLMProviderType
 from common_core.error_enums import ErrorCode
-from common_core.models.error_models import ErrorDetail as CanonicalErrorDetail
 from huleedu_service_libs.error_handling.error_detail_factory import (
     create_error_detail_with_context,
 )
@@ -26,7 +25,6 @@ from services.cj_assessment_service.models_api import (
     CJLLMComparisonMetadata,
     ComparisonResult,
     ComparisonTask,
-    ErrorDetail,
 )
 from services.cj_assessment_service.protocols import (
     LLMInteractionProtocol,
@@ -34,18 +32,6 @@ from services.cj_assessment_service.protocols import (
 )
 
 logger = create_service_logger("cj_assessment_service.llm_interaction_impl")
-
-
-def _convert_to_local_error_detail(canonical_error: CanonicalErrorDetail) -> ErrorDetail:
-    """Convert canonical ErrorDetail to local service ErrorDetail."""
-    return ErrorDetail(
-        error_code=canonical_error.error_code,
-        message=canonical_error.message,
-        correlation_id=canonical_error.correlation_id,
-        timestamp=canonical_error.timestamp,
-        service=canonical_error.service,
-        details=canonical_error.details,
-    )
 
 
 class LLMInteractionImpl(LLMInteractionProtocol):
@@ -254,18 +240,16 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                     return ComparisonResult(
                         task=task,
                         llm_assessment=None,
-                        error_detail=_convert_to_local_error_detail(
-                            create_error_detail_with_context(
-                                error_code=ErrorCode.PROCESSING_ERROR,
-                                message=f"Unexpected error processing task: {e!s}",
-                                service="cj_assessment_service",
-                                operation="process_comparison_task",
-                                correlation_id=correlation_id,
-                                details={
-                                    "essay_a_id": task.essay_a.id,
-                                    "essay_b_id": task.essay_b.id,
-                                },
-                            )
+                        error_detail=create_error_detail_with_context(
+                            error_code=ErrorCode.PROCESSING_ERROR,
+                            message=f"Unexpected error processing task: {e!s}",
+                            service="cj_assessment_service",
+                            operation="process_comparison_task",
+                            correlation_id=correlation_id,
+                            details={
+                                "essay_a_id": task.essay_a.id,
+                                "essay_b_id": task.essay_b.id,
+                            },
                         ),
                         raw_llm_response_content=None,
                     )
@@ -299,18 +283,16 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                         ComparisonResult(
                             task=tasks[i],
                             llm_assessment=None,
-                            error_detail=_convert_to_local_error_detail(
-                                create_error_detail_with_context(
-                                    error_code=ErrorCode.PROCESSING_ERROR,
-                                    message=f"Task execution failed: {result!s}",
-                                    service="cj_assessment_service",
-                                    operation="process_comparisons_batch",
-                                    correlation_id=correlation_id,
-                                    details={
-                                        "essay_a_id": tasks[i].essay_a.id,
-                                        "essay_b_id": tasks[i].essay_b.id,
-                                    },
-                                )
+                            error_detail=create_error_detail_with_context(
+                                error_code=ErrorCode.PROCESSING_ERROR,
+                                message=f"Task execution failed: {result!s}",
+                                service="cj_assessment_service",
+                                operation="process_comparisons_batch",
+                                correlation_id=correlation_id,
+                                details={
+                                    "essay_a_id": tasks[i].essay_a.id,
+                                    "essay_b_id": tasks[i].essay_b.id,
+                                },
                             ),
                             raw_llm_response_content=None,
                         ),
@@ -350,15 +332,13 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                 ComparisonResult(
                     task=task,
                     llm_assessment=None,
-                    error_detail=_convert_to_local_error_detail(
-                        create_error_detail_with_context(
-                            error_code=ErrorCode.PROCESSING_ERROR,
-                            message=f"Critical processing error: {e!s}",
-                            service="cj_assessment_service",
-                            operation="process_comparisons_critical_error",
-                            correlation_id=correlation_id,
-                            details={"essay_a_id": task.essay_a.id, "essay_b_id": task.essay_b.id},
-                        )
+                    error_detail=create_error_detail_with_context(
+                        error_code=ErrorCode.PROCESSING_ERROR,
+                        message=f"Critical processing error: {e!s}",
+                        service="cj_assessment_service",
+                        operation="process_comparisons_critical_error",
+                        correlation_id=correlation_id,
+                        details={"essay_a_id": task.essay_a.id, "essay_b_id": task.essay_b.id},
                     ),
                     raw_llm_response_content=None,
                 )

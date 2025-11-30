@@ -86,7 +86,7 @@ In `trigger_existing_workflow_continuation`:
   - [ ] `small_net_phase2_entered` when moving into Phase‑2 for a batch.
   - [ ] `small_net_resampling_wave_started` each time a resampling wave is triggered.
 
-### 3.3 Tests to Flip from xfail
+### 3.3 Tests to Flip from xfail and Follow-Up Refactor
 
 In `services/cj_assessment_service/tests/unit/test_workflow_continuation.py`:
 
@@ -96,6 +96,11 @@ In `services/cj_assessment_service/tests/unit/test_workflow_continuation.py`:
       full coverage and remaining budget; no immediate finalization.
   - [ ] `test_small_net_resampling_respects_resampling_pass_cap`
     - Should see no resampling when `resampling_pass_count` equals the cap and finalization occurs instead.
+
+- [ ] Refactor `workflow_continuation.py` after PR‑7 semantics are stable:
+  - [ ] Extract a small continuation state helper (e.g. `continuation_state.py`) to compute stability, caps, and coverage metrics so `trigger_existing_workflow_continuation` is no longer a god module.
+  - [ ] Move small‑net Phase‑2 branching into a dedicated function operating on a typed continuation context (scores, coverage, caps) while keeping logging and DI boundaries in the wrapper.
+  - [ ] Keep `trigger_existing_workflow_continuation` as an orchestration layer that wires dependencies, delegates to helpers, and invokes the existing finalizer and comparison-processing APIs.
 
 ## 4. Pair Generation – Resampling Mode
 

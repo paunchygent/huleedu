@@ -843,7 +843,9 @@ class TestIncrementalScoring:
         assert actual_percentage >= 80, f"Actual percentage {actual_percentage}% should be >= 80%"
 
 
-# TODO[TASK-LLM-BATCH-STRATEGY-IMPLEMENTATION]:
-# Add a workflow-level test that drives iterative convergence via
-# callbacks and _check_iteration_stability, not just math-level
-# stability via check_score_stability().
+# NOTE[US-00XY]:
+# Workflow-level convergence is covered by workflow_continuation tests
+# and the synthetic convergence harness rather than an explicit
+# iterative loop in comparison_processing; the former
+# _check_iteration_stability helper is no longer part of the
+# implementation.

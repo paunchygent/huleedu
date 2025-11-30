@@ -8,43 +8,100 @@ harness is implemented.
 
 from __future__ import annotations
 
-import pytest
+from services.cj_assessment_service.cj_core_logic.convergence_harness import (
+    ConvergenceCapReason,
+    ConvergenceHarnessConfig,
+    run_convergence_harness,
+)
+from services.cj_assessment_service.models_api import EssayForComparison
 
 
-@pytest.mark.xfail(reason="PR-7 convergence harness not yet implemented", strict=False)
+def _make_synthetic_essays() -> list[EssayForComparison]:
+    """Create a small synthetic net of essays."""
+
+    return [
+        EssayForComparison(id="e1", text_content="Essay 1"),
+        EssayForComparison(id="e2", text_content="Essay 2"),
+        EssayForComparison(id="e3", text_content="Essay 3"),
+        EssayForComparison(id="e4", text_content="Essay 4"),
+    ]
+
+
+def _make_true_scores_easy() -> dict[str, float]:
+    """Return ground-truth scores for an easy-to-converge net."""
+
+    return {
+        "e1": -1.0,
+        "e2": -0.3,
+        "e3": 0.3,
+        "e4": 1.0,
+    }
+
+
 def test_convergence_harness_stops_on_stability_before_max_iterations() -> None:
-    """Convergence harness should stop once stability is achieved.
+    """Convergence harness should stop once stability is achieved."""
 
-    Expected PR-7 behaviour (high-level):
-    - The harness runs iterations of comparison waves against synthetic nets
-      using the same BT scoring routines as production.
-    - Stability checks start only after
-      MIN_COMPARISONS_FOR_STABILITY_CHECK successful comparisons.
-    - If BT score deltas fall below SCORE_STABILITY_THRESHOLD before
-      MAX_ITERATIONS is reached, the harness must stop scheduling additional
-      iterations even when global comparison budget remains.
-    - Once implemented, this test should be replaced with a concrete
-      scenario that constructs a small synthetic net and verifies that the
-      harness exits early on stability.
-    """
+    essays = _make_synthetic_essays()
+    true_scores = _make_true_scores_easy()
 
-    assert False, "PR-7 convergence harness not implemented"
+    config = ConvergenceHarnessConfig(
+        comparisons_per_iteration=6,  # full nC2 for 4 essays
+        min_comparisons_for_stability_check=6,
+        max_iterations=5,
+        max_pairwise_comparisons=30,
+        stability_threshold=10.0,  # permissive threshold ensures stability once deltas are bounded
+    )
+
+    result = run_convergence_harness(
+        essays=essays,
+        true_scores=true_scores,
+        config=config,
+        random_seed=123,
+    )
+
+    # All essays receive BT scores.
+    assert set(result.final_scores.keys()) == {essay.id for essay in essays}
+
+    # Stability is achieved before hitting iteration or budget caps.
+    assert result.stability_achieved is True
+    assert result.cap_reason is ConvergenceCapReason.STABILITY
+    assert result.iterations_run < config.max_iterations
+    assert result.total_comparisons <= config.max_pairwise_comparisons
+
+    # Diagnostics are populated for debugging.
+    assert result.max_score_change is not None
+    assert result.se_summary is not None
 
 
-@pytest.mark.xfail(reason="PR-7 convergence harness not yet implemented", strict=False)
 def test_convergence_harness_stops_after_max_iterations_or_budget() -> None:
-    """Convergence harness must respect iteration and budget caps.
+    """Convergence harness must respect iteration caps when stability is not evaluated."""
 
-    Expected PR-7 behaviour (high-level):
-    - Given MAX_ITERATIONS and MAX_PAIRWISE_COMPARISONS, the harness should
-      stop scheduling new iterations when either cap is reached, even if
-      score stability has not yet been achieved.
-    - The harness should surface which cap fired (iterations vs budget) so
-      downstream diagnostics and product docs can distinguish "not stable"
-      from "capped" runs.
-    - Once implemented, this test should be rewritten to drive the harness
-      with an intentionally difficult synthetic net and assert that it stops
-      on the configured caps.
-    """
+    essays = _make_synthetic_essays()
+    true_scores = _make_true_scores_easy()
 
-    assert False, "PR-7 convergence harness not implemented"
+    config = ConvergenceHarnessConfig(
+        comparisons_per_iteration=3,
+        # Make stability check unreachable so only caps can stop the harness.
+        min_comparisons_for_stability_check=1000,
+        max_iterations=3,
+        max_pairwise_comparisons=100,
+        stability_threshold=0.05,
+    )
+
+    result = run_convergence_harness(
+        essays=essays,
+        true_scores=true_scores,
+        config=config,
+        random_seed=456,
+    )
+
+    # All essays still receive BT scores.
+    assert set(result.final_scores.keys()) == {essay.id for essay in essays}
+
+    # Stability is not achieved; iteration cap should fire.
+    assert result.stability_achieved is False
+    assert result.cap_reason is ConvergenceCapReason.ITERATIONS
+    assert result.iterations_run == config.max_iterations
+
+    # Global budget is respected.
+    assert result.total_comparisons <= config.max_pairwise_comparisons

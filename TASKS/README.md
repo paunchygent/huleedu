@@ -1,141 +1,138 @@
-# HuleEdu Task Documentation
-
-This directory contains planning, design, and tracking documents for significant work items across the HuleEdu platform.
-
-## Directory Structure
-
-```
-TASKS/
-├── infrastructure/          # Infrastructure, CI/CD, orchestration tasks
-│   ├── README.md           # Infrastructure task guidelines
-│   └── *.md                # Individual infrastructure tasks
-└── *.md                    # Service-specific and feature tasks
-```
-
-## Task Organization
-
-### Infrastructure Tasks (`infrastructure/`)
-
-Tasks related to platform infrastructure, service orchestration, CI/CD, and cross-cutting operational concerns.
-
-**Examples:**
-
-- Docker configuration and orchestration
-- CI/CD pipeline improvements
-- Test automation frameworks
-- Monitoring and observability
-- Event schema governance
-- Configuration validation tools
-
-**See**: [infrastructure/README.md](./infrastructure/README.md) for details.
-
-### Service & Feature Tasks (root level)
-
-Tasks related to service implementation, business logic, feature development, and service-specific refactoring.
-
-**Examples:**
-
-- CJ assessment improvements
-- Identity service implementation
-- API productization
-- Multi-tenancy features
-- Service-specific test coverage
-
-## Task Naming Conventions
-
-### Numbered Tasks
-
-Format: `NNN-descriptive-name.md`
-
-Used for sequential, dependent tasks or milestone work.
-
-**Example**: `002-eng5-cli-validation.md`
-
-### Descriptive Tasks
-
-Format: `DESCRIPTIVE_NAME_IN_CAPS.md`
-
-Used for standalone tasks, planning documents, or major initiatives.
-
-**Example**: `API_PRODUCTIZATION_AND_DOCS_PLAN.md`
-
-### Prefixed Tasks
-
-Format: `TASK-CATEGORY-description.md`
-
-Used for categorized work items.
-
-**Example**: `TASK-PHASE4-CODE-HARDENING.md`
-
-## Task Statuses
-
-Use emoji indicators in the task file:
-
-- 🔵 **RESEARCH** - Research and planning phase
-- 🟡 **BLOCKED** - Waiting on dependencies
-- 🟢 **IN PROGRESS** - Active work
-- ✅ **COMPLETED** - Finished
-- 🔴 **PAUSED** - Temporarily suspended
-- ⚫ **ARCHIVED** - Completed and archived
-
-## Task Template
-
-```markdown
-# TASK: [Descriptive Title]
-
-**Status**: [Status Emoji] [Status Text]
-**Priority**: LOW / MEDIUM / HIGH / CRITICAL
-**Created**: YYYY-MM-DD
-**Assigned**: [Team/Person if applicable]
-**Type**: [Feature / Refactor / Infrastructure / Research]
-
-## Objective
-[What are we trying to achieve?]
-
-## Context
-[Why is this needed? Background information]
-
-## Prerequisites
-[Dependencies, blockers, required state]
-
-## Implementation Plan
-[Detailed steps or phases]
-
-## Success Criteria
-[How do we know it's done?]
-
-## Related Documents
-[Links to relevant docs, services, rules]
-```
-
-## Integration with Documentation
-
-Tasks complement other documentation:
-
-- **`.claude/work/session/handoff.md`** - Current session work, immediate next steps
-- **`.claude/work/session/readme-first.md`** - Architectural decisions, service status
-- **`.claude/rules/`** - Implementation standards and requirements
-- **`services/*/README.md`** - Service-specific patterns and guides
-- **`TASKS/`** - Detailed planning and design for significant work
-
-## Creating New Tasks
-
-1. **Determine Category**: Infrastructure vs service/feature
-2. **Choose Location**: `infrastructure/` or root level
-3. **Use Template**: Follow the structure above
-4. **Link Related Work**: Reference other tasks, docs, services
-5. **Update Index**: Add to relevant README if creating a sequence
-
-## Maintenance
-
-Periodically review tasks to:
-
-- Update statuses
-- Archive completed work
-- Identify stale tasks
-- Ensure new work is captured
-- Keep documentation links current
-
 ---
+id: 'tasks-readme'
+title: 'TASKS README'
+type: 'doc'
+status: 'completed'
+priority: 'medium'
+domain: 'architecture'
+service: ''
+owner_team: 'architecture'
+owner: ''
+program: ''
+created: '2025-11-13'
+last_updated: '2025-11-30'
+related: []
+labels: []
+---
+# HuleEdu TASKS – Canonical Overview
 
-**Last Updated**: 2025-11-13
+This README is the canonical entrypoint for the `TASKS/` tree. It aligns with
+the formal structure spec in `_REORGANIZATION_PROPOSAL.md`, the task
+frontmatter schema, and the validation scripts under `scripts/task_mgmt/`.
+
+For full machine-readable rules, see:
+
+- `TASKS/_REORGANIZATION_PROPOSAL.md`
+- `scripts/task_mgmt/task_frontmatter_schema.py`
+
+Those documents and this README describe the **same** source of truth.
+
+## Directory taxonomy
+
+Top-level directories under `TASKS/`:
+
+- `programs/` – multi-team or multi-domain initiatives (programme hubs).
+- `assessment/` – CJ, NLP, grading, runners, result aggregation.
+- `content/` – Content Service, prompt references, storage-by-reference work.
+- `identity/` – Identity, auth, JWT, roles, API Gateway auth flows.
+- `frontend/` – SPA integration, dashboards, websockets, ENG5 UI.
+- `infrastructure/` – DevOps, CI/CD, Docker/Compose, observability, shared scripts.
+- `security/` – AppSec, secrets, audits, compliance.
+- `integrations/` – external APIs/providers, LLM providers, SIS, etc.
+- `architecture/` – cross-service patterns, refactors, system-wide plans.
+- `archive/` – year/month-partitioned storage for archived/legacy tasks.
+
+No other top-level directories are allowed. Ambiguous items default to the most
+specific domain (for example, CJ-specific infra lives under `assessment/`).
+
+## Frontmatter and status (single source of truth)
+
+Every task-like file under `TASKS/` (excluding `_REORGANIZATION_PROPOSAL.md`,
+indexes, and historical archive exceptions) MUST start with YAML frontmatter
+matching the canonical schema:
+
+- `id` – globally unique, lowercase kebab-case.
+- `title` – short, factual title.
+- `type` – typically `task`, `story`, `doc`, or `programme`.
+- `status` – one of:
+  - `research`, `blocked`, `in_progress`,
+  - `completed`, `paused`, `archived`.
+- `priority` – `low` | `medium` | `high` | `critical`.
+- `domain` – one of the top-level domains above (including `programs`).
+- `service` – optional service name (e.g. `cj_assessment_service`).
+- `owner_team` – team that owns the work (`agents` for AI-owned tasks by default).
+- `owner` – optional human owner.
+- `program` – optional programme key (e.g. `cj_confidence`, `eng5`).
+- `created` / `last_updated` – ISO dates (YYYY-MM-DD).
+- `related` – list of related task IDs or doc paths.
+- `labels` – free-form tags.
+
+Status is defined **only** in frontmatter. Emojis in the body are optional and
+must not drift from the frontmatter state.
+
+## Naming conventions
+
+- File basename MUST match `id` exactly:
+  - `TASKS/assessment/us-00xy-cleanup-unused-comparison-processing-code-paths.md`
+    → `id: 'us-00xy-cleanup-unused-comparison-processing-code-paths'`.
+- `id` and filename must:
+  - Use lowercase letters, digits, and `-` only.
+  - Be kebab-case (no spaces, underscores, or uppercase).
+- Programme hubs:
+  - Live under `programs/<name>/HUB.md`.
+  - Use `type: programme` and set `program` to the programme key.
+
+Legacy patterns like `NNN-DESCRIPTIVE_NAME.md` or all‑caps basenames are
+considered historical only; new tasks must follow the `id == filename` rule.
+
+## Task creation and lifecycle
+
+- **Creating tasks**
+  - Always use the helper:
+    - `pdm run new-task --domain <domain> --title "Title"`
+  - This allocates a unique `id`, locates the correct domain directory, and
+    scaffolds valid frontmatter.
+
+- **Updating tasks**
+  - Update `status` and `last_updated` together when work state changes.
+  - Keep `related` pointing at relevant tasks, ADRs, and epics as work evolves.
+
+- **Archiving**
+  - Archived tasks live under `TASKS/archive/YYYY/MM/<domain>/`.
+  - When archiving:
+    - Move the file to the archive path.
+    - Set `status: archived`.
+    - Preserve `id` and `created`.
+
+## Relationship to epics, ADRs, and PRs
+
+The `TASKS/` tree is the execution layer in the documentation-as-code stack:
+
+- **ADRs** – `docs/decisions/*.md`
+  - Capture architectural decisions and long-lived rules.
+- **Epics / product docs** – `docs/product/epics/*.md`
+  - Describe higher-level goals and user-facing outcomes.
+- **Tasks (this directory)** – drive implementation and testing work:
+  - Stories like `US-00YA` link back to epics and ADRs in `related`.
+  - Tasks reference the code and tests they touch via paths inside the body.
+- **PRs** – reference specific task IDs and ADRs in their descriptions.
+
+Validation scripts (`validate_front_matter.py`, `task_frontmatter_schema.py`,
+`index_tasks.py`) and CI enforce that the TASKS tree stays consistent with this
+model.
+
+## Integration with other docs
+
+Use this directory alongside:
+
+- `.claude/work/session/readme-first.md` – current sprint focus and CJ-critical patterns.
+- `.claude/work/session/handoff.md` – per-session active/next work.
+- `.claude/rules/` – global development and architecture standards.
+- `docs/operations/` – runbooks and operational guides.
+- `services/*/README.md` – service-specific patterns and constraints.
+
+In practice:
+
+- Epics/ADRs define the **why** and **constraints**.
+- TASKS entries define the **what** and **how** for concrete work.
+- CI + scripts keep everything in sync.***

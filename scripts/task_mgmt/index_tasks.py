@@ -29,6 +29,9 @@ ALLOWED_DOMAINS = [
     "architecture",
 ]
 
+# Preferred display order for task types when grouping within domains.
+TYPE_ORDER = ["story", "task", "programme", "doc"]
+
 
 def _display_path(p: Path) -> str:
     """Return path relative to ROOT if possible, else absolute."""
@@ -99,9 +102,10 @@ def main(argv: list[str]) -> int:
             continue
         domain = fm.get("domain", "unknown")
         status = fm.get("status", "unknown")
+        task_type = fm.get("type", "task")
         program = fm.get("program", "")
         title = fm.get("title", p.stem)
-        by_domain[domain].append((title, status, str(rel)))
+        by_domain[domain].append((task_type, title, status, str(rel)))
         by_status[status].append((title, domain, str(rel)))
         if program:
             by_program[program].append((title, domain, status, str(rel)))
@@ -130,12 +134,22 @@ def main(argv: list[str]) -> int:
     # By Domain
     lines.append("## By Domain")
     for d in ALLOWED_DOMAINS + other_domains:
-        items = sorted(by_domain.get(d, []), key=lambda x: x[0].lower())
+        items = by_domain.get(d, [])
         lines.append(f"\n### {d} ({len(items)})")
         if not items:
             lines.append("- (none)")
             continue
-        for title, status, rel in items:
+
+        # Sort primarily by type (stories first, then tasks, etc.), then by title.
+        def _type_index(t: str) -> int:
+            try:
+                return TYPE_ORDER.index(t)
+            except ValueError:
+                return len(TYPE_ORDER)
+
+        for task_type, title, status, rel in sorted(
+            items, key=lambda x: (_type_index(x[0]), x[1].lower())
+        ):
             lines.append(f"- [{title}]({rel}) — `{status}`")
 
     # By Status

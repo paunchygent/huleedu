@@ -38,12 +38,24 @@ class TaskDomain(str, Enum):
     programs = "programs"
 
 
+class TaskType(str, Enum):
+    """Allowed task type categories for TASKS frontmatter.
+
+    Keep this list in sync with TASKS/_REORGANIZATION_PROPOSAL.md and TASKS/README.md.
+    """
+
+    task = "task"
+    story = "story"
+    doc = "doc"
+    programme = "programme"
+
+
 class TaskFrontmatter(BaseModel):
     """Typed representation of task frontmatter used across agents and scripts."""
 
     id: str
     title: str
-    type: str = Field(default="task")
+    type: TaskType = Field(default=TaskType.task)
     status: TaskStatus
     priority: TaskPriority
     domain: TaskDomain
