@@ -139,7 +139,8 @@ Per-essay grade probabilities → Confidence calculation → GradeProjection
 | ≥ 2 unique grades, sparse coverage | Yes | Variance inflation for missing grades |
 | Full coverage (≥3 per grade) | Yes | Pure empirical calibration |
 
-For batch-level diagnostics, CJ reuses the BT SE metadata from EPIC‑005:
+For batch-level diagnostics, CJ reuses the BT SE metadata from EPIC‑005 and the
+merged PR‑4 scoring refactor:
 
 - `bt_se_summary` on `CJBatchState.processing_metadata` captures SE and comparison coverage
   information for the full CJ graph.
@@ -149,7 +150,10 @@ For batch-level diagnostics, CJ reuses the BT SE metadata from EPIC‑005:
   - `has_isolated_items` – presence of isolated items in the comparison graph
 
 These indicators are intended for ops/analysis dashboards and grade‑projection diagnostics; they
-do **not** change when or how batches are finalized or how grades are assigned.
+do **not** change when or how batches are finalized or how grades are assigned. BT SE computation
+and the `bt_se_summary` structure are provided by `BTScoringResult` /
+`compute_bt_scores_and_se(...)` as introduced in PR‑4 (now merged), so EPIC‑006 can treat them as
+stable inputs when designing projection quality and confidence semantics.
 
 ## RAS / analytics alignment (forward-looking)
 

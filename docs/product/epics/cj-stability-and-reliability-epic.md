@@ -119,11 +119,11 @@ Harden the CJ Assessment callback and completion flow to ensure safe finalizatio
 
 ---
 
-### PR-4: Scoring Core Refactor (BT Inference Robustness)
+### PR-4: Scoring Core Refactor (BT Inference Robustness) ✅ MERGED
 
 **Purpose:** Make the Bradley–Terry scoring core easier to reason about and safer to extend
 for EPIC‑005/EPIC‑006, without changing PR‑2’s completion, stability, or success‑rate
-semantics.
+semantics. This work is **merged and in production** as of 2025‑11‑29.
 
 - Introduce a domain-level result object in `scoring_ranking.py`:
   - `BTScoringResult` with:

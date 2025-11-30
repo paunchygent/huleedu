@@ -30,6 +30,14 @@ ALLOWED_DOMAINS = [
 ]
 
 
+def _display_path(p: Path) -> str:
+    """Return path relative to ROOT if possible, else absolute."""
+    try:
+        return str(p.relative_to(ROOT))
+    except ValueError:
+        return str(p)
+
+
 def read_front_matter(p: Path) -> Tuple[Dict[str, Any], str]:
     text = p.read_text(encoding="utf-8")
     if not text.startswith("---\n"):
@@ -71,8 +79,8 @@ def main(argv: list[str]) -> int:
     )
     args = ap.parse_args(argv)
 
-    root = Path(args.root)
-    out = Path(args.out)
+    root = Path(args.root).resolve()
+    out = Path(args.out).resolve()
 
     by_domain = defaultdict(list)
     by_status = defaultdict(list)
@@ -156,7 +164,7 @@ def main(argv: list[str]) -> int:
 
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print(f"Wrote {out.relative_to(ROOT)}")
+    print(f"Wrote {_display_path(out)}")
 
     if args.fail_on_missing and missing_meta:
         print("Missing front matter detected.")

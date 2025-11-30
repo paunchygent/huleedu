@@ -51,13 +51,16 @@ CLI refactored to handler-based architecture:
 
 **Tests:**
 - 51 unit tests for `alignment_report.py` ✓
-- typecheck-all passes ✓
-- lint passes ✓
+- New unit tests for ENG5 runner handlers (PLAN, DRY_RUN, ANCHOR_ALIGN_TEST, EXECUTE) ✓
+  - `scripts/cj_experiments_runners/eng5_np/tests/unit/test_plan_handler.py`
+  - `scripts/cj_experiments_runners/eng5_np/tests/unit/test_dry_run_handler.py`
+  - `scripts/cj_experiments_runners/eng5_np/tests/unit/test_anchor_align_handler.py`
+  - `scripts/cj_experiments_runners/eng5_np/tests/unit/test_execute_handler.py`
+- Typer CLI integration tests for ENG5 runner (`test_cli_integration.py`) ✓
+- `pdm run format-all`, `pdm run lint-fix --unsafe-fixes`, and `pdm run typecheck-all` passing ✓
 
 **Outstanding:**
-- Handler tests (pending)
-- CLI integration tests (pending)
-- anchor_align_handler.py and execute_handler.py exceed 200-line target (future improvement)
+- `anchor_align_handler.py` and `execute_handler.py` still exceed the 200-line target (future refactor if complexity grows)
 
 ### Ready for Baseline Experiment
 
@@ -67,6 +70,23 @@ CLI refactored to handler-based architecture:
 | **Create experiment prompts** | High | Develop hypothesis-driven prompt variants (anti-narrative, E/F boundary, etc.) |
 | **Run prompt comparison experiments** | High | Iterate through prompt variants, measure alignment changes |
 | **Document findings** | Medium | Create experiment report with conclusions and recommendations |
+
+### Baseline Smoke Run (2025-11-30) ⚠️ NOT COMPLETE
+
+Batch ID: `anchor-align-baseline-20251130-011352`  
+Report: `.claude/research/data/eng5_np_2016/anchor_align_anchor-align-baseline-20251130-011352_20251130_001406.md`
+
+| Metric            | Batch 108 Baseline | This Run | Target | Status      |
+|-------------------|--------------------|----------|--------|-------------|
+| Direct inversions | 5                  | 0        | ≤1     | ⚠️ (no data) |
+| Zero-win anchors  | 1 (ANCHOR_7)       | 12       | 0      | ⚠️          |
+| Kendall's tau     | ~0.82              | 1.00     | ≥0.90  | ⚠️ (no data) |
+| A/B regression    | 0                  | 0        | 0      | ⚠️ (no data) |
+
+Short notes:
+- No LLM comparison callbacks were hydrated for this run (`llm_comparisons` length = 0), despite `comparison_count=66` in `assessment_metadata` for CJ job 112.
+- Expert anchor grade map was not applied (all anchors appear as `UNKNOWN`), so tau and inversion metrics are not meaningful for calibration.
+- This run is a pipeline smoke test only; the true baseline experiment remains **pending** until ENG5-specific LLM callbacks for anchor-align-test are flowing and hydrated.
 
 ---
 

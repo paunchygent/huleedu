@@ -3,7 +3,7 @@ type: epic-catalog
 id: epic-index
 title: HuleEdu Product Epics
 created: 2025-11-27
-last_updated: 2025-11-28
+last_updated: 2025-11-30
 ---
 
 # HuleEdu Product Epics
@@ -21,6 +21,8 @@ Epic catalog for tracking major product initiatives.
 | EPIC-005 | CJ Stability & Reliability | draft | high | Callback flow, completion gating |
 | EPIC-006 | Grade Projection Quality | draft | high | Anchor calibration, confidence |
 | EPIC-007 | Developer Experience & Testing | draft | medium | Test helpers, dev runner |
+| EPIC-008 | ENG5 Runner Refactor & Prompt Tuning | draft | medium | ENG5 runner handlers + prompt harness |
+| EPIC-009 | Observability & Metrics Alignment | draft | medium | Prometheus config, DatabaseMetrics, dashboards |
 
 ## Epic Status Legend
 
@@ -145,3 +147,33 @@ Epic catalog for tracking major product initiatives.
 **Out of Scope**: Stability/reliability (EPIC-005), grade projection quality (EPIC-006)
 
 **File**: [cj-developer-experience-and-testing.md](cj-developer-experience-and-testing.md)
+
+---
+
+### EPIC-008: ENG5 NP Runner Refactor & Prompt Tuning
+
+**Status**: Draft
+
+**Scope**:
+- Refactor ENG5 NP runner CLI into handler-based architecture.
+- Introduce `anchor-align-test` mode and alignment reporting.
+- Provide tests and runbooks for ENG5 prompt-tuning experiments.
+
+**Out of Scope**: Core CJ convergence/projection algorithms (EPIC-005/EPIC-006).
+
+**File**: [eng5-runner-refactor-and-prompt-tuning-epic.md](eng5-runner-refactor-and-prompt-tuning-epic.md)
+
+---
+
+### EPIC-009: Observability & Metrics Alignment
+
+**Status**: Draft
+
+**Scope**:
+- Add missing services to Prometheus scraping configuration
+- Add DatabaseMetrics to services with databases that lack instrumentation
+- Enhance Grafana dashboards for full service coverage
+
+**Out of Scope**: SERVICE_NAME standardization (separate infrastructure task), production AlertManager configuration
+
+**File**: [observability-metrics-alignment-epic.md](observability-metrics-alignment-epic.md)
