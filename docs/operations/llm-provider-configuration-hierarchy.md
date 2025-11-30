@@ -133,3 +133,30 @@ true
 3. **Design Intent**: Safety feature preventing accidental real API calls in test/dev
 4. **Cost Control**: Ensures CI/functional tests never incur charges
 5. **Determinism**: Mock provider uses fixed seed for reproducible test output
+
+## ENG5 / CJ Overrides – Queueing Behaviour (Implementation Note)
+
+Request-level overrides only influence model selection if they survive all the
+way into the queue processor:
+
+- For CJ callers (ENG5 runner and similar):
+  - CJ emits `ELS_CJAssessmentRequestV1.llm_config_overrides`.
+  - CJ transforms this into `CJAssessmentRequestData.llm_config_overrides`, persists it
+    in `CJBatchUpload.processing_metadata["original_request"]`, and forwards overrides
+    via `LLMProviderServiceClient` as HTTP `llm_config_overrides` to LLM Provider.
+  - The LLM Provider HTTP API parses these into `LLMComparisonRequest.llm_config_overrides`.
+- For queued processing:
+  - `LLMOrchestratorImpl.perform_comparison()` must ensure that any request-level
+    overrides are propagated into `QueuedRequest.request_data.llm_config_overrides`
+    when creating the `QueuedRequest`.
+  - Queue strategies (`SingleRequestStrategy`, `SerialBundleStrategy`) rely on
+    `request.request_data.llm_config_overrides` when calling
+    `build_override_kwargs(request)`; if this field is `None`, model and temperature
+    fall back to service defaults (`ANTHROPIC_DEFAULT_MODEL`, etc.).
+
+When debugging model-selection issues (e.g., ENG5 anchor-align runs using Haiku
+despite Sonnet overrides), always check:
+
+1. The HTTP request body to LLM Provider includes the expected `llm_config_overrides`.
+2. `QueuedRequest.request_data.llm_config_overrides` is populated for that batch.
+3. Anthropic/OpenAI provider logs show `using_override=True` and the expected model id.

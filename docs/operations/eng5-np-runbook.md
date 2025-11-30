@@ -204,6 +204,35 @@ When `--await-completion` is set and Kafka callbacks complete, the handler:
      - **Kendall's tau** between expected (expert) and actual (BT) ranks.
      - Embedded system prompt and judge rubric text for reproducibility.
 
+#### DB-Based Alignment Report (No Re-run, CJ as Source of Truth)
+
+For post-hoc analysis and baseline validation, prefer generating alignment
+reports directly from CJ Assessment DB data instead of re-running ENG5:
+
+```bash
+# 1) Ensure .env is exported so CJ DB credentials are available
+bash -lc 'set -a; source .env >/dev/null 2>&1 || true; set +a; \
+  pdm run python -m scripts.cj_experiments_runners.eng5_np.db_alignment_report \
+    --cj-batch-id <cj_batch_id>'
+```
+
+Notes:
+- `db_alignment_report`:
+  - Reads `cj_comparison_pairs` and `cj_processed_essays` for the given
+    `cj_batch_id` using the same connection settings as
+    `scripts/cj_assessment_service/diagnostics/extract_cj_results.py`.
+  - Filters comparisons to successful pairs only (matching CJ scoring
+    semantics), then reconstructs per-anchor wins/losses, zero-win anchors,
+    and direct inversions (unique anchor pairs).
+  - Derives expert grades and filenames from
+    `test_uploads/ANCHOR ESSAYS/ROLE_MODELS_ENG5_NP_2016/anchor_essays/`
+    using `extract_grade_from_filename`, so duplicate grades (two A, B,
+    F+ anchors) remain distinguishable.
+  - Writes a timestamped markdown report under
+    `.claude/research/data/eng5_np_2016/anchor_align_db_{batch_label}_{timestamp}.md`.
+- Use `scripts/cj_assessment_service/diagnostics/extract_cj_results.py` to
+  discover the correct `cj_batch_id` (or BOS batch ID) for a given ENG5 run.
+
 Baseline acceptance targets (from batch 108 analysis):
 
 | Metric            | Baseline (Batch 108) | Target |

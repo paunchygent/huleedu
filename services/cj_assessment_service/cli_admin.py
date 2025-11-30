@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Mapping, TypeAlias, TypedDict, cast
 
 import httpx
+import jwt
 import typer
 from common_core.grade_scales import GRADE_SCALES
 
@@ -21,6 +22,8 @@ TOKEN_CACHE_PATH = Path(
 CJ_ADMIN_TOKEN_OVERRIDE = os.getenv("CJ_ADMIN_TOKEN")
 CJ_ADMIN_EMAIL = os.getenv("CJ_ADMIN_EMAIL")
 CJ_ADMIN_PASSWORD = os.getenv("CJ_ADMIN_PASSWORD")
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+HULEEDU_ENVIRONMENT = os.getenv("HULEEDU_ENVIRONMENT", "development")
 
 app = typer.Typer(help="CJ Assessment admin CLI")
 instructions_app = typer.Typer(help="Manage assessment instructions")
@@ -72,6 +75,22 @@ class AuthManager:
             token = refreshed.get("access_token")
             if isinstance(token, str):
                 return token
+
+        # Auto-generate dev token in development environment
+        if HULEEDU_ENVIRONMENT == "development" and JWT_SECRET_KEY:
+            typer.secho("Auto-generating dev admin token...", fg=typer.colors.YELLOW)
+            return jwt.encode(
+                {
+                    "sub": "dev-admin",
+                    "email": "dev-admin@huleedu.local",
+                    "roles": ["admin"],
+                    "aud": "huleedu-platform",
+                    "iss": "huleedu-identity-service",
+                    "exp": datetime.now(UTC) + timedelta(hours=24),
+                },
+                JWT_SECRET_KEY,
+                algorithm="HS256",
+            )
 
         typer.secho("No cached admin token found. Run `cj-admin login` first.", fg=typer.colors.RED)
         raise typer.Exit(code=1)
@@ -174,6 +193,14 @@ def _admin_request(method: str, path: str, json_body: JSONMapping | None = None)
         typer.secho(
             f"Request failed ({resp.status_code}) {resp.text}", fg=typer.colors.RED, err=True
         )
+        # Provide hint for common "not found" errors
+        resp_lower = resp.text.lower()
+        if "not found" in resp_lower or resp.status_code == 404:
+            typer.secho(
+                "Hint: Run `cj-admin instructions list` to see existing assignment IDs",
+                fg=typer.colors.YELLOW,
+                err=True,
+            )
         raise typer.Exit(code=1)
 
     if resp.text:
@@ -244,6 +271,49 @@ def issue_token(
             TOKEN_CACHE_PATH.unlink()
 
     typer.echo(json.dumps({k: v for k, v in payload.items() if k != "refresh_token"}, indent=2))
+
+
+@token_app.command("dev")
+def dev_token(
+    cache: bool = typer.Option(
+        False,
+        help="Cache the generated token to ~/.huleedu/cj_admin_token.json",
+    ),
+) -> None:
+    """Generate a dev admin token using JWT_SECRET_KEY (development only)."""
+    if HULEEDU_ENVIRONMENT != "development":
+        typer.secho(
+            "Dev tokens only available in development environment", fg=typer.colors.RED, err=True
+        )
+        raise typer.Exit(code=1)
+
+    if not JWT_SECRET_KEY:
+        typer.secho("JWT_SECRET_KEY not set in environment", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1)
+
+    token = jwt.encode(
+        {
+            "sub": "dev-admin",
+            "email": "dev-admin@huleedu.local",
+            "roles": ["admin"],
+            "aud": "huleedu-platform",
+            "iss": "huleedu-identity-service",
+            "exp": datetime.now(UTC) + timedelta(hours=24),
+        },
+        JWT_SECRET_KEY,
+        algorithm="HS256",
+    )
+
+    if cache:
+        cache_data: TokenCache = {
+            "access_token": token,
+            "expires_in": 86400,
+        }
+        TOKEN_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        TOKEN_CACHE_PATH.write_text(json.dumps(cache_data, indent=2), encoding="utf-8")
+        typer.secho(f"Token cached to {TOKEN_CACHE_PATH}", fg=typer.colors.GREEN)
+
+    typer.echo(token)
 
 
 def _upload_prompt_helper(assignment_id: str, content: str) -> str:

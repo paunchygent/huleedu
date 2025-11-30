@@ -148,6 +148,56 @@ chmod +x scripts/setup_huledu_environment.sh
 - Local development environments
 - CI/CD environments
 
+#### `dev-shell.sh`
+
+**Purpose**: Open an interactive shell with `.env` exported so DB and service
+environment variables are available to local tools and diagnostics scripts.
+
+**Usage**:
+
+```bash
+chmod +x scripts/dev-shell.sh   # once
+./scripts/dev-shell.sh          # opens a new shell with .env loaded
+```
+
+The script:
+
+- Changes directory to the repo root.
+- Exports variables from `.env` into the environment.
+- Executes your default shell with those variables set.
+
+### ENG5 NP Runner & Alignment Diagnostics
+
+#### `scripts/cj_experiments_runners/eng5_np/db_alignment_report.py`
+
+**Purpose**: Generate ENG5 anchor-alignment reports directly from CJ Assessment
+database data (no re-run, CJ as source of truth).
+
+**Usage** (from project root):
+
+```bash
+# Ensure CJ DB credentials are exported
+bash -lc 'set -a; source .env >/dev/null 2>&1 || true; set +a; \
+  pdm run python -m scripts.cj_experiments_runners.eng5_np.db_alignment_report \
+    --cj-batch-id <cj_batch_id>'
+```
+
+**What it does**:
+
+- Connects to the CJ Assessment DB using the same settings as
+  `scripts/cj_assessment_service/diagnostics/extract_cj_results.py`.
+- Reads `cj_comparison_pairs` and `cj_processed_essays` for the given batch.
+- Filters comparisons to successful winners only (matching CJ BT scoring).
+- Reconstructs ENG5 alignment metrics (per-anchor wins/losses, zero-win
+  anchors, direct inversions as unique anchor pairs, Kendall’s tau).
+- Resolves expert grades and filenames from the ENG5 vt_2017 anchors under:
+  `test_uploads/ANCHOR ESSAYS/ROLE_MODELS_ENG5_NP_2016/anchor_essays/`.
+- Writes a timestamped markdown report to:
+  `.claude/research/data/eng5_np_2016/anchor_align_db_{batch_label}_{timestamp}.md`.
+
+See `docs/operations/eng5-np-runbook.md` (Alignment Report Output section) for
+full ENG5 runner and alignment workflow details.
+
 ## Script Documentation
 
 Detailed documentation for each script is available in the [`docs/`](./docs/) directory:

@@ -4,6 +4,10 @@
 
 ### 1. Initial Setup
 
+Before using pdm run, start an env-aware shell:
+
+  ./scripts/dev-shell.sh   # loads .env, then run `pdm run ...`
+
 ```markdown
 - FIRST ACTION Read `.claude/rules/000-rule-index.md` first. The index contains onboard instructions for all services and project rules and standards. If the prompt contains a task description, use it to read and review all rule files related to the task at hand.
 - SECOND ACTION Use the user's task description to read and review all rule files related to the task at hand.

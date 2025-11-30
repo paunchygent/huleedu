@@ -312,7 +312,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avg_over_time(up{job=\"${service}\"}[5m])",
+          "expr": "sum by (endpoint) (rate(http_requests_total{job=\"${service}\", status_code=~\"5..\"}[5m])) / sum by (endpoint) (rate(http_requests_total{job=\"${service}\"}[5m]))",
           "format": "table",
           "instant": true,
           "refId": "A"
