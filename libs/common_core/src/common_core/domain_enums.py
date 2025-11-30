@@ -122,4 +122,3 @@ class EssayComparisonWinner(str, Enum):
 
     ESSAY_A = "Essay A"
     ESSAY_B = "Essay B"
-    ERROR = "Error"

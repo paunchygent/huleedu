@@ -155,14 +155,31 @@ class TestIncrementalScoring:
         request_id = str(uuid4())
 
         if winner == "a":
-            winner_enum = EssayComparisonWinner.ESSAY_A
-            justification = f"Essay A ({essay_a.id}) demonstrates superior quality"
+            winner_enum: EssayComparisonWinner | None = EssayComparisonWinner.ESSAY_A
+            justification: str | None = f"Essay A ({essay_a.id}) demonstrates superior quality"
+            confidence: float | None = 4.0  # 1-5 scale
+            error_detail = None
         elif winner == "b":
             winner_enum = EssayComparisonWinner.ESSAY_B
             justification = f"Essay B ({essay_b.id}) demonstrates superior quality"
+            confidence = 4.0
+            error_detail = None
         else:
-            winner_enum = EssayComparisonWinner.ERROR
-            justification = "Comparison failed"
+            # Error case: winner/confidence/justification are None, error_detail populated
+            from common_core.error_enums import ErrorCode
+            from common_core.models.error_models import ErrorDetail
+
+            winner_enum = None
+            justification = None
+            confidence = None
+            error_detail = ErrorDetail(
+                error_code=ErrorCode.LLM_PROVIDER_SERVICE_ERROR,
+                message="Comparison failed",
+                correlation_id=correlation_id,
+                timestamp=datetime.now(UTC),
+                service="llm_provider_service",
+                operation="compare_essays",
+            )
 
         result = LLMComparisonResultV1(
             request_id=request_id,
@@ -170,7 +187,7 @@ class TestIncrementalScoring:
             provider=LLMProviderType.ANTHROPIC,
             model="claude-3-haiku-20240307",
             winner=winner_enum,
-            confidence=4.0,  # Changed from 0.85 to 4.0 (1-5 scale)
+            confidence=confidence,
             justification=justification,
             response_time_ms=1500,
             token_usage=TokenUsage(
@@ -181,7 +198,7 @@ class TestIncrementalScoring:
             cost_estimate=0.001,
             requested_at=datetime.now(UTC),
             completed_at=datetime.now(UTC),
-            error_detail=None,
+            error_detail=error_detail,
         )
 
         metadata = SystemProcessingMetadata(

@@ -104,17 +104,16 @@ class TestBradleyTerryScoring:
         comparison_pattern: list[tuple[int, int, str]],
     ) -> list[ComparisonResult]:
         """Create comparison results based on pattern."""
+        from datetime import UTC, datetime
+        from uuid import uuid4
+
+        from common_core.error_enums import ErrorCode
+        from common_core.models.error_models import ErrorDetail
+
         results = []
         for idx_a, idx_b, winner in comparison_pattern:
             essay_a = essays[idx_a]
             essay_b = essays[idx_b]
-
-            if winner == "a":
-                winner_enum = EssayComparisonWinner.ESSAY_A
-            elif winner == "b":
-                winner_enum = EssayComparisonWinner.ESSAY_B
-            else:
-                winner_enum = EssayComparisonWinner.ERROR
 
             task = ComparisonTask(
                 essay_a=essay_a,
@@ -122,19 +121,55 @@ class TestBradleyTerryScoring:
                 prompt="Compare these essays",
             )
 
-            assessment = LLMAssessmentResponseSchema(
-                winner=winner_enum,
-                justification=f"Essay {winner} is better",
-                confidence=4.0,
-            )
-
-            results.append(
-                ComparisonResult(
-                    task=task,
-                    llm_assessment=assessment,
-                    raw_llm_response_content="Mock LLM response",
+            if winner == "a":
+                winner_enum = EssayComparisonWinner.ESSAY_A
+                assessment = LLMAssessmentResponseSchema(
+                    winner=winner_enum,
+                    justification=f"Essay {winner} is better",
+                    confidence=4.0,
                 )
-            )
+                results.append(
+                    ComparisonResult(
+                        task=task,
+                        llm_assessment=assessment,
+                        raw_llm_response_content="Mock LLM response",
+                    )
+                )
+            elif winner == "b":
+                winner_enum = EssayComparisonWinner.ESSAY_B
+                assessment = LLMAssessmentResponseSchema(
+                    winner=winner_enum,
+                    justification=f"Essay {winner} is better",
+                    confidence=4.0,
+                )
+                results.append(
+                    ComparisonResult(
+                        task=task,
+                        llm_assessment=assessment,
+                        raw_llm_response_content="Mock LLM response",
+                    )
+                )
+            elif winner == "error":
+                # Error case: llm_assessment=None, error_detail populated
+                error_detail = ErrorDetail(
+                    error_code=ErrorCode.LLM_PROVIDER_SERVICE_ERROR,
+                    message="Test comparison failed",
+                    correlation_id=uuid4(),
+                    timestamp=datetime.now(UTC),
+                    service="llm_provider_service",
+                    operation="compare_essays",
+                )
+                results.append(
+                    ComparisonResult(
+                        task=task,
+                        llm_assessment=None,
+                        error_detail=error_detail,
+                        raw_llm_response_content=None,
+                    )
+                )
+            else:
+                raise ValueError(f"Invalid winner value in test pattern: {winner}")
+
         return results
 
     async def test_basic_bt_score_computation(

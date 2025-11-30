@@ -237,7 +237,7 @@ class AssessmentRunHydrator:
         elif normalized_winner in {"essay_b", "b"}:
             winner_id, loser_id = essay_b, essay_a
         else:
-            # Treat unknown/ERROR/tie winners as a failed comparison; keep
+            # Treat unknown/tie winners as a failed comparison; keep
             # essay_a/essay_b for traceability but mark status="failed"
             # below so reporting can filter them out.
             winner_id, loser_id = essay_a, essay_b

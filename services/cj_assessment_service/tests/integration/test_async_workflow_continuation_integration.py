@@ -145,7 +145,7 @@ class TestAsyncWorkflowContinuation:
     def _create_callback_result(
         self,
         correlation_id: UUID,
-        winner: EssayComparisonWinner,
+        winner: EssayComparisonWinner | None,
         is_error: bool = False,
     ) -> LLMComparisonResultV1:
         """Create a mock LLM callback result."""
@@ -478,7 +478,7 @@ class TestAsyncWorkflowContinuation:
         # Process mix of success and error callbacks
         results = [
             (correlation_ids[0], EssayComparisonWinner.ESSAY_A, False),  # Success
-            (correlation_ids[1], EssayComparisonWinner.ERROR, True),  # Error
+            (correlation_ids[1], None, True),  # Error - winner=None for errors
             (correlation_ids[2], EssayComparisonWinner.ESSAY_B, False),  # Success
         ]
 

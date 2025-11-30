@@ -652,7 +652,9 @@ class AnthropicProviderImpl(LLMProviderProtocol):
                 elif validated_response.winner == "Essay B":
                     winner = EssayComparisonWinner.ESSAY_B
                 else:
-                    winner = EssayComparisonWinner.ERROR
+                    raise ValueError(
+                        f"Unexpected winner from validator: {validated_response.winner}"
+                    )
 
                 # Get token usage
                 usage = response_data.get("usage", {})

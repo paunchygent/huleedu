@@ -239,7 +239,9 @@ class OpenRouterProviderImpl(LLMProviderProtocol):
                             elif validated_response.winner == "Essay B":
                                 winner = EssayComparisonWinner.ESSAY_B
                             else:
-                                winner = EssayComparisonWinner.ERROR
+                                raise ValueError(
+                                    f"Unexpected winner from validator: {validated_response.winner}"
+                                )
 
                             # Convert confidence from 1-5 scale to 0-1 scale for internal model
                             confidence_normalized = (validated_response.confidence - 1.0) / 4.0

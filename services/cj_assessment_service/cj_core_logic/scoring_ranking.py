@@ -252,8 +252,6 @@ async def record_comparisons_and_update_scores(
                     winner_db_val = "essay_a"
                 elif result.llm_assessment.winner == EssayComparisonWinner.ESSAY_B:
                     winner_db_val = "essay_b"
-                elif result.llm_assessment.winner == EssayComparisonWinner.ERROR:
-                    winner_db_val = "error"
 
                 # Extract error details if available
                 error_code = None
@@ -286,7 +284,10 @@ async def record_comparisons_and_update_scores(
                 session.add(new_pair)
 
                 # Only count successful comparisons (not errors)
-                if result.llm_assessment.winner != EssayComparisonWinner.ERROR:
+                if result.llm_assessment.winner in {
+                    EssayComparisonWinner.ESSAY_A,
+                    EssayComparisonWinner.ESSAY_B,
+                }:
                     successful_comparisons_this_round += 1
 
         if successful_comparisons_this_round > 0:

@@ -262,7 +262,9 @@ class OpenAIProviderImpl(LLMProviderProtocol):
                             elif validated_response.winner == "Essay B":
                                 winner = EssayComparisonWinner.ESSAY_B
                             else:
-                                winner = EssayComparisonWinner.ERROR
+                                raise ValueError(
+                                    f"Unexpected winner from validator: {validated_response.winner}"
+                                )
 
                             # ARCHITECTURAL BOUNDARY: Convert from LLM contract scale (1-5)
                             # to internal mathematical scale (0-1) for probability operations.
