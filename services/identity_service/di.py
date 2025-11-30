@@ -7,6 +7,7 @@ from datetime import timedelta
 
 from aiohttp import ClientSession
 from dishka import Provider, Scope, provide
+from huleedu_service_libs.database import DatabaseMetrics, setup_database_monitoring
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.outbox import OutboxRepositoryProtocol
@@ -94,6 +95,11 @@ class CoreProvider(Provider):
     async def provide_database_engine(self, settings: Settings) -> AsyncEngine:
         engine = create_async_engine(settings.DATABASE_URL, echo=False)
         return engine
+
+    @provide(scope=Scope.APP)
+    def provide_database_metrics(self, engine: AsyncEngine, settings: Settings) -> DatabaseMetrics:
+        """Provide database metrics monitoring for identity service."""
+        return setup_database_monitoring(engine=engine, service_name=settings.SERVICE_NAME)
 
     @provide(scope=Scope.APP)
     def provide_service_name(self, settings: Settings) -> str:

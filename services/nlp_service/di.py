@@ -23,6 +23,7 @@ from huleedu_nlp_shared.feature_pipeline.extractors import (
     GrammarOverviewExtractor,
     NormalizationFeaturesExtractor,
 )
+from huleedu_service_libs.database import DatabaseMetrics, setup_database_monitoring
 from huleedu_service_libs.error_handling import HuleEduError
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.outbox import OutboxRepositoryProtocol
@@ -165,6 +166,16 @@ class NlpServiceInfrastructureProvider(Provider):
     def provide_engine(self) -> AsyncEngine:
         """Provide database engine."""
         return self._engine
+
+    @provide(scope=Scope.APP)
+    def provide_database_metrics(self, engine: AsyncEngine, settings: Settings) -> DatabaseMetrics:
+        """Provide database metrics monitoring for NLP service.
+
+        Note: nlp_service is a pure Kafka worker without an HTTP server,
+        so these metrics are registered but not scrapeable via /metrics endpoint.
+        Consider adding push gateway integration for production observability.
+        """
+        return setup_database_monitoring(engine=engine, service_name=settings.SERVICE_NAME)
 
     @provide(scope=Scope.APP)
     def provide_outbox_manager(

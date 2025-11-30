@@ -7,7 +7,9 @@ from typing import TYPE_CHECKING, Any
 from aiohttp import ClientSession, ClientTimeout
 from dishka import Provider, Scope, provide
 from prometheus_client import CollectorRegistry
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
+from huleedu_service_libs.database import DatabaseMetrics, setup_database_monitoring
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
 from services.batch_conductor_service.config import Settings, settings
 from services.batch_conductor_service.protocols import (
@@ -61,13 +63,31 @@ class CoreInfrastructureProvider(Provider):
         await redis_client.start()
         return redis_client
 
+    @provide(scope=Scope.APP)
+    def provide_database_engine(self, settings: Settings) -> AsyncEngine:
+        """Provide async database engine for BCS PostgreSQL repository."""
+        return create_async_engine(
+            settings.DATABASE_URL,
+            echo=False,
+            future=True,
+            pool_size=10,
+            max_overflow=20,
+            pool_pre_ping=True,
+            pool_recycle=3600,
+        )
+
+    @provide(scope=Scope.APP)
+    def provide_database_metrics(self, engine: AsyncEngine, settings: Settings) -> DatabaseMetrics:
+        """Provide database metrics monitoring for batch conductor service."""
+        return setup_database_monitoring(engine=engine, service_name=settings.SERVICE_NAME)
+
 
 class EventDrivenServicesProvider(Provider):
     """Provider for event-driven service dependencies."""
 
     @provide(scope=Scope.APP)
     def provide_batch_state_repository(
-        self, redis_client: AtomicRedisClientProtocol, settings: Settings
+        self, redis_client: AtomicRedisClientProtocol, settings: Settings, engine: AsyncEngine
     ) -> BatchStateRepositoryProtocol:
         """
         Provide batch state repository with cache-aside pattern.
@@ -87,9 +107,9 @@ class EventDrivenServicesProvider(Provider):
                 redis_batch_state_repository,
             )
 
-            # Create PostgreSQL repository for permanent storage
+            # Create PostgreSQL repository for permanent storage using shared engine
             postgres_repo = postgres_batch_state_repository.PostgreSQLBatchStateRepositoryImpl(
-                database_url=settings.DATABASE_URL
+                engine=engine
             )
 
             # Create Redis repository with PostgreSQL fallback

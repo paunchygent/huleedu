@@ -8,6 +8,7 @@ from typing import Any
 from aiohttp import ClientSession
 from aiokafka.errors import KafkaError
 from dishka import Provider, Scope, provide
+from huleedu_service_libs.database import DatabaseMetrics, setup_database_monitoring
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.outbox import OutboxRepositoryProtocol
@@ -142,6 +143,11 @@ class CoreInfrastructureProvider(Provider):
             pool_pre_ping=True,  # Verify connections before use
         )
         return engine
+
+    @provide(scope=Scope.APP)
+    def provide_database_metrics(self, engine: AsyncEngine, settings: Settings) -> DatabaseMetrics:
+        """Provide database metrics monitoring for file service."""
+        return setup_database_monitoring(engine=engine, service_name=settings.SERVICE_NAME)
 
     @provide(scope=Scope.APP)
     def provide_service_name(self, settings: Settings) -> str:

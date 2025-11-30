@@ -32,7 +32,7 @@ class Settings(SecureServiceSettings):
         validation_alias="ENVIRONMENT",  # Read from global ENVIRONMENT var
         description="Runtime environment for the service",
     )
-    SERVICE_NAME: str = "spell-checker-service"
+    SERVICE_NAME: str = "spellchecker_service"
     VERSION: str = "1.0.0"
     KAFKA_BOOTSTRAP_SERVERS: str = Field(
         default="localhost:9092",

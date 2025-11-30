@@ -5,6 +5,7 @@ Content Service dependency injection configuration.
 from __future__ import annotations
 
 from dishka import Provider, Scope, provide
+from huleedu_service_libs.database import DatabaseMetrics, setup_database_monitoring
 from prometheus_client import CollectorRegistry, Counter
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
@@ -58,6 +59,11 @@ class ContentServiceProvider(Provider):
             max_overflow=10,
             pool_pre_ping=True,
         )
+
+    @provide(scope=Scope.APP)
+    def provide_database_metrics(self, engine: AsyncEngine, settings: Settings) -> DatabaseMetrics:
+        """Provide database metrics monitoring for content service."""
+        return setup_database_monitoring(engine=engine, service_name=settings.SERVICE_NAME)
 
     @provide(scope=Scope.APP)
     def provide_content_repository(

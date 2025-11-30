@@ -13,7 +13,12 @@ from time import time
 from sqlalchemy import and_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from huleedu_service_libs.logging_utils import create_service_logger
@@ -47,20 +52,30 @@ class PostgreSQLBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
     - Metrics: Prometheus histograms for operation duration and error counters
     """
 
-    def __init__(self, database_url: str):
-        """Initialize the PostgreSQL repository with connection settings."""
-        self.database_url = database_url
+    def __init__(self, database_url: str | None = None, engine: AsyncEngine | None = None):
+        """Initialize the PostgreSQL repository with connection settings.
 
-        # Create async engine with connection pooling
-        self.engine = create_async_engine(
-            database_url,
-            echo=False,
-            future=True,
-            pool_size=10,
-            max_overflow=20,
-            pool_pre_ping=True,
-            pool_recycle=3600,
-        )
+        Args:
+            database_url: Database connection URL (used if engine not provided)
+            engine: Optional pre-configured AsyncEngine for connection reuse and metrics
+        """
+        if engine is not None:
+            self.engine = engine
+            self.database_url = None
+        elif database_url is not None:
+            self.database_url = database_url
+            # Create async engine with connection pooling
+            self.engine = create_async_engine(
+                database_url,
+                echo=False,
+                future=True,
+                pool_size=10,
+                max_overflow=20,
+                pool_pre_ping=True,
+                pool_recycle=3600,
+            )
+        else:
+            raise ValueError("Either database_url or engine must be provided")
 
         # Create session maker
         self.async_session = async_sessionmaker(
