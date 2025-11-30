@@ -208,7 +208,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "batch_orchestrator_service_database_connections_active or vector(0)",
+          "expr": "batch_orchestrator_service_database_connections_active",
           "legendFormat": "Batch Orchestrator Service",
           "refId": "A"
         },
@@ -217,7 +217,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "essay_lifecycle_service_database_connections_active or vector(0)",
+          "expr": "essay_lifecycle_service_database_connections_active",
           "legendFormat": "Essay Lifecycle Service",
           "refId": "B"
         },
@@ -226,7 +226,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "cj_assessment_service_database_connections_active or vector(0)",
+          "expr": "cj_assessment_service_database_connections_active",
           "legendFormat": "CJ Assessment Service",
           "refId": "C"
         },
@@ -235,7 +235,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "class_management_service_database_connections_active or vector(0)",
+          "expr": "class_management_service_database_connections_active",
           "legendFormat": "Class Management Service",
           "refId": "D"
         },
@@ -244,7 +244,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "result_aggregator_service_database_connections_active or vector(0)",
+          "expr": "result_aggregator_service_database_connections_active",
           "legendFormat": "Result Aggregator Service",
           "refId": "E"
         },
@@ -253,9 +253,45 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "spellchecker_service_database_connections_active or vector(0)",
+          "expr": "spellchecker_service_database_connections_active",
           "legendFormat": "Spell Checker Service",
           "refId": "F"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "{__name__=~\"batch-conductor-service_database_connections_active\"}",
+          "legendFormat": "Batch Conductor Service",
+          "refId": "G"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "{__name__=~\"content-service_database_connections_active\"}",
+          "legendFormat": "Content Service",
+          "refId": "H"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "{__name__=~\"file-service_database_connections_active\"}",
+          "legendFormat": "File Service",
+          "refId": "I"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "identity_service_database_connections_active",
+          "legendFormat": "Identity Service",
+          "refId": "J"
         }
       ],
       "title": "Database Connection Pool Status",
@@ -323,7 +359,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(batch_orchestrator_service_database_connections_total or vector(0)) + sum(essay_lifecycle_service_database_connections_total or vector(0)) + sum(cj_assessment_service_database_connections_total or vector(0)) + sum(class_management_service_database_connections_total or vector(0)) + sum(result_aggregator_service_database_connections_total or vector(0)) + sum(spellchecker_service_database_connections_total or vector(0))",
+          "expr": "sum(batch_orchestrator_service_database_connections_total or vector(0)) + sum(essay_lifecycle_service_database_connections_total or vector(0)) + sum(cj_assessment_service_database_connections_total or vector(0)) + sum(class_management_service_database_connections_total or vector(0)) + sum(result_aggregator_service_database_connections_total or vector(0)) + sum(spellchecker_service_database_connections_total or vector(0)) + sum({__name__=~\"batch-conductor-service_database_connections_total\"} or vector(0)) + sum({__name__=~\"content-service_database_connections_total\"} or vector(0)) + sum({__name__=~\"file-service_database_connections_total\"} or vector(0)) + sum(identity_service_database_connections_total or vector(0))",
           "refId": "A"
         }
       ],
@@ -392,7 +428,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(batch_orchestrator_service_database_errors_total[1m]) or vector(0)) + sum(rate(essay_lifecycle_service_database_errors_total[1m]) or vector(0)) + sum(rate(cj_assessment_service_database_errors_total[1m]) or vector(0)) + sum(rate(class_management_service_database_errors_total[1m]) or vector(0)) + sum(rate(result_aggregator_service_database_errors_total[1m]) or vector(0)) + sum(rate(spellchecker_service_database_errors_total[1m]) or vector(0))",
+          "expr": "sum(rate(batch_orchestrator_service_database_errors_total[1m]) or vector(0)) + sum(rate(essay_lifecycle_service_database_errors_total[1m]) or vector(0)) + sum(rate(cj_assessment_service_database_errors_total[1m]) or vector(0)) + sum(rate(class_management_service_database_errors_total[1m]) or vector(0)) + sum(rate(result_aggregator_service_database_errors_total[1m]) or vector(0)) + sum(rate(spellchecker_service_database_errors_total[1m]) or vector(0)) + sum(rate({__name__=~\"batch-conductor-service_database_errors_total\"}[1m]) or vector(0)) + sum(rate({__name__=~\"content-service_database_errors_total\"}[1m]) or vector(0)) + sum(rate({__name__=~\"file-service_database_errors_total\"}[1m]) or vector(0)) + sum(rate(identity_service_database_errors_total[1m]) or vector(0))",
           "refId": "A"
         }
       ],
@@ -461,7 +497,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "avg((batch_orchestrator_service_database_connections_active / batch_orchestrator_service_database_connections_total * 100) or (essay_lifecycle_service_database_connections_active / essay_lifecycle_service_database_connections_total * 100) or (cj_assessment_service_database_connections_active / cj_assessment_service_database_connections_total * 100) or (class_management_service_database_connections_active / class_management_service_database_connections_total * 100) or (result_aggregator_service_database_connections_active / result_aggregator_service_database_connections_total * 100) or (spellchecker_service_database_connections_active / spellchecker_service_database_connections_total * 100))",
+          "expr": "avg((batch_orchestrator_service_database_connections_active / batch_orchestrator_service_database_connections_total * 100) or (essay_lifecycle_service_database_connections_active / essay_lifecycle_service_database_connections_total * 100) or (cj_assessment_service_database_connections_active / cj_assessment_service_database_connections_total * 100) or (class_management_service_database_connections_active / class_management_service_database_connections_total * 100) or (result_aggregator_service_database_connections_active / result_aggregator_service_database_connections_total * 100) or (spellchecker_service_database_connections_active / spellchecker_service_database_connections_total * 100) or ({__name__=~\"batch-conductor-service_database_connections_active\"} / {__name__=~\"batch-conductor-service_database_connections_total\"} * 100) or ({__name__=~\"content-service_database_connections_active\"} / {__name__=~\"content-service_database_connections_total\"} * 100) or ({__name__=~\"file-service_database_connections_active\"} / {__name__=~\"file-service_database_connections_total\"} * 100) or (identity_service_database_connections_active / identity_service_database_connections_total * 100))",
           "refId": "A"
         }
       ],
@@ -549,7 +585,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.95, sum(rate(batch_orchestrator_service_database_query_duration_seconds_bucket[5m])) by (le)) or vector(0)",
+          "expr": "histogram_quantile(0.95, sum(rate(batch_orchestrator_service_database_query_duration_seconds_bucket[5m])) by (le))",
           "legendFormat": "Batch Orchestrator Service",
           "refId": "A"
         },
@@ -558,7 +594,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.95, sum(rate(essay_lifecycle_service_database_query_duration_seconds_bucket[5m])) by (le)) or vector(0)",
+          "expr": "histogram_quantile(0.95, sum(rate(essay_lifecycle_service_database_query_duration_seconds_bucket[5m])) by (le))",
           "legendFormat": "Essay Lifecycle Service",
           "refId": "B"
         },
@@ -567,7 +603,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.95, sum(rate(cj_assessment_service_database_query_duration_seconds_bucket[5m])) by (le)) or vector(0)",
+          "expr": "histogram_quantile(0.95, sum(rate(cj_assessment_service_database_query_duration_seconds_bucket[5m])) by (le))",
           "legendFormat": "CJ Assessment Service",
           "refId": "C"
         },
@@ -576,7 +612,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.95, sum(rate(class_management_service_database_query_duration_seconds_bucket[5m])) by (le)) or vector(0)",
+          "expr": "histogram_quantile(0.95, sum(rate(class_management_service_database_query_duration_seconds_bucket[5m])) by (le))",
           "legendFormat": "Class Management Service",
           "refId": "D"
         },
@@ -585,7 +621,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.95, sum(rate(result_aggregator_service_database_query_duration_seconds_bucket[5m])) by (le)) or vector(0)",
+          "expr": "histogram_quantile(0.95, sum(rate(result_aggregator_service_database_query_duration_seconds_bucket[5m])) by (le))",
           "legendFormat": "Result Aggregator Service",
           "refId": "E"
         },
@@ -594,9 +630,45 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.95, sum(rate(spellchecker_service_database_query_duration_seconds_bucket[5m])) by (le)) or vector(0)",
+          "expr": "histogram_quantile(0.95, sum(rate(spellchecker_service_database_query_duration_seconds_bucket[5m])) by (le))",
           "legendFormat": "Spell Checker Service",
           "refId": "F"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum(rate({__name__=~\"batch-conductor-service_database_query_duration_seconds_bucket\"}[5m])) by (le))",
+          "legendFormat": "Batch Conductor Service",
+          "refId": "G"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum(rate({__name__=~\"content-service_database_query_duration_seconds_bucket\"}[5m])) by (le))",
+          "legendFormat": "Content Service",
+          "refId": "H"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum(rate({__name__=~\"file-service_database_query_duration_seconds_bucket\"}[5m])) by (le))",
+          "legendFormat": "File Service",
+          "refId": "I"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum(rate(identity_service_database_query_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "Identity Service",
+          "refId": "J"
         }
       ],
       "title": "Database Query Performance (95th Percentile)",
@@ -731,6 +803,42 @@
           "expr": "rate(spellchecker_service_database_transaction_duration_seconds_count{result=\"success\"}[5m]) / rate(spellchecker_service_database_transaction_duration_seconds_count[5m]) * 100 or vector(100)",
           "legendFormat": "Spell Checker Service",
           "refId": "F"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "rate({__name__=~\"batch-conductor-service_database_transaction_duration_seconds_count\", result=\"success\"}[5m]) / rate({__name__=~\"batch-conductor-service_database_transaction_duration_seconds_count\"}[5m]) * 100 or vector(100)",
+          "legendFormat": "Batch Conductor Service",
+          "refId": "G"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "rate({__name__=~\"content-service_database_transaction_duration_seconds_count\", result=\"success\"}[5m]) / rate({__name__=~\"content-service_database_transaction_duration_seconds_count\"}[5m]) * 100 or vector(100)",
+          "legendFormat": "Content Service",
+          "refId": "H"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "rate({__name__=~\"file-service_database_transaction_duration_seconds_count\", result=\"success\"}[5m]) / rate({__name__=~\"file-service_database_transaction_duration_seconds_count\"}[5m]) * 100 or vector(100)",
+          "legendFormat": "File Service",
+          "refId": "I"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "rate(identity_service_database_transaction_duration_seconds_count{result=\"success\"}[5m]) / rate(identity_service_database_transaction_duration_seconds_count[5m]) * 100 or vector(100)",
+          "legendFormat": "Identity Service",
+          "refId": "J"
         }
       ],
       "title": "Database Transaction Success Rate",

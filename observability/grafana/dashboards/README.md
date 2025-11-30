@@ -1,86 +1,92 @@
 # HuleEdu Grafana Dashboards
 
-This directory contains the three-tier dashboard system for HuleEdu monitoring.
+Domain-organized dashboard system following SRP principles. Subdirectories map to Grafana folders via `foldersFromFilesStructure`.
 
-## Dashboard Overview
+## Directory Structure
 
-### Tier 1: System Health Overview
-- **File**: `HuleEdu_System_Health_Overview.json`
-- **UID**: `huleedu-system-health`
-- **Purpose**: 10,000-foot view of platform health
-- **Key Panels**: Service availability, global error rate, active alerts, infrastructure status
+```
+dashboards/
+├── system/                    # Platform-wide health
+│   └── HuleEdu_System_Health_Overview.json
+├── services/                  # Service-level monitoring
+│   ├── HuleEdu_Service_Deep_Dive_Template.json
+│   └── HuleEdu_LLM_Prompt_Cache.json
+├── database/                  # PostgreSQL monitoring
+│   ├── HuleEdu_Database_Health_Overview.json
+│   ├── HuleEdu_Database_Deep_Dive.json
+│   └── HuleEdu_Database_Troubleshooting.json
+├── cj-assessment/             # Comparative Judgment domain
+│   └── HuleEdu_CJ_Assessment_Deep_Dive.json
+└── troubleshooting/           # Request tracing and debugging
+    ├── HuleEdu_Troubleshooting.json
+    └── tier3-distributed-tracing.json
+```
 
-### Tier 2: Service Deep Dive
-- **File**: `HuleEdu_Service_Deep_Dive_Template.json`
-- **UID**: `huleedu-service-deep-dive`
-- **Purpose**: 1,000-foot view of individual service performance
-- **Key Features**: Service variable templating, conditional business metrics, live logs
+## Dashboards by Domain
 
-### Tier 3: Troubleshooting
-- **File**: `HuleEdu_Troubleshooting.json`
-- **UID**: `huleedu-troubleshooting`
-- **Purpose**: Ground-level distributed tracing via correlation IDs
-- **Key Features**: Correlation ID search, chronological log timeline, service involvement map
+### System (`system/`)
 
-## Import Instructions
+| Dashboard | UID | Purpose |
+|-----------|-----|---------|
+| System Health Overview | `huleedu-system-health` | 10,000-foot platform health view |
 
-1. Access Grafana UI at <http://localhost:3000>
-2. Navigate to Dashboards → Import
-3. Upload each JSON file in order (Tier 1 → Tier 2 → Tier 3)
-4. Select the appropriate Prometheus and Loki data sources when prompted
+### Services (`services/`)
 
-## Progressive Disclosure Navigation
+| Dashboard | UID | Purpose |
+|-----------|-----|---------|
+| Service Deep Dive | `huleedu-service-deep-dive` | Per-service performance with variable templating |
+| LLM Prompt Cache | `huleedu-llm-prompt-cache` | Prompt cache efficiency and token savings |
 
-- Tier 1 → Tier 2: Click on service metrics to drill down
-- Tier 2 → Tier 3: Click on correlation IDs in logs to trace requests
-- All dashboards have navigation links in the top bar
+### Database (`database/`)
 
-## Database Monitoring Dashboards
+| Dashboard | UID | Purpose |
+|-----------|-----|---------|
+| Database Health Overview | `huleedu-database-health` | Cross-service PostgreSQL health |
+| Database Deep Dive | `huleedu-database-deep-dive` | Service-specific database analysis |
+| Database Troubleshooting | `huleedu-database-troubleshooting` | Connection pool and query investigation |
 
-### Database Health Overview
-- **File**: `HuleEdu_Database_Health_Overview.json`
-- **UID**: `huleedu-database-health`
-- **Purpose**: System-wide PostgreSQL database health monitoring
-- **Key Panels**: Connection pools across all services, query performance, transaction success rates
-- **Coverage**: All 6 PostgreSQL services (Batch Orchestrator, Essay Lifecycle, CJ Assessment, Class Management, Result Aggregator, Spell Checker)
+### CJ Assessment (`cj-assessment/`)
 
-### Database Service Deep Dive
-- **File**: `HuleEdu_Database_Deep_Dive.json`
-- **UID**: `huleedu-database-deep-dive`
-- **Purpose**: Service-specific database performance analysis
-- **Key Features**: Service selector variable, detailed connection pool metrics, query breakdown by operation
-- **Usage**: Select service from dropdown to analyze database performance
+| Dashboard | UID | Purpose |
+|-----------|-----|---------|
+| CJ Assessment Deep Dive | `huleedu-cj-assessment-deep-dive` | BT SE diagnostics, quality flags, batch health |
 
-### Database Troubleshooting
-- **File**: `HuleEdu_Database_Troubleshooting.json`
-- **UID**: `huleedu-database-troubleshooting`
-- **Purpose**: Database performance correlation and investigation
-- **Key Features**: Performance outliers, connection pool exhaustion detection, cross-service load correlation
+### Troubleshooting (`troubleshooting/`)
 
-### LLM Prompt Cache (LLM Provider)
-- **File**: `HuleEdu_LLM_Prompt_Cache.json`
-- **UID**: `huleedu-llm-prompt-cache`
-- **Purpose**: Prompt cache efficiency and token-savings visibility for LLM Provider
-- **Key Panels**: Hit rate, events by result/provider/model, tokens saved (reads), tokens written (cache creation)
-- **Navigation**: Linked from prompt cache alerts; use together with Service Deep Dive for provider health
+| Dashboard | UID | Purpose |
+|-----------|-----|---------|
+| Troubleshooting | `huleedu-troubleshooting` | Correlation ID request tracing |
+| Distributed Tracing | `tier3-distributed-tracing` | OpenTelemetry span visualization |
 
-## Import Instructions
+## Provisioning
 
-1. Access Grafana UI at <http://localhost:3000>
-2. Navigate to Dashboards → Import
-3. Upload each JSON file in order (System → Service → Troubleshooting → Database dashboards)
-4. Select the appropriate Prometheus and Loki data sources when prompted
+Dashboards auto-load via Grafana provisioning with `foldersFromFilesStructure: true`. Subdirectories become Grafana folders.
 
-## Progressive Disclosure Navigation
+**Reload options:**
+- Wait 30 seconds for auto-scan
+- Restart: `docker restart huleedu_grafana`
+- Full cycle: `pdm run obs-down && pdm run obs-up`
 
-- Tier 1 → Tier 2: Click on service metrics to drill down
-- Tier 2 → Tier 3: Click on correlation IDs in logs to trace requests
-- Database Health → Database Deep Dive: Click on service-specific database metrics
-- All dashboards have navigation links in the top bar
+## Alert Rules
 
-## Alert Integration
+Alert rules are organized by domain in `prometheus/rules/`:
 
-Prometheus alerts in `prometheus/rules/service_alerts.yml` include:
-- `dashboard_url`: Links to relevant dashboard for investigation
-- `runbook_url`: Links to operational playbook for resolution steps
-- Database alerts link to appropriate database monitoring dashboards
+| File | Domain |
+|------|--------|
+| `service-health-alerts.yml` | Service availability, error rates, LLM cache |
+| `distributed-tracing-alerts.yml` | Tracing, latency, circuit breakers |
+| `infrastructure-alerts.yml` | Kafka, Redis, PostgreSQL exporters |
+| `database-alerts.yml` | Connection pools, query latency, transactions |
+| `cj-assessment-alerts.yml` | BT SE diagnostics, quality flag spikes |
+
+## Navigation Flow
+
+```
+System Health → Service Deep Dive → Troubleshooting
+     ↓                ↓
+Database Health → Database Deep Dive
+     ↓
+CJ Assessment (domain-specific)
+```
+
+All dashboards include top-bar navigation links.

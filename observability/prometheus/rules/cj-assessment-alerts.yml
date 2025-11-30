@@ -1,0 +1,26 @@
+# CJ Assessment Alerts
+# Domain: Comparative Judgment service, BT scoring diagnostics
+groups:
+- name: CJBTDiagnosticsAlerts
+  rules:
+  - alert: CJBTSEInflatedBatchesSpike
+    expr: increase(cj_bt_se_inflated_batches_total[5m]) > 0
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: "CJ batches with inflated BT standard errors detected"
+      description: "{{ $value }} batches flagged with inflated SE in the last 5 minutes. Check anchor coverage and comparison budgets."
+      dashboard_url: "http://localhost:3000/d/huleedu-cj-assessment-deep-dive"
+      runbook_url: "file:///docs/operations/eng5-np-runbook.md#bt-se-diagnostics-interpretation"
+
+  - alert: CJBTSparseCoverageBatchesSpike
+    expr: increase(cj_bt_sparse_coverage_batches_total[5m]) > 0
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: "CJ batches with sparse comparison coverage detected"
+      description: "{{ $value }} batches flagged with sparse coverage in the last 5 minutes. May indicate isolated items or insufficient comparisons."
+      dashboard_url: "http://localhost:3000/d/huleedu-cj-assessment-deep-dive"
+      runbook_url: "file:///docs/operations/eng5-np-runbook.md#bt-se-diagnostics-interpretation"

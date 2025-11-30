@@ -1,0 +1,54 @@
+# Infrastructure Alerts
+# Domain: Exporters, Kafka, Redis, and platform-level health
+groups:
+- name: InfrastructureAlerts
+  rules:
+  - alert: KafkaExporterDown
+    expr: up{job="kafka_exporter"} == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Kafka exporter is down"
+      description: "Kafka monitoring is unavailable - exporter has been down for more than 1 minute."
+      dashboard_url: "http://localhost:3000/d/huleedu-system-health/huleedu-system-health-overview"
+
+  - alert: PostgreSQLExporterDown
+    expr: up{job="postgres_exporter"} == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "PostgreSQL exporter is down"
+      description: "PostgreSQL monitoring is unavailable - exporter has been down for more than 1 minute."
+      dashboard_url: "http://localhost:3000/d/huleedu-system-health/huleedu-system-health-overview"
+
+  - alert: RedisExporterDown
+    expr: up{job="redis_exporter"} == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Redis exporter is down"
+      description: "Redis monitoring is unavailable - exporter has been down for more than 1 minute."
+      dashboard_url: "http://localhost:3000/d/huleedu-system-health/huleedu-system-health-overview"
+
+  - alert: LowServiceAvailability
+    expr: huleedu:service_availability:percent < 80
+    for: 2m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Low overall service availability"
+      description: "Overall service availability is {{ $value }}% - below 80% threshold."
+      dashboard_url: "http://localhost:3000/d/huleedu-system-health/huleedu-system-health-overview"
+
+  - alert: HighKafkaLatency
+    expr: huleedu:kafka_latency:mean > 1.0
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High Kafka message queue latency"
+      description: "Kafka message queue latency is {{ $value }}s - higher than 1s threshold."
+      dashboard_url: "http://localhost:3000/d/huleedu-system-health/huleedu-system-health-overview"

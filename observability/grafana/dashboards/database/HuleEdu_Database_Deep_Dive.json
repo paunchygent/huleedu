@@ -803,9 +803,29 @@
             "selected": false,
             "text": "spellchecker_service",
             "value": "spellchecker_service"
+          },
+          {
+            "selected": false,
+            "text": "batch-conductor-service",
+            "value": "batch-conductor-service"
+          },
+          {
+            "selected": false,
+            "text": "content-service",
+            "value": "content-service"
+          },
+          {
+            "selected": false,
+            "text": "file-service",
+            "value": "file-service"
+          },
+          {
+            "selected": false,
+            "text": "identity_service",
+            "value": "identity_service"
           }
         ],
-        "query": "batch_orchestrator_service,essay_lifecycle_service,cj_assessment_service,class_management_service,result_aggregator_service,spellchecker_service",
+        "query": "batch_orchestrator_service,essay_lifecycle_service,cj_assessment_service,class_management_service,result_aggregator_service,spellchecker_service,batch-conductor-service,content-service,file-service,identity_service",
         "queryValue": "",
         "skipUrlSync": false,
         "type": "custom"

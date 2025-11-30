@@ -92,7 +92,7 @@
             "uid": "${DS_LOKI}"
           },
           "editorMode": "code",
-          "expr": "sum by() (count_over_time({service=~\".+\"} | json | correlation_id=\"${correlation_id}\" [1h]))",
+          "expr": "sum by() (count_over_time({service=~\".+\", service!~\"loki|promtail|grafana|prometheus|jaeger\"} | json | __error__=\"\" | correlation_id=\"${correlation_id}\" [1h]))",
           "queryType": "instant",
           "refId": "A"
         }
@@ -143,7 +143,7 @@
             "uid": "${DS_LOKI}"
           },
           "editorMode": "code",
-          "expr": "{service=~\".+\"} | json | correlation_id=\"${correlation_id}\" | line_format \"{{.timestamp}} [{{.service}}] {{.level}}: {{.message}}\"",
+          "expr": "{service=~\".+\", service!~\"loki|promtail|grafana|prometheus|jaeger\"} | json | __error__=\"\" | correlation_id=\"${correlation_id}\" | line_format \"{{.timestamp}} [{{.service}}] {{.level}}: {{.message}}\"",
           "queryType": "range",
           "refId": "A"
         }
@@ -208,7 +208,7 @@
             "uid": "${DS_LOKI}"
           },
           "editorMode": "code",
-          "expr": "sum by (service) (count_over_time({service=~\".+\"} | json | correlation_id=\"${correlation_id}\" [${time_window}]))",
+          "expr": "sum by (service) (count_over_time({service=~\".+\", service!~\"loki|promtail|grafana|prometheus|jaeger\"} | json | __error__=\"\" | correlation_id=\"${correlation_id}\" [${time_window}]))",
           "queryType": "instant",
           "refId": "A"
         }
@@ -310,7 +310,7 @@
             "uid": "${DS_LOKI}"
           },
           "editorMode": "code",
-          "expr": "sum by (service, level) (count_over_time({service=~\".+\"} | json | correlation_id=\"${correlation_id}\" [${time_window}]))",
+          "expr": "sum by (service, level) (count_over_time({service=~\".+\", service!~\"loki|promtail|grafana|prometheus|jaeger\"} | json | __error__=\"\" | correlation_id=\"${correlation_id}\" [${time_window}]))",
           "queryType": "instant",
           "refId": "A"
         }

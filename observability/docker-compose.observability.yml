@@ -111,17 +111,11 @@ services:
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
       - GF_USERS_ALLOW_SIGN_UP=false
-      - GF_DATASOURCES_0_NAME=Prometheus
-      - GF_DATASOURCES_0_TYPE=prometheus
-      - GF_DATASOURCES_0_URL=http://prometheus:9090
-      - GF_DATASOURCES_0_IS_DEFAULT=true
-      - GF_DATASOURCES_1_NAME=Loki
-      - GF_DATASOURCES_1_TYPE=loki
-      - GF_DATASOURCES_1_URL=http://loki:3100
 
   # Infrastructure exporters for comprehensive monitoring
   kafka_exporter:

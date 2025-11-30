@@ -409,7 +409,7 @@
       "pluginVersion": "8.0.0",
       "targets": [
         {
-          "expr": "{service_name=~\"$service\"} |= \"correlation_id=$correlation_id\" | json",
+          "expr": "{service_name=~\"$service\", service_name!~\"loki|promtail|grafana|prometheus|jaeger\"} |= \"correlation_id=$correlation_id\" | json | __error__=\"\"",
           "refId": "A"
         }
       ],
@@ -595,7 +595,7 @@
       "pluginVersion": "8.0.0",
       "targets": [
         {
-          "expr": "{service_name=~\"$service\"} |= \"error_context\" | json | line_format \"{{.timestamp}} [{{.error_context_service_name}}] {{.error_context_operation}}: {{.error_context_error_message}}\"",
+          "expr": "{service_name=~\"$service\", service_name!~\"loki|promtail|grafana|prometheus|jaeger\"} |= \"error_context\" | json | __error__=\"\" | line_format \"{{.timestamp}} [{{.error_context_service_name}}] {{.error_context_operation}}: {{.error_context_error_message}}\"",
           "refId": "A"
         }
       ],
@@ -618,7 +618,7 @@
   "templating": {
     "list": [
       {
-        "allValue": ".*",
+        "allValue": ".+",
         "current": {
           "selected": true,
           "text": "All",

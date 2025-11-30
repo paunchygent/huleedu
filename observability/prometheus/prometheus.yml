@@ -74,6 +74,26 @@ scrape_configs:
       - targets: ['batch_conductor_service:4002']
     metrics_path: '/metrics'
 
+  - job_name: 'email_service'
+    static_configs:
+      - targets: ['email_service:8080']
+    metrics_path: '/metrics'
+
+  - job_name: 'entitlements_service'
+    static_configs:
+      - targets: ['entitlements_service:8083']
+    metrics_path: '/metrics'
+
+  - job_name: 'websocket_service'
+    static_configs:
+      - targets: ['websocket_service:8080']
+    metrics_path: '/metrics'
+
+  - job_name: 'language_tool_service'
+    static_configs:
+      - targets: ['language_tool_service:8085']
+    metrics_path: '/metrics'
+
   # Infrastructure exporters for proper monitoring
   - job_name: 'kafka_exporter'
     static_configs:

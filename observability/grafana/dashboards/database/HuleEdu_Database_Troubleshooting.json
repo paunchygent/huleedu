@@ -175,6 +175,42 @@
           "expr": "histogram_quantile(0.99, sum(rate(spellchecker_service_database_query_duration_seconds_bucket[5m])) by (le))",
           "legendFormat": "Spell Checker Service (99th)",
           "refId": "F"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.99, sum(rate({__name__=~\"batch-conductor-service_database_query_duration_seconds_bucket\"}[5m])) by (le))",
+          "legendFormat": "Batch Conductor Service (99th)",
+          "refId": "G"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.99, sum(rate({__name__=~\"content-service_database_query_duration_seconds_bucket\"}[5m])) by (le))",
+          "legendFormat": "Content Service (99th)",
+          "refId": "H"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.99, sum(rate({__name__=~\"file-service_database_query_duration_seconds_bucket\"}[5m])) by (le))",
+          "legendFormat": "File Service (99th)",
+          "refId": "I"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.99, sum(rate(identity_service_database_query_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "Identity Service (99th)",
+          "refId": "J"
         }
       ],
       "title": "Database Query Performance Outliers (99th Percentile)",
@@ -309,6 +345,42 @@
           "expr": "(spellchecker_service_database_connections_active / spellchecker_service_database_connections_total) * 100",
           "legendFormat": "Spell Checker Service",
           "refId": "F"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "({__name__=~\"batch-conductor-service_database_connections_active\"} / {__name__=~\"batch-conductor-service_database_connections_total\"}) * 100",
+          "legendFormat": "Batch Conductor Service",
+          "refId": "G"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "({__name__=~\"content-service_database_connections_active\"} / {__name__=~\"content-service_database_connections_total\"}) * 100",
+          "legendFormat": "Content Service",
+          "refId": "H"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "({__name__=~\"file-service_database_connections_active\"} / {__name__=~\"file-service_database_connections_total\"}) * 100",
+          "legendFormat": "File Service",
+          "refId": "I"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "(identity_service_database_connections_active / identity_service_database_connections_total) * 100",
+          "legendFormat": "Identity Service",
+          "refId": "J"
         }
       ],
       "title": "Connection Pool Exhaustion Detection",
@@ -443,6 +515,42 @@
           "expr": "(rate(spellchecker_service_database_transaction_duration_seconds_count{result=\"error\"}[5m]) / rate(spellchecker_service_database_transaction_duration_seconds_count[5m])) * 100",
           "legendFormat": "Spell Checker Service",
           "refId": "F"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "(rate({__name__=~\"batch-conductor-service_database_transaction_duration_seconds_count\", result=\"error\"}[5m]) / rate({__name__=~\"batch-conductor-service_database_transaction_duration_seconds_count\"}[5m])) * 100",
+          "legendFormat": "Batch Conductor Service",
+          "refId": "G"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "(rate({__name__=~\"content-service_database_transaction_duration_seconds_count\", result=\"error\"}[5m]) / rate({__name__=~\"content-service_database_transaction_duration_seconds_count\"}[5m])) * 100",
+          "legendFormat": "Content Service",
+          "refId": "H"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "(rate({__name__=~\"file-service_database_transaction_duration_seconds_count\", result=\"error\"}[5m]) / rate({__name__=~\"file-service_database_transaction_duration_seconds_count\"}[5m])) * 100",
+          "legendFormat": "File Service",
+          "refId": "I"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "(rate(identity_service_database_transaction_duration_seconds_count{result=\"error\"}[5m]) / rate(identity_service_database_transaction_duration_seconds_count[5m])) * 100",
+          "legendFormat": "Identity Service",
+          "refId": "J"
         }
       ],
       "title": "Transaction Rollback Analysis",
@@ -577,6 +685,42 @@
           "expr": "rate(spellchecker_service_database_query_duration_seconds_count[5m])",
           "legendFormat": "Spell Checker Service",
           "refId": "F"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "rate({__name__=~\"batch-conductor-service_database_query_duration_seconds_count\"}[5m])",
+          "legendFormat": "Batch Conductor Service",
+          "refId": "G"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "rate({__name__=~\"content-service_database_query_duration_seconds_count\"}[5m])",
+          "legendFormat": "Content Service",
+          "refId": "H"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "rate({__name__=~\"file-service_database_query_duration_seconds_count\"}[5m])",
+          "legendFormat": "File Service",
+          "refId": "I"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "rate(identity_service_database_query_duration_seconds_count[5m])",
+          "legendFormat": "Identity Service",
+          "refId": "J"
         }
       ],
       "title": "Cross-Service Database Load Correlation",
@@ -799,6 +943,94 @@
           "hide": false,
           "instant": true,
           "refId": "L"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "{__name__=~\"batch-conductor-service_database_connections_active\"}",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "refId": "M"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "{__name__=~\"batch-conductor-service_database_connections_total\"}",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "refId": "N"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "{__name__=~\"content-service_database_connections_active\"}",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "refId": "O"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "{__name__=~\"content-service_database_connections_total\"}",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "refId": "P"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "{__name__=~\"file-service_database_connections_active\"}",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "refId": "Q"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "{__name__=~\"file-service_database_connections_total\"}",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "refId": "R"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "identity_service_database_connections_active",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "refId": "S"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "identity_service_database_connections_total",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "refId": "T"
         }
       ],
       "title": "Database Connection Status Summary",
@@ -833,6 +1065,14 @@
               "Value #J": "RAS Total",
               "Value #K": "SCS Active",
               "Value #L": "SCS Total",
+              "Value #M": "BCS Active",
+              "Value #N": "BCS Total",
+              "Value #O": "CS Active",
+              "Value #P": "CS Total",
+              "Value #Q": "FS Active",
+              "Value #R": "FS Total",
+              "Value #S": "IDS Active",
+              "Value #T": "IDS Total",
               "instance": "Service"
             }
           }

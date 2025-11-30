@@ -1,0 +1,53 @@
+# Service Health Alerts
+# Domain: Core service availability and application-level health
+groups:
+- name: HuleEduServiceAlerts
+  rules:
+  - alert: ServiceDown
+    expr: up == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Service {{ $labels.job }} is down"
+      description: "The Prometheus target for {{ $labels.job }} has been down for more than 1 minute."
+      dashboard_url: "http://localhost:3000/d/huleedu-system-health/huleedu-system-health-overview"
+      runbook_url: "http://localhost:3000/d/huleedu-service-deep-dive/huleedu-service-deep-dive?var-service={{ $labels.job }}"
+
+  - alert: HighErrorRate
+    expr: huleedu:http_errors_5xx:rate5m > 0.1
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High 5xx error rate across HuleEdu services"
+      description: "HuleEdu services are experiencing {{ $value }} 5xx errors per second over the last 5 minutes."
+      dashboard_url: "http://localhost:3000/d/huleedu-system-health/huleedu-system-health-overview"
+      runbook_url: "file:///app/Documentation/OPERATIONS/01-Grafana-Playbook.md#high-error-rate"
+
+  - alert: LLMPromptCacheLowHitRate
+    expr: |
+      (
+        sum(rate(llm_provider_cache_scope_total{provider="anthropic", scope="assignment", result="hit"}[5m]))
+        /
+        clamp_min(sum(rate(llm_provider_cache_scope_total{provider="anthropic", scope="assignment"}[5m])), 0.001)
+      ) < 0.4
+      and sum(rate(llm_provider_cache_scope_total{provider="anthropic", scope="assignment"}[5m])) > 0.1
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "LLM prompt cache hit rate low (Anthropic)"
+      description: "Prompt cache hit rate is {{ $value | humanizePercentage }} over 5m; review prompt segmentation or TTL configuration."
+      dashboard_url: "http://localhost:3000/d/huleedu-llm-prompt-cache/llm-provider-prompt-cache"
+      runbook_url: "http://localhost:3000/d/huleedu-llm-prompt-cache/llm-provider-prompt-cache"
+
+  - alert: LLMPromptTTLOutOfOrder
+    expr: increase(llm_provider_prompt_ttl_violations_total[5m]) > 0
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Prompt TTL ordering violations detected"
+      description: "Prompt TTL ordering failed in the last 5m for provider {{ $labels.provider }} / model {{ $labels.model }} (stage={{ $labels.stage }})."
+      dashboard_url: "http://localhost:3000/d/huleedu-llm-prompt-cache/llm-provider-prompt-cache"
