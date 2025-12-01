@@ -59,7 +59,14 @@ class TestLLMProviderServiceIntegration:
                 assert response.status == 200
                 health_data = await response.json()
                 assert health_data["status"] == "healthy"
-                assert health_data["dependencies"]["redis"] == "healthy"
+                dependencies = health_data.get("dependencies", {})
+                redis_dep = dependencies.get("redis")
+                # Newer health schema exposes a nested object for redis
+                if isinstance(redis_dep, dict):
+                    assert redis_dep.get("status") == "healthy"
+                else:
+                    # Backwards-compatible with older string-only schema
+                    assert redis_dep == "healthy"
                 print(f"LLM Provider Service: {health_data}")
         except Exception as e:
             pytest.skip(f"LLM Provider Service not available: {str(e)}")
@@ -71,7 +78,14 @@ class TestLLMProviderServiceIntegration:
             ) as response:
                 assert response.status == 200
                 health_data = await response.json()
-                assert health_data["status"] == "ok"
+                # Canonical health status across services is "healthy" per rule 073.
+                assert health_data["status"] == "healthy"
+                dependencies = health_data.get("dependencies", {})
+                db_dep = dependencies.get("database")
+                if isinstance(db_dep, dict):
+                    assert db_dep.get("status") == "healthy"
+                elif db_dep is not None:
+                    assert db_dep == "healthy"
                 print(f"CJ Assessment Service: {health_data}")
         except Exception as e:
             pytest.skip(f"CJ Assessment Service not available: {str(e)}")

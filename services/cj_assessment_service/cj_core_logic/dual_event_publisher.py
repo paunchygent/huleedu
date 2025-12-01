@@ -49,6 +49,9 @@ class DualEventPublishingData:
     user_id: str  # Required for resource consumption tracking
     org_id: Optional[str]
     created_at: datetime
+    # Optional LLM attribution fields derived from provider metadata
+    llm_model_used: str | None = None
+    llm_provider_used: str | None = None
 
 
 async def publish_dual_assessment_events(
@@ -96,6 +99,12 @@ async def publish_dual_assessment_events(
     cj_batch_id = publishing_data.cj_batch_id
     assignment_id = publishing_data.assignment_id
     course_code = publishing_data.course_code
+
+    # Determine LLM attribution, preferring batch-level metadata when available.
+    # Fall back to CJ defaults to preserve historical behavior when metadata
+    # has not been threaded through (e.g. older tests or legacy callers).
+    model_used = publishing_data.llm_model_used or settings.DEFAULT_LLM_MODEL
+    model_provider = publishing_data.llm_provider_used or settings.DEFAULT_LLM_PROVIDER.value
 
     # Convert course_code enum to string if needed
     if hasattr(course_code, "value"):
@@ -208,8 +217,8 @@ async def publish_dual_assessment_events(
         cj_assessment_job_id=cj_batch_id,
         assignment_id=assignment_id,
         assessment_method="cj_assessment",
-        model_used=settings.DEFAULT_LLM_MODEL,
-        model_provider=settings.DEFAULT_LLM_PROVIDER.value,
+        model_used=model_used,
+        model_provider=model_provider,
         model_version=getattr(settings, "DEFAULT_LLM_MODEL_VERSION", None),
         essay_results=essay_results,
         assessment_metadata={

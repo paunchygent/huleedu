@@ -537,6 +537,46 @@ class BatchMonitor:
                         },
                     )
 
+                # Derive LLM provider/model attribution from comparison metadata
+                llm_model_used: str | None = None
+                llm_provider_used: str | None = None
+                try:
+                    comparisons = await self._comparison_repository.get_valid_comparisons_for_batch(
+                        session=session,
+                        batch_id=batch_id,
+                    )
+                    counts: dict[tuple[str, str], int] = {}
+                    for pair in comparisons:
+                        metadata = getattr(pair, "processing_metadata", None) or {}
+                        provider = metadata.get("provider")
+                        model = metadata.get("model")
+                        if not provider or not model:
+                            continue
+                        key = (str(provider), str(model))
+                        counts[key] = counts.get(key, 0) + 1
+                    if counts:
+                        (llm_provider_used, llm_model_used), _ = max(
+                            counts.items(), key=lambda item: item[1]
+                        )
+                        logger.info(
+                            "Derived LLM metadata for forced scoring batch",
+                            extra={
+                                "batch_id": batch_id,
+                                "correlation_id": str(correlation_id),
+                                "llm_provider_used": llm_provider_used,
+                                "llm_model_used": llm_model_used,
+                            },
+                        )
+                except Exception as exc:  # pragma: no cover - defensive guard
+                    logger.warning(
+                        "Failed to derive LLM metadata for forced scoring batch",
+                        extra={
+                            "batch_id": batch_id,
+                            "correlation_id": str(correlation_id),
+                            "reason": str(exc),
+                        },
+                    )
+
                 # Extract data from batch_upload for publishing
                 # user_id MUST be present for resource consumption tracking
                 if not batch_upload.user_id:
@@ -553,6 +593,8 @@ class BatchMonitor:
                     user_id=batch_upload.user_id,  # Will raise if None due to check above
                     org_id=batch_upload.org_id,
                     created_at=batch_upload.created_at,
+                    llm_model_used=llm_model_used,
+                    llm_provider_used=llm_provider_used,
                 )
 
                 # Use centralized dual event publishing function

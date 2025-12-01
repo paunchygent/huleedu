@@ -366,6 +366,52 @@ class TestDualEventPublishing:
         assert ras_envelope.data.assessment_metadata["course_code"] == "SV2"
 
     @pytest.mark.asyncio
+    async def test_llm_attribution_prefers_publishing_data_over_defaults(
+        self,
+        mock_event_publisher: AsyncMock,
+        test_settings: Mock,
+        sample_publishing_data: DualEventPublishingData,
+    ) -> None:
+        """Ensure model_used/model_provider come from publishing data when provided."""
+        rankings = [
+            {"els_essay_id": "student_1", "bradley_terry_score": 0.8, "rank": 1},
+        ]
+        grade_projections = GradeProjectionSummary(
+            projections_available=False,
+            primary_grades={"student_1": "A"},
+            confidence_labels={},
+            confidence_scores={},
+        )
+
+        # Override defaults with explicit OpenAI GPT-5.1 attribution
+        publishing_data = DualEventPublishingData(
+            bos_batch_id=sample_publishing_data.bos_batch_id,
+            cj_batch_id=sample_publishing_data.cj_batch_id,
+            assignment_id=sample_publishing_data.assignment_id,
+            course_code=sample_publishing_data.course_code,
+            user_id=sample_publishing_data.user_id,
+            org_id=sample_publishing_data.org_id,
+            created_at=sample_publishing_data.created_at,
+            llm_model_used="gpt-5.1",
+            llm_provider_used="openai",
+        )
+
+        await publish_dual_assessment_events(
+            rankings=rankings,
+            grade_projections=grade_projections,
+            publishing_data=publishing_data,
+            event_publisher=mock_event_publisher,
+            settings=test_settings,
+            correlation_id=uuid4(),
+        )
+
+        ras_call = mock_event_publisher.publish_assessment_result.call_args
+        ras_envelope = ras_call.kwargs["result_data"]
+
+        assert ras_envelope.data.model_used == "gpt-5.1"
+        assert ras_envelope.data.model_provider == "openai"
+
+    @pytest.mark.asyncio
     async def test_processing_duration_calculation(
         self,
         mock_event_publisher: AsyncMock,

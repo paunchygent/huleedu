@@ -152,6 +152,8 @@ class TestResourceConsumptionPublishing:
                 created_at=datetime(2024, 1, 1, 10, 0, 0, tzinfo=UTC),
                 org_id="test-org",
                 user_id=None,  # Simulating None user_id
+                llm_model_used=None,
+                llm_provider_used=None,
             )
         else:  # missing scenario
             # Create mock without user_id attribute
@@ -162,6 +164,8 @@ class TestResourceConsumptionPublishing:
                 course_code="SV2",
                 created_at=datetime(2024, 1, 1, 10, 0, 0, tzinfo=UTC),
                 org_id="test-org",
+                llm_model_used=None,
+                llm_provider_used=None,
                 # user_id is missing - will trigger AttributeError
             )
             if hasattr(publishing_data, "user_id"):
