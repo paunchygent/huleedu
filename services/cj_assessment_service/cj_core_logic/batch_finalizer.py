@@ -24,6 +24,7 @@ from common_core.status_enums import BatchStatus, ProcessingStage
 from common_core.status_enums import CJBatchStateEnum as CoreCJState
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.observability import inject_trace_context
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.cj_assessment_service.cj_core_logic.dual_event_publisher import (
     DualEventPublishingData,
@@ -74,6 +75,59 @@ class BatchFinalizer:
         self._content = content_client
         self._settings = settings
         self._grade_projector = grade_projector
+
+    async def _derive_llm_metadata_for_batch(
+        self,
+        session: AsyncSession,
+        batch_id: int,
+        correlation_id: UUID,
+    ) -> tuple[str | None, str | None]:
+        """Derive LLM provider/model used for a CJ batch from comparison metadata.
+
+        Uses successful comparison rows (no error_code) as the source of truth and
+        selects the most frequent (provider, model) pair when multiple rows exist.
+        Falls back to (None, None) when no usable metadata is available.
+        """
+        try:
+            comparisons = await self._comparison_repo.get_valid_comparisons_for_batch(
+                session=session,
+                batch_id=batch_id,
+            )
+        except Exception as exc:  # pragma: no cover - defensive guard
+            logger.warning(
+                "Failed to load comparison metadata for LLM attribution",
+                extra={
+                    "batch_id": batch_id,
+                    "correlation_id": str(correlation_id),
+                    "reason": str(exc),
+                },
+            )
+            return None, None
+
+        counts: dict[tuple[str, str], int] = {}
+        for pair in comparisons:
+            metadata = getattr(pair, "processing_metadata", None) or {}
+            provider = metadata.get("provider")
+            model = metadata.get("model")
+            if not provider or not model:
+                continue
+            key = (str(provider), str(model))
+            counts[key] = counts.get(key, 0) + 1
+
+        if not counts:
+            return None, None
+
+        (provider, model), _ = max(counts.items(), key=lambda item: item[1])
+        logger.info(
+            "Derived LLM metadata for batch",
+            extra={
+                "batch_id": batch_id,
+                "correlation_id": str(correlation_id),
+                "llm_provider_used": provider,
+                "llm_model_used": model,
+            },
+        )
+        return provider, model
 
     async def finalize_scoring(
         self,
@@ -181,6 +235,12 @@ class BatchFinalizer:
                         f"user_id is None for batch {batch_upload.id} - identity threading failed"
                     )
 
+                llm_provider_used, llm_model_used = await self._derive_llm_metadata_for_batch(
+                    session=session,
+                    batch_id=batch_id,
+                    correlation_id=correlation_id,
+                )
+
                 publishing_data = DualEventPublishingData(
                     bos_batch_id=batch_upload.bos_batch_id,
                     cj_batch_id=str(batch_upload.id),
@@ -189,6 +249,8 @@ class BatchFinalizer:
                     user_id=batch_upload.user_id,
                     org_id=batch_upload.org_id,
                     created_at=batch_upload.created_at,
+                    llm_model_used=llm_model_used,
+                    llm_provider_used=llm_provider_used,
                 )
 
                 await publish_dual_assessment_events(
