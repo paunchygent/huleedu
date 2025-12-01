@@ -229,3 +229,204 @@ class TestCliAnchorAlignMode:
         assert calls["settings_assignment_id"] is None
         assert calls["inventory"] is dummy_inventory
         assert calls["ensure_capacity_called"] is True
+
+    def test_anchor_align_language_control_configuration_uses_sonnet_and_prompts(
+        self,
+        tmp_path: Path,
+        monkeypatch,
+    ) -> None:
+        """CLI wires Sonnet 4.5 + 003 language-control prompts into settings."""
+        dummy_inventory = _make_dummy_inventory(tmp_path)
+        calls: dict[str, object] = {}
+
+        class DummyHandler:
+            def __init__(self) -> None:
+                calls["handler_constructed"] = True
+
+            def execute(self, settings, inventory, paths) -> int:  # noqa: ANN001
+                calls["settings"] = settings
+                calls["inventory"] = inventory
+                calls["paths"] = paths
+                return 0
+
+        def fake_collect_inventory(paths: RunnerPaths) -> RunnerInventory:
+            calls["collect_paths_repo_root"] = paths.repo_root
+            return dummy_inventory
+
+        def fake_ensure_comparison_capacity(*, anchors, students, max_comparisons):
+            calls["ensure_capacity_called"] = True
+            calls["anchors_count"] = anchors.count
+            calls["students_count"] = students.count
+            calls["max_comparisons"] = max_comparisons
+
+        def fake_validate_llm_overrides(*, provider, model) -> None:
+            calls["validated_llm_overrides"] = (provider, model)
+
+        def fake_configure_cli_logging(verbose: bool) -> None:
+            calls["configure_cli_logging_verbose"] = verbose
+
+        def fake_setup_cli_logger(settings):
+            class DummyLogger:
+                def info(self, *_args, **_kwargs) -> None:
+                    calls["logger_info_called"] = True
+
+            return DummyLogger()
+
+        def fake_gather_git_sha(_repo_root: Path) -> str:
+            return "test-git-sha"
+
+        monkeypatch.setitem(cli.HANDLER_MAP, RunnerMode.ANCHOR_ALIGN_TEST, DummyHandler)
+        monkeypatch.setattr(cli, "collect_inventory", fake_collect_inventory)
+        monkeypatch.setattr(cli, "ensure_comparison_capacity", fake_ensure_comparison_capacity)
+        monkeypatch.setattr(cli, "validate_llm_overrides", fake_validate_llm_overrides)
+        monkeypatch.setattr(cli, "configure_cli_logging", fake_configure_cli_logging)
+        monkeypatch.setattr(cli, "setup_cli_logger", fake_setup_cli_logger)
+        monkeypatch.setattr(cli, "gather_git_sha", fake_gather_git_sha)
+        monkeypatch.setattr(cli, "configure_execute_logging", lambda *_, **__: None)
+
+        system_prompt_rel = (
+            "scripts/cj_experiments_runners/eng5_np/prompts/system/003_language_control.txt"
+        )
+        rubric_rel = (
+            "scripts/cj_experiments_runners/eng5_np/prompts/rubric/003_language_control.txt"
+        )
+
+        result = runner.invoke(
+            cli.app,
+            [
+                "--mode",
+                "anchor-align-test",
+                "--batch-id",
+                "anchor-align-language-control",
+                "--kafka-bootstrap",
+                "localhost:9093",
+                "--course-id",
+                str(uuid.UUID("00000000-0000-0000-0000-000000000052")),
+                "--llm-provider",
+                "anthropic",
+                "--llm-model",
+                "claude-sonnet-4-5-20250929",
+                "--system-prompt",
+                system_prompt_rel,
+                "--rubric",
+                rubric_rel,
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert calls["handler_constructed"] is True
+        settings = calls["settings"]
+        assert settings.mode is RunnerMode.ANCHOR_ALIGN_TEST
+        assert settings.llm_overrides is not None
+        overrides = settings.llm_overrides
+        assert overrides.model_override == "claude-sonnet-4-5-20250929"
+        assert overrides.provider_override is not None
+        assert "anthropic" in str(overrides.provider_override).lower()
+
+        # Prompt file paths are propagated into settings
+        assert settings.system_prompt_file is not None
+        assert settings.rubric_file is not None
+        assert str(settings.system_prompt_file).endswith(system_prompt_rel)
+        assert str(settings.rubric_file).endswith(rubric_rel)
+
+        # Manifest validation called with the exact CLI values
+        assert calls["validated_llm_overrides"] == (
+            "anthropic",
+            "claude-sonnet-4-5-20250929",
+        )
+
+    def test_anchor_align_gpt51_reasoning_effort_flags(
+        self,
+        tmp_path: Path,
+        monkeypatch,
+    ) -> None:
+        """CLI wires GPT-5.1 + reasoning effort into settings for anchor-align-test."""
+        dummy_inventory = _make_dummy_inventory(tmp_path)
+        calls: dict[str, object] = {}
+
+        class DummyHandler:
+            def __init__(self) -> None:
+                calls["handler_constructed"] = True
+
+            def execute(self, settings, inventory, paths) -> int:  # noqa: ANN001
+                calls["settings"] = settings
+                calls["inventory"] = inventory
+                calls["paths"] = paths
+                return 0
+
+        def fake_collect_inventory(paths: RunnerPaths) -> RunnerInventory:
+            calls["collect_paths_repo_root"] = paths.repo_root
+            return dummy_inventory
+
+        def fake_ensure_comparison_capacity(*, anchors, students, max_comparisons):
+            calls["ensure_capacity_called"] = True
+            calls["anchors_count"] = anchors.count
+            calls["students_count"] = students.count
+            calls["max_comparisons"] = max_comparisons
+
+        def fake_validate_llm_overrides(*, provider, model) -> None:
+            calls["validated_llm_overrides"] = (provider, model)
+
+        def fake_configure_cli_logging(verbose: bool) -> None:
+            calls["configure_cli_logging_verbose"] = verbose
+
+        def fake_setup_cli_logger(settings):
+            class DummyLogger:
+                def info(self, *_args, **_kwargs) -> None:
+                    calls["logger_info_called"] = True
+
+            return DummyLogger()
+
+        def fake_gather_git_sha(_repo_root: Path) -> str:
+            return "test-git-sha"
+
+        monkeypatch.setitem(cli.HANDLER_MAP, RunnerMode.ANCHOR_ALIGN_TEST, DummyHandler)
+        monkeypatch.setattr(cli, "collect_inventory", fake_collect_inventory)
+        monkeypatch.setattr(cli, "ensure_comparison_capacity", fake_ensure_comparison_capacity)
+        monkeypatch.setattr(cli, "validate_llm_overrides", fake_validate_llm_overrides)
+        monkeypatch.setattr(cli, "configure_cli_logging", fake_configure_cli_logging)
+        monkeypatch.setattr(cli, "setup_cli_logger", fake_setup_cli_logger)
+        monkeypatch.setattr(cli, "gather_git_sha", fake_gather_git_sha)
+        monkeypatch.setattr(cli, "configure_execute_logging", lambda *_, **__: None)
+
+        result = runner.invoke(
+            cli.app,
+            [
+                "--mode",
+                "anchor-align-test",
+                "--batch-id",
+                "anchor-align-gpt5-1",
+                "--kafka-bootstrap",
+                "localhost:9093",
+                "--course-id",
+                str(uuid.UUID("00000000-0000-0000-0000-000000000052")),
+                "--anchor-align-provider",
+                "openai",
+                "--anchor-align-model",
+                "gpt-5.1",
+                "--anchor-align-reasoning-effort",
+                "medium",
+                "--anchor-align-output-verbosity",
+                "high",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert calls["handler_constructed"] is True
+        settings = calls["settings"]
+        assert settings.mode is RunnerMode.ANCHOR_ALIGN_TEST
+        # Effective provider/model recorded on settings and overrides
+        assert settings.anchor_align_llm_provider == "openai"
+        assert settings.anchor_align_llm_model == "gpt-5.1"
+        assert settings.anchor_align_reasoning_effort == "medium"
+        assert settings.anchor_align_output_verbosity == "high"
+        assert settings.llm_overrides is not None
+        overrides = settings.llm_overrides
+        assert overrides.model_override == "gpt-5.1"
+        assert overrides.provider_override is not None
+        assert "openai" in str(overrides.provider_override).lower()
+        assert overrides.reasoning_effort == "medium"
+        assert overrides.output_verbosity == "high"
+
+        # Manifest validation called with effective GPT-5.1 config
+        assert calls["validated_llm_overrides"] == ("openai", "gpt-5.1")

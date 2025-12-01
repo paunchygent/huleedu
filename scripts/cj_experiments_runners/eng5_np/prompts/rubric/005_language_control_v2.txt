@@ -19,7 +19,9 @@ range, variety, clarity, and accuracy in:
 - vocabulary, phraseology, and idiomatic usage
 - sentence construction, cohesion, and overall structure
 
-accuracy in spelling and punctuation
+accuracy in:
+- spelling and punctuation
+- idiomatic usage (e.g., absence of awkward phrasing, negative Swedish transfer)
 
 **Instructions**
 

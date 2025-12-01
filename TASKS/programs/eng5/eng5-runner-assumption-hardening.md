@@ -7,7 +7,7 @@ priority: high
 domain: programs
 owner_team: agents
 created: '2025-11-21'
-last_updated: '2025-11-21'
+last_updated: '2025-11-30'
 service: ''
 owner: ''
 program: ''
@@ -56,6 +56,42 @@ Recent validation exposed several incorrect ENG5 runner assumptions that mask co
 2. Implement Checkpoint 3 (R4/R5) to remove automatic anchor uploads, add a CJ anchor preflight, and introduce `--auto-extract-eng5-db` tied to `--await-completion`, including smoke coverage.
 3. Complete Checkpoint 4 (R6) by documenting grade-scale ownership in CJ, updating ENG5 examples accordingly, and filing any CJ-side follow-ups discovered during the research pass.
 4. Complete Checkpoint 5 (R7 Phase 1–2) by documenting the current essay-upload flow, then adding manifest-level caching with a `--force-reupload` override plus unit coverage.
+5. Run and analyse dedicated ENG5 anchor alignment experiments using `ANCHOR_ALIGN_TEST` with language-control prompts and Sonnet 4.5, feeding findings back into runner defaults and CJ prompt configuration.
+
+## Progress (2025-11-30) – ENG5 Anchor Alignment Experiment
+
+- Added focused ENG5 NP runner tests to codify the anchor alignment configuration:
+  - `scripts/cj_experiments_runners/eng5_np/tests/unit/test_cli_integration.py::TestCliAnchorAlignMode::test_anchor_align_language_control_configuration_uses_sonnet_and_prompts` verifies CLI wiring for:
+    - `--mode anchor-align-test`
+    - `--llm-provider anthropic`
+    - `--llm-model claude-sonnet-4-5-20250929`
+    - `--system-prompt scripts/cj_experiments_runners/eng5_np/prompts/system/003_language_control.txt`
+    - `--rubric scripts/cj_experiments_runners/eng5_np/prompts/rubric/003_language_control.txt`
+  - `scripts/cj_experiments_runners/eng5_np/tests/unit/test_anchor_align_handler_prompts.py::TestAnchorAlignHandlerLanguageControlPrompts::test_execute_with_language_control_prompts_wires_overrides_and_report` verifies that:
+    - `AnchorAlignHandler` loads the 003 language-control system prompt and rubric from disk.
+    - `RunnerSettings.system_prompt_text` / `rubric_text` are populated with the loaded content.
+    - `LLMConfigOverrides` preserves provider/model/temperature/max_tokens and adds matching `system_prompt_override` and `judge_rubric_override`.
+    - `generate_alignment_report(...)` receives the same prompt text that was sent to CJ.
+- Ran a full ENG5 anchor-only alignment experiment in `ANCHOR_ALIGN_TEST` mode:
+  - Command:
+    - `pdm run python -m scripts.cj_experiments_runners.eng5_np.cli --mode anchor-align-test --course-id 00000000-0000-0000-0000-000000000052 --batch-id eng5-language-control-sonnet45 --kafka-bootstrap localhost:9093 --llm-provider anthropic --llm-model claude-sonnet-4-5-20250929 --system-prompt scripts/cj_experiments_runners/eng5_np/prompts/system/003_language_control.txt --rubric scripts/cj_experiments_runners/eng5_np/prompts/rubric/003_language_control.txt --await-completion`
+  - Model manifest validation confirmed `claude-sonnet-4-5-20250929` as a valid Anthropic model (64k max tokens).
+  - Runner submitted 12 anchors as “student” essays via Content Service and awaited CJ completion over Kafka (`66` LLM comparisons, `1` CJ completion, `1` assessment result).
+  - Alignment report written to:
+    - `.claude/research/data/eng5_np_2016/anchor_align_eng5-language-control-sonnet45_20251130_235510.md`
+- High-level findings from the language-control alignment report:
+  - Overall rank/grade alignment is strong:
+    - Kendall’s tau ≈ `0.85` with only `5` direct inversions across the full anchor set.
+    - A-band anchors (A/A) are correctly ranked at the top with high win rates (≥80%).
+    - F-band and E-band anchors appear at the bottom with low win rates, with one zero-win E- anchor behaving as a “hard negative” reference.
+  - Misalignment patterns:
+    - Most inversions occur at near-boundaries (e.g. B vs C+, D- vs E+, E- vs F+), suggesting the prompt/rubric is sensitive but not perfect around neighbouring grade thresholds.
+    - Language-heavy mid-band essays (C+/C-/D+) are occasionally preferred over slightly higher-grade anchors when content/structure is weak, which is acceptable for a language-control-focused experiment but should be monitored.
+  - Configuration implications:
+    - The 003 language-control system + rubric prompts appear suitable as a stricter language-weighted lens on ENG5 anchors without catastrophic drift from the expert grade ordering.
+    - For follow-ups, we may want to:
+      - Explore slightly lower temperature (e.g. `0.0–0.1`) or a narrower max-token budget for justifications to reduce stochastic inversions at boundaries.
+      - Compare these results against a baseline prompt configuration (e.g. the current ENG5 production system prompt) using the same anchor set and CJ convergence thresholds.
 
 This task hardens the ENG5 runner as a **strict validating orchestrator**: it validates inputs, resolves authoritative metadata from CJ APIs, and emits well-formed batches without owning persistence rules that belong in services.
 

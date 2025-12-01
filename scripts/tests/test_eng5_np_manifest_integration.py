@@ -227,6 +227,23 @@ class TestBuildLLMOverrides:
         assert result is not None
         assert result.system_prompt_override == "CJ prompt"
 
+    def test_build_supports_reasoning_and_verbosity(self) -> None:
+        """Verify _build_llm_overrides can set reasoning and verbosity."""
+        result = _build_llm_overrides(
+            provider="openai",
+            model="gpt-5.1",
+            temperature=None,
+            max_tokens=None,
+            system_prompt=None,
+            reasoning_effort="medium",
+            output_verbosity="high",
+        )
+
+        assert result is not None
+        assert result.model_override == "gpt-5.1"
+        assert result.reasoning_effort == "medium"
+        assert result.output_verbosity == "high"
+
 
 class TestEventComposition:
     """Test suite for event composition with LLM overrides."""

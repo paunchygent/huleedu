@@ -259,8 +259,20 @@ def _build_llm_overrides(
     temperature: float | None,
     max_tokens: int | None,
     system_prompt: str | None,
+    reasoning_effort: str | None = None,
+    output_verbosity: str | None = None,
 ) -> LLMConfigOverrides | None:
-    if not any([provider, model, temperature, max_tokens, system_prompt]):
+    if not any(
+        [
+            provider,
+            model,
+            temperature,
+            max_tokens,
+            system_prompt,
+            reasoning_effort,
+            output_verbosity,
+        ]
+    ):
         return None
 
     provider_value: LLMProviderType | None = None
@@ -287,6 +299,8 @@ def _build_llm_overrides(
         temperature_override=temperature,
         max_tokens_override=max_tokens,
         system_prompt_override=system_prompt,
+        reasoning_effort=reasoning_effort,
+        output_verbosity=output_verbosity,
     )
 
 
@@ -410,6 +424,26 @@ def main(
             "or changing this mode."
         ),
     ),
+    anchor_align_provider: str | None = typer.Option(
+        None,
+        "--anchor-align-provider",
+        help="Override LLM provider for anchor-align-test (e.g., anthropic, openai).",
+    ),
+    anchor_align_model: str | None = typer.Option(
+        None,
+        "--anchor-align-model",
+        help="Override LLM model identifier for anchor-align-test.",
+    ),
+    anchor_align_reasoning_effort: str | None = typer.Option(
+        None,
+        "--anchor-align-reasoning-effort",
+        help="Reasoning effort for GPT-5.1 anchor-align runs: none, low, medium, high.",
+    ),
+    anchor_align_output_verbosity: str | None = typer.Option(
+        None,
+        "--anchor-align-output-verbosity",
+        help="Output verbosity for GPT-5.1 anchor-align runs: low, medium, high.",
+    ),
     # Anchor alignment test mode options
     system_prompt_file: Path | None = typer.Option(
         None,
@@ -438,6 +472,18 @@ def main(
                 param_hint="'--course-id'",
             )
 
+    if mode is not RunnerMode.ANCHOR_ALIGN_TEST and any(
+        [
+            anchor_align_provider,
+            anchor_align_model,
+            anchor_align_reasoning_effort,
+            anchor_align_output_verbosity,
+        ]
+    ):
+        raise typer.BadParameter(
+            "Anchor-align specific flags can only be used with --mode anchor-align-test"
+        )
+
     repo_root = repo_root_from_package()
     paths = RunnerPaths.from_repo_root(repo_root)
 
@@ -456,8 +502,45 @@ def main(
             err=True,
         )
 
+    effective_llm_provider = llm_provider
+    effective_llm_model = llm_model
+
+    anchor_align_llm_provider_value: str | None = None
+    anchor_align_llm_model_value: str | None = None
+    anchor_align_reasoning_effort_value: str | None = None
+    anchor_align_output_verbosity_value: str | None = None
+
+    if mode is RunnerMode.ANCHOR_ALIGN_TEST:
+        if anchor_align_provider is not None:
+            effective_llm_provider = anchor_align_provider
+        if anchor_align_model is not None:
+            effective_llm_model = anchor_align_model
+
+        if anchor_align_reasoning_effort is not None:
+            normalized_effort = anchor_align_reasoning_effort.lower()
+            valid_efforts = {"none", "low", "medium", "high"}
+            if normalized_effort not in valid_efforts:
+                raise typer.BadParameter(
+                    "Invalid --anchor-align-reasoning-effort; valid values are: none, low, medium, high.",  # noqa: E501
+                    param_hint="'--anchor-align-reasoning-effort'",
+                )
+            anchor_align_reasoning_effort_value = normalized_effort
+
+        if anchor_align_output_verbosity is not None:
+            normalized_verbosity = anchor_align_output_verbosity.lower()
+            valid_verbosity = {"low", "medium", "high"}
+            if normalized_verbosity not in valid_verbosity:
+                raise typer.BadParameter(
+                    "Invalid --anchor-align-output-verbosity; valid values are: low, medium, high.",  # noqa: E501
+                    param_hint="'--anchor-align-output-verbosity'",
+                )
+            anchor_align_output_verbosity_value = normalized_verbosity
+
+        anchor_align_llm_provider_value = effective_llm_provider
+        anchor_align_llm_model_value = effective_llm_model
+
     # Validate LLM model override against manifest before proceeding
-    validate_llm_overrides(provider=llm_provider, model=llm_model)
+    validate_llm_overrides(provider=effective_llm_provider, model=effective_llm_model)
 
     system_prompt_override = build_cj_system_prompt() if cj_system_prompt else None
 
@@ -482,11 +565,13 @@ def main(
         cj_service_url=cj_service_url,
         content_service_url=content_service_url,
         llm_overrides=_build_llm_overrides(
-            provider=llm_provider,
-            model=llm_model,
+            provider=effective_llm_provider,
+            model=effective_llm_model,
             temperature=llm_temperature,
             max_tokens=llm_max_tokens,
             system_prompt=system_prompt_override,
+            reasoning_effort=anchor_align_reasoning_effort_value,
+            output_verbosity=anchor_align_output_verbosity_value,
         ),
         max_comparisons=max_comparisons,
         await_completion=await_completion,
@@ -494,6 +579,10 @@ def main(
         llm_batching_mode_hint=llm_batching_mode,
         system_prompt_file=system_prompt_file,
         rubric_file=rubric_file,
+        anchor_align_llm_provider=anchor_align_llm_provider_value,
+        anchor_align_llm_model=anchor_align_llm_model_value,
+        anchor_align_reasoning_effort=anchor_align_reasoning_effort_value,
+        anchor_align_output_verbosity=anchor_align_output_verbosity_value,
     )
 
     # Reconfigure logging for execute mode to enable file persistence

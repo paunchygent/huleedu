@@ -158,6 +158,9 @@ prompt/rubric variants.
   - EPIC-005: CJ Stability & Reliability (uses ENG5 runs for diagnostics).
   - EPIC-006: Grade Projection Quality & Anchors.
   - EPIC-007: Developer Experience & Testing (ENG5 runner is a key dev tool).
+  - LLM Provider OpenAI GPT-5.x Reasoning Controls (task-level dependency for GPT-5.x support in ENG5 experiments).
 
-- **Primary Task**
+- **Primary Tasks**
   - `TASKS/assessment/anchor-alignment-prompt-tuning-experiment.md`
+  - `TASKS/infrastructure/llm-provider-openai-gpt-5x-reasoning-controls.md`
+  - `TASKS/programs/eng5-gpt-51-reasoning-effort-alignment-experiment.md`

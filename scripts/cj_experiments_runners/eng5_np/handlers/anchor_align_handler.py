@@ -129,6 +129,8 @@ class AnchorAlignHandler:
             max_tokens_override=getattr(existing_overrides, "max_tokens_override", None),
             system_prompt_override=system_prompt_content,
             judge_rubric_override=rubric_content,
+            reasoning_effort=getattr(existing_overrides, "reasoning_effort", None),
+            output_verbosity=getattr(existing_overrides, "output_verbosity", None),
         )
         settings.llm_overrides = llm_overrides
 

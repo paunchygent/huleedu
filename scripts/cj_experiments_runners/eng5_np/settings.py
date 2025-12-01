@@ -51,3 +51,8 @@ class RunnerSettings:
     rubric_file: Path | None = None
     system_prompt_text: str | None = None
     rubric_text: str | None = None
+    # Anchor-align specific LLM configuration (effective values for this mode)
+    anchor_align_llm_provider: str | None = None
+    anchor_align_llm_model: str | None = None
+    anchor_align_reasoning_effort: str | None = None
+    anchor_align_output_verbosity: str | None = None

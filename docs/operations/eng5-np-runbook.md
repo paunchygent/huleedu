@@ -244,6 +244,41 @@ Baseline acceptance targets (from batch 108 analysis):
 
 These metrics should be monitored when iterating on prompt/rubric variants.
 
+#### GPT-5.1 / GPT-5.x Experiments (via LLM Provider)
+
+For cross-provider experiments (e.g. comparing Anthropic Sonnet vs OpenAI GPT-5.1
+on the same ENG5 anchors), use `ANCHOR_ALIGN_TEST` with explicit LLM overrides
+that target the LLM Provider Service:
+
+```bash
+# Example: ENG5 anchor-align-test with OpenAI GPT-5.1 (reasoning effort = none)
+pdm run python -m scripts.cj_experiments_runners.eng5_np.cli \
+  --mode anchor-align-test \
+  --course-id 00000000-0000-0000-0000-000000000052 \
+  --batch-id eng5-gpt51-none \
+  --kafka-bootstrap localhost:9093 \
+  --llm-provider openai \
+  --llm-model gpt-5.1 \
+  --system-prompt scripts/cj_experiments_runners/eng5_np/prompts/system/003_language_control.txt \
+  --rubric scripts/cj_experiments_runners/eng5_np/prompts/rubric/003_language_control.txt \
+  --await-completion
+```
+
+Notes and conventions:
+- GPT-5.x (including GPT-5.1) does **not** support `temperature`/`top_p` and
+  uses reasoning controls instead. Reasoning effort and verbosity are carried
+  via LLM Provider overrides:
+  - `reasoning.effort ∈ {none, low, medium, high}` (default: `none`).
+  - `text.verbosity ∈ {low, medium, high}` (default: provider-specific).
+- The LLM Provider Service exposes these hints through
+  `LLMConfigOverridesHTTP.reasoning_effort` / `output_verbosity` and maps them
+  into OpenAI payloads for GPT-5 family models.
+- For ENG5 research runs, treat GPT-5.1 as an **analysis configuration**:
+  - Keep Anthropic Sonnet/Haiku as primary baseline.
+  - Use GPT-5.1 with different `reasoning_effort` levels in `anchor-align-test`
+    mode and compare alignment reports (Kendall’s tau, inversions, zero-win
+    anchors) using `db_alignment_report`.
+
 ### Background Job Caveat (Batch IDs)
 
 When launching ENG5 runs as **background tasks** via Bash tooling, avoid
