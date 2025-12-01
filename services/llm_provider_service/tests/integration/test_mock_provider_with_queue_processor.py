@@ -192,6 +192,8 @@ class ErrorTriggeringMockProvider:
         model_override: Optional[str] = None,
         temperature_override: Optional[float] = None,
         max_tokens_override: Optional[int] = None,
+        reasoning_effort: Optional[str] = None,
+        output_verbosity: Optional[str] = None,
     ) -> Any:
         """Generate comparison with guaranteed errors every 10th request."""
         # Use class-level counter to ensure shared state across DI instances

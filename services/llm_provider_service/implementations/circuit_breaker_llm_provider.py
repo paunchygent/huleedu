@@ -53,6 +53,8 @@ class CircuitBreakerLLMProvider(LLMProviderProtocol):
         model_override: str | None = None,
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,
+        reasoning_effort: str | None = None,
+        output_verbosity: str | None = None,
     ) -> LLMProviderResponse:
         """Generate LLM comparison with circuit breaker protection.
 
@@ -89,4 +91,6 @@ class CircuitBreakerLLMProvider(LLMProviderProtocol):
             model_override,
             temperature_override,
             max_tokens_override,
+            reasoning_effort,
+            output_verbosity,
         )

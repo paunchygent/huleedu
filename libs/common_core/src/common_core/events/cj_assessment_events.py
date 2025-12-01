@@ -109,6 +109,19 @@ class LLMConfigOverrides(BaseModel):
         default=None,
         description="Judge rubric text to force for this batch (overrides hydrated rubric).",
     )
+    reasoning_effort: str | None = Field(
+        default=None,
+        description=(
+            "Optional reasoning effort hint for GPT-5 family models "
+            "('none', 'low', 'medium', 'high')."
+        ),
+    )
+    output_verbosity: str | None = Field(
+        default=None,
+        description=(
+            "Optional output verbosity hint for GPT-5 family models ('low', 'medium', 'high')."
+        ),
+    )
 
 
 class ELS_CJAssessmentRequestV1(BaseEventData):

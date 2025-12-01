@@ -25,6 +25,48 @@ from services.llm_provider_service.manifest.types import (
 
 OPENAI_MODELS = [
     ModelConfig(
+        model_id="gpt-5.1",
+        provider=ProviderName.OPENAI,
+        display_name="GPT-5.1",
+        model_family="gpt-5",
+        api_version="v1",
+        structured_output_method=StructuredOutputMethod.JSON_SCHEMA,
+        # GPT-5.1 uses reasoning controls instead of sampling parameters
+        supports_temperature=False,
+        supports_top_p=False,
+        supports_frequency_penalty=False,
+        supports_presence_penalty=False,
+        uses_max_completion_tokens=True,
+        capabilities={
+            "function_calling": True,
+            "json_mode": True,
+            "response_format_schema": True,
+        },
+        max_tokens=16384,
+        context_window=272_000,  # 272K context window (GPT-5 family)
+        supports_streaming=True,
+        # Release date and pricing may evolve; omit until stable
+        release_date=None,
+        is_deprecated=False,
+        cost_per_1k_input_tokens=None,
+        cost_per_1k_output_tokens=None,
+        recommended_for=[
+            "complex_analysis",
+            "reasoning",
+            "agentic_tools",
+            "general_purpose",
+        ],
+        notes=(
+            "GPT-5.1 flagship model in the GPT-5 family. "
+            "Does NOT support temperature/top_p/frequency_penalty/presence_penalty. "
+            "Use reasoning controls instead, e.g. "
+            "reasoning={'effort': 'none' | 'low' | 'medium' | 'high'} and "
+            "text={'verbosity': 'low' | 'medium' | 'high'}. "
+            "For minimal thinking effort / lowest latency, start with "
+            "reasoning.effort='none' and tune upward only when needed."
+        ),
+    ),
+    ModelConfig(
         model_id="gpt-5-2025-08-07",
         provider=ProviderName.OPENAI,
         display_name="GPT-5",
@@ -278,6 +320,11 @@ def validate_model_capability__gpt_5_2025_08_07(capability: str) -> bool:
     return capability in ["function_calling", "json_mode", "response_format_schema"]
 
 
+def validate_model_capability__gpt_5_1(capability: str) -> bool:
+    """Validator for GPT-5.1 flagship model."""
+    return capability in ["function_calling", "json_mode", "response_format_schema"]
+
+
 def validate_model_capability__gpt_5_mini_2025_08_07(capability: str) -> bool:
     """Validator for GPT-5 Mini model."""
     return capability in ["function_calling", "json_mode", "response_format_schema"]
@@ -325,6 +372,7 @@ def validate_model_capability__gpt_4o_mini_2024_07_18(capability: str) -> bool:
 
 # Validator registry mapping model_id to validator function
 MODEL_VALIDATORS: dict[str, Callable[[str], bool]] = {
+    "gpt-5.1": validate_model_capability__gpt_5_1,
     "gpt-5-2025-08-07": validate_model_capability__gpt_5_2025_08_07,
     "gpt-5-mini-2025-08-07": validate_model_capability__gpt_5_mini_2025_08_07,
     "gpt-5-nano-2025-08-07": validate_model_capability__gpt_5_nano_2025_08_07,

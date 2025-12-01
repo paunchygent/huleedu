@@ -56,6 +56,8 @@ class OpenAIProviderImpl(LLMProviderProtocol):
         model_override: str | None = None,
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,
+        reasoning_effort: str | None = None,
+        output_verbosity: str | None = None,
     ) -> LLMProviderResponse:
         """Generate LLM comparison response.
 
@@ -112,6 +114,8 @@ class OpenAIProviderImpl(LLMProviderProtocol):
                 temperature_override=temperature_override,
                 max_tokens_override=max_tokens_override,
                 prompt_sha256=prompt_sha256,
+                reasoning_effort=reasoning_effort,
+                output_verbosity=output_verbosity,
             )
             # Type assert since retry manager returns Any
             return result  # type: ignore
@@ -134,6 +138,8 @@ class OpenAIProviderImpl(LLMProviderProtocol):
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,
         prompt_sha256: str | None = None,
+        reasoning_effort: str | None = None,
+        output_verbosity: str | None = None,
     ) -> LLMProviderResponse:
         """Make API request to OpenAI.
 
@@ -213,6 +219,14 @@ class OpenAIProviderImpl(LLMProviderProtocol):
         else:
             # Log if we try to use top_p with a model that doesn't support it
             pass
+
+        # GPT-5 family uses reasoning and text controls instead of sampling parameters
+        if model_config.model_family == "gpt-5":
+            if reasoning_effort is not None:
+                payload["reasoning"] = {"effort": reasoning_effort}
+            if output_verbosity is not None:
+                text_block = payload.setdefault("text", {})
+                text_block["verbosity"] = output_verbosity
 
         # Add response_format for structured output
         payload["response_format"] = {

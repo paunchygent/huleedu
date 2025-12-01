@@ -61,6 +61,8 @@ class OpenRouterProviderImpl(LLMProviderProtocol):
         model_override: str | None = None,
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,
+        reasoning_effort: str | None = None,
+        output_verbosity: str | None = None,
     ) -> LLMProviderResponse:
         """Generate LLM comparison response.
 

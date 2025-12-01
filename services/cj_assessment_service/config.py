@@ -191,7 +191,7 @@ class Settings(SecureServiceSettings, JWTValidationSettings):
     ]  # Explicit defaults for transient network/API issues
 
     # CJ assessment parameters
-    MAX_PAIRWISE_COMPARISONS: int = 300
+    MAX_PAIRWISE_COMPARISONS: int = 120
 
     # NOTE:
     # These BT convergence parameters are already used in pure math

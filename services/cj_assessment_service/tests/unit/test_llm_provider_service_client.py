@@ -275,6 +275,22 @@ class TestOverrideAdapter:
             "system_prompt_override": "custom",
         }
 
+    def test_accepts_reasoning_and_verbosity_from_cj_overrides(self) -> None:
+        overrides = CJLLMConfigOverrides(
+            provider_override="openai",
+            model_override="gpt-5.1",
+            temperature_override=None,
+            max_tokens_override=None,
+            system_prompt_override=None,
+            reasoning_effort="medium",
+            output_verbosity="high",
+        )
+
+        payload = _build_llm_config_override_payload(overrides=overrides)
+        assert payload is not None
+        assert payload["reasoning_effort"] == "medium"
+        assert payload["output_verbosity"] == "high"
+
     async def test_generate_comparison_rejects_sync_response(
         self, client: LLMProviderServiceClient, mock_session: AsyncMock
     ) -> None:

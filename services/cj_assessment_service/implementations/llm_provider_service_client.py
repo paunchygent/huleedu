@@ -42,6 +42,8 @@ def _build_llm_config_override_payload(
     temperature_override: float | None = None,
     system_prompt_override: str | None = None,
     max_tokens_override: int | None = None,
+    reasoning_effort: str | None = None,
+    output_verbosity: str | None = None,
 ) -> dict[str, Any] | None:
     """Convert CJ overrides into the provider service payload."""
     if overrides is not None:
@@ -56,6 +58,12 @@ def _build_llm_config_override_payload(
         prompt_attr = getattr(overrides, "system_prompt_override", None)
         if system_prompt_override is None and prompt_attr is not None:
             system_prompt_override = prompt_attr
+        reasoning_attr = getattr(overrides, "reasoning_effort", None)
+        if reasoning_effort is None and reasoning_attr is not None:
+            reasoning_effort = reasoning_attr
+        verbosity_attr = getattr(overrides, "output_verbosity", None)
+        if output_verbosity is None and verbosity_attr is not None:
+            output_verbosity = verbosity_attr
     provider_enum: LLMProviderType | None = None
     if isinstance(provider_override, LLMProviderType):
         provider_enum = provider_override
@@ -75,6 +83,8 @@ def _build_llm_config_override_payload(
         temperature_override=temperature_override,
         system_prompt_override=system_prompt_override,
         max_tokens_override=max_tokens_override,
+        reasoning_effort=reasoning_effort,
+        output_verbosity=output_verbosity,
     )
     payload = overrides_model.model_dump(exclude_none=True)
     return payload or None
@@ -138,6 +148,8 @@ class LLMProviderServiceClient(LLMProviderProtocol):
             temperature_override=temperature_override or self.settings.DEFAULT_LLM_TEMPERATURE,
             system_prompt_override=system_prompt_override,
             max_tokens_override=max_tokens_override,
+            reasoning_effort=(request_metadata or {}).get("reasoning_effort"),
+            output_verbosity=(request_metadata or {}).get("output_verbosity"),
         )
 
         request_body: dict[str, Any] = {

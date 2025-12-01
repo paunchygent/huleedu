@@ -26,6 +26,12 @@ def build_override_kwargs(request: QueuedRequest) -> Dict[str, Any]:
         overrides["system_prompt_override"] = config.system_prompt_override
     if config.max_tokens_override is not None:
         overrides["max_tokens_override"] = config.max_tokens_override
+    reasoning_effort = getattr(config, "reasoning_effort", None)
+    if reasoning_effort is not None:
+        overrides["reasoning_effort"] = reasoning_effort
+    output_verbosity = getattr(config, "output_verbosity", None)
+    if output_verbosity is not None:
+        overrides["output_verbosity"] = output_verbosity
 
     return overrides
 

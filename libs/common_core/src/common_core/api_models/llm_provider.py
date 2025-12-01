@@ -37,6 +37,16 @@ class LLMConfigOverridesHTTP(BaseModel):
     temperature_override: float | None = Field(None, ge=0.0, le=2.0)
     system_prompt_override: str | None = None
     max_tokens_override: int | None = Field(None, gt=0)
+    reasoning_effort: str | None = Field(
+        default=None,
+        pattern=r"^(none|low|medium|high)$",
+        description="Optional reasoning effort hint for GPT-5 family models.",
+    )
+    output_verbosity: str | None = Field(
+        default=None,
+        pattern=r"^(low|medium|high)$",
+        description="Optional output verbosity hint for GPT-5 family models.",
+    )
 
 
 # ====================================================================

@@ -213,6 +213,8 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
                 temperature_override=overrides.get("temperature_override"),
                 system_prompt_override=overrides.get("system_prompt_override"),
                 max_tokens_override=overrides.get("max_tokens_override"),
+                reasoning_effort=overrides.get("reasoning_effort"),
+                output_verbosity=overrides.get("output_verbosity"),
             )
         else:
             # Even when no explicit overrides dict is provided, persist the
@@ -320,6 +322,8 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
                     model_override=overrides.get("model_override"),
                     temperature_override=overrides.get("temperature_override"),
                     max_tokens_override=overrides.get("max_tokens_override"),
+                    reasoning_effort=overrides.get("reasoning_effort"),
+                    output_verbosity=overrides.get("output_verbosity"),
                 )
 
             response_time_ms = int((time.time() - start_time) * 1000)

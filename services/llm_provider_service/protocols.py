@@ -27,6 +27,8 @@ class LLMProviderProtocol(Protocol):
         model_override: str | None = None,
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,
+        reasoning_effort: str | None = None,
+        output_verbosity: str | None = None,
     ) -> LLMProviderResponse:
         """Generate LLM comparison response.
 
@@ -37,6 +39,8 @@ class LLMProviderProtocol(Protocol):
             model_override: Optional model override
             temperature_override: Optional temperature override
             max_tokens_override: Optional max tokens override
+            reasoning_effort: Optional reasoning effort hint for GPT-5 family models
+            output_verbosity: Optional output verbosity hint for GPT-5 family models
 
         Returns:
             The LLM provider response containing comparison result
