@@ -51,36 +51,47 @@ pdm run pytest-root tests/integration/  # Cross-service tests
 
 ## CJ Assessment – Sprint-Critical Validation & Patterns
 
-### Current Sprint Focus
+### Current Focus (mid-term)
 1. Stable CJ completion semantics (PR‑2) under high callback failure rates.
 2. Robust BT scoring core (PR‑4) with clear transaction ownership and SE diagnostics.
-3. ENG5 validation runs that use RAS as the source of truth and respect assignment_id propagation.
+3. Continuation module split + observability (US‑00YA/US‑00YB): continuation decisions and diagnostics driven purely from `ContinuationContext` + `ContinuationDecision`.
 
-### Critical Fixes & Patterns (carry forward)
-- **Batch state tracking** (2025‑11‑19): `total_budget` and cumulative comparison counters live on `CJBatchState`; always use `completion_denominator()` as the single source of truth for completion math.
-- **Completion logic** (PR‑2): stability‑first behaviour:
+### Critical CJ Patterns (carry forward, compressed)
+- **Batch state & completion math**:
+  - `CJBatchState` owns `total_budget` and cumulative comparison counters; always use `completion_denominator()` as the single source of truth for completion math.
+  - Continuation logic lives in `workflow_context.py` (builds `ContinuationContext`), `workflow_decision.py` (`ContinuationDecision`, `decide(ctx)`), and `workflow_continuation.py` (orchestration).
+- **Completion logic (PR‑2)**:
   - Recompute BT scores only when a callback iteration is fully complete.
-  - Gate early stopping with `MIN_COMPARISONS_FOR_STABILITY_CHECK` and `SCORE_STABILITY_THRESHOLD`.
-  - Apply success‑rate guards (`MIN_SUCCESS_RATE_THRESHOLD`) when caps/budgets fire; low/zero‑success batches finalize via `finalize_failure`, not `finalize_scoring`.
-- **Error exclusion**: only successful comparisons (`winner in {"essay_a","essay_b"}`) contribute to completion and BT inference; error comparisons are stored but excluded from the BT graph.
-- **Batch state access**: callback persistence, completion checks, and monitor logic go through repository protocols with `for_update=True` where needed; no raw `AsyncSession` selects or cross‑service imports against `CJBatchState`.
-- **Position randomization**: per‑pair A/B randomization is required to avoid anchor bias; use the shared matching‑strategy helpers and respect `CJ_ASSESSMENT_SERVICE_PAIR_GENERATION_SEED` in tests.
+  - Early stop only when:
+    - `callbacks_received >= MIN_COMPARISONS_FOR_STABILITY_CHECK`.
+    - `max_score_change <= SCORE_STABILITY_THRESHOLD`.
+    - `success_rate` is None or ≥ `MIN_SUCCESS_RATE_THRESHOLD`.
+  - Low/zero‑success batches finalize via the failure path, not `finalize_scoring`.
+- **Small-net semantics (PR‑7)**:
+  - Small‑net / coverage / resampling context is built in `build_small_net_context(...)` and stored on `ContinuationContext` (`is_small_net`, `max_possible_pairs`, `successful_pairs_count`, `unique_coverage_complete`, `resampling_pass_count`, `small_net_resampling_cap`, `small_net_cap_reached`).
+  - `_can_attempt_small_net_resampling(ctx)` and the resampling flow in `workflow_continuation.trigger_existing_workflow_continuation(...)` implement Phase‑2 semantics; convergence remains owned by `workflow_continuation` + `BatchFinalizer` and the synthetic `convergence_harness`.
+- **BT SE / coverage diagnostics**:
+  - `build_bt_metadata_updates(...)` derives `bt_se_summary`, `bt_quality_flags`, and coverage flags (`bt_se_inflated`, `comparison_coverage_sparse`, `has_isolated_items`) and stores them on `ContinuationContext` + `CJBatchState.processing_metadata`.
+  - `workflow_diagnostics.record_bt_batch_quality(ctx)` emits `cj_bt_se_inflated_batches_total` and `cj_bt_sparse_coverage_batches_total` from those flags **diagnostically only**.
+- **Continuation observability (US‑00YB)**:
+  - `workflow_diagnostics.record_workflow_decision(ctx, decision)` emits `cj_workflow_decisions_total{decision=...}` using `ContinuationDecision.value` and is wired from `workflow_continuation.trigger_existing_workflow_continuation(...)`.
+  - The structured “Continuation decision evaluated” log uses the same decision vocabulary and includes key context fields (callbacks, caps, stability, small‑net flags, BT SE/coverage flags).
+  - See `docs/operations/cj-assessment-runbook.md` and `observability/grafana/dashboards/cj-assessment/HuleEdu_CJ_Assessment_Deep_Dive.json` for example queries/panels.
 
-### PR‑4: CJ Scoring Core Refactor (BT inference robustness)
-- Introduced `BTScoringResult` and `compute_bt_scores_and_se(...)` as pure BT domain logic:
-  - Builds the CJ graph from `EssayForComparison` + `CJ_ComparisonPair`.
-  - Delegates to `choix.ilsr_pairwise` + `bt_inference.compute_bt_standard_errors` using `BT_STANDARD_ERROR_MAX`.
-  - Returns scores, per‑essay SEs, comparison counts, and a batch‑level SE diagnostics summary.
-- `record_comparisons_and_update_scores(...)` is the single scoring entry point that:
-  - Uses one `SessionProviderProtocol` session to persist new `CJ_ComparisonPair` rows, reload valid comparisons, update `CJ_ProcessedEssay` scores/SEs/counts, and commit once.
-  - Delegates BT math to `compute_bt_scores_and_se` and emits structured SE diagnostics logs (`mean_se`, `max_se`, `min_se`, `item_count`, `comparison_count`, `items_at_cap`, `isolated_items`, comparison‑per‑item stats).
-  - Returns `dict[str, float]` BT scores so PR‑2 stability/success‑rate gating in `workflow_continuation` and `BatchFinalizer` remains unchanged.
-- `trigger_existing_workflow_continuation` now also persists `bt_se_summary` into `CJBatchState.processing_metadata` using its existing session, keeping BT SE diagnostics available for EPIC‑006 without introducing nested `CJBatchState` writes from scoring helpers.
-
-### ENG5 & RAS Alignment (Sprint-Critical)
-- **Result surface**: Result Aggregator Service (RAS) is the authoritative surface for CJ/ENG5 outputs; use RAS APIs or tables for reporting, never CJ service tables directly.
+### ENG5 & RAS Alignment (sprint-critical, compressed)
+- **Result surface**: Result Aggregator Service (RAS) is the authoritative surface for CJ/ENG5 outputs; use RAS APIs/tables for reporting, never CJ service tables directly.
 - **Assignment context**: `assignment_id` propagates end‑to‑end (client → BOS → ELS → CJ → RAS); RAS persists it on `BatchResult.assignment_id` and exposes it via `BatchStatusResponse.assignment_id`.
 - **Guest flows**: For runs without student IDs, join filenames to CJ metrics (`cj_rank`, `cj_score`) via RAS (`/internal/v1/batches/{batch_id}/status`), not by querying CJ’s internal tables.
+
+### ENG5 GPT‑5.1 Anchor-Align Experiments (Dec 2025)
+
+- ENG5 NP runner now supports GPT‑5.1 anchor-align experiments via `ANCHOR_ALIGN_TEST` with anchor-align specific flags (`--anchor-align-provider`, `--anchor-align-model`, `--anchor-align-reasoning-effort`, `--anchor-align-output-verbosity`); Anthropic Haiku/Sonnet + 003 prompts remain the default, GPT‑5.1 is opt‑in.
+- Three GPT‑5.1 runs have been completed against the vt_2017 ENG5 anchors using 003 language-control system/rubric prompts and `output_verbosity="medium"`:
+  - `eng5-gpt51-none-20251201-142319` (cj_batch_id 137, BOS UUID `05c687fc-463d-4c2d-bcaa-73250d0830ca`)
+  - `eng5-gpt51-low-20251201-142416` (cj_batch_id 138, BOS UUID `ddc3f259-b125-4a08-97fb-f4907fa50b3d`)
+  - `eng5-gpt51-medium-20251201-142646` (cj_batch_id 139, BOS UUID `7c0dcd60-deeb-482a-ad7c-f851df09f454`)
+- LLM Provider callbacks for these batches use `provider="openai"`, `model="gpt-5.1"`, and `resolved_model="gpt-5.1"`; CJ `AssessmentResultV1.model_used` / `model_provider` still report Anthropic Haiku, which is tracked as a CJ metadata bug (scoring is GPT‑5.1; attribution is stale).
+- DB-based alignment reports (summary + full, including all comparison justifications) live under `.claude/research/data/eng5_np_2016/anchor_align_db*_*.md` and are the primary artefacts for reasoning-effort analysis; `reasoning_effort="high"` is intentionally deferred until metadata semantics and cost/latency guardrails are agreed.
 
 ## Critical Development Info
 
