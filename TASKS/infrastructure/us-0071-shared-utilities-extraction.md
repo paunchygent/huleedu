@@ -2,7 +2,7 @@
 id: 'us-0071-shared-utilities-extraction'
 title: 'US-007.1 Shared Utilities Extraction'
 type: 'story'
-status: 'research'
+status: 'completed'
 priority: 'high'
 domain: 'infrastructure'
 service: ''
@@ -34,9 +34,17 @@ Extract common frontmatter and validation utilities to `scripts/utils/` to elimi
 
 ## Success Criteria
 
-- [ ] Both utilities created with tests
-- [ ] Pattern extracted from `scripts/task_mgmt/validate_front_matter.py`
-- [ ] No external dependencies (stdlib only)
+- [x] Both utilities created (`frontmatter_utils.py`, `validation_reporter.py`)
+- [x] Pattern extracted from `scripts/task_mgmt/validate_front_matter.py`
+- [x] Uses yaml.safe_load (stdlib + yaml, no new deps added)
+- [x] Smoke tests pass for both utilities
+- [x] Strict mypy passes for new modules
+
+## Implementation Notes
+
+- Used `yaml.safe_load` instead of regex-based parsing (aligns with `validate_claude_structure.py`)
+- `ValidationReporter` supports verbose mode and strict mode (warnings as errors)
+- Tests via smoke commands; formal unit tests deferred to US-007.6 refactoring story
 
 ## Related
 

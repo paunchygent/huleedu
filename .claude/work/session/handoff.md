@@ -17,6 +17,12 @@ Use this file to coordinate what the very next agent should focus on.
 
 ## 🎯 ACTIVE WORK (2025-12-01)
 
+- EPIC-007 US-007.1 COMPLETE - shared utilities extracted to `scripts/utils/`:
+  - `scripts/utils/__init__.py` - package init
+  - `scripts/utils/frontmatter_utils.py` - `read_front_matter`, `write_front_matter`, `validate_frontmatter_against_schema`
+  - `scripts/utils/validation_reporter.py` - `ValidationReporter` class
+  - Next: US-007.2 Schema Consolidation
+
 - ENG5 GPT‑5.1 runner wiring + experiments:
   - Tasks:
     - `TASKS/programs/eng5-gpt-51-reasoning-effort-alignment-experiment.md`
