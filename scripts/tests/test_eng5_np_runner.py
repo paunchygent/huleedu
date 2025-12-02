@@ -122,6 +122,24 @@ def test_snapshot_directory_handles_missing(tmp_path: Path) -> None:
     assert snapshot.count == 0
 
 
+def test_snapshot_directory_ignores_word_lockfiles(tmp_path: Path) -> None:
+    root = tmp_path / "anchors"
+    root.mkdir()
+
+    real = root / "anchor_essay_eng_5_17_vt_003_E-.docx"
+    real.write_text("anchor", encoding="utf-8")
+
+    # Simulate a Word lock file that should be ignored by inventory.
+    lockfile = root / "~$chor_essay_eng_5_17_vt_003_E-.docx"
+    lockfile.write_text("lock", encoding="utf-8")
+
+    snapshot = snapshot_directory(root, patterns=["*.docx"])
+
+    assert snapshot.missing is False
+    assert snapshot.count == 1
+    assert snapshot.files[0].path.name == real.name
+
+
 def test_write_stub_creates_schema_compliant_file(tmp_path: Path) -> None:
     schema_path = tmp_path / "schema.json"
     schema_path.write_text(json.dumps({"title": "test"}), encoding="utf-8")

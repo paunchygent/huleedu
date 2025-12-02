@@ -69,7 +69,9 @@ def snapshot_directory(path: Path, patterns: Iterable[str]) -> DirectorySnapshot
     if path.exists():
         for pattern in patterns:
             for entry in sorted(path.glob(pattern)):
-                if entry.is_file():
+                # Skip transient editor/lock files (e.g. Word "~$" lockfiles)
+                # which are not real essays and can break DOCX extraction.
+                if entry.is_file() and not entry.name.startswith("~$"):
                     files.append(FileRecord.from_path(entry))
     return DirectorySnapshot(root=path, files=files)
 

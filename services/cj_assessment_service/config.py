@@ -165,7 +165,7 @@ class Settings(SecureServiceSettings, JWTValidationSettings):
     )
 
     # Score stability configuration
-    MAX_ITERATIONS: int = Field(default=5, description="Maximum comparison iterations")
+    MAX_ITERATIONS: int = Field(default=10, description="Maximum comparison iterations")
 
     # Performance tuning
     MAX_CONCURRENT_COMPARISONS: int = Field(
@@ -202,7 +202,7 @@ class Settings(SecureServiceSettings, JWTValidationSettings):
         default=12,
         description="Minimum successful comparisons required before checking score stability",
     )
-    SCORE_STABILITY_THRESHOLD: float = 0.05
+    SCORE_STABILITY_THRESHOLD: float = 0.025
 
     # BT SE diagnostics (observability-only; no gating semantics)
     BT_MEAN_SE_WARN_THRESHOLD: float = Field(
@@ -229,14 +229,14 @@ class Settings(SecureServiceSettings, JWTValidationSettings):
 
     # Small-net Phase-2 resampling controls (PR-7)
     MIN_RESAMPLING_NET_SIZE: int = Field(
-        default=10,
+        default=3,
         description=(
             "Nets with expected_essay_count below this threshold are treated as small and "
             "eligible for limited Phase-2 resampling semantics."
         ),
     )
     MAX_RESAMPLING_PASSES_FOR_SMALL_NET: int = Field(
-        default=2,
+        default=4,
         description=(
             "Maximum number of Phase-2 resampling passes allowed for small nets once "
             "unique pairwise coverage is complete."

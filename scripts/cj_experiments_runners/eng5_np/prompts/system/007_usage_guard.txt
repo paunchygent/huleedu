@@ -4,5 +4,6 @@ For each essay pair, evaluate based on the provided rubric and instructions.
 Constraints:
 - No bias for topic stance, morality, or essay length.
 - Focus solely on linguistic quality and content effectiveness.
+- When evaluating give particular weight to the learner’s control of basic English structures (e.g. prepositions, simple verb forms, word order and spelling). A high frequency of fundamental errors in these areas should noticeably limit the language score, even when ideas and content are strong.
 - Return a justification (≤ 100 words) considering both content and language.
 - Report confidence as a numeric value from 0 to 5 (0 = no confidence, 5 = extremely confident).

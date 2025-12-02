@@ -83,6 +83,17 @@ experiments can safely adopt GPT‑5.x without violating OpenAI API semantics.
 - Updated LLM orchestrator + queue plumbing so `LLMConfigOverridesHTTP.reasoning_effort` / `.output_verbosity` are preserved on queued requests and forwarded unchanged into provider calls (`llm_orchestrator_impl.py`, `llm_override_utils.py`), covered by `test_orchestrator_reasoning_overrides.py`.
 - Confirmed CJ Assessment → LLM Provider HTTP client translates reasoning/verbosity overrides by extending `_build_llm_config_override_payload` tests in `services/cj_assessment_service/tests/unit/test_llm_provider_service_client.py` and re‑running the full client test suite.
 
+### Canonical GPT‑5.1 low configuration (ENG5 anchor-align)
+
+- For ENG5 anchor-align experiments that target GPT‑5.1 via LLM Provider, we
+  currently treat the following as the canonical OpenAI configuration:
+  - Provider/model: `openai` / `gpt-5.1`
+  - Reasoning effort: `"low"`
+  - Output verbosity: `"low"`
+- These settings are passed from ENG5 through `LLMConfigOverrides` and
+  `LLMConfigOverridesHTTP` into the OpenAI provider payload as
+  `reasoning.effort` and `text.verbosity` for GPT‑5 family models.
+
 ## Related
 
 - Epic: `docs/product/epics/eng5-runner-refactor-and-prompt-tuning-epic.md` (EPIC‑008)

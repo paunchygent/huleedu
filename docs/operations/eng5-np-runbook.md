@@ -279,6 +279,23 @@ Notes and conventions:
     mode and compare alignment reports (Kendall’s tau, inversions, zero-win
     anchors) using `db_alignment_report`.
 
+### Prompt variants
+
+- **003 – language-control (baseline)**:
+  - 50-word justification cap focused on language and style control.
+  - Files:
+    - System: `scripts/cj_experiments_runners/eng5_np/prompts/system/003_language_control.txt`
+    - Rubric: `scripts/cj_experiments_runners/eng5_np/prompts/rubric/003_language_control.txt`
+- **006 – usage/content parity (planned GPT‑5.1 low)**:
+  - 50-word justification cap emphasizing joint content and language
+    quality (“usage/content parity”) for anchor-align experiments.
+  - Files:
+    - System: `scripts/cj_experiments_runners/eng5_np/prompts/system/006_usage_content_parity_system.txt`
+    - Rubric: `scripts/cj_experiments_runners/eng5_np/prompts/rubric/006_usage_content_parity_rubric.txt`
+  - Intended to run with OpenAI GPT‑5.1, `reasoning_effort="low"`,
+    `output_verbosity="low"`, using the explicit `--system-prompt` /
+    `--rubric` pattern once the ENG5→CJ→LPS→RAS flow is fully validated.
+
 ### Background Job Caveat (Batch IDs)
 
 When launching ENG5 runs as **background tasks** via Bash tooling, avoid

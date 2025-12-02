@@ -1,0 +1,42 @@
+#
+# ENG5 LOWER5 CJ override for tail-only alignment experiments.
+#
+# Usage (development stack):
+#   docker compose \
+#     -f docker-compose.yml \
+#     -f docker-compose.dev.yml \
+#     -f docker-compose.eng5-lower5.override.yml \
+#     up -d cj_assessment_service llm_provider_service
+#
+# This leaves the main compose files untouched and only adjusts CJ settings
+# for small-net experiments (e.g. the 5 lowest anchors).
+#
+
+services:
+  cj_assessment_service:
+    environment:
+      # For the 5-essay LOWER5 net:
+      # - There are 10 unique pairs (C(5,2) = 10).
+      # - We want approximately 2× coverage (≈20 comparisons) before CJ is
+      #   allowed to consider stability, so we align the global budget and the
+      #   stability gate on the same comparison count.
+
+      # Global comparison budget per batch (CJ-side).
+      # For LOWER5 experiments with deeper coverage, push the budget to 60 so
+      # we can see multiple passes over the 10 unique pairs.
+      - CJ_ASSESSMENT_SERVICE_MAX_PAIRWISE_COMPARISONS=60
+
+      # Do not even evaluate score stability until we have reached the full
+      # comparison budget, so stability cannot stop the run early.
+      - CJ_ASSESSMENT_SERVICE_MIN_COMPARISONS_FOR_STABILITY_CHECK=60
+
+      # Keep per-iteration batch size small so we still see behaviour over
+      # multiple waves instead of a single monolithic call.
+      - CJ_ASSESSMENT_SERVICE_DEFAULT_BATCH_SIZE=20
+
+      # Keep the LOWER5 experiment firmly in the "small net" regime so Phase-2
+      # resampling is available once unique pairwise coverage is complete.
+      # (The default MIN_RESAMPLING_NET_SIZE=10 already treats 5 essays as
+      # small, but values are made explicit here for clarity.)
+      - CJ_ASSESSMENT_SERVICE_MIN_RESAMPLING_NET_SIZE=10
+      - CJ_ASSESSMENT_SERVICE_MAX_RESAMPLING_PASSES_FOR_SMALL_NET=10
