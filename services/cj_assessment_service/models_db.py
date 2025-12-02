@@ -306,19 +306,24 @@ class CJBatchState(Base):
 
     def completion_denominator(self) -> int:
         """Return the denominator to use for completion math."""
-        max_possible_pairs = self._max_possible_comparisons()
-
         if self.total_budget and self.total_budget > 0:
-            if max_possible_pairs:
-                return min(self.total_budget, max_possible_pairs)
+            # total_budget is the single source of truth for how many
+            # comparisons this batch is allowed to perform. Coverage and
+            # small-net semantics use explicit metadata (max_possible_pairs,
+            # successful_pairs_count, etc.) instead of clamping this value to
+            # nC2. See ADR-0020.
             return self.total_budget
 
         if self.total_comparisons and self.total_comparisons > 0:
-            if max_possible_pairs:
-                return min(self.total_comparisons, max_possible_pairs)
+            # Fallback for legacy/synthetic batches that have not yet been
+            # migrated to explicit total_budget semantics.
             return self.total_comparisons
 
-        return max_possible_pairs
+        # As a final fallback, approximate using nC2 so that monitoring and
+        # tests continue to have a non-zero denominator even when state is
+        # partially populated. Real CJ batches are expected to set
+        # total_budget explicitly during submission.
+        return self._max_possible_comparisons()
 
     def _max_possible_comparisons(self) -> int:
         """Compute the n-choose-2 upper bound for this batch.

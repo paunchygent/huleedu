@@ -65,6 +65,11 @@ currently dropped).
   cross-service tests (`test_cj_lps_metadata_roundtrip.py`) assert that
   reasoning/verbosity survive the HTTP → queue → Kafka callback cycle in
   `request_metadata`.
+- CJ completion semantics have been updated so that `CJBatchState.total_budget`
+  is seeded from `comparison_budget.max_pairs_requested` and
+  `completion_denominator()` returns this budget (not `min(budget, nC2)`),
+  with unit tests guarding small-net LOWER5 behaviour (`test_batch_state_tracking.py`,
+  `test_completion_threshold.py`).
 
 ## Plan
 

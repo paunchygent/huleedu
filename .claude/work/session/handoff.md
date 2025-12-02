@@ -35,16 +35,16 @@ Use this file to coordinate what the very next agent should focus on.
         - `scripts/cj_experiments_runners/eng5_np/paths.py` (ENG5_ANCHOR_DIR_OVERRIDE handling)
         - `scripts/cj_experiments_runners/eng5_np/db_alignment_report.py`
         - `docker-compose.eng5-lower5.override.yml` (CJ small‑net tuning for LOWER5)
-      - Current focus: ENG5 LOWER5 tail alignment, GPT‑5.1 `reasoning_effort` in {`"low"`, `"none"`}, comparing usage guard 007 + 006 rubric vs 006/006 parity prompts, with DB-based reports as the canonical surface for tau/inversion/justification analysis, **and** fixing remaining CJ/LPS plumbing gaps so reasoning controls and small‑net budgets behave as configured. ADR-0020 (`docs/decisions/0020-cj-assessment-completion-semantics-v2.md`) now captures the agreed simplification of CJ completion semantics: `total_budget` as the single source of truth for completion denominators, with small-net coverage (`nC2`) handled explicitly via small-net metadata instead of clamping the denominator.
+      - Current focus: ENG5 LOWER5 tail alignment, GPT‑5.1 `reasoning_effort` in {`"low"`, `"none"`}, comparing usage guard 007 + 006 rubric vs 006/006 parity prompts, with DB-based reports as the canonical surface for tau/inversion/justification analysis, **and** fixing remaining CJ/LPS plumbing gaps so reasoning controls and small-net budgets behave as configured. ADR-0020 (`docs/decisions/0020-cj-assessment-completion-semantics-v2.md`) now captures the agreed simplification of CJ completion semantics: `total_budget` as the single source of truth for completion denominators, with small-net coverage (`nC2`) handled explicitly via small-net metadata instead of clamping the denominator.
       - Focus (next sessions):
         - Maintain a repeatable LOWER5 loop over the 5 weakest anchors (`D‑`, `E+`, `E‑`, `F+`, `F+`) using:
-          - CJ override: `docker-compose.eng5-lower5.override.yml` (currently `MAX_PAIRWISE_COMPARISONS=60`, `MIN_COMPARISONS_FOR_STABILITY_CHECK=60`, `MIN_RESAMPLING_NET_SIZE=10`, `MAX_RESAMPLING_PASSES_FOR_SMALL_NET=10`).
+          - CJ dev overrides set via env/config (no compose override): e.g. `CJ_ASSESSMENT_SERVICE_MAX_PAIRWISE_COMPARISONS=60`, `CJ_ASSESSMENT_SERVICE_MIN_COMPARISONS_FOR_STABILITY_CHECK=60`, `CJ_ASSESSMENT_SERVICE_MIN_RESAMPLING_NET_SIZE=10`, `CJ_ASSESSMENT_SERVICE_MAX_RESAMPLING_PASSES_FOR_SMALL_NET=10` in your `.env` or shell before starting the standard `docker-compose.yml:docker-compose.dev.yml` stack.
           - ENG5 runner LOWER5 wiring: `ENG5_ANCHOR_DIR_OVERRIDE` → `/app/test_uploads/ANCHOR ESSAYS/ROLE_MODELS_ENG5_NP_2016/anchor_essays_5_lowest_grades`.
           - Prompts: system `007_usage_guard.txt`, rubric `006_usage_content_parity_rubric.txt`.
           - Model: `openai` / `gpt-5.1`, where we **expect** `reasoning_effort` / `output_verbosity` from ENG5 runner overrides to reach OpenAI.
         - Known CJ/LPS plumbing gaps to fix (highest priority for dev implementing next session):
           - ✅ RESOLVED (2025-12-02): CJ now threads `LLMConfigOverrides.reasoning_effort` / `output_verbosity` from ENG5 into `CJLLMComparisonMetadata` and on to `LLMConfigOverridesHTTP` in the CJ → LPS HTTP payload; cross-service tests (`TestCJLPSMetadataRoundtrip::test_reasoning_overrides_roundtrip`) and CJ integration tests guard this contract. OpenAI GPT‑5.x provider continues to honour these hints via `reasoning.effort` / `text.verbosity`.
-          - For LOWER5 nets (`expected_essay_count=5`), `CJBatchState.completion_denominator()` still resolves to `max_possible_pairs = C(5,2) = 10` because `total_budget` / `total_comparisons` are not set to 60 on these guest batches; continuation sees `callbacks_received >= 10` after the first coverage pass and finalizes the batch, so small‑net Phase‑2 resampling never runs despite the 60‑comparison budget and `MAX_RESAMPLING_PASSES_FOR_SMALL_NET=10`.
+          - ✅ RESOLVED (2025-12-02): CJ completion semantics for small-net LOWER5 batches now treat `total_budget` as the completion denominator (no `min(budget, nC2)` clamp). `CJBatchState._resolve_total_budget()` seeds `total_budget` from `comparison_budget.max_pairs_requested`, and `completion_denominator()` returns this budget for all nets. Unit tests (`test_batch_state_tracking.py::test_small_net_total_budget_uses_configured_comparison_budget`, `test_completion_threshold.py::test_completion_denominator_uses_small_batch_nc2_cap`) cover the new behaviour; ENG5 LOWER5 experiments still need to be run to confirm multi-wave resampling and >10 comparisons in practice.
         - After each run, generate DB-based LOWER5 reports via `scripts.cj_experiments_runners/eng5_np/db_alignment_report.py` with `--system-prompt-file 007_usage_guard.txt` and `--rubric-file 006_usage_content_parity_rubric.txt`, and capture:
           - Kendall’s tau over the 5‑essay ladder.
           - Direct inversions among {D‑, E+, E‑, F+, F+}.
@@ -85,6 +85,18 @@ Use this file to coordinate what the very next agent should focus on.
             - First, **fix plumbing** so ENG5 `reasoning_effort` / `output_verbosity` values reach LLM Provider, and adjust CJ completion logic so LOWER5 runs can actually use the configured 60‑comparison budget and `MAX_RESAMPLING_PASSES_FOR_SMALL_NET` without being hard‑capped at `C(n,2)`.
             - Then repeat LOWER5 for each (prompt, reasoning_effort) combination to estimate inversion frequency (especially F+/E‑ crossings) and stability now that reasoning controls and resampling are behaving as expected.
             - Consider a small grid over `output_verbosity` or budget (within safety constraints) if PM wants to probe whether richer justifications correlate with safer tail alignment under 006/006 once the above fixes land.
+
+### Next sessions – concrete entry points
+
+- Scope: Do **not** change CJ/LPS contracts or reasoning controls; focus on running and analysing ENG5 LOWER5 experiments now that CJ respects `total_budget` for small nets.
+- Start with LOWER5 loops:
+  - Commands: see canonical LOWER5 run in `TASKS/programs/eng5-gpt-51-reasoning-effort-alignment-experiment.md` and `docs/operations/eng5-np-runbook.md`.
+  - Files/tests: `docker-compose.eng5-lower5.override.yml`, `scripts/cj_experiments_runners/eng5_np/db_alignment_report.py`, `services/cj_assessment_service/tests/unit/test_batch_state_tracking.py`, `services/cj_assessment_service/tests/unit/test_completion_threshold.py`.
+- Analyse LOWER5 reports:
+  - Generate DB reports per run and capture tau/inversions/justifications for the 5 anchors; record findings back into `TASKS/programs/eng5-gpt-51-reasoning-effort-alignment-experiment.md`.
+- Optional future work (keep in TASKS, not this session):
+  - Refine Anthropic thinking controls and logging (`services/llm_provider_service/implementations/anthropic_provider_impl.py`, `services/llm_provider_service/tests/integration/test_anthropic_prompt_cache_blocks.py`).
+  - Design and implement Google Gemini `thinkingConfig` mapping driven by `reasoning_effort` (see `TASKS/infrastructure/llm-provider-anthropic-thinking-controls.md` for current thinking patterns).
 
 - Anthropic / thinking controls status (2025-12-02):
   - `AnthropicProviderImpl` now maps `reasoning_effort` to an Anthropic `thinking` block for models that advertise `extended_thinking` in the manifest (e.g. `claude-haiku-4-5-20251001`), with `budget_tokens` derived from `max_tokens` and clamped to the `[1024, max_tokens)` interval.

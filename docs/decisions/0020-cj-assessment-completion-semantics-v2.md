@@ -212,3 +212,8 @@ source of truth for “how much work this batch is allowed to do”.
 - `docs/decisions/0015-cj-assessment-convergence-tuning-strategy.md`
 - `services/cj_assessment_service/models_db.py`
 - `services/cj_assessment_service/cj_core_logic/workflow_continuation.py`
+
+### Follow-up Work
+
+- Task: `TASKS/assessment/cj-completion-semantics-v2-enforce-total_budget-and-remove-nc2-fallback.md`
+  - Purpose: tighten `completion_denominator()` to raise when `total_budget` is missing/invalid, remove `nC2`/`total_comparisons` fallbacks from completion math, and align tests/docs/epics with the strict budget-only invariant described above.

@@ -10,7 +10,7 @@ owner_team: 'agents'
 owner: ''
 program: 'eng5'
 created: '2025-12-01'
-last_updated: '2025-12-01'
+last_updated: '2025-12-02'
 related: ['EPIC-008', 'llm-provider-openai-gpt-5x-reasoning-controls']
 labels: ['eng5', 'alignment', 'gpt5']
 ---
@@ -178,8 +178,9 @@ configurations.
   - Goal: drive ≈20 comparisons on this 5‑essay net and **avoid early stop on BT stability**, using CJ’s small‑net Phase‑2 semantics.
 
 - CJ configuration (LOWER5 small‑net override):
-  - Compose override: `docker-compose.eng5-lower5.override.yml`.
-  - Settings applied to `cj_assessment_service`:
+  - Settings applied to `cj_assessment_service` for these experiments (set in
+    your dev environment, e.g. `.env` or exported in the shell before
+    starting the stack):
     - `CJ_ASSESSMENT_SERVICE_MAX_PAIRWISE_COMPARISONS=20`
     - `CJ_ASSESSMENT_SERVICE_MIN_COMPARISONS_FOR_STABILITY_CHECK=20`
     - `CJ_ASSESSMENT_SERVICE_DEFAULT_BATCH_SIZE=20`
@@ -191,7 +192,6 @@ configurations.
     docker compose \
       -f docker-compose.yml \
       -f docker-compose.dev.yml \
-      -f docker-compose.eng5-lower5.override.yml \
       up -d cj_assessment_service llm_provider_service
     ```
 

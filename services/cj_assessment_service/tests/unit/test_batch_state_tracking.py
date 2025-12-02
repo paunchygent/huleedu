@@ -118,3 +118,30 @@ async def test_subsequent_submission_accumulates_counters(
     assert batch_state.current_iteration == 2
     session = mock_session_provider.get_last_session()
     session.commit.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_small_net_total_budget_uses_configured_comparison_budget(
+    batch_processor: BatchProcessor,
+    mock_session_provider: MockSessionProvider,
+    mock_batch_repo: AsyncMock,
+) -> None:
+    """Small-net batches must still use the configured comparison budget."""
+
+    batch_state = _build_mock_state()
+    # Simulate a LOWER5-style small net (n=5) with an explicit 60-comparison budget.
+    batch_state.processing_metadata = {
+        "comparison_budget": {"max_pairs_requested": 60, "source": "runner_override"}
+    }
+
+    mock_batch_repo.get_batch_state_for_update = AsyncMock(return_value=batch_state)
+
+    await batch_processor._update_batch_state_with_totals(
+        cj_batch_id=batch_state.batch_id,
+        state=CJBatchStateEnum.WAITING_CALLBACKS,
+        iteration_comparisons=10,
+        correlation_id=uuid4(),
+    )
+
+    # total_budget should be set from comparison_budget, regardless of small-net size.
+    assert batch_state.total_budget == 60

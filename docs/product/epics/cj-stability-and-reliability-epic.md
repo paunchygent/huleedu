@@ -43,6 +43,7 @@ Harden the CJ Assessment callback and completion flow to ensure safe finalizatio
 - [ ] `CJBatchState.completion_denominator()` is the single source of truth for **budget-based** completion math in both `BatchCompletionChecker` and `BatchCompletionPolicy` (see ADR-0020):
   - For all batches, `completion_denominator()` reflects the per-batch comparison budget (`total_budget`), derived from either a per-request override or `MAX_PAIRWISE_COMPARISONS`.
   - Small-net coverage semantics (`nC2` over the comparison graph) and Phase-2 resampling behaviour are driven by explicit small-net metadata (`max_possible_pairs`, `successful_pairs_count`, `unique_coverage_complete`, `resampling_pass_count`, `small_net_resampling_cap`), not by clamping the denominator to `nC2`.
+  - Follow-up hardening: see `TASKS/assessment/cj-completion-semantics-v2-enforce-total_budget-and-remove-nc2-fallback.md` for removing legacy `nC2`/`total_comparisons` fallbacks from `completion_denominator()` and treating missing `total_budget` as a strict error.
 - [ ] A batch with `completed_comparisons == 0` is **never** finalized as COMPLETE_*:
   - If all attempts fail, the batch ends in an explicit error status and logs a clear error reason
 - [ ] Integration tests cover:

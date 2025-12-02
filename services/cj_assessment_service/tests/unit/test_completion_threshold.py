@@ -91,4 +91,9 @@ def test_completion_denominator_uses_small_batch_nc2_cap() -> None:
         status=CJBatchStatusEnum.PENDING,
     )
 
-    assert batch_state.completion_denominator() == 6
+    # Even though a 4-essay net has nC2 = 6 possible unique pairs, the
+    # completion denominator must reflect the configured comparison budget
+    # rather than the coverage cap. Small-net coverage and resampling
+    # semantics are handled via explicit small-net metadata instead of
+    # clamping the denominator to nC2.
+    assert batch_state.completion_denominator() == 350

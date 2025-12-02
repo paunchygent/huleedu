@@ -106,7 +106,9 @@ explicit coverage). This story focuses on:
       on Docker overrides for experiment budgets.
 - [ ] LOWER5 runs:
       - Show `total_budget`/`completion_denominator` equal to the configured
-        budget (e.g. 60).
+        budget (e.g. 60); CJ core logic and unit tests now enforce this for
+        small-net batches, but ENG5 LOWER5 experiments still need to be run
+        and documented.
       - Perform more than 10 comparisons (multiple resampling waves) when
         budget and resampling caps allow.
       - Produce DB reports that reflect the expanded comparison set (and
