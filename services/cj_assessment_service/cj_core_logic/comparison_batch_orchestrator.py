@@ -150,6 +150,21 @@ class ComparisonBatchOrchestrator:
                 iteration_metadata_context=iteration_metadata_context,
             )
 
+            # Propagate reasoning/verbosity overrides into request metadata so that
+            # CJ → LPS HTTP payloads can construct LLMConfigOverridesHTTP with the
+            # correct reasoning_effort/output_verbosity fields.
+            llm_overrides = normalized.llm_config_overrides
+            if llm_overrides is not None:
+                reasoning_effort = getattr(llm_overrides, "reasoning_effort", None)
+                output_verbosity = getattr(llm_overrides, "output_verbosity", None)
+                if reasoning_effort is not None or output_verbosity is not None:
+                    enriched_metadata_context: dict[str, Any] = dict(metadata_context)
+                    if reasoning_effort is not None:
+                        enriched_metadata_context.setdefault("reasoning_effort", reasoning_effort)
+                    if output_verbosity is not None:
+                        enriched_metadata_context.setdefault("output_verbosity", output_verbosity)
+                    metadata_context = enriched_metadata_context
+
             await self._persist_llm_overrides_if_present(
                 cj_batch_id=cj_batch_id,
                 normalized=normalized,

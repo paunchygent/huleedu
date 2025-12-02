@@ -149,6 +149,8 @@ class AnthropicProviderImpl(LLMProviderProtocol):
                 temperature_override=temperature_override,
                 max_tokens_override=max_tokens_override,
                 prompt_sha256=prompt_sha256,
+                reasoning_effort=reasoning_effort,
+                output_verbosity=output_verbosity,
             )
             # Type assert since retry manager returns Any
             return result  # type: ignore
@@ -466,6 +468,8 @@ class AnthropicProviderImpl(LLMProviderProtocol):
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,
         prompt_sha256: str | None = None,
+        reasoning_effort: str | None = None,
+        output_verbosity: str | None = None,
     ) -> LLMProviderResponse:
         """Make API request to Anthropic.
 
@@ -490,6 +494,7 @@ class AnthropicProviderImpl(LLMProviderProtocol):
 
         # Get API version and configuration from manifest
         api_version = "2023-06-01"  # Fallback
+        model_config = None
         try:
             model_config = self.settings.get_model_from_manifest(ProviderName.ANTHROPIC, model)
             api_version = model_config.api_version
@@ -567,7 +572,7 @@ class AnthropicProviderImpl(LLMProviderProtocol):
         # Anthropic only allows `metadata.user_id`; custom keys are rejected.
         metadata = {"user_id": str(correlation_id)}
 
-        payload = {
+        payload: dict[str, Any] = {
             "model": model,
             "system": system_blocks,
             "messages": [{"role": "user", "content": user_message_content}],
@@ -577,6 +582,40 @@ class AnthropicProviderImpl(LLMProviderProtocol):
             "tool_choice": {"type": "tool", "name": "comparison_result"},
             "metadata": metadata,
         }
+
+        # Map generic reasoning_effort hint to Anthropic thinking controls when supported.
+        # For now we treat reasoning_effort as a soft knob: when a model advertises
+        # "extended_thinking" in the manifest and the caller requests low/medium/high,
+        # allocate an increasing share of max_tokens to thinking.budget_tokens while
+        # respecting Anthropic's minimum budget requirement.
+        supports_thinking = (
+            bool(
+                getattr(model_config, "capabilities", {}).get("extended_thinking")  # type: ignore[union-attr]
+            )
+            if model_config is not None
+            else False
+        )
+
+        thinking_payload: dict[str, Any] | None = None
+        if supports_thinking and reasoning_effort and reasoning_effort != "none":
+            # Minimum budget per Anthropic docs; skip thinking when the cap is too low.
+            min_budget = 1024
+            if max_tokens > min_budget:
+                effort_fraction = {
+                    "low": 0.25,
+                    "medium": 0.5,
+                    "high": 0.75,
+                }.get(reasoning_effort, 0.5)
+                budget_tokens = int(max_tokens * effort_fraction)
+                budget_tokens = max(min_budget, budget_tokens)
+                if budget_tokens >= max_tokens:
+                    budget_tokens = max_tokens - 1
+
+                if budget_tokens >= min_budget:
+                    thinking_payload = {"type": "enabled", "budget_tokens": budget_tokens}
+
+        if thinking_payload is not None:
+            payload["thinking"] = thinking_payload
 
         response_text = await self._perform_http_request_with_metrics(
             endpoint=endpoint,

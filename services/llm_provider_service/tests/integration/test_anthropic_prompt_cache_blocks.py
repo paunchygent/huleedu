@@ -91,6 +91,59 @@ def _build_provider(settings: Settings) -> tuple[AnthropicProviderImpl, dict[str
 
 
 @pytest.mark.asyncio
+async def test_reasoning_effort_adds_thinking_block_for_extended_models() -> None:
+    """reasoning_effort should map to Anthropic thinking config when supported."""
+
+    settings = Settings(ANTHROPIC_API_KEY="test-key", ENABLE_PROMPT_CACHING=False)
+    # Ensure we use a manifest-backed model that advertises extended_thinking.
+    settings.ANTHROPIC_DEFAULT_MODEL = "claude-haiku-4-5-20251001"
+    provider, captured = _build_provider(settings)
+
+    provider._perform_http_request_with_metrics = _capture_http_response(  # type: ignore[assignment]
+        captured, _fake_tool_response()
+    )
+
+    await provider.generate_comparison(
+        user_prompt="legacy prompt",
+        prompt_blocks=None,
+        correlation_id=uuid4(),
+        reasoning_effort="medium",
+    )
+
+    payload = captured["payload"]
+    thinking = payload.get("thinking")
+    assert thinking is not None, "Expected thinking block for extended_thinking model"
+    assert thinking.get("type") == "enabled"
+    assert isinstance(thinking.get("budget_tokens"), int)
+    assert thinking["budget_tokens"] >= 1024
+    assert thinking["budget_tokens"] < payload["max_tokens"]
+
+
+@pytest.mark.asyncio
+async def test_reasoning_effort_ignored_for_non_thinking_models() -> None:
+    """Models without extended_thinking capability should ignore reasoning_effort."""
+
+    settings = Settings(ANTHROPIC_API_KEY="test-key", ENABLE_PROMPT_CACHING=False)
+    # Use a synthetic model id not present in manifest to simulate no extended_thinking flag.
+    settings.ANTHROPIC_DEFAULT_MODEL = "claude-legacy-non-thinking"
+    provider, captured = _build_provider(settings)
+
+    provider._perform_http_request_with_metrics = _capture_http_response(  # type: ignore[assignment]
+        captured, _fake_tool_response()
+    )
+
+    await provider.generate_comparison(
+        user_prompt="legacy prompt",
+        prompt_blocks=None,
+        correlation_id=uuid4(),
+        reasoning_effort="high",
+    )
+
+    payload = captured["payload"]
+    assert "thinking" not in payload
+
+
+@pytest.mark.asyncio
 async def test_prompt_blocks_preferred_over_user_prompt() -> None:
     """Prompt blocks should drive the payload when provided."""
 

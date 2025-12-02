@@ -346,6 +346,8 @@ class TestLLMPayloadConstructionIntegration:
             temperature_override=0.35,
             max_tokens_override=2048,
             system_prompt_override="ENG5 custom system prompt",
+            reasoning_effort="low",
+            output_verbosity="low",
         )
 
         http_request = await _submit_and_capture_request(
@@ -364,13 +366,13 @@ class TestLLMPayloadConstructionIntegration:
         )
 
         llm_config = http_request["llm_config_overrides"]
-        assert llm_config == {
-            "provider_override": "anthropic",
-            "model_override": "claude-haiku-4-5-20251001",
-            "temperature_override": 0.35,
-            "max_tokens_override": 2048,
-            "system_prompt_override": "ENG5 custom system prompt",
-        }
+        assert llm_config["provider_override"] == "anthropic"
+        assert llm_config["model_override"] == "claude-haiku-4-5-20251001"
+        assert llm_config["temperature_override"] == 0.35
+        assert llm_config["max_tokens_override"] == 2048
+        assert llm_config["system_prompt_override"] == "ENG5 custom system prompt"
+        assert llm_config["reasoning_effort"] == "low"
+        assert llm_config["output_verbosity"] == "low"
 
     async def test_metadata_correlation_id_flow(
         self,

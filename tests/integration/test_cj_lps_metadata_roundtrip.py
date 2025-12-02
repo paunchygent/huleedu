@@ -278,3 +278,90 @@ class TestCJLPSMetadataRoundtrip:
         print("   • Complete metadata preservation ✓")
         print("   • No metadata pollution ✓")
         print(f"   Winner: {callback_data.winner}, Confidence: {callback_data.confidence}")
+
+    @pytest.mark.docker
+    @pytest.mark.integration
+    @pytest.mark.asyncio
+    async def test_reasoning_overrides_roundtrip(
+        self,
+        validated_services: dict,  # noqa: ARG002 - ensures services are running
+        kafka_manager: KafkaTestManager,
+    ) -> None:
+        """LLMComparisonRequest with reasoning/verbosity overrides is accepted and echoed."""
+        correlation_id = uuid4()
+        callback_topic = "test.llm.callback.reasoning.v1"
+
+        task = ComparisonTask(
+            essay_a=EssayForComparison(id="essay-a-reason", text_content="Essay A content"),
+            essay_b=EssayForComparison(id="essay-b-reason", text_content="Essay B content"),
+            prompt="Compare with reasoning controls",
+        )
+
+        metadata_adapter = CJLLMComparisonMetadata.from_comparison_task(
+            task,
+            bos_batch_id="bos-reasoning-001",
+        ).with_additional_context(
+            reasoning_effort="low",
+            output_verbosity="low",
+        )
+        request_metadata = metadata_adapter.to_request_metadata()
+
+        request = LLMComparisonRequest(
+            user_prompt=task.prompt,
+            callback_topic=callback_topic,
+            correlation_id=correlation_id,
+            metadata=request_metadata,
+            llm_config_overrides=ProviderOverrides(
+                provider_override=LLMProviderType.MOCK,
+                system_prompt_override="Reasoning controls test system prompt",
+                reasoning_effort="low",
+                output_verbosity="low",
+            ),
+        )
+
+        await kafka_manager.ensure_topics([callback_topic])
+
+        lps_url = "http://localhost:8090/api/v1/comparison"
+
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                lps_url,
+                json=request.model_dump(mode="json"),
+                timeout=aiohttp.ClientTimeout(total=10.0),
+                headers={"Content-Type": "application/json"},
+            ) as response:
+                assert response.status == 202, f"Expected 202 (queued), got {response.status}"
+                data = await response.json()
+                queued = LLMQueuedResponse.model_validate(data)
+                queue_id = queued.queue_id
+
+        callback: LLMComparisonResultV1 | None = None
+        async with kafka_manager.consumer(
+            "cj_lps_reasoning_roundtrip",
+            topics=[callback_topic],
+            auto_offset_reset="earliest",
+        ) as consumer:
+            try:
+                async with asyncio.timeout(30.0):
+                    async for message in consumer:
+                        envelope = EventEnvelope[Any].model_validate_json(message.value)
+                        result = LLMComparisonResultV1.model_validate(envelope.data)
+                        if result.request_id == str(queue_id):
+                            callback = result
+                            break
+            except TimeoutError:
+                pytest.fail(
+                    "Timeout waiting for LPS callback (30s) in reasoning overrides test. "
+                    "Check LPS queue processor is running and MOCK provider is enabled."
+                )
+
+        assert callback is not None, "No callback received for reasoning overrides test"
+        assert callback.provider in LLMProviderType
+
+        meta = callback.request_metadata
+        assert meta.get("essay_a_id") == "essay-a-reason"
+        assert meta.get("essay_b_id") == "essay-b-reason"
+        assert meta.get("bos_batch_id") == "bos-reasoning-001"
+        # Reasoning/verbosity hints should roundtrip via metadata
+        assert meta.get("reasoning_effort") == "low"
+        assert meta.get("output_verbosity") == "low"

@@ -7,6 +7,7 @@ from uuid import uuid4
 
 import aiohttp
 import pytest
+from common_core import LLMComparisonRequest
 from common_core.error_enums import ErrorCode
 from common_core.events.cj_assessment_events import LLMConfigOverrides as CJLLMConfigOverrides
 from huleedu_service_libs.error_handling import HuleEduError, assert_raises_huleedu_error
@@ -219,6 +220,38 @@ Please respond with a JSON object."""
 
         request_body = mock_session.post.call_args[1]["json"]
         assert request_body["metadata"] == metadata
+
+    async def test_generate_comparison_builds_reasoning_overrides_from_metadata(
+        self, client: LLMProviderServiceClient, mock_session: AsyncMock
+    ) -> None:
+        """Simulate ENG5 path: reasoning/verbosity in metadata → HTTP overrides."""
+        mock_response = AsyncMock()
+        mock_response.status = 202
+        mock_response.text = AsyncMock(
+            return_value=json.dumps({"queue_id": str(uuid4()), "status": "queued"})
+        )
+        mock_session.post.return_value.__aenter__.return_value = mock_response
+
+        prompt = "Compare essays with reasoning controls"
+        metadata = {
+            "essay_a_id": "1",
+            "essay_b_id": "2",
+            "reasoning_effort": "low",
+            "output_verbosity": "low",
+        }
+
+        await client.generate_comparison(
+            user_prompt=prompt,
+            correlation_id=uuid4(),
+            request_metadata=metadata,
+        )
+
+        request_body = mock_session.post.call_args[1]["json"]
+        # Validate against HTTP contract
+        parsed = LLMComparisonRequest.model_validate(request_body)
+        assert parsed.llm_config_overrides is not None
+        assert parsed.llm_config_overrides.reasoning_effort == "low"
+        assert parsed.llm_config_overrides.output_verbosity == "low"
 
 
 class TestOverrideAdapter:

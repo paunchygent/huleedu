@@ -189,7 +189,6 @@ class BatchRetryProcessor:
                 batch_config_overrides=None,
                 provider_override=final_provider_override,
             )
-
             metadata_context = build_llm_metadata_context(
                 cj_batch_id=cj_batch_id,
                 cj_source=(original_request_payload or {}).get("cj_source"),
@@ -198,6 +197,16 @@ class BatchRetryProcessor:
                 effective_mode=effective_batching_mode,
                 iteration_metadata_context=None,
             )
+
+            # Preserve reasoning/verbosity hints from persisted overrides so that
+            # retry batches respect the original ENG5/CJ configuration when
+            # constructing CJ → LPS HTTP payloads.
+            reasoning_effort = persisted_overrides.get("reasoning_effort")
+            output_verbosity = persisted_overrides.get("output_verbosity")
+            if reasoning_effort is not None:
+                metadata_context.setdefault("reasoning_effort", reasoning_effort)
+            if output_verbosity is not None:
+                metadata_context.setdefault("output_verbosity", output_verbosity)
 
             # Submit retry batch using core submitter
             result = cast(
