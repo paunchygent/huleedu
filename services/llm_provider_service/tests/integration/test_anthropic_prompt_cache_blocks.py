@@ -144,6 +144,43 @@ async def test_reasoning_effort_ignored_for_non_thinking_models() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("reasoning_effort", "expected_budget"),
+    [
+        ("low", 2048),
+        ("medium", 8000),
+        ("high", 16000),
+    ],
+)
+async def test_reasoning_effort_absolute_budgets(
+    reasoning_effort: str, expected_budget: int
+) -> None:
+    """Verify absolute budget values per Anthropic best practices."""
+
+    settings = Settings(ANTHROPIC_API_KEY="test-key", ENABLE_PROMPT_CACHING=False)
+    settings.ANTHROPIC_DEFAULT_MODEL = "claude-haiku-4-5-20251001"
+    # Set max_tokens high enough that clamping doesn't affect expected values
+    settings.LLM_DEFAULT_MAX_TOKENS = 64000
+    provider, captured = _build_provider(settings)
+
+    provider._perform_http_request_with_metrics = _capture_http_response(  # type: ignore[assignment]
+        captured, _fake_tool_response()
+    )
+
+    await provider.generate_comparison(
+        user_prompt="test prompt",
+        prompt_blocks=None,
+        correlation_id=uuid4(),
+        reasoning_effort=reasoning_effort,
+    )
+
+    payload = captured["payload"]
+    thinking = payload.get("thinking")
+    assert thinking is not None
+    assert thinking["budget_tokens"] == expected_budget
+
+
+@pytest.mark.asyncio
 async def test_prompt_blocks_preferred_over_user_prompt() -> None:
     """Prompt blocks should drive the payload when provided."""
 

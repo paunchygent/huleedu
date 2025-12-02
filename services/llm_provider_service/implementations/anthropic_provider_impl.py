@@ -584,10 +584,10 @@ class AnthropicProviderImpl(LLMProviderProtocol):
         }
 
         # Map generic reasoning_effort hint to Anthropic thinking controls when supported.
-        # For now we treat reasoning_effort as a soft knob: when a model advertises
-        # "extended_thinking" in the manifest and the caller requests low/medium/high,
-        # allocate an increasing share of max_tokens to thinking.budget_tokens while
-        # respecting Anthropic's minimum budget requirement.
+        # Use absolute token budgets per Anthropic guidance:
+        # - Minimum: 1024 tokens (API requirement)
+        # - Complex tasks: 16k+ recommended
+        # - Above 32k: batch processing recommended (timeout risk)
         supports_thinking = (
             bool(
                 getattr(model_config, "capabilities", {}).get("extended_thinking")  # type: ignore[union-attr]
@@ -598,21 +598,20 @@ class AnthropicProviderImpl(LLMProviderProtocol):
 
         thinking_payload: dict[str, Any] | None = None
         if supports_thinking and reasoning_effort and reasoning_effort != "none":
-            # Minimum budget per Anthropic docs; skip thinking when the cap is too low.
+            # Absolute budget values per Anthropic best practices.
+            # All values stay under 32k batch threshold.
             min_budget = 1024
-            if max_tokens > min_budget:
-                effort_fraction = {
-                    "low": 0.25,
-                    "medium": 0.5,
-                    "high": 0.75,
-                }.get(reasoning_effort, 0.5)
-                budget_tokens = int(max_tokens * effort_fraction)
-                budget_tokens = max(min_budget, budget_tokens)
-                if budget_tokens >= max_tokens:
-                    budget_tokens = max_tokens - 1
+            thinking_budgets = {
+                "low": 2048,  # Light reasoning, fast
+                "medium": 8000,  # Moderate analysis
+                "high": 16000,  # Complex tasks per Anthropic guidance
+            }
+            target_budget = thinking_budgets.get(reasoning_effort, 8000)
 
-                if budget_tokens >= min_budget:
-                    thinking_payload = {"type": "enabled", "budget_tokens": budget_tokens}
+            # Clamp to valid range: [min_budget, max_tokens - 1]
+            if max_tokens > min_budget:
+                budget_tokens = max(min_budget, min(target_budget, max_tokens - 1))
+                thinking_payload = {"type": "enabled", "budget_tokens": budget_tokens}
 
         if thinking_payload is not None:
             payload["thinking"] = thinking_payload
