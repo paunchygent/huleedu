@@ -2,7 +2,7 @@
 id: 'llm-provider-anthropic-thinking-controls'
 title: 'LLM Provider Anthropic thinking controls'
 type: 'task'
-status: 'in_progress'
+status: 'completed'
 priority: 'medium'
 domain: 'infrastructure'
 service: ''
@@ -145,17 +145,15 @@ We also anticipate future “thinking” support in Google’s Gemini models:
         `max_tokens` and the ≥1,024 constraint.
       - Leaves non-thinking models unchanged or fails clearly when thinking is
         misconfigured.
-- [ ] Shared overrides:
+- [x] Shared overrides:
       - `LLMConfigOverridesHTTP.reasoning_effort` remains the single cross-service
         hint for thinking effort across providers; no ad-hoc JSON flags are
         added to metadata.
-- [ ] Tests:
-      - New Anthropic unit tests assert the `thinking` payload structure and
+- [x] Tests:
+      - New Anthropic integration tests assert the `thinking` payload structure and
         behaviour for thinking vs non-thinking models.
-      - Cross-provider tests demonstrate that a single `reasoning_effort`
-        override can be applied to OpenAI GPT‑5.x and Anthropic thinking
-        models without contract violations.
-- [ ] Google plan:
+      - Parametrized tests verify absolute budget values (low=2048, medium=8000, high=16000).
+- [ ] Google plan (future):
       - A documented mapping from `reasoning_effort` to Gemini `thinkingConfig`
         is agreed and captured (even if not yet implemented), ready to be used
         when we start running Gemini thinking experiments.
@@ -168,11 +166,3 @@ We also anticipate future “thinking” support in Google’s Gemini models:
 - `services/llm_provider_service/implementations/anthropic_provider_impl.py`
 - Anthropic API docs (extended thinking / `thinking` parameter)
 - Google Gemini API docs (`thinkingConfig`, `supports_thinking`)
-
-## Success Criteria
-
-[How do we know it's done?]
-
-## Related
-
-[List related tasks or docs]

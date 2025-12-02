@@ -2,7 +2,7 @@
 id: 'cj-lps-reasoning-verbosity-metadata-contract'
 title: 'CJ LPS reasoning-verbosity metadata contract'
 type: 'task'
-status: 'in_progress'
+status: 'completed'
 priority: 'medium'
 domain: 'architecture'
 service: ''
@@ -139,7 +139,7 @@ regression to slip through.
 - [x] CJ and LPS unit tests clearly separate responsibilities:
       - LPS tests: “Given overrides, provider payload is correct.”
       - CJ tests: “Given CJ/ENG5 overrides, HTTP payload to LPS is correct.”
-- [ ] ENG5 reasoning experiments and docs no longer claim behaviour (e.g.
+- [x] ENG5 reasoning experiments and docs no longer claim behaviour (e.g.
       `reasoning_effort="low"`) that is not backed by the actual contract
       implementation; instead, they rely on this hardened boundary.
 
@@ -154,11 +154,3 @@ regression to slip through.
 - `services/llm_provider_service/tests/unit/test_orchestrator_reasoning_overrides.py`
 - `services/llm_provider_service/tests/unit/test_openai_provider_gpt5_family.py`
 - `services/cj_assessment_service/tests/unit/test_llm_provider_service_client.py`
-
-## Success Criteria
-
-[How do we know it's done?]
-
-## Related
-
-[List related tasks or docs]
