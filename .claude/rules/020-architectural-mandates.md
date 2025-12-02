@@ -36,7 +36,7 @@ child_rules: ["020.1-content-service-architecture", "020.2-spellchecker-service-
 
 ### 3.1. Contract Models
 - All inter-service data **MUST** be Pydantic models in `common/`
-- **FORBIDDEN**: Ad-hoc dictionaries for inter-service communication
+- **FORBIDDEN**: Ad-hoc dictionaries for inter-service communication (We explicitly avoid ad‑hoc JSON keys in metadata for cross-cutting data)
 - **MUST** use/create Pydantic models from `common/` for data exchange
 
 ### 3.2. Versioning & Adherence

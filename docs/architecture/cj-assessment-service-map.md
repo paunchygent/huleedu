@@ -42,16 +42,21 @@ between three paths:
 - **Request additional comparisons** when callbacks for the current iteration
   are complete, stability has not passed, and comparison budget remains.
 
-`MAX_PAIRWISE_COMPARISONS` and the per‑batch `completion_denominator()` work
-in tandem:
+`MAX_PAIRWISE_COMPARISONS`, per-request overrides, and the per‑batch
+`completion_denominator()` work in tandem (see ADR-0020):
 
-- `MAX_PAIRWISE_COMPARISONS` is a global hard cap on how many comparisons CJ
-  will attempt for a batch (subject to per‑request overrides).
-- `completion_denominator()` computes the effective denominator used for
-  completion math as `min(total_budget, nC2)` where `nC2` is derived from the
-  batch’s expected essay count. Small nets therefore finalize once their
-  small n‑choose‑2 graph is saturated, while large nets are naturally capped
-  by budget.
+- `MAX_PAIRWISE_COMPARISONS` is the global default comparison budget for a
+  batch.
+- A per-request `comparison_budget.max_pairs_requested` value, when present,
+  overrides this default for that batch.
+- `CJBatchState.total_budget` is set from one of these sources at batch
+  creation and is the single source of truth for how many comparisons CJ is
+  allowed to perform for that batch.
+- `completion_denominator()` returns `total_budget` and is used purely as the
+  budget-based denominator for completion math. Coverage semantics for small
+  nets (`nC2` over the comparison graph) and Phase‑2 resampling are handled
+  via explicit small-net metadata on the continuation context rather than by
+  clamping the denominator to `nC2`.
 
 ---
 

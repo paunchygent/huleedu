@@ -67,6 +67,9 @@ pdm run python scripts/task_mgmt/index_tasks.py --root "$(pwd)/TASKS" --out "/tm
 pdm run python scripts/docs_mgmt/validate_docs_structure.py --verbose
 ```
 
+- **ALWAYS** create tasks/docs/rules via `pdm run new-task`, `pdm run new-doc`, `pdm run new-rule` (never by hand), and after updates run `pdm run validate-tasks` plus the docs validators and task/docs indexers.
+- **ALWAYS** use the `pdm run` script aliases defined in `pyproject.toml` (e.g. `new-task`, `validate-tasks`, `new-doc`, `new-rule`) from repo root instead of calling Python modules/files directly.
+
 **Specs:** `TASKS/_REORGANIZATION_PROPOSAL.md`, `docs/DOCS_STRUCTURE_SPEC.md`, `.claude/CLAUDE_STRUCTURE_SPEC.md`
 
 ---

@@ -35,7 +35,7 @@ Use this file to coordinate what the very next agent should focus on.
         - `scripts/cj_experiments_runners/eng5_np/paths.py` (ENG5_ANCHOR_DIR_OVERRIDE handling)
         - `scripts/cj_experiments_runners/eng5_np/db_alignment_report.py`
         - `docker-compose.eng5-lower5.override.yml` (CJ small‑net tuning for LOWER5)
-      - Current focus: ENG5 LOWER5 tail alignment, GPT‑5.1 `reasoning_effort` in {`"low"`, `"none"`}, comparing usage guard 007 + 006 rubric vs 006/006 parity prompts, with DB-based reports as the canonical surface for tau/inversion/justification analysis, **and** fixing remaining CJ/LPS plumbing gaps so reasoning controls and small‑net budgets behave as configured.
+      - Current focus: ENG5 LOWER5 tail alignment, GPT‑5.1 `reasoning_effort` in {`"low"`, `"none"`}, comparing usage guard 007 + 006 rubric vs 006/006 parity prompts, with DB-based reports as the canonical surface for tau/inversion/justification analysis, **and** fixing remaining CJ/LPS plumbing gaps so reasoning controls and small‑net budgets behave as configured. ADR-0020 (`docs/decisions/0020-cj-assessment-completion-semantics-v2.md`) now captures the agreed simplification of CJ completion semantics: `total_budget` as the single source of truth for completion denominators, with small-net coverage (`nC2`) handled explicitly via small-net metadata instead of clamping the denominator.
       - Focus (next sessions):
         - Maintain a repeatable LOWER5 loop over the 5 weakest anchors (`D‑`, `E+`, `E‑`, `F+`, `F+`) using:
           - CJ override: `docker-compose.eng5-lower5.override.yml` (currently `MAX_PAIRWISE_COMPARISONS=60`, `MIN_COMPARISONS_FOR_STABILITY_CHECK=60`, `MIN_RESAMPLING_NET_SIZE=10`, `MAX_RESAMPLING_PASSES_FOR_SMALL_NET=10`).

@@ -40,9 +40,9 @@ Harden the CJ Assessment callback and completion flow to ensure safe finalizatio
   - `pending_callbacks == 0` (where `pending = submitted - (completed + failed)`),
   - Logs all four counters plus `completion_denominator` for the batch
 - [ ] When `pending_callbacks > 0`, continuation is skipped and a structured log line shows `pending_callbacks`, `submitted_comparisons`, `completed_comparisons`, and `failed_comparisons`
-- [ ] `CJBatchState.completion_denominator()` is the single source of truth for completion math in both `BatchCompletionChecker` and `BatchCompletionPolicy`:
-  - For small batches (e.g. 4 essays → 6 max pairs), completion is measured against the n-choose-2 maximum
-  - For large batches, completion is measured against `min(total_budget, max_possible_pairs)`
+- [ ] `CJBatchState.completion_denominator()` is the single source of truth for **budget-based** completion math in both `BatchCompletionChecker` and `BatchCompletionPolicy` (see ADR-0020):
+  - For all batches, `completion_denominator()` reflects the per-batch comparison budget (`total_budget`), derived from either a per-request override or `MAX_PAIRWISE_COMPARISONS`.
+  - Small-net coverage semantics (`nC2` over the comparison graph) and Phase-2 resampling behaviour are driven by explicit small-net metadata (`max_possible_pairs`, `successful_pairs_count`, `unique_coverage_complete`, `resampling_pass_count`, `small_net_resampling_cap`), not by clamping the denominator to `nC2`.
 - [ ] A batch with `completed_comparisons == 0` is **never** finalized as COMPLETE_*:
   - If all attempts fail, the batch ends in an explicit error status and logs a clear error reason
 - [ ] Integration tests cover:
