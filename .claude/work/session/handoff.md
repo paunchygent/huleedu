@@ -15,7 +15,7 @@ Use this file to coordinate what the very next agent should focus on.
 
 ---
 
-## 🎯 ACTIVE WORK (2025-12-01)
+## 🎯 ACTIVE WORK (2025-12-02)
 
 - EPIC-007 US-007.3 COMPLETE - creation scripts added:
   - `scripts/docs_mgmt/new_doc.py` - creates runbooks, ADRs, epics (`pdm run new-doc`)
@@ -25,7 +25,7 @@ Use this file to coordinate what the very next agent should focus on.
   - DecisionFrontmatter.id pattern fixed to `^ADR-\d{4}$` for consistency with EpicFrontmatter
   - Next: US-007.4 (Indexing Scripts) or US-007.5 (Unified Validation)
 
-  - ENG5 GPT‑5.1 usage/content parity experiments (006, reasoning_effort=\"low\") + LOWER5 tail-only loop:
+  - ENG5 GPT‑5.1 usage/content parity experiments (006/007 prompts, reasoning_effort in {\"low\",\"none\"}) + LOWER5 tail-only loop:
       - Tasks:
         - `TASKS/programs/eng5-gpt-51-reasoning-effort-alignment-experiment.md`
         - `TASKS/programs/eng5/eng5-runner-assumption-hardening.md`
@@ -35,13 +35,16 @@ Use this file to coordinate what the very next agent should focus on.
         - `scripts/cj_experiments_runners/eng5_np/paths.py` (ENG5_ANCHOR_DIR_OVERRIDE handling)
         - `scripts/cj_experiments_runners/eng5_np/db_alignment_report.py`
         - `docker-compose.eng5-lower5.override.yml` (CJ small‑net tuning for LOWER5)
-      - Current focus: ENG5 LOWER5 tail alignment, GPT‑5.1 `reasoning_effort` in {`"low"`, `"none"`}, comparing usage guard 007 + 006 rubric vs 006/006 parity prompts, with DB-based reports as the canonical surface for tau/inversion/justification analysis.
+      - Current focus: ENG5 LOWER5 tail alignment, GPT‑5.1 `reasoning_effort` in {`"low"`, `"none"`}, comparing usage guard 007 + 006 rubric vs 006/006 parity prompts, with DB-based reports as the canonical surface for tau/inversion/justification analysis, **and** fixing remaining CJ/LPS plumbing gaps so reasoning controls and small‑net budgets behave as configured.
       - Focus (next sessions):
         - Maintain a repeatable LOWER5 loop over the 5 weakest anchors (`D‑`, `E+`, `E‑`, `F+`, `F+`) using:
-          - CJ override: `docker-compose.eng5-lower5.override.yml` (20-comparison budget, no early stability stop, small‑net resampling cap=1).
+          - CJ override: `docker-compose.eng5-lower5.override.yml` (currently `MAX_PAIRWISE_COMPARISONS=60`, `MIN_COMPARISONS_FOR_STABILITY_CHECK=60`, `MIN_RESAMPLING_NET_SIZE=10`, `MAX_RESAMPLING_PASSES_FOR_SMALL_NET=10`).
           - ENG5 runner LOWER5 wiring: `ENG5_ANCHOR_DIR_OVERRIDE` → `/app/test_uploads/ANCHOR ESSAYS/ROLE_MODELS_ENG5_NP_2016/anchor_essays_5_lowest_grades`.
           - Prompts: system `007_usage_guard.txt`, rubric `006_usage_content_parity_rubric.txt`.
-          - Model: `openai` / `gpt-5.1`, `reasoning_effort=\"low\"`, `output_verbosity=\"low\"`.
+          - Model: `openai` / `gpt-5.1`, where we **expect** `reasoning_effort` / `output_verbosity` from ENG5 runner overrides to reach OpenAI.
+        - Known CJ/LPS plumbing gaps to fix (highest priority for dev implementing next session):
+          - For ENG5 anchor-align guest flows, `LLMConfigOverrides.reasoning_effort` / `output_verbosity` are stored on the CJ batch (`cj_batch_uploads.processing_metadata.original_request.llm_config_overrides`) but are **not** currently threaded into `request_metadata` → `llm_config_overrides` on the CJ → LLM Provider HTTP payload; OpenAI therefore uses its internal default reasoning mode for all GPT‑5.1 runs run via ENG5, regardless of runner flags.
+          - For LOWER5 nets (`expected_essay_count=5`), `CJBatchState.completion_denominator()` still resolves to `max_possible_pairs = C(5,2) = 10` because `total_budget` / `total_comparisons` are not set to 60 on these guest batches; continuation sees `callbacks_received >= 10` after the first coverage pass and finalizes the batch, so small‑net Phase‑2 resampling never runs despite the 60‑comparison budget and `MAX_RESAMPLING_PASSES_FOR_SMALL_NET=10`.
         - After each run, generate DB-based LOWER5 reports via `scripts.cj_experiments_runners/eng5_np/db_alignment_report.py` with `--system-prompt-file 007_usage_guard.txt` and `--rubric-file 006_usage_content_parity_rubric.txt`, and capture:
           - Kendall’s tau over the 5‑essay ladder.
           - Direct inversions among {D‑, E+, E‑, F+, F+}.
@@ -50,7 +53,7 @@ Use this file to coordinate what the very next agent should focus on.
           - The canonical LOWER5 loop command.
           - Paths to the latest LOWER5 DB reports.
           - Notes on tail behaviour changes across runs (e.g. if usage guard tightens or loosens preference bias at F+/E‑ boundary).
-        - Latest LOWER5 runs (2025-12-01, GPT‑5.1 low/low and none/low):
+        - Latest LOWER5 runs (2025-12-01/02, GPT‑5.1 low/low and none/low; all currently capped at 10 comparisons because of the denominator issue above):
           - 007 system + 006 rubric (usage guard + parity rubric):
           - Runner batch: `batch_id=eng5-gpt51-lower5-007-20251202-001714`, `batch_uuid=50f4509e-2e8c-4c62-a19d-93cf0739eefd`, `cj_batch_id=147`.
           - DB-based reports:
@@ -74,9 +77,14 @@ Use this file to coordinate what the very next agent should focus on.
               - Runner batch: `batch_id=eng5-gpt51-lower5-006-none-20251202-003200`, `batch_uuid=8cb7d51a-abc9-486c-bc4f-3654c19da7e1`, `cj_batch_id=150`.
               - DB-based reports: `.claude/research/data/eng5_np_2016/anchor_align_db_8cb7d51a-abc9-486c-bc4f-3654c19da7e1_20251201_233241.md` (summary) and `.claude/research/data/eng5_np_2016/anchor_align_db_full_8cb7d51a-abc9-486c-bc4f-3654c19da7e1_20251201_233241.md` (full).
               - Metrics: Kendall’s tau `= 1.000`, `0` direct inversions, one zero‑win F+ anchor with ladder `D‑ > E+ > E‑ > F+ > F+`, mirroring the low/low 007+006 run.
+            - 009 system + 008 rubric (strong usage prompt + strong usage rubric), reasoning_effort=`"low"`:
+              - Runner batch: `batch_id=eng5-gpt51-lower5-009-008-20251202-170737`, `batch_uuid=cfa94544-e80e-48e7-afa7-dff3e856b57d`, `cj_batch_id=155`.
+              - DB-based reports: `.claude/research/data/eng5_np_2016/anchor_align_db_cfa94544-e80e-48e7-afa7-dff3e856b57d_20251202_170737.md` (summary) and `.claude/research/data/eng5_np_2016/anchor_align_db_full_cfa94544-e80e-48e7-afa7-dff3e856b57d_20251202_170737.md` (full).
+              - Metrics: `Total comparisons = 10`, Kendall’s tau `≈ 0.600`, `2` direct inversions at the E‑/F+ boundary (both F+ essays beating E‑ with usage/structure‑focused justifications); further interpretation is blocked until reasoning controls + small‑net behaviour are fixed and the budget‑driven resampling path is exercised.
           - Suggested next experiments:
-            - Repeat LOWER5 for each (prompt, reasoning_effort) combination to estimate inversion frequency (especially F+/E‑ crossings) and stability.
-            - Consider a small grid over `output_verbosity` or budget (within safety constraints) if PM wants to probe whether richer justifications correlate with safer tail alignment under 006/006.
+            - First, **fix plumbing** so ENG5 `reasoning_effort` / `output_verbosity` values reach LLM Provider, and adjust CJ completion logic so LOWER5 runs can actually use the configured 60‑comparison budget and `MAX_RESAMPLING_PASSES_FOR_SMALL_NET` without being hard‑capped at `C(n,2)`.
+            - Then repeat LOWER5 for each (prompt, reasoning_effort) combination to estimate inversion frequency (especially F+/E‑ crossings) and stability now that reasoning controls and resampling are behaving as expected.
+            - Consider a small grid over `output_verbosity` or budget (within safety constraints) if PM wants to probe whether richer justifications correlate with safer tail alignment under 006/006 once the above fixes land.
 
 ---
 

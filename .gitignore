@@ -77,3 +77,5 @@ dist/
 # Migration backups
 *_backup_*/
 documentation_backup_*/
+.DS_Store
+.DS_Store
