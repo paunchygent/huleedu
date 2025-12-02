@@ -9,9 +9,9 @@ Migrate TASKS/ to spec-compliant structure.
 - Idempotent: safe to run multiple times
 
 Usage:
-    python scripts/task_mgmt/migrate_to_spec.py --dry-run  # Preview changes
-    python scripts/task_mgmt/migrate_to_spec.py --backup   # Create backup first
-    python scripts/task_mgmt/migrate_to_spec.py            # Execute migration
+    python -m scripts.task_mgmt.migrate_to_spec --dry-run  # Preview changes
+    python -m scripts.task_mgmt.migrate_to_spec --backup   # Create backup first
+    python -m scripts.task_mgmt.migrate_to_spec            # Execute migration
 """
 
 from __future__ import annotations
@@ -24,24 +24,14 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Tuple
 
+from pydantic import ValidationError
+
+from scripts.schemas.task_schema import (
+    TaskFrontmatter,
+    TaskStatus,
+)
+
 ROOT = Path(__file__).resolve().parents[2]
-if str(ROOT) not in sys.path:
-    sys.path.append(str(ROOT))
-
-try:
-    from pydantic import ValidationError  # type: ignore
-
-    from scripts.task_mgmt.task_frontmatter_schema import (  # noqa: E402
-        TaskFrontmatter,
-        TaskStatus,
-    )
-
-    HAVE_SCHEMA = True
-except Exception:  # pragma: no cover - fallback when deps unavailable
-    HAVE_SCHEMA = False
-    TaskFrontmatter = None  # type: ignore
-    TaskStatus = None  # type: ignore
-
 TASKS_DIR = ROOT / "TASKS"
 
 ALLOWED_DOMAINS = {
@@ -315,7 +305,7 @@ def generate_frontmatter(
         "id": task_id,
         "title": title,
         "type": "task",
-        "status": TaskStatus.research.value if HAVE_SCHEMA else "research",
+        "status": TaskStatus.research.value,
         "priority": "medium",
         "domain": domain,
         "service": "",
@@ -342,14 +332,13 @@ def generate_frontmatter(
             fm["id"] = f"{program.upper()}_HUB"
 
     # Validate before emitting text to catch enum/domain issues early
-    if HAVE_SCHEMA:
-        try:
-            TaskFrontmatter.model_validate(fm)
-        except ValidationError as e:  # pragma: no cover - defensive
-            errors = "; ".join(
-                f"{'.'.join(str(x) for x in err['loc'])}: {err['msg']}" for err in e.errors()
-            )
-            raise ValueError(f"Frontmatter validation failed for {filepath}: {errors}") from e
+    try:
+        TaskFrontmatter.model_validate(fm)
+    except ValidationError as e:
+        errors = "; ".join(
+            f"{'.'.join(str(x) for x in err['loc'])}: {err['msg']}" for err in e.errors()
+        )
+        raise ValueError(f"Frontmatter validation failed for {filepath}: {errors}") from e
 
     lines = ["---"]
     for key, value in fm.items():

@@ -22,7 +22,7 @@ repos:
 
     -   id: validate-tasks-frontmatter
         name: Validate TASKS frontmatter and structure
-        entry: bash -c 'cd "$(git rev-parse --show-toplevel)" && pdm run python scripts/task_mgmt/validate_front_matter.py'
+        entry: bash -c 'cd "$(git rev-parse --show-toplevel)" && pdm run python -m scripts.task_mgmt.validate_front_matter'
         language: system
         files: ^TASKS/.*\.md$
         exclude: ^TASKS/(_REORGANIZATION_PROPOSAL|INDEX|README|archive/)
@@ -31,7 +31,7 @@ repos:
 
     -   id: validate-docs-structure
         name: Validate documentation structure
-        entry: bash -c 'cd "$(git rev-parse --show-toplevel)" && pdm run python scripts/docs_mgmt/validate_docs_structure.py'
+        entry: bash -c 'cd "$(git rev-parse --show-toplevel)" && pdm run python -m scripts.docs_mgmt.validate_docs_structure'
         language: system
         files: ^docs/.*\.md$
         exclude: ^docs/(DOCS_STRUCTURE_SPEC|_archive/)
@@ -40,7 +40,7 @@ repos:
 
     -   id: validate-claude-structure
         name: Validate .claude/ structure and rule frontmatter
-        entry: bash -c 'cd "$(git rev-parse --show-toplevel)" && pdm run python scripts/claude_mgmt/validate_claude_structure.py'
+        entry: bash -c 'cd "$(git rev-parse --show-toplevel)" && pdm run python -m scripts.claude_mgmt.validate_claude_structure'
         language: system
         files: ^\.claude/rules/.*\.md$
         exclude: ^\.claude/rules/README\.md$

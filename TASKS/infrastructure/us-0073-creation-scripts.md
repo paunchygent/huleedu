@@ -2,7 +2,7 @@
 id: 'us-0073-creation-scripts'
 title: 'US-007.3 Creation Scripts'
 type: 'story'
-status: 'research'
+status: 'completed'
 priority: 'high'
 domain: 'infrastructure'
 service: ''
@@ -42,10 +42,12 @@ pdm run new-rule --title "My Rule" --type service --scope backend
 
 ## Success Criteria
 
-- [ ] Both scripts work with single CLI invocation
-- [ ] Auto-increment IDs work correctly
-- [ ] Terminal output shows allowed enum values
-- [ ] Pattern mirrors `new_task.py`
+- [x] Both scripts work with single CLI invocation
+- [x] Auto-increment IDs work correctly
+- [x] Terminal output shows allowed enum values
+- [x] Pattern mirrors `new_task.py`
+- [x] All management scripts run as modules (no sys.path bootstrap)
+- [x] PDM scripts registered: `new-doc`, `new-rule`
 
 ## Related
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Validate YAML-like front matter in TASKS markdown files. No external deps required.
+Validate YAML-like front matter in TASKS markdown files.
+
 - Ensures required fields exist and enum values are valid.
 - Exits non-zero on failures.
 """
@@ -14,20 +15,9 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Tuple
 
-ROOT = Path(__file__).resolve().parents[2]
-if str(ROOT) not in sys.path:
-    sys.path.append(str(ROOT))
+from pydantic import ValidationError
 
-try:  # Optional: schema validation if pydantic is available
-    from pydantic import ValidationError  # type: ignore
-
-    from scripts.task_mgmt.task_frontmatter_schema import (
-        TaskFrontmatter,
-    )
-
-    HAVE_SCHEMA = True
-except Exception:  # pragma: no cover - fallback when deps unavailable
-    HAVE_SCHEMA = False
+from scripts.schemas.task_schema import TaskFrontmatter
 
 ROOT = Path(__file__).resolve().parents[2]
 TASKS_DIR = ROOT / "TASKS"
@@ -234,7 +224,7 @@ def validate_directory_naming(p: Path, tasks_root: Path) -> list[str]:
 
 def validate_with_schema(fm: Dict[str, Any], p: Path) -> list[str]:
     """Validate frontmatter against the shared Pydantic schema."""
-    if not fm or not HAVE_SCHEMA:
+    if not fm:
         return []
     try:
         TaskFrontmatter.model_validate(fm)

@@ -447,11 +447,15 @@ docker-clean = "docker system prune -af"  # Clean Docker resources (use with cau
 codex = "scripts/codex-exec"  # Start codex with full system access and high reasoning
 
 # Task Management
-new-task = {cmd = ["python", "scripts/task_mgmt/new_task.py"]}  # Create new task with frontmatter
-validate-tasks = "python scripts/task_mgmt/validate_front_matter.py --verbose"  # Validate task frontmatter
-tasks = {cmd = ["python", "scripts/task_mgmt/filter_tasks.py"]}  # Filter and query tasks by frontmatter
-tasks-now = "python scripts/task_mgmt/filter_tasks.py --priority high --status in_progress"  # High priority tasks in progress
-tasks-next = "python scripts/task_mgmt/filter_tasks.py --priority high --priority medium --status research --sort priority"  # Research tasks ready to start (high priority first)
+new-task = {cmd = ["python", "-m", "scripts.task_mgmt.new_task"]}  # Create new task with frontmatter
+validate-tasks = "python -m scripts.task_mgmt.validate_front_matter --verbose"  # Validate task frontmatter
+tasks = {cmd = ["python", "-m", "scripts.task_mgmt.filter_tasks"]}  # Filter and query tasks by frontmatter
+tasks-now = "python -m scripts.task_mgmt.filter_tasks --priority high --status in_progress"  # High priority tasks in progress
+tasks-next = "python -m scripts.task_mgmt.filter_tasks --priority high --priority medium --status research --sort priority"  # Research tasks ready to start (high priority first)
+
+# Documentation & Rules Management
+new-doc = {cmd = ["python", "-m", "scripts.docs_mgmt.new_doc"]}  # Create new doc (runbook, adr, epic)
+new-rule = {cmd = ["python", "-m", "scripts.claude_mgmt.new_rule"]}  # Create new rule file
 
 # Observability Stack Management
 obs-up = "docker compose up -d prometheus grafana loki jaeger promtail alertmanager"

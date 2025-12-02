@@ -23,8 +23,7 @@ from typing import Any
 import yaml
 from pydantic import ValidationError
 
-# Import the Pydantic schema
-from rule_frontmatter_schema import RuleFrontmatter
+from scripts.schemas.rule_schema import RuleFrontmatter
 
 ROOT = Path(__file__).resolve().parents[2]
 CLAUDE_DIR = ROOT / ".claude"

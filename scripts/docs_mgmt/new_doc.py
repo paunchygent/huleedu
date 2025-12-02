@@ -1,0 +1,276 @@
+#!/usr/bin/env python3
+"""
+Scaffold a new documentation file (runbook, ADR, or epic) with YAML frontmatter.
+
+Usage examples:
+  pdm run new-doc --type runbook --title "Service Recovery" \
+    --service cj_assessment_service --severity high
+
+  pdm run new-doc --type adr --title "Cache Strategy"
+
+  pdm run new-doc --type epic --title "User Dashboard" --id EPIC-010
+"""
+
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import re
+import sys
+from pathlib import Path
+from typing import get_args
+
+from pydantic import ValidationError
+
+from scripts.schemas.docs_schema import (
+    DecisionFrontmatter,
+    EpicFrontmatter,
+    EpicStatus,
+    RunbookFrontmatter,
+    RunbookSeverity,
+    get_allowed_values,
+)
+from scripts.utils.frontmatter_utils import write_front_matter
+
+ROOT = Path(__file__).resolve().parents[2]
+
+# Output directories by doc type
+DOC_OUTPUT_PATHS = {
+    "runbook": ROOT / "docs" / "operations",
+    "adr": ROOT / "docs" / "decisions",
+    "epic": ROOT / "docs" / "product" / "epics",
+}
+
+
+def slugify(text: str) -> str:
+    """Convert title to kebab-case filename slug."""
+    text = text.strip()
+    text = re.sub(r"[\s/]+", "-", text)
+    text = re.sub(r"[^A-Za-z0-9_-]+", "", text)
+    return text.lower().strip("-")
+
+
+def get_next_adr_id(decisions_dir: Path) -> str:
+    """Scan docs/decisions/ for NNNN-*.md and return next 4-digit ID."""
+    existing = [p.stem for p in decisions_dir.glob("????-*.md")]
+    if not existing:
+        return "0001"
+    ids = [int(s[:4]) for s in existing if s[:4].isdigit()]
+    if not ids:
+        return "0001"
+    return f"{max(ids) + 1:04d}"
+
+
+def get_next_epic_id(epics_dir: Path) -> str:
+    """Scan docs/product/epics/ for existing EPIC-NNN patterns and return next ID."""
+    existing = list(epics_dir.glob("*.md"))
+    max_id = 0
+    for p in existing:
+        # Read frontmatter to find id field
+        text = p.read_text(encoding="utf-8")
+        match = re.search(r"^id:\s*['\"]?EPIC-(\d{3})['\"]?", text, re.MULTILINE)
+        if match:
+            max_id = max(max_id, int(match.group(1)))
+    return f"EPIC-{max_id + 1:03d}"
+
+
+def create_runbook(args: argparse.Namespace, today: str) -> tuple[Path, dict, str]:
+    """Create runbook frontmatter and body."""
+    slug = slugify(args.title)
+    dest = DOC_OUTPUT_PATHS["runbook"] / f"{slug}.md"
+
+    fm = {
+        "type": "runbook",
+        "service": args.service,
+        "severity": args.severity,
+        "last_reviewed": today,
+    }
+
+    body = f"""# {args.title}
+
+## Symptoms
+
+## Diagnosis
+
+## Resolution
+
+## Prevention
+"""
+    return dest, fm, body
+
+
+def create_adr(args: argparse.Namespace, today: str) -> tuple[Path, dict, str]:
+    """Create ADR frontmatter and body with auto-increment ID."""
+    decisions_dir = DOC_OUTPUT_PATHS["adr"]
+    adr_num = get_next_adr_id(decisions_dir)
+    adr_id = f"ADR-{adr_num}"
+
+    slug = slugify(args.title)
+    dest = decisions_dir / f"{adr_num}-{slug}.md"
+
+    fm = {
+        "type": "decision",
+        "id": adr_id,
+        "status": "proposed",
+        "created": today,
+        "last_updated": today,
+    }
+
+    body = f"""# {adr_id}: {args.title}
+
+## Status
+
+Proposed
+
+## Context
+
+## Decision
+
+## Consequences
+"""
+    return dest, fm, body
+
+
+def create_epic(args: argparse.Namespace, today: str) -> tuple[Path, dict, str]:
+    """Create epic frontmatter and body."""
+    epics_dir = DOC_OUTPUT_PATHS["epic"]
+
+    # Use provided ID or auto-generate
+    epic_id = args.id if args.id else get_next_epic_id(epics_dir)
+
+    slug = slugify(args.title)
+    dest = epics_dir / f"{slug}.md"
+
+    fm = {
+        "type": "epic",
+        "id": epic_id,
+        "title": args.title,
+        "status": args.status,
+        "phase": args.phase,
+        "sprint_target": args.sprint_target,
+        "created": today,
+        "last_updated": today,
+    }
+
+    body = f"""# {epic_id}: {args.title}
+
+## Summary
+
+## Deliverables
+
+## User Stories
+
+## References
+"""
+    return dest, fm, body
+
+
+def validate_frontmatter(doc_type: str, fm: dict) -> bool:
+    """Validate frontmatter against appropriate schema."""
+    schema_map = {
+        "runbook": RunbookFrontmatter,
+        "adr": DecisionFrontmatter,
+        "epic": EpicFrontmatter,
+    }
+    schema = schema_map[doc_type]
+
+    try:
+        schema.model_validate(fm)
+        return True
+    except ValidationError as e:
+        print("Frontmatter validation failed:", file=sys.stderr)
+        for err in e.errors():
+            loc = ".".join(str(p) for p in err["loc"])
+            print(f"  {loc}: {err['msg']}", file=sys.stderr)
+        return False
+
+
+def print_allowed_values() -> None:
+    """Print allowed enum values for CLI reference."""
+    print("\nAllowed values for reference:")
+    allowed = get_allowed_values()
+    for field, values in allowed.items():
+        print(f"  {field}: {', '.join(values)}")
+
+
+def main(argv: list[str]) -> int:
+    p = argparse.ArgumentParser(description="Create a new documentation file")
+    p.add_argument(
+        "--type",
+        required=True,
+        choices=["runbook", "adr", "epic"],
+        help="Document type to create",
+    )
+    p.add_argument("--title", required=True, help="Human title for the document")
+
+    # Runbook-specific args
+    p.add_argument("--service", help="Service name (required for runbooks)")
+    p.add_argument(
+        "--severity",
+        choices=list(get_args(RunbookSeverity)),
+        help="Severity level (required for runbooks)",
+    )
+
+    # Epic-specific args
+    p.add_argument("--id", help="Epic ID (e.g., EPIC-010), auto-generated if omitted")
+    p.add_argument(
+        "--status",
+        choices=list(get_args(EpicStatus)),
+        default="draft",
+        help="Epic status",
+    )
+    p.add_argument("--phase", type=int, help="Epic phase number")
+    p.add_argument("--sprint-target", dest="sprint_target", help="Target sprint")
+
+    args = p.parse_args(argv)
+    today = dt.date.today().isoformat()
+
+    # Validate required args per type
+    if args.type == "runbook":
+        if not args.service:
+            print("Error: --service is required for runbooks", file=sys.stderr)
+            return 1
+        if not args.severity:
+            print("Error: --severity is required for runbooks", file=sys.stderr)
+            return 1
+        dest, fm, body = create_runbook(args, today)
+
+    elif args.type == "adr":
+        dest, fm, body = create_adr(args, today)
+
+    elif args.type == "epic":
+        # Validate epic ID format if provided
+        if args.id and not re.match(r"^EPIC-\d{3}$", args.id):
+            print(
+                "Error: --id must match pattern EPIC-NNN (e.g., EPIC-010)",
+                file=sys.stderr,
+            )
+            return 1
+        dest, fm, body = create_epic(args, today)
+
+    else:
+        print(f"Error: Unknown type {args.type}", file=sys.stderr)
+        return 1
+
+    # Check if file exists
+    if dest.exists():
+        print(f"Error: {dest} already exists", file=sys.stderr)
+        return 2
+
+    # Validate frontmatter
+    if not validate_frontmatter(args.type, fm):
+        return 1
+
+    # Create parent directory if needed
+    dest.parent.mkdir(parents=True, exist_ok=True)
+
+    # Write file
+    write_front_matter(dest, fm, body)
+    print(f"Created {dest.relative_to(ROOT)}")
+    print_allowed_values()
+
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))

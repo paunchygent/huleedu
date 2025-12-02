@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 """
 Scaffold a new TASKS markdown file with minimal YAML front matter and a standard body template.
+
 Usage examples:
-  python scripts/task_mgmt/new_task.py --title "Svelte 5 + Vite CORS" \
-    --domain frontend
-  python scripts/task_mgmt/new_task.py --title "CJ Phase 3 Hub" \
-    --program cj_confidence --domain assessment
-  python scripts/task_mgmt/new_task.py --title "AI Feedback Service" \
-    --domain assessment --service ai_feedback_service --priority high
+  pdm run new-task --title "Svelte 5 + Vite CORS" --domain frontend
+  pdm run new-task --title "CJ Phase 3 Hub" --program cj_confidence --domain assessment
+  pdm run new-task --title "AI Feedback Service" --domain assessment --priority high
 """
 
 from __future__ import annotations
@@ -20,17 +18,14 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-ROOT = Path(__file__).resolve().parents[2]  # repo root
-# Ensure repo root is importable when running via `python scripts/...`
-if str(ROOT) not in sys.path:
-    sys.path.append(str(ROOT))
-
-from scripts.task_mgmt.task_frontmatter_schema import (  # noqa: E402
+from scripts.schemas.task_schema import (
     TaskDomain,
     TaskFrontmatter,
     TaskPriority,
     TaskStatus,
 )
+
+ROOT = Path(__file__).resolve().parents[2]
 
 TASKS_DIR = ROOT / "TASKS"
 

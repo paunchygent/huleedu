@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 Archive a TASKS markdown file by moving it to archive/YYYY/MM/{domain}/ and updating status.
+
 Optionally uses `git mv` if --git is provided and git is available.
 """
 
@@ -15,23 +16,14 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Tuple
 
+from pydantic import ValidationError
+
+from scripts.schemas.task_schema import (
+    TaskFrontmatter,
+    TaskStatus,
+)
+
 ROOT = Path(__file__).resolve().parents[2]
-if str(ROOT) not in sys.path:
-    sys.path.append(str(ROOT))
-
-try:  # Optional: schema validation when pydantic is available
-    from pydantic import ValidationError  # type: ignore
-
-    from scripts.task_mgmt.task_frontmatter_schema import (  # noqa: E402
-        TaskFrontmatter,
-        TaskStatus,
-    )
-
-    HAVE_SCHEMA = True
-except Exception:  # pragma: no cover - fallback when deps unavailable
-    HAVE_SCHEMA = False
-    TaskStatus = None  # type: ignore
-
 TASKS_DIR = ROOT / "TASKS"
 
 
@@ -72,14 +64,13 @@ essential_keys = (
 
 
 def write_front_matter(p: Path, fm: Dict[str, Any], body: str) -> None:
-    if HAVE_SCHEMA:
-        try:
-            TaskFrontmatter.model_validate(fm)
-        except ValidationError as e:  # pragma: no cover - defensive guard
-            errors = "; ".join(
-                f"{'.'.join(str(x) for x in err['loc'])}: {err['msg']}" for err in e.errors()
-            )
-            raise ValueError(f"Frontmatter validation failed for {p}: {errors}") from e
+    try:
+        TaskFrontmatter.model_validate(fm)
+    except ValidationError as e:
+        errors = "; ".join(
+            f"{'.'.join(str(x) for x in err['loc'])}: {err['msg']}" for err in e.errors()
+        )
+        raise ValueError(f"Frontmatter validation failed for {p}: {errors}") from e
 
     lines = ["---"]
     for k, v in fm.items():
@@ -132,7 +123,7 @@ def main(argv: list[str]) -> int:
 
     # Update front matter if present
     if fm:
-        fm["status"] = TaskStatus.archived.value if HAVE_SCHEMA else "archived"
+        fm["status"] = TaskStatus.archived.value
         fm["last_updated"] = today.isoformat()
         write_front_matter(dest, fm, body)
 
