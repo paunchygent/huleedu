@@ -6,10 +6,12 @@
 
 Before using pdm run, start an env-aware shell:
 
-  ./scripts/dev-shell.sh   # loads .env, then run `pdm run ...`
+```bash
+./scripts/dev-shell.sh   # loads .env, then run `pdm run ...`
+```
 
 ```markdown
-- FIRST ACTION Read `.claude/rules/000-rule-index.md` first. The index contains onboard instructions for all services and project rules and standards. If the prompt contains a task description, use it to read and review all rule files related to the task at hand.
+- FIRST ACTION: Load `.claude/rules/000-rule-index.md` first. The index contains onboard instructions for all services and project rules and standards. If the prompt contains a task description, use it to read and review all rule files related to the task at hand.
 - SECOND ACTION Use the user's task description to read and review all rule files related to the task at hand.
 - THIRD ACTION Read `.claude/work/session/handoff.md` and `.claude/work/session/readme-first.md` for **critical** cross-service task context.
 
@@ -23,7 +25,7 @@ Before using pdm run, start an env-aware shell:
 2. **Select Mode**: Use `.claude/rules/110-ai-agent-interaction-modes.md` to choose mode (Planning, Coding, Debugging)
 3. **Rule Reference**: Consult `.claude/rules/000-rule-index.md` for relevant rules
 cross-service task context.
-4. **Update**: After each task phase, Always stop to update 1. **active task documents** 2. short-term critical updates live in `.claude/work/session/handoff.md`. 3. compact and move to sprint-critical updates in `.claude/work/session/readme-first.md` as soon as PR or Task is completed. Always ask user any clarifying questions to retain alignment with user's intent.
+4. **Update**: After each task phase, Always stop to update 1. **active task documents** 2.`.claude/work/session/handoff.md` and `.claude/work/session/readme-first.md` with any new information + ask user any clarifying questions to retain alignment with user's intent.
 ```
 
 ### 3. Error Resolution Protocol

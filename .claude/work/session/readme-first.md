@@ -204,3 +204,35 @@ For Docker/database troubleshooting, see `CLAUDE.md` sections on Docker Developm
 - **LLM Provider configuration hierarchy**: `USE_MOCK_LLM=true` is a DI boot‑time decision; request‑level overrides cannot bypass it. See `docs/operations/llm-provider-configuration-hierarchy.md` when changing LLM provider behaviour.
 - **Pair matching strategy via DI**: CJ uses a DI‑swappable `PairMatchingStrategyProtocol` with `OptimalGraphMatchingStrategy` as the default implementation. Tests that care about comparison graph structure should use the real strategy via the shared helpers; only A/B position randomization tests should stub the strategy.
 - **ENG5 runner handler pattern + tests**: The ENG5 NP runner now uses a handler-based Typer CLI (`cli.py` + `handlers/*.py`) with per-mode unit tests and a small Typer `CliRunner` integration suite under `scripts/cj_experiments_runners/eng5_np/tests/unit/`. Use this as the reference pattern for future CLI refactors and mode-specific handler testing.
+
+### ENG5 GPT‑5.1 attribution, prompt variants, and LOWER5 loop (Dec 2025)
+- CJ batch-level LLM attribution for ENG5 anchor-align runs is now derived
+  from `ComparisonPair.processing_metadata["provider"]` / `["model"]` via
+  batch aggregation in `BatchFinalizer` / `BatchMonitor`, so
+  `AssessmentResultV1.model_used` / `model_provider` can reflect OpenAI
+  GPT‑5.1 rather than legacy Anthropic defaults.
+- ENG5 treats OpenAI `gpt-5.1` with `reasoning_effort="low"` and
+  `output_verbosity="low"` as the canonical GPT‑5.1 analysis configuration
+  for anchor-align experiments (003 language-control prompts by default).
+- A 006 usage/content parity prompt pair (50-word justifications) is
+  available under `scripts/cj_experiments_runners/eng5_np/prompts/{system, rubric}/`
+  for GPT‑5.1 low experiments; see
+  `docs/operations/eng5-np-runbook.md` for the CLI pattern.
+- For LOWER5 tail-only experiments:
+  - CJ tuning is applied via `docker-compose.eng5-lower5.override.yml`
+    (`MAX_PAIRWISE_COMPARISONS=20`, `MIN_COMPARISONS_FOR_STABILITY_CHECK=20`,
+    `DEFAULT_BATCH_SIZE=20`, `MIN_RESAMPLING_NET_SIZE=10`,
+    `MAX_RESAMPLING_PASSES_FOR_SMALL_NET=1`).
+  - The ENG5 runner uses `ENG5_ANCHOR_DIR_OVERRIDE` to point at
+    `test_uploads/ANCHOR ESSAYS/ROLE_MODELS_ENG5_NP_2016/anchor_essays_5_lowest_grades`
+    so ANCHOR_ALIGN_TEST operates only on the 5 weakest anchors.
+  - Canonical LOWER5 config: `openai` / `gpt-5.1`, `reasoning_effort="low"`,
+    `output_verbosity="low"`, system prompt
+    `007_usage_guard.txt`, rubric
+    `006_usage_content_parity_rubric.txt`, DB reports produced with the
+    same prompt pair via `scripts.cj_experiments_runners/eng5_np/db_alignment_report.py`.
+  - Latest LOWER5 runs (2025-12-01, GPT‑5.1 low/low and none/low):
+    - 007 system + 006 rubric (usage guard + parity rubric, `reasoning_effort="low"`): `batch_id=eng5-gpt51-lower5-007-20251202-001714`, `batch_uuid=50f4509e-2e8c-4c62-a19d-93cf0739eefd`, `cj_batch_id=147`; DB summary and full reports at `.claude/research/data/eng5_np_2016/anchor_align_db_50f4509e-2e8c-4c62-a19d-93cf0739eefd_20251201_231822.md` and `.claude/research/data/eng5_np_2016/anchor_align_db_full_50f4509e-2e8c-4c62-a19d-93cf0739eefd_20251201_231822.md`, with Kendall’s tau `= 1.000`, `0` direct inversions, and one zero‑win F+ anchor (ladder `D‑ > E+ > E‑ > F+ > F+`).
+    - 006 system + 006 rubric (pure usage/content parity, `reasoning_effort="low"`): `batch_id=eng5-gpt51-lower5-006-20251202-002205`, `batch_uuid=ec9c935c-e589-448c-b829-56ad545862f5`, `cj_batch_id=148`; DB summary and full reports at `.claude/research/data/eng5_np_2016/anchor_align_db_ec9c935c-e589-448c-b829-56ad545862f5_20251201_232251.md` and `.claude/research/data/eng5_np_2016/anchor_align_db_full_ec9c935c-e589-448c-b829-56ad545862f5_20251201_232251.md`, with Kendall’s tau `= 0.800`, `1` direct inversion where F+ `ANCHOR_ESSAY_ENG_5_363940D5` beats E‑ `ANCHOR_ESSAY_ENG_5_73127661` (“Clearer structure, richer content”), and one zero‑win F+ anchor; top of the ladder (D‑, E+) remains stable.
+    - 007 system + 006 rubric with `reasoning_effort="none"`: `batch_id=eng5-gpt51-lower5-007-none-20251202-003112`, `batch_uuid=4ce7468b-bf15-46b8-8a97-ebe51f79d45f`, `cj_batch_id=149`; DB summary and full reports at `.claude/research/data/eng5_np_2016/anchor_align_db_4ce7468b-bf15-46b8-8a97-ebe51f79d45f_20251201_233151.md` and `.claude/research/data/eng5_np_2016/anchor_align_db_full_4ce7468b-bf15-46b8-8a97-ebe51f79d45f_20251201_233151.md`, with Kendall’s tau `= 0.800`, `1` direct inversion where F+ `ANCHOR_ESSAY_ENG_5_D298E687` beats E‑ `ANCHOR_ESSAY_ENG_5_73127661` (strong structure/ideas justification) and one zero‑win F+ anchor.
+    - 006 system + 006 rubric with `reasoning_effort="none"`: `batch_id=eng5-gpt51-lower5-006-none-20251202-003200`, `batch_uuid=8cb7d51a-abc9-486c-bc4f-3654c19da7e1`, `cj_batch_id=150`; DB summary and full reports at `.claude/research/data/eng5_np_2016/anchor_align_db_8cb7d51a-abc9-486c-bc4f-3654c19da7e1_20251201_233241.md` and `.claude/research/data/eng5_np_2016/anchor_align_db_full_8cb7d51a-abc9-486c-bc4f-3654c19da7e1_20251201_233241.md`, with Kendall’s tau `= 1.000`, `0` direct inversions, and one zero‑win F+ anchor (ladder `D‑ > E+ > E‑ > F+ > F+`), i.e. perfect LOWER5 alignment despite the weaker NONE-level behavior on the full anchor set.

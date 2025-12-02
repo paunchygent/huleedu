@@ -142,6 +142,17 @@ Baseline reference: ENG5 batch 108 (Role Models anchors).
 These metrics are computed from the alignment report and used to compare
 prompt/rubric variants.
 
+### Interim Finding: GPT‑5.1 NONE vs LOW at LOWER5 Tail (Dec 2025)
+
+- LOWER5 experiments on the 5 weakest anchors (`D‑`, `E+`, `E‑`, `F+`, `F+`) show:
+  - With usage guard 007 system + 006 rubric:
+    - `reasoning_effort="low"` achieves Kendall’s tau `= 1.000` and `0` direct inversions (ladder `D‑ > E+ > E‑ > F+ > F+`).
+    - `reasoning_effort="none"` drops to tau `= 0.800` with a single F+/E‑ inversion driven by “clearer structure + fuller ideas” justifications.
+  - With 006 system + 006 rubric (usage/content parity prompts):
+    - `reasoning_effort="low"` yields tau `= 0.800` with one F+/E‑ inversion.
+    - `reasoning_effort="none"` recovers tau `= 1.000` and `0` inversions, matching the expected ladder.
+- Interpretation (preliminary, LOWER5 only): GPT‑5.1 `low` remains the safer default on the full anchor set, but NONE-level behavior is not uniformly worse at the tail; under 006/006 parity prompts in a small-net regime, NONE can match or exceed LOW on LOWER5 alignment. Further repeats are required to characterise inversion frequency and sensitivity to prompt/budget choices before changing ENG5 defaults.
+
 ## Technical Acceptance
 
 - [ ] All new handler and CLI tests passing.
