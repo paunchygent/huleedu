@@ -1,16 +1,18 @@
-"""Pydantic schema for TASKS frontmatter to provide type hints and validation."""
+"""Pydantic schema for TASKS frontmatter with type hints and validation."""
 
 from __future__ import annotations
 
 from datetime import date
 from enum import Enum
-from typing import List, Optional
+from typing import Optional
 
 from pydantic import BaseModel, Field
 from pydantic.config import ConfigDict
 
 
 class TaskStatus(str, Enum):
+    """Allowed status values for task frontmatter."""
+
     research = "research"
     blocked = "blocked"
     in_progress = "in_progress"
@@ -20,6 +22,8 @@ class TaskStatus(str, Enum):
 
 
 class TaskPriority(str, Enum):
+    """Allowed priority values for task frontmatter."""
+
     low = "low"
     medium = "medium"
     high = "high"
@@ -27,6 +31,8 @@ class TaskPriority(str, Enum):
 
 
 class TaskDomain(str, Enum):
+    """Allowed domain values for task frontmatter."""
+
     assessment = "assessment"
     content = "content"
     identity = "identity"
@@ -65,8 +71,21 @@ class TaskFrontmatter(BaseModel):
     service: Optional[str] = ""
     owner: Optional[str] = ""
     program: Optional[str] = ""
-    related: List[str] = Field(default_factory=list)
-    labels: List[str] = Field(default_factory=list)
+    related: list[str] = Field(default_factory=list)
+    labels: list[str] = Field(default_factory=list)
 
-    # Be tolerant of ancillary fields while still validating known keys
     model_config = ConfigDict(extra="allow")
+
+
+def get_allowed_values() -> dict[str, list[str]]:
+    """Return dict of field names to allowed values for CLI hints.
+
+    Returns:
+        Dict mapping enum field names to their allowed string values.
+    """
+    return {
+        "status": [e.value for e in TaskStatus],
+        "priority": [e.value for e in TaskPriority],
+        "domain": [e.value for e in TaskDomain],
+        "type": [e.value for e in TaskType],
+    }

@@ -1,32 +1,17 @@
-#!/usr/bin/env python3
-"""
-Minimal Pydantic schema for .claude/rules/ frontmatter validation.
+"""Pydantic schema for .claude/rules/ frontmatter validation.
 
-Based on comprehensive analysis of all 92 HuleEdu rules and critical evaluation
-of operational value for each field.
-
-Design Principles:
-- Minimal: Only 8 fields (5 required, 3 optional)
-- Purposeful: Every field has clear operational value
-- Lintable: Ruff + MyPy compatible with Literal enums
-- Type-safe: Strict validation with business rules
-- Maintainable: No fuzzy metadata, no over-engineering
-
-Analysis reports: .claude/work/reports/2025-11-22-rule-analysis-batch-{1,2,3,4-FINAL}.md
+8 fields total (5 required, 3 optional). Uses Literal types for tight enum validation.
 """
 
 from __future__ import annotations
 
 import re
 from datetime import date
-from typing import Literal
+from typing import Literal, get_args
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-# =============================================================================
-# Type Definitions (Tight, Meaningful Enums)
-# =============================================================================
-
+# Type definitions using Literal for tight validation
 RuleType = Literal[
     "service",  # Service-specific architecture (020.X series)
     "architecture",  # System design, patterns, boundaries
@@ -50,14 +35,8 @@ RuleScope = Literal[
 ]
 
 
-# =============================================================================
-# Pydantic Model (Minimal, 8 Fields)
-# =============================================================================
-
-
 class RuleFrontmatter(BaseModel):
-    """
-    Minimal frontmatter schema for HuleEdu .claude/rules/ files.
+    """Minimal frontmatter schema for HuleEdu .claude/rules/ files.
 
     8 fields total:
     - 5 required: id, type, created, last_updated, scope
@@ -66,10 +45,7 @@ class RuleFrontmatter(BaseModel):
     All fields validated for type safety and business rules.
     """
 
-    # -------------------------------------------------------------------------
     # Required Fields (5)
-    # -------------------------------------------------------------------------
-
     id: str = Field(
         ...,
         description="Rule ID matching filename stem (e.g., '020.7-cj-assessment-service')",
@@ -96,10 +72,7 @@ class RuleFrontmatter(BaseModel):
         description="Where this rule applies (technical scope)",
     )
 
-    # -------------------------------------------------------------------------
     # Optional Fields (3)
-    # -------------------------------------------------------------------------
-
     parent_rule: str | None = Field(
         default=None,
         description="Parent rule ID for sub-rules (e.g., '020' for '020.7')",
@@ -116,10 +89,6 @@ class RuleFrontmatter(BaseModel):
         description="Service name for service-type rules (e.g., 'cj_assessment_service')",
         pattern=r"^[a-z][a-z0-9_]*$",
     )
-
-    # -------------------------------------------------------------------------
-    # Validators
-    # -------------------------------------------------------------------------
 
     @field_validator("id")
     @classmethod
@@ -186,66 +155,13 @@ class RuleFrontmatter(BaseModel):
         return self
 
 
-# =============================================================================
-# Example Usage
-# =============================================================================
+def get_allowed_values() -> dict[str, list[str]]:
+    """Return dict of field names to allowed values for CLI hints.
 
-if __name__ == "__main__":
-    from datetime import date
-
-    # Example 1: Service rule
-    service_rule = RuleFrontmatter(
-        id="020.7-cj-assessment-service",
-        type="service",
-        created=date(2025, 6, 15),
-        last_updated=date(2025, 11, 20),
-        scope="backend",
-        parent_rule="020-architectural-mandates",
-        service_name="cj_assessment_service",
-    )
-
-    print("✓ Valid service rule:")
-    print(service_rule.model_dump_json(indent=2))
-
-    # Example 2: Architecture rule
-    arch_rule = RuleFrontmatter(
-        id="030-event-driven-architecture-eda-standards",
-        type="architecture",
-        created=date(2025, 5, 1),
-        last_updated=date(2025, 11, 18),
-        scope="all",
-    )
-
-    print("\n✓ Valid architecture rule:")
-    print(arch_rule.model_dump_json(indent=2))
-
-    # Example 3: Observability parent with children
-    obs_parent = RuleFrontmatter(
-        id="071-observability-index",
-        type="observability",
-        created=date(2025, 7, 1),
-        last_updated=date(2025, 11, 15),
-        scope="backend",
-        child_rules=[
-            "071.1-observability-core-patterns",
-            "071.2-prometheus-metrics-patterns",
-            "071.3-jaeger-tracing-patterns",
-            "071.4-grafana-loki-patterns",
-            "071.5-llm-debugging-with-observability",
-        ],
-    )
-
-    print("\n✓ Valid observability parent:")
-    print(obs_parent.model_dump_json(indent=2))
-
-    # Example 4: Library rule
-    library_rule = RuleFrontmatter(
-        id="051-pydantic-v2-standards",
-        type="library",
-        created=date(2025, 6, 10),
-        last_updated=date(2025, 11, 15),
-        scope="backend",
-    )
-
-    print("\n✓ Valid library rule:")
-    print(library_rule.model_dump_json(indent=2))
+    Returns:
+        Dict mapping enum field names to their allowed string values.
+    """
+    return {
+        "type": list(get_args(RuleType)),
+        "scope": list(get_args(RuleScope)),
+    }

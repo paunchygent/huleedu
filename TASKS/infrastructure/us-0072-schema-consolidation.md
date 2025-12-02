@@ -2,7 +2,7 @@
 id: 'us-0072-schema-consolidation'
 title: 'US-007.2 Schema Consolidation'
 type: 'story'
-status: 'research'
+status: 'completed'
 priority: 'high'
 domain: 'infrastructure'
 service: ''
@@ -18,29 +18,48 @@ labels: ['dev-tooling']
 
 ## Objective
 
-Create docs frontmatter schema and add `get_allowed_values()` helpers to all schemas for CLI hints.
+Consolidate all frontmatter schemas into `scripts/schemas/` with `get_allowed_values()` helpers.
 
-## Deliverables
+## Implementation (COMPLETED)
 
-### 1. `scripts/docs_mgmt/docs_frontmatter_schema.py`
-Extract from `validate_docs_structure.py`:
-- `RunbookFrontmatter` - runbook schema
-- `ADRFrontmatter` - decision record schema
-- `EpicFrontmatter` - epic schema
-- `DocType` enum: runbook, adr, epic
-- `get_allowed_values()` - returns dict of field -> allowed values
+### Schemas Created in `scripts/schemas/`
 
-### 2. Update existing schemas
-- `task_frontmatter_schema.py`: Add `get_allowed_values()`
-- `rule_frontmatter_schema.py`: Add `get_allowed_values()`
+1. **`task_schema.py`** - TaskFrontmatter, TaskStatus, TaskPriority, TaskDomain, TaskType enums
+2. **`rule_schema.py`** - RuleFrontmatter, RuleType, RuleScope Literal types
+3. **`docs_schema.py`** - RunbookFrontmatter, DecisionFrontmatter, EpicFrontmatter
+4. **`__init__.py`** - Public exports for all schemas
+
+### All Schemas Include `get_allowed_values()`
+
+```python
+def get_allowed_values() -> dict[str, list[str]]:
+    """Return dict of field names to allowed values for CLI hints."""
+```
+
+### Import Updates
+
+Consumer files updated to import from `scripts.schemas.*`:
+- `scripts/task_mgmt/new_task.py`
+- `scripts/task_mgmt/validate_front_matter.py`
+- `scripts/task_mgmt/archive_task.py`
+- `scripts/task_mgmt/migrate_to_spec.py`
+- `scripts/claude_mgmt/validate_claude_structure.py`
+
+### Original Files Deleted
+
+- `scripts/task_mgmt/task_frontmatter_schema.py` - DELETED
+- `scripts/claude_mgmt/rule_frontmatter_schema.py` - DELETED
 
 ## Success Criteria
 
-- [ ] `docs_frontmatter_schema.py` created with Pydantic models
-- [ ] All three schemas have `get_allowed_values()` returning enum values
-- [ ] `validate_docs_structure.py` imports schema instead of hardcoded rules
+- [x] `scripts/schemas/` created with consolidated schemas
+- [x] All schemas have `get_allowed_values()` returning enum values
+- [x] Consumer scripts import from new location
+- [x] Original schema files deleted
+- [x] 66 tests passing
+- [x] typecheck-all passes
 
 ## Related
 
 - Depends on: US-007.1
-- Plan: `.claude/plans/keen-growing-umbrella.md`
+- Plan: `.claude/plans/steady-finding-muffin.md`
