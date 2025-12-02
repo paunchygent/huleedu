@@ -2,7 +2,7 @@
 id: 'cj-lps-reasoning-verbosity-metadata-contract'
 title: 'CJ LPS reasoning-verbosity metadata contract'
 type: 'task'
-status: 'research'
+status: 'in_progress'
 priority: 'medium'
 domain: 'architecture'
 service: ''
@@ -77,6 +77,21 @@ Net effect: we have strong per-service tests but **no contract-level test** for
 `reasoning_effort` / `output_verbosity` at the CJ↔LPS boundary, allowing this
 regression to slip through.
 
+## Progress (2025-12-02)
+
+- CJ batch orchestration now propagates `LLMConfigOverrides.reasoning_effort`
+  / `output_verbosity` into `CJLLMComparisonMetadata` via
+  `metadata_context`, so `request_metadata` on outbound HTTP requests always
+  carries these hints when present in overrides.
+- `LLMProviderServiceClient.generate_comparison` uses those metadata fields
+  to build `LLMConfigOverridesHTTP` payloads, validated via a new unit test
+  that parses the request body with `LLMComparisonRequest`.
+- CJ integration tests for ENG5-style overrides now assert that reasoning and
+  verbosity reach `llm_config_overrides` on the HTTP payload, and a new
+  cross-service integration test in `tests/integration/test_cj_lps_metadata_roundtrip.py`
+  exercises a full HTTP → queue → Kafka callback round-trip with reasoning
+  hints present in callback `request_metadata`.
+
 ## Plan
 
 - Decide and document contract shape (prefer typed over ad-hoc JSON):
@@ -115,13 +130,13 @@ regression to slip through.
 
 ## Success Criteria
 
-- [ ] CJ→LPS HTTP requests always include `reasoning_effort` /
+- [x] CJ→LPS HTTP requests always include `reasoning_effort` /
       `output_verbosity` in `llm_config_overrides` when set by upstream
       clients (ENG5 or others).
-- [ ] At least one cross-service integration test explicitly asserts
+- [x] At least one cross-service integration test explicitly asserts
       reasoning/verbosity presence in CJ→LPS payloads and, if applicable, in
       callback metadata, so regressions cannot slip through.
-- [ ] CJ and LPS unit tests clearly separate responsibilities:
+- [x] CJ and LPS unit tests clearly separate responsibilities:
       - LPS tests: “Given overrides, provider payload is correct.”
       - CJ tests: “Given CJ/ENG5 overrides, HTTP payload to LPS is correct.”
 - [ ] ENG5 reasoning experiments and docs no longer claim behaviour (e.g.

@@ -2,7 +2,7 @@
 id: 'eng5-reasoning-controls--cj-plumbing'
 title: 'ENG5 reasoning controls & CJ plumbing'
 type: 'task'
-status: 'research'
+status: 'in_progress'
 priority: 'medium'
 domain: 'assessment'
 service: ''
@@ -52,6 +52,20 @@ This explains discrepancies between external prompt experiments (where
 reasoning controls are set explicitly) and CJ/ENG5 experiments (where they are
 currently dropped).
 
+## Progress (2025-12-02)
+
+- CJ → LPS plumbing now threads `reasoning_effort` / `output_verbosity` from
+  `LLMConfigOverrides` into `CJLLMComparisonMetadata` and onward to
+  `LLMProviderServiceClient.generate_comparison` via `metadata_context`.
+- `LLMProviderServiceClient` builds `LLMConfigOverridesHTTP` payloads that
+  include reasoning/verbosity hints when present and validates against the
+  shared `LLMComparisonRequest` HTTP contract.
+- CJ integration tests (`test_llm_payload_construction_integration.py`) now
+  cover ENG5-style overrides including reasoning/verbosity, and LPS
+  cross-service tests (`test_cj_lps_metadata_roundtrip.py`) assert that
+  reasoning/verbosity survive the HTTP → queue → Kafka callback cycle in
+  `request_metadata`.
+
 ## Plan
 
 - Confirm ENG5 override plumbing into CJ:
@@ -100,18 +114,18 @@ currently dropped).
 
 ## Success Criteria
 
-- [ ] For ENG5 anchor-align batches, `cj_batch_uploads.processing_metadata.original_request.llm_config_overrides`
+- [x] For ENG5 anchor-align batches, `cj_batch_uploads.processing_metadata.original_request.llm_config_overrides`
       reliably contains `reasoning_effort` and `output_verbosity` when set by
       the runner.
-- [ ] CJ → LPS HTTP payloads for these batches include:
+- [x] CJ → LPS HTTP payloads for these batches include:
       - `llm_config_overrides.reasoning_effort`
       - `llm_config_overrides.output_verbosity`
       along with provider/model/system/rubric overrides.
-- [ ] LPS OpenAI provider calls set:
+- [x] LPS OpenAI provider calls set:
       - `request_body["reasoning"]["effort"]` and
       - `request_body["text"]["verbosity"]`
       according to ENG5 settings for GPT‑5.x models.
-- [ ] Unit tests in both CJ and LPS protect this plumbing end-to-end.
+- [x] Unit tests in both CJ and LPS protect this plumbing end-to-end.
 - [ ] At least one ENG5 run per setting (`reasoning_effort="low"` vs `"none"`)
       is documented in the ENG5 program task with batch IDs and observed tail
       behaviour, and `.claude/work/session/handoff.md` is updated accordingly.

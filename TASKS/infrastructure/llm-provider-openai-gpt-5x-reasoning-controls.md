@@ -10,7 +10,7 @@ owner_team: 'agents'
 owner: ''
 program: ''
 created: '2025-12-01'
-last_updated: '2025-12-01'
+last_updated: '2025-12-02'
 related: ['EPIC-008']
 labels: ['llm-provider', 'openai', 'gpt5']
 ---
@@ -82,6 +82,17 @@ experiments can safely adopt GPT‑5.x without violating OpenAI API semantics.
 - Extended `OpenAIProviderImpl.generate_comparison` / `_make_api_request` to accept `reasoning_effort` / `output_verbosity` and, for GPT‑5 family models, emit `max_completion_tokens`, `reasoning={'effort': ...}`, and `text={'verbosity': ...}` while omitting `temperature`; validated via `test_openai_provider_gpt5_family.py`.
 - Updated LLM orchestrator + queue plumbing so `LLMConfigOverridesHTTP.reasoning_effort` / `.output_verbosity` are preserved on queued requests and forwarded unchanged into provider calls (`llm_orchestrator_impl.py`, `llm_override_utils.py`), covered by `test_orchestrator_reasoning_overrides.py`.
 - Confirmed CJ Assessment → LLM Provider HTTP client translates reasoning/verbosity overrides by extending `_build_llm_config_override_payload` tests in `services/cj_assessment_service/tests/unit/test_llm_provider_service_client.py` and re‑running the full client test suite.
+
+## Progress (2025-12-02)
+
+- CJ batch orchestration (`ComparisonBatchOrchestrator` + `BatchRetryProcessor`) now
+  injects `reasoning_effort` / `output_verbosity` from `LLMConfigOverrides` into
+  `CJLLMComparisonMetadata` so that ENG5-style overrides flow into
+  `LLMComparisonRequest.metadata` and are consumed by `LLMProviderServiceClient`.
+- New CJ unit/integration tests (`test_generate_comparison_builds_reasoning_overrides_from_metadata`,
+  `TestLLMPayloadConstructionIntegration::test_eng5_overrides_reach_llm_provider`) and
+  cross-service contract tests (`TestCJLPSMetadataRoundtrip::test_reasoning_overrides_roundtrip`)
+  now guard the full ENG5 → CJ → LPS reasoning/verbosity path.
 
 ### Canonical GPT‑5.1 low configuration (ENG5 anchor-align)
 

@@ -43,7 +43,7 @@ Use this file to coordinate what the very next agent should focus on.
           - Prompts: system `007_usage_guard.txt`, rubric `006_usage_content_parity_rubric.txt`.
           - Model: `openai` / `gpt-5.1`, where we **expect** `reasoning_effort` / `output_verbosity` from ENG5 runner overrides to reach OpenAI.
         - Known CJ/LPS plumbing gaps to fix (highest priority for dev implementing next session):
-          - For ENG5 anchor-align guest flows, `LLMConfigOverrides.reasoning_effort` / `output_verbosity` are stored on the CJ batch (`cj_batch_uploads.processing_metadata.original_request.llm_config_overrides`) but are **not** currently threaded into `request_metadata` → `llm_config_overrides` on the CJ → LLM Provider HTTP payload; OpenAI therefore uses its internal default reasoning mode for all GPT‑5.1 runs run via ENG5, regardless of runner flags.
+          - ✅ RESOLVED (2025-12-02): CJ now threads `LLMConfigOverrides.reasoning_effort` / `output_verbosity` from ENG5 into `CJLLMComparisonMetadata` and on to `LLMConfigOverridesHTTP` in the CJ → LPS HTTP payload; cross-service tests (`TestCJLPSMetadataRoundtrip::test_reasoning_overrides_roundtrip`) and CJ integration tests guard this contract. OpenAI GPT‑5.x provider continues to honour these hints via `reasoning.effort` / `text.verbosity`.
           - For LOWER5 nets (`expected_essay_count=5`), `CJBatchState.completion_denominator()` still resolves to `max_possible_pairs = C(5,2) = 10` because `total_budget` / `total_comparisons` are not set to 60 on these guest batches; continuation sees `callbacks_received >= 10` after the first coverage pass and finalizes the batch, so small‑net Phase‑2 resampling never runs despite the 60‑comparison budget and `MAX_RESAMPLING_PASSES_FOR_SMALL_NET=10`.
         - After each run, generate DB-based LOWER5 reports via `scripts.cj_experiments_runners/eng5_np/db_alignment_report.py` with `--system-prompt-file 007_usage_guard.txt` and `--rubric-file 006_usage_content_parity_rubric.txt`, and capture:
           - Kendall’s tau over the 5‑essay ladder.
@@ -85,6 +85,11 @@ Use this file to coordinate what the very next agent should focus on.
             - First, **fix plumbing** so ENG5 `reasoning_effort` / `output_verbosity` values reach LLM Provider, and adjust CJ completion logic so LOWER5 runs can actually use the configured 60‑comparison budget and `MAX_RESAMPLING_PASSES_FOR_SMALL_NET` without being hard‑capped at `C(n,2)`.
             - Then repeat LOWER5 for each (prompt, reasoning_effort) combination to estimate inversion frequency (especially F+/E‑ crossings) and stability now that reasoning controls and resampling are behaving as expected.
             - Consider a small grid over `output_verbosity` or budget (within safety constraints) if PM wants to probe whether richer justifications correlate with safer tail alignment under 006/006 once the above fixes land.
+
+- Anthropic / thinking controls status (2025-12-02):
+  - `AnthropicProviderImpl` now maps `reasoning_effort` to an Anthropic `thinking` block for models that advertise `extended_thinking` in the manifest (e.g. `claude-haiku-4-5-20251001`), with `budget_tokens` derived from `max_tokens` and clamped to the `[1024, max_tokens)` interval.
+  - Non-thinking Anthropic models (or unknown model IDs) ignore `reasoning_effort` hints and do not emit a `thinking` payload, preserving existing behaviour.
+  - Tests in `services/llm_provider_service/tests/integration/test_anthropic_prompt_cache_blocks.py` now pin down the `thinking` payload shape for thinking vs non-thinking models; Gemini `thinkingConfig` mapping remains design-only in `TASKS/infrastructure/llm-provider-anthropic-thinking-controls.md`.
 
 ---
 

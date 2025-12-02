@@ -98,9 +98,10 @@ pdm run pytest-root tests/integration/  # Cross-service tests
 ### CJ Assessment & LLM Provider Integration
 
 - All CJ↔LLM interactions must use `common_core.api_models.llm_provider` contracts; cross‑service imports from `services.<name>.api_models` are forbidden.
-- Metadata contract between CJ and LLM Provider is documented and guarded by tests; see:
+- Metadata contract between CJ and LLM Provider now treats `LLMConfigOverridesHTTP.reasoning_effort` / `.output_verbosity` as first‑class HTTP fields and preserves them end‑to‑end via `CJLLMComparisonMetadata` and `request_metadata`; tests guard this boundary:
   - `docs/operations/eng5-np-runbook.md` for ENG5 runner usage and metadata expectations.
   - `tests/integration/test_cj_lps_metadata_roundtrip.py` for round‑trip coverage.
+  - `services/cj_assessment_service/tests/integration/test_llm_payload_construction_integration.py` for CJ → LPS HTTP payload construction.
 - LLM batching behaviour (per‑request vs serial‑bundle vs future batch‑API modes) is controlled via settings and metadata hints; treat those as part of the stability/throughput tuning toolkit for EPIC‑005/EPIC‑006 rather than ad‑hoc decisions in code.
 
 ### Grade Projection & Phase 3
@@ -127,7 +128,7 @@ pdm run pytest-root tests/integration/  # Cross-service tests
 - Preparing reproducible research bundles for empirical validation
 - Hardening CJ batch throughput before serial_bundle rollout: total_budget tracking + denominator-aware completion logic merged (tests: `test_batch_state_tracking.py`, `test_completion_threshold.py`; commands: `pdm run format-all`, `pdm run lint-fix --unsafe-fixes`, `pdm run typecheck-all`).
 - Eliminating CJ pair-position bias: per-pair randomization + optional `CJ_ASSESSMENT_SERVICE_PAIR_GENERATION_SEED` shipped with `test_pair_generation_randomization.py` guarding deterministic + statistical behavior.
- - Validating ENG5 LOWER5 small-net behaviour: ensure CJ `total_budget` is respected for 5-essay nets and that `CJBatchState.completion_denominator()` plus small-net resampling semantics allow more than `C(n,2)` comparisons when budget and `MAX_RESAMPLING_PASSES_FOR_SMALL_NET` permit (current LOWER5 runs are capped at 10 comparisons despite a 60-comparison budget).
+- Validating ENG5 LOWER5 small-net behaviour: ensure CJ `total_budget` is respected for 5-essay nets and that `CJBatchState.completion_denominator()` plus small-net resampling semantics allow more than `C(n,2)` comparisons when budget and `MAX_RESAMPLING_PASSES_FOR_SMALL_NET` permit (current LOWER5 runs are capped at 10 comparisons despite a 60-comparison budget).
 - **2025-11-19**: Batch-state locking regression fixed by routing `_update_batch_state_with_totals()` through `get_batch_state(..., for_update=True)`; new unit test `TestBatchProcessor.test_update_batch_state_with_totals_uses_locked_fetch` plus `pdm run pytest-root services/cj_assessment_service/tests/unit/test_batch_processor.py` + repo-wide format/lint/typecheck runs are green.
 - **2025-11-30 (PR‑7 Phase‑5)**: Small‑net Phase‑2 semantics, coverage metadata on `CJBatchState.processing_metadata`, and the synthetic convergence harness are implemented and documented; use `convergence_harness.run_convergence_harness` plus CJ settings (`MAX_PAIRWISE_COMPARISONS`, `COMPARISONS_PER_STABILITY_CHECK_ITERATION`, `MIN_COMPARISONS_FOR_STABILITY_CHECK`, `SCORE_STABILITY_THRESHOLD`, `MIN_RESAMPLING_NET_SIZE`, `MAX_RESAMPLING_PASSES_FOR_SMALL_NET`) as the reference for convergence tuning and stability experiments.
 

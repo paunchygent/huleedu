@@ -2,7 +2,7 @@
 id: 'llm-provider-anthropic-thinking-controls'
 title: 'LLM Provider Anthropic thinking controls'
 type: 'task'
-status: 'research'
+status: 'in_progress'
 priority: 'medium'
 domain: 'infrastructure'
 service: ''
@@ -115,9 +115,31 @@ We also anticipate future “thinking” support in Google’s Gemini models:
   - Once we start implementing Gemini thinking:
     - Add tests for `thinkingConfig` mapping driven by `reasoning_effort`.
 
+## Progress (2025-12-02)
+
+- `AnthropicProviderImpl.generate_comparison` now forwards `reasoning_effort` /
+  `output_verbosity` into `_make_api_request`, and `_make_api_request` uses the
+  model manifest to detect `extended_thinking` support for each model.
+- For Anthropic models with `capabilities["extended_thinking"] = True`
+  (for example `claude-haiku-4-5-20251001`), `reasoning_effort` values other
+  than `"none"` are mapped to a `thinking` payload with `"type": "enabled"` and
+  `budget_tokens` derived as fractions of `max_tokens` and clamped to the
+  `[1024, max_tokens)` interval.
+- For non-thinking models or models not present in the manifest, reasoning
+  hints are ignored and no `thinking` block is added, keeping existing payloads
+  unchanged.
+- New integration tests in
+  `services/llm_provider_service/tests/integration/test_anthropic_prompt_cache_blocks.py`
+  assert:
+  - `test_reasoning_effort_adds_thinking_block_for_extended_models` – validates
+    the presence and shape of the `thinking` block.
+  - `test_reasoning_effort_ignored_for_non_thinking_models` – confirms that
+    models without `extended_thinking` capability do not receive a `thinking`
+    payload even when `reasoning_effort` is provided.
+
 ## Success Criteria
 
-- [ ] Anthropic provider:
+- [x] Anthropic provider:
       - Accepts `reasoning_effort` as a knob for thinking-enabled models and
         maps it to a valid `thinking` payload with `budget_tokens` bounded by
         `max_tokens` and the ≥1,024 constraint.
