@@ -419,6 +419,8 @@ services:
       - huleedu_internal_network
     ports:
       - "9095:9090"
+    env_file:
+      - .env
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=${ENVIRONMENT:-production}
