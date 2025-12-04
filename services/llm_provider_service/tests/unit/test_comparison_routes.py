@@ -409,3 +409,38 @@ class TestComparisonRoutes:
         call_kwargs = mock_orchestrator.perform_comparison.call_args.kwargs
         assert "correlation_id" in call_kwargs
         assert isinstance(call_kwargs["correlation_id"], UUID)
+
+    @pytest.mark.asyncio
+    async def test_comparison_forwards_reasoning_controls_to_orchestrator(
+        self,
+        app_client: QuartTestClient,
+        mock_orchestrator: AsyncMock,
+    ) -> None:
+        """Test POST /comparison forwards reasoning_effort and output_verbosity to orchestrator.
+
+        Regression test for ENG5 GPT-5.1 reasoning controls bug where these parameters
+        were extracted from llm_config_overrides but not passed to perform_comparison().
+        """
+        mock_orchestrator.perform_comparison.return_value = create_queued_result(
+            provider=LLMProviderType.OPENAI,
+        )
+
+        await app_client.post(
+            "/api/v1/comparison",
+            json={
+                "user_prompt": "Compare essay A to essay B",
+                "callback_topic": "llm.comparison.results",
+                "llm_config_overrides": {
+                    "provider_override": "openai",
+                    "model_override": "gpt-5.1",
+                    "reasoning_effort": "low",
+                    "output_verbosity": "high",
+                },
+            },
+        )
+
+        # Verify orchestrator was called with reasoning controls
+        mock_orchestrator.perform_comparison.assert_called_once()
+        call_kwargs = mock_orchestrator.perform_comparison.call_args.kwargs
+        assert call_kwargs.get("reasoning_effort") == "low"
+        assert call_kwargs.get("output_verbosity") == "high"

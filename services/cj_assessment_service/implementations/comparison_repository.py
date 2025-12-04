@@ -213,8 +213,8 @@ class PostgreSQLCJComparisonRepository(CJComparisonRepositoryProtocol):
             )
             .where(
                 ComparisonPair.cj_batch_id == batch_id,
-                ComparisonPair.error_code.is_(None),
-                ComparisonPair.winner.in_(("essay_a", "essay_b")),
+                ComparisonPair.winner.isnot(None),
+                ComparisonPair.winner != "error",
             )
             .distinct()
             .subquery()

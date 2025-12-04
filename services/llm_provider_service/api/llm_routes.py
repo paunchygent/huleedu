@@ -69,6 +69,8 @@ async def generate_comparison(
             model_override = None
             temperature_override = None
             system_prompt_override = None
+            reasoning_effort = None
+            output_verbosity = None
 
             if comparison_request.llm_config_overrides:
                 provider_override = comparison_request.llm_config_overrides.provider_override
@@ -77,6 +79,8 @@ async def generate_comparison(
                 system_prompt_override = (
                     comparison_request.llm_config_overrides.system_prompt_override
                 )
+                reasoning_effort = comparison_request.llm_config_overrides.reasoning_effort
+                output_verbosity = comparison_request.llm_config_overrides.output_verbosity
 
             # Require explicit provider configuration
             if not provider_override:
@@ -111,6 +115,8 @@ async def generate_comparison(
                 system_prompt_override=system_prompt_override,
                 callback_topic=comparison_request.callback_topic,
                 request_metadata=comparison_request.metadata,
+                reasoning_effort=reasoning_effort,
+                output_verbosity=output_verbosity,
             )
 
             # Success - result should not be None

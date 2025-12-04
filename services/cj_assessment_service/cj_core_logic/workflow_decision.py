@@ -128,7 +128,11 @@ async def _derive_small_net_flags(
 
     coverage_metrics: tuple[int, int] | None = None
 
-    if max_possible_pairs == 0 and successful_pairs_count == 0 and not unique_coverage_complete:
+    # Refresh coverage metrics from the repository whenever coverage has not
+    # yet been marked complete. This ensures that small-net metadata does not
+    # get "stuck" with stale counts when additional successful comparisons
+    # arrive across multiple waves.
+    if not unique_coverage_complete:
         try:
             raw_coverage_metrics = await comparison_repository.get_coverage_metrics_for_batch(
                 session=session,

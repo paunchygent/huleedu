@@ -129,11 +129,11 @@ def build_small_net_context(
     coverage metrics into the fields used by ContinuationContext while
     preserving existing PR-2/PR-7 semantics:
 
-    - Prefer metadata values when present.
-    - Fall back to coverage_metrics only when metadata does not yet contain
-      coverage counts.
+    - Prefer metadata values when present, but allow coverage_metrics to
+      "refresh" them when coverage has progressed further in the database.
     - Mark unique_coverage_complete when max_possible_pairs > 0 and
-      successful_pairs_count >= max_possible_pairs.
+      successful_pairs_count >= max_possible_pairs, using the effective
+      values after any coverage_metrics merge.
     - Compute is_small_net from expected_essay_count and the
       MIN_RESAMPLING_NET_SIZE threshold.
     - Derive the small-net resampling cap and cap-reached flag from
@@ -145,22 +145,28 @@ def build_small_net_context(
 
     is_small_net = normalized_expected_essay_count < min_resampling_net_size
 
-    # Prefer metadata coverage metrics; only fall back to repository-derived
-    # coverage_metrics when metadata is effectively empty and coverage has
-    # not already been marked complete.
+    # Prefer metadata coverage metrics but allow repository-derived
+    # coverage_metrics to update them when coverage progresses between
+    # iterations. This keeps metadata monotonic and avoids stale coverage
+    # counts for small nets that accumulate successful pairs over multiple
+    # waves.
     effective_max_possible_pairs = max_possible_pairs
     effective_successful_pairs_count = successful_pairs_count
     effective_unique_coverage_complete = unique_coverage_complete
     effective_resampling_pass_count = resampling_pass_count
 
-    if (
-        effective_max_possible_pairs == 0
-        and effective_successful_pairs_count == 0
-        and not effective_unique_coverage_complete
-        and coverage_metrics is not None
-        and len(coverage_metrics) == 2
-    ):
-        effective_max_possible_pairs, effective_successful_pairs_count = coverage_metrics
+    if coverage_metrics is not None and len(coverage_metrics) == 2:
+        coverage_max_pairs, coverage_successful_pairs = coverage_metrics
+
+        # Use the larger of metadata vs repository-derived values so that
+        # coverage counts only ever move forwards.
+        if isinstance(coverage_max_pairs, int) and coverage_max_pairs >= 0:
+            effective_max_possible_pairs = max(effective_max_possible_pairs, coverage_max_pairs)
+        if isinstance(coverage_successful_pairs, int) and coverage_successful_pairs >= 0:
+            effective_successful_pairs_count = max(
+                effective_successful_pairs_count,
+                coverage_successful_pairs,
+            )
 
     if (
         effective_max_possible_pairs > 0
