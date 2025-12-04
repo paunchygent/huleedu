@@ -10,7 +10,7 @@ owner_team: 'agents'
 owner: ''
 program: 'eng5'
 created: '2025-12-01'
-last_updated: '2025-12-02'
+last_updated: '2025-12-04'
 related: ['EPIC-008', 'llm-provider-openai-gpt-5x-reasoning-controls']
 labels: ['eng5', 'alignment', 'gpt5']
 ---
@@ -331,3 +331,27 @@ configurations.
 - Epic: `docs/product/epics/eng5-runner-refactor-and-prompt-tuning-epic.md` (EPIC‑008)
 - Task: `TASKS/infrastructure/llm-provider-openai-gpt-5x-reasoning-controls.md`
 - ENG5 runner: `scripts/cj_experiments_runners/eng5_np`
+
+## Progress (2025-12-04) – CJ completion & coverage alignment
+
+- CJ completion semantics v2 (budget-only denominator) are now supported by a cleaner separation between completion math and coverage/small-net metadata:
+  - Coverage helper `PostgreSQLCJComparisonRepository.get_coverage_metrics_for_batch` has been updated to use the same “valid comparison” predicate as BT scoring (`winner is not None` and `winner != "error"`), ensuring coverage counts all BT-relevant comparisons and ignores error-only pairs.
+  - Unit tests `test_get_coverage_metrics_for_batch_returns_expected_counts`, `test_coverage_ignores_error_only_pairs`, and `test_coverage_counts_retry_success_after_error` guard this behaviour and confirm that retry success is treated as coverage.
+- CJ small-net continuation and resampling semantics for LOWER5 are now covered by dedicated unit tests:
+  - `test_workflow_small_net_resampling.py` exercises LOWER5-like nets (5 essays, `nC2=10`) with:
+    - `successful_pairs_count == max_possible_pairs` and `unique_coverage_complete=True`.
+    - Multiple resampling waves requested while `resampling_pass_count < MAX_RESAMPLING_PASSES_FOR_SMALL_NET`, `callbacks_received < total_budget`, and success-rate/stability gates allow it.
+  - This gives confidence that LOWER5 ENG5 runs configured with budgets > `nC2` (e.g. 20 or 60) can legitimately use multiple waves instead of finalizing after a single 10-comparison coverage pass.
+- Workflow continuation tests have been refactored into SRP-aligned modules with <500 LoC each, in line with Rule 075:
+  - `test_workflow_continuation_orchestration.py` now focuses on orchestration decisions (FINALIZE vs REQUEST_MORE) and remains compact (~230 LoC).
+  - `test_workflow_continuation_metadata_bt_flags.py` owns BT SE summary and `bt_quality_flags` propagation.
+  - `test_workflow_continuation_success_rate.py` owns success-rate failure semantics.
+  - `test_workflow_continuation_check.py` focuses on pure continuation gating and budget/denominator resolution.
+- For this ENG5 program, the net effect is:
+  - LOWER5 GPT‑5.1 experiments described above can rely on CJ to:
+    - Treat `total_budget` as the completion denominator (per ADR‑0020 and the v2 tasks).
+    - Use coverage metadata only for small-net resampling decisions, not as an implicit cap.
+  - DB alignment reports for new LOWER5 runs should show:
+    - `max_possible_pairs` matching `nC2` (e.g. 10), while
+    - `successful_pairs_count` tracking the full set of BT-valid comparisons (including retries) and
+    - total comparisons potentially exceeding `nC2` when resampling is in play.

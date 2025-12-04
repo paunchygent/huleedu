@@ -10,7 +10,7 @@ owner_team: 'agents'
 owner: ''
 program: ''
 created: '2025-12-03'
-last_updated: '2025-12-03'
+last_updated: '2025-12-04'
 related: []
 labels: []
 ---
@@ -111,3 +111,20 @@ Make CJ completion semantics v2 fully budget-only by:
 - `TASKS/assessment/cj-completion-semantics-v2--budget-vs-coverage.md`
 - `TASKS/assessment/cj-completion-semantics-v2--eng5--lower5.md`
 - `TASKS/programs/eng5-gpt-51-reasoning-effort-alignment-experiment.md`
+
+## Progress (2025-12-04)
+
+- Coverage helper semantics have been aligned with Bradley–Terry scoring:
+  - `PostgreSQLCJComparisonRepository.get_coverage_metrics_for_batch` now treats any unordered pair with a non-null, non-`"error"` winner as “successful,” regardless of whether the winner originated as an enum or the normalized `"essay_a"` / `"essay_b"` strings.
+  - Pairs that only ever produced `"error"` winners are ignored for coverage; pairs that first errored and later succeeded via retry now count as covered.
+  - Guarded by `services/cj_assessment_service/tests/unit/test_comparison_repository_coverage_metrics.py`:
+    - `test_get_coverage_metrics_for_batch_returns_expected_counts`
+    - `test_coverage_ignores_error_only_pairs`
+    - `test_coverage_counts_retry_success_after_error`
+- Small-net continuation and completion tests have been split into SRP-aligned modules under `services/cj_assessment_service/tests/unit/`:
+  - `test_workflow_continuation_check.py` (denominator/budget resolution + continuation gate).
+  - `test_workflow_continuation_orchestration.py` (budget/cap and “request more vs finalize” orchestration; now <500 LoC).
+  - `test_workflow_continuation_success_rate.py` (success-rate-driven failure semantics).
+  - `test_workflow_small_net_resampling.py` (Phase-2 small-net resampling and `resampling_pass_count` caps).
+  - `test_workflow_continuation_metadata_bt_flags.py` (BT SE summaries and `bt_quality_flags` propagation).
+- These changes ensure coverage (`max_possible_pairs`, `successful_pairs_count`, `unique_coverage_complete`) is fully decoupled from `completion_denominator()` and owned by explicit helpers/metadata, paving the way for enforcing the strict `total_budget`-only denominator described in this task.

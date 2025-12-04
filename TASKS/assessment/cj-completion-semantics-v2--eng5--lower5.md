@@ -10,7 +10,7 @@ owner_team: 'agents'
 owner: ''
 program: ''
 created: '2025-12-02'
-last_updated: '2025-12-02'
+last_updated: '2025-12-04'
 related: []
 labels: []
 ---
@@ -125,3 +125,22 @@ explicit coverage). This story focuses on:
 - `TASKS/assessment/cj-completion-semantics-v2--budget-vs-coverage.md`
 - `TASKS/programs/eng5-gpt-51-reasoning-effort-alignment-experiment.md`
 - `TASKS/programs/eng5/eng5-runner-assumption-hardening.md`
+
+## Progress (2025-12-04)
+
+- CJ coverage semantics for small nets now match BT scoring validity:
+  - Coverage metrics are computed via `PostgreSQLCJComparisonRepository.get_coverage_metrics_for_batch`, which counts a pair as “successful” when at least one non-null, non-`"error"` winner has been recorded.
+  - Error-only pairs are excluded; retry success after an initial error now contributes to `successful_pairs_count`.
+  - Unit tests in `test_comparison_repository_coverage_metrics.py` pin this behaviour (including error-only and retry-success cases).
+- Small-net continuation/resampling behaviour has been carved out into a dedicated unit test module:
+  - `services/cj_assessment_service/tests/unit/test_workflow_small_net_resampling.py` covers:
+    - `build_small_net_context` and `_derive_small_net_flags` for small nets (e.g. LOWER5: 5 essays, `max_possible_pairs=10`).
+    - `_can_attempt_small_net_resampling(ctx)` semantics when coverage is complete but budget and resampling caps allow further waves.
+    - `trigger_existing_workflow_continuation` requesting additional comparisons with `PairGenerationMode.RESAMPLING` until `resampling_pass_count` reaches `MAX_RESAMPLING_PASSES_FOR_SMALL_NET`.
+- Workflow continuation tests have been split to keep responsibilities and file sizes in line with Rules 070/075:
+  - Orchestration/budget flows (`trigger_existing_workflow_continuation` deciding between FINALIZE and REQUEST_MORE) live in `test_workflow_continuation_orchestration.py` (now ~230 LoC).
+  - BT metadata and quality flags (`bt_se_summary`, `bt_quality_flags`) live in `test_workflow_continuation_metadata_bt_flags.py`.
+  - Success-rate-driven failure semantics live in `test_workflow_continuation_success_rate.py`.
+- These changes validate that, under the v2 semantics targeted by this task:
+  - LOWER5 and other small nets can exhaust `total_budget` through multiple waves (COVERAGE + RESAMPLING) even when `nC2` is small, as long as resampling caps and stability/success-rate conditions allow.
+  - Coverage metadata (`max_possible_pairs`, `successful_pairs_count`, `unique_coverage_complete`, `resampling_pass_count`) is authoritative for small-net decisions and no longer entangled with completion denominator logic.
