@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from pathlib import Path
 from statistics import mean
 from typing import Any
@@ -77,6 +78,18 @@ class TestCJMockParityGeneric:
         - Token usage means remain close to the recorded fixture.
         - Latency stays within a reasonable band of the recorded trace.
         """
+        # This test is only valid when the LPS container is configured
+        # to use the CJ generic mock mode and mock-only provider.
+        use_mock_env = os.getenv("LLM_PROVIDER_SERVICE_USE_MOCK_LLM", "").lower()
+        mock_mode_env = os.getenv("LLM_PROVIDER_SERVICE_MOCK_MODE")
+        if use_mock_env != "true" or mock_mode_env != "cj_generic_batch":
+            pytest.skip(
+                "LLM_PROVIDER_SERVICE_USE_MOCK_LLM must be 'true' and "
+                "LLM_PROVIDER_SERVICE_MOCK_MODE must be set to "
+                "'cj_generic_batch' for this test; adjust .env and restart "
+                "the dev stack before running."
+            )
+
         scenario_id = "cj_lps_roundtrip_mock_20251205"
 
         # 1. Load recorded summary for baseline metrics

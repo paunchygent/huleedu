@@ -144,6 +144,14 @@ class MockProviderImpl(LLMProviderProtocol):
             # Defensive fallback if settings were partially constructed
             return False
 
+    def _is_eng5_lower5_mode(self) -> bool:
+        """Return True when running in ENG5 LOWER5 GPT-5.1 low mock mode."""
+        try:
+            return self.mock_mode == MockMode.ENG5_LOWER5_GPT51_LOW
+        except Exception:
+            # Defensive fallback if settings were partially constructed
+            return False
+
     def _rng(self, correlation_id: UUID) -> random.Random:
         """Create a deterministic RNG per request based on seed + correlation ID."""
         combined_seed = hash((self.base_seed, str(correlation_id))) & 0xFFFFFFFF
@@ -152,6 +160,13 @@ class MockProviderImpl(LLMProviderProtocol):
     async def _apply_latency(self, rng: random.Random) -> None:
         base_ms = max(0, self.settings.MOCK_LATENCY_MS)
         jitter_ms = max(0, self.settings.MOCK_LATENCY_JITTER_MS)
+
+        # For ENG5 LOWER5 mode, default to a slightly lower-latency
+        # profile than full-anchor while still reflecting real traces
+        # when no explicit latency overrides are configured.
+        if self._is_eng5_lower5_mode() and base_ms == 0 and jitter_ms == 0:
+            base_ms = 1000
+            jitter_ms = 1000
 
         # For ENG5 anchor mode, default to a higher-latency profile that
         # approximates the recorded GPT-5.1 low anchor run when no
@@ -166,7 +181,12 @@ class MockProviderImpl(LLMProviderProtocol):
         await asyncio.sleep(delay_ms / 1000.0)
 
     def _maybe_raise_error(self, rng: random.Random, correlation_id: UUID, model: str) -> None:
-        if self.performance_mode or self._is_cj_generic_batch_mode() or self._is_eng5_anchor_mode():
+        if (
+            self.performance_mode
+            or self._is_cj_generic_batch_mode()
+            or self._is_eng5_anchor_mode()
+            or self._is_eng5_lower5_mode()
+        ):
             return
 
         # Burst mode: if enabled, occasionally force a short run of failures
@@ -203,6 +223,15 @@ class MockProviderImpl(LLMProviderProtocol):
             # For CJ generic batch mode, keep behaviour pinned: always favour Essay A
             # to mirror winner_counts={"Essay A": N} in reference traces.
             return EssayComparisonWinner.ESSAY_A
+
+        if self._is_eng5_lower5_mode():
+            # Bias winner selection to approximate the ENG5 LOWER5
+            # GPT-5.1 low distribution (~4/10 Essay A vs 6/10 Essay B)
+            # using a stable hash-based mapping over a small net.
+            value = int(prompt_sha256[:8], 16)
+            return (
+                EssayComparisonWinner.ESSAY_A if (value % 10) < 4 else EssayComparisonWinner.ESSAY_B
+            )
 
         if self._is_eng5_anchor_mode():
             # Bias winner selection to approximate the ENG5 full-anchor
@@ -269,6 +298,22 @@ class MockProviderImpl(LLMProviderProtocol):
 
         prompt_tokens = estimate(prompt)
         completion_tokens = estimate(justification) + 10
+
+        # CJ generic batch mode should stay in the lightweight token
+        # regime observed in the `cj_lps_roundtrip_mock_20251205`
+        # fixture (prompt≈5, completion≈17, total≈22). Keep this
+        # behaviour independent of ENG5-specific modes so parity
+        # tests can assume small prompts for the generic CJ mode.
+        if self._is_cj_generic_batch_mode():
+            prompt_tokens = max(prompt_tokens, 5)
+            completion_tokens = max(completion_tokens, 17)
+
+        # ENG5 LOWER5 mode uses a moderately high token scale that
+        # remains below the full-anchor floor while reflecting LOWER5
+        # traces.
+        if self._is_eng5_lower5_mode():
+            prompt_tokens = max(prompt_tokens, 1000)
+            completion_tokens = max(completion_tokens, 30)
 
         # ENG5 anchor mode uses a higher token scale to approximate
         # large ENG5 prompts and longer justifications observed in

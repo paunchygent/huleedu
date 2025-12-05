@@ -156,6 +156,8 @@ services:
       - ENV_TYPE=docker
       - ENVIRONMENT=development
       - LOG_LEVEL=DEBUG
+      - LLM_PROVIDER_SERVICE_USE_MOCK_LLM=${LLM_PROVIDER_SERVICE_USE_MOCK_LLM}
+      - LLM_PROVIDER_SERVICE_MOCK_MODE=${LLM_PROVIDER_SERVICE_MOCK_MODE}
 
   # API Gateway Service
   api_gateway_service:

@@ -405,6 +405,7 @@ test-sequential = "pytest -n 0"
 test-financial = "pytest -m 'financial or docker or e2e' -v --tb=short"
 test-providers = "pytest services/*/tests/integration/ -m 'financial or slow or docker' -v"
 pytest-root = "scripts/pytest-root.sh"
+llm-mock-profile = {shell = "scripts/llm_mgmt/mock_profile_helper.sh \"$@\""}
 
 # Development Environment Commands (hot-reload enabled, debug mode)
 dev = "scripts/dev.sh"  # Main dev script - type 'pdm run dev help' for all commands

@@ -40,6 +40,7 @@ class MockMode(StrEnum):
 
     DEFAULT = "default"
     CJ_GENERIC_BATCH = "cj_generic_batch"
+    ENG5_LOWER5_GPT51_LOW = "eng5_lower5_gpt51_low"
     ENG5_ANCHOR_GPT51_LOW = "eng5_anchor_gpt51_low"
 
 

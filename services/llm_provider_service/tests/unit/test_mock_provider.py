@@ -113,3 +113,27 @@ async def test_eng5_anchor_mode_produces_successful_responses() -> None:
     # Token scaling for ENG5 anchor mode should approximate large ENG5 prompts.
     assert resp.prompt_tokens >= 1100
     assert resp.completion_tokens >= 40
+
+
+@pytest.mark.asyncio
+async def test_eng5_lower5_mode_produces_successful_responses_in_lower_token_band() -> None:
+    """ENG5 LOWER5 mock mode is pinned-success with slightly smaller tokens than full-anchor."""
+    settings = _base_settings(
+        MOCK_MODE=MockMode.ENG5_LOWER5_GPT51_LOW.value,
+        MOCK_ERROR_RATE=1.0,
+        MOCK_ERROR_CODES=[503],
+    )
+    provider = MockProviderImpl(settings=settings)
+
+    resp: LLMProviderResponse = await provider.generate_comparison(
+        user_prompt="ENG5 LOWER5 comparison prompt",
+        correlation_id=uuid4(),
+    )
+
+    # Despite error_rate=1.0, ENG5 LOWER5 mode disables simulated errors.
+    assert isinstance(resp, LLMProviderResponse)
+    assert resp.winner is not None
+    # LOWER5 token scaling should sit below the ENG5 anchor floor but
+    # well above generic mock defaults for short prompts.
+    assert 1000 <= resp.prompt_tokens < 1100
+    assert 30 <= resp.completion_tokens < 40
