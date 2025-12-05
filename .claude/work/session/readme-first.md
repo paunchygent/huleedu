@@ -134,6 +134,17 @@ pdm run pytest-root tests/integration/  # Cross-service tests
 
 **Reference**: See `TASKS/phase3_cj_confidence/PHASE3_CJ_CONFIDENCE_HUB.md` for complete task breakdown and `TASKS/phase3_cj_confidence/TASK-CJ-CONFIDENCE-PHASE3-GRADE-SCALE-DATA-PIPELINE.md` for implementation details.
 
+### CJ/ENG5 Mock Profiles – Docker Coverage Layer (Dec 2025)
+
+- LLM Provider mock profiles for CJ generic, ENG5 full-anchor, and ENG5 LOWER5 are now pinned against recorded LLM traces via docker-backed tests:
+  - CJ generic:
+    - Core parity and multi-batch coverage tests in `tests/integration/test_cj_mock_parity_generic.py` (mock profile `cj_generic_batch`, trace `cj_lps_roundtrip_mock_20251205`).
+  - ENG5 full-anchor:
+    - Full 12-anchor (66 comparison) parity test in `tests/integration/test_eng5_mock_parity_full_anchor.py` (mock profile `eng5_anchor_gpt51_low`, trace `eng5_anchor_align_gpt51_low_20251201`).
+  - ENG5 LOWER5:
+    - LOWER5 parity + small-net diagnostics tests in `tests/integration/test_eng5_mock_parity_lower5.py` (mock profile `eng5_lower5_gpt51_low`, trace `eng5_lower5_gpt51_low_20251202`).
+- Use `pdm run llm-mock-profile <profile>` (with `.env` set to the desired mock mode and `./scripts/dev-shell.sh` for env loading) as the entry point for per-profile docker test runs (CJ generic, ENG5 anchor, ENG5 LOWER5).
+
 ## Architecture Decisions
 
 ### 1. Hot-Reload Standardization (Nov 2025)

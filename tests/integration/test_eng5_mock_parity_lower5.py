@@ -48,6 +48,23 @@ from tests.utils.service_test_manager import ServiceTestManager
 class TestEng5MockParityLower5:
     """Integration test: ENG5 LOWER5 mock mode parity vs recorded summary."""
 
+    @staticmethod
+    def _load_env_mock_mode() -> str | None:
+        """Load LLM_PROVIDER_SERVICE_MOCK_MODE from the repo-root .env if present."""
+
+        env_path = Path(__file__).resolve().parents[2] / ".env"
+        if not env_path.exists():
+            return None
+
+        for line in env_path.read_text(encoding="utf-8").splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            if stripped.startswith("LLM_PROVIDER_SERVICE_MOCK_MODE"):
+                _, _, value = stripped.partition("=")
+                return value.strip() or None
+        return None
+
     @pytest.fixture
     async def service_manager(self) -> ServiceTestManager:
         """Service validation manager."""
@@ -92,12 +109,18 @@ class TestEng5MockParityLower5:
         # to use the ENG5 LOWER5 mock mode and mock-only provider.
         use_mock_env = os.getenv("LLM_PROVIDER_SERVICE_USE_MOCK_LLM", "").lower()
         mock_mode_env = os.getenv("LLM_PROVIDER_SERVICE_MOCK_MODE")
+        file_mock_mode = self._load_env_mock_mode()
         if use_mock_env != "true" or mock_mode_env != "eng5_lower5_gpt51_low":
             pytest.skip(
                 "LLM_PROVIDER_SERVICE_USE_MOCK_LLM must be 'true' and "
                 "LLM_PROVIDER_SERVICE_MOCK_MODE must be set to "
                 "'eng5_lower5_gpt51_low' for this test; adjust .env and restart "
                 "the dev stack before running."
+            )
+        if file_mock_mode is not None and file_mock_mode != mock_mode_env:
+            pytest.skip(
+                "Process env LLM_PROVIDER_SERVICE_MOCK_MODE does not match .env; "
+                "ensure .env and the running LPS container are using 'eng5_lower5_gpt51_low'."
             )
 
         scenario_id = "eng5_lower5_gpt51_low_20251202"
@@ -297,3 +320,322 @@ class TestEng5MockParityLower5:
         # Keep mean and p95 within a modest additive band of the fixture.
         assert live_rt["mean_ms"] <= recorded_rt["mean_ms"] + 100.0
         assert live_rt["p95_ms"] <= recorded_rt["p95_ms"] + 200.0
+
+    @pytest.mark.docker
+    @pytest.mark.integration
+    @pytest.mark.asyncio
+    async def test_eng5_mock_lower5_small_net_diagnostics_across_batches(
+        self,
+        validated_services: dict,  # noqa: ARG002 - ensures services are running
+        kafka_manager: KafkaTestManager,
+    ) -> None:
+        """
+        Small-net diagnostics test for ENG5 LOWER5 mock profile.
+
+        Drives multiple LOWER5-shaped batches through LPS under the same mock
+        profile while varying BOS batch ids and CJ batching hints, and records:
+        - Unique comparison pairs per batch and across batches.
+        - Winner distribution and error rate per batch.
+        - Response time statistics using the same trace summariser as the
+          recorded ENG5 LOWER5 trace.
+        """
+        use_mock_env = os.getenv("LLM_PROVIDER_SERVICE_USE_MOCK_LLM", "").lower()
+        mock_mode_env = os.getenv("LLM_PROVIDER_SERVICE_MOCK_MODE")
+        file_mock_mode = self._load_env_mock_mode()
+        if use_mock_env != "true" or mock_mode_env != "eng5_lower5_gpt51_low":
+            pytest.skip(
+                "LLM_PROVIDER_SERVICE_USE_MOCK_LLM must be 'true' and "
+                "LLM_PROVIDER_SERVICE_MOCK_MODE must be set to "
+                "'eng5_lower5_gpt51_low' for this test; adjust .env and restart "
+                "the dev stack before running."
+            )
+        if file_mock_mode is not None and file_mock_mode != mock_mode_env:
+            pytest.skip(
+                "Process env LLM_PROVIDER_SERVICE_MOCK_MODE does not match .env; "
+                "ensure .env and the running LPS container are using 'eng5_lower5_gpt51_low'."
+            )
+
+        scenario_id = "eng5_lower5_gpt51_low_20251202"
+
+        summary_path = (
+            Path(__file__).resolve().parent.parent
+            / "data"
+            / "llm_traces"
+            / scenario_id
+            / "summary.json"
+        )
+        with summary_path.open("r", encoding="utf-8") as f:
+            recorded_summary: dict[str, Any] = json.load(f)
+
+        # Sanity-check fixture expectations (guards against accidental edits)
+        assert recorded_summary["total_events"] == recorded_summary["success_count"]
+        assert recorded_summary["error_count"] == 0
+
+        callback_topic = "test.llm.mock_parity.eng5_lower5.diagnostics.v1"
+        await kafka_manager.ensure_topics([callback_topic])
+
+        # LOWER5 net: 5 anchors → C(5, 2) = 10 comparisons
+        anchor_ids = [f"eng5-lower5-anchor-{i:02d}" for i in range(1, 6)]
+        anchor_pairs = list(combinations(anchor_ids, 2))
+        pairs_per_batch = len(anchor_pairs)
+        assert pairs_per_batch == 10
+
+        num_batches = 3
+        total_requests = num_batches * pairs_per_batch
+
+        bos_batch_ids = [f"bos-eng5-lower5-diagnostics-{i + 1:03d}" for i in range(num_batches)]
+        batching_modes = ["per_request", "serial_bundle", "provider_batch_api"]
+        batching_mode_by_batch: dict[str, str] = {}
+
+        lps_url = "http://localhost:8090/api/v1/comparison"
+
+        request_ids_by_batch: dict[str, list[str]] = {}
+
+        # 1. Publish several LOWER5-shaped batches with varying metadata hints
+        async with aiohttp.ClientSession() as session:
+            for index, bos_batch_id in enumerate(bos_batch_ids):
+                batching_mode = batching_modes[index % len(batching_modes)]
+                batching_mode_by_batch[bos_batch_id] = batching_mode
+
+                batch_request_ids: list[str] = []
+
+                for anchor_a, anchor_b in anchor_pairs:
+                    correlation_id = uuid4()
+
+                    task = ComparisonTask(
+                        essay_a=EssayForComparison(
+                            id=anchor_a,
+                            text_content=f"ENG5 LOWER5 anchor essay content for {anchor_a}",
+                        ),
+                        essay_b=EssayForComparison(
+                            id=anchor_b,
+                            text_content=f"ENG5 LOWER5 anchor essay content for {anchor_b}",
+                        ),
+                        prompt="ENG5 LOWER5 anchor alignment comparison prompt",
+                    )
+
+                    metadata_adapter = CJLLMComparisonMetadata.from_comparison_task(
+                        task,
+                        bos_batch_id=bos_batch_id,
+                    ).with_additional_context(cj_llm_batching_mode=batching_mode)
+
+                    request_metadata = metadata_adapter.to_request_metadata()
+
+                    user_prompt = (
+                        f"ENG5 LOWER5 anchor alignment comparison between {anchor_a} "
+                        f"and {anchor_b}. Judge which essay better matches the "
+                        "ENG5 LOWER5 rubric."
+                    )
+
+                    request = LLMComparisonRequest(
+                        user_prompt=user_prompt,
+                        callback_topic=callback_topic,
+                        correlation_id=correlation_id,
+                        metadata=request_metadata,
+                        llm_config_overrides=ProviderOverrides(
+                            provider_override=LLMProviderType.MOCK,
+                        ),
+                    )
+
+                    async with session.post(
+                        lps_url,
+                        json=request.model_dump(mode="json"),
+                        timeout=aiohttp.ClientTimeout(total=15.0),
+                        headers={"Content-Type": "application/json"},
+                    ) as response:
+                        assert response.status == 202, (
+                            f"Expected 202 (queued), got {response.status}"
+                        )
+
+                        data = await response.json()
+                        queued = LLMQueuedResponse.model_validate(data)
+                        batch_request_ids.append(str(queued.queue_id))
+
+                request_ids_by_batch[bos_batch_id] = batch_request_ids
+
+        all_request_ids = {rid for ids in request_ids_by_batch.values() for rid in ids}
+
+        # 2. Consume callbacks for all batches and bucket them per BOS batch id
+        callbacks: list[LLMComparisonResultV1] = []
+        callbacks_by_batch: dict[str, list[LLMComparisonResultV1]] = {}
+
+        async with kafka_manager.consumer(
+            "eng5_mock_parity_lower5_diagnostics",
+            topics=[callback_topic],
+            auto_offset_reset="earliest",
+        ) as consumer:
+            try:
+                async with asyncio.timeout(60.0):
+                    while len(callbacks) < total_requests:
+                        msg_batch = await consumer.getmany(timeout_ms=1000, max_records=20)
+                        if not msg_batch:
+                            continue
+
+                        for _tp, messages in msg_batch.items():
+                            for message in messages:
+                                envelope = EventEnvelope[Any].model_validate_json(message.value)
+
+                                try:
+                                    result = LLMComparisonResultV1.model_validate(envelope.data)
+                                except Exception as exc:  # pragma: no cover - defensive guard
+                                    pytest.fail(
+                                        "Malformed LLMComparisonResultV1 payload in LOWER5 "
+                                        f"diagnostics test: {exc}"
+                                    )
+
+                                if result.request_id not in all_request_ids:
+                                    continue
+
+                                callbacks.append(result)
+
+                                bos_id = str(result.request_metadata.get("bos_batch_id"))
+                                callbacks_by_batch.setdefault(bos_id, []).append(result)
+
+                                if len(callbacks) >= total_requests:
+                                    break
+                            if len(callbacks) >= total_requests:
+                                break
+            except TimeoutError:
+                pytest.fail(
+                    "Timeout waiting for LPS callbacks (60s) in LOWER5 diagnostics test. "
+                    "Ensure dev stack is running and LPS mock mode is configured "
+                    "for eng5_lower5_gpt51_low."
+                )
+
+        assert len(callbacks) == total_requests, (
+            f"Expected {total_requests} callbacks across LOWER5 batches, collected {len(callbacks)}"
+        )
+
+        assert set(callbacks_by_batch.keys()) == set(bos_batch_ids)
+
+        # 3. Basic contract checks and small-net coverage diagnostics
+        global_unique_pairs: set[tuple[str, str]] = set()
+        per_batch_unique_pairs: dict[str, set[tuple[str, str]]] = {}
+
+        for bos_batch_id in bos_batch_ids:
+            batch_callbacks = callbacks_by_batch.get(bos_batch_id, [])
+            assert len(batch_callbacks) == pairs_per_batch, (
+                f"Batch {bos_batch_id} expected {pairs_per_batch} callbacks, "
+                f"collected {len(batch_callbacks)}"
+            )
+
+            batch_unique_pairs: set[tuple[str, str]] = set()
+
+            for cb in batch_callbacks:
+                assert cb.is_success, (
+                    f"Expected success result in LOWER5 diagnostics test, "
+                    f"got error: {cb.error_detail}"
+                )
+                assert cb.winner is not None
+                assert cb.justification
+                assert cb.confidence is not None
+                assert 1.0 <= cb.confidence <= 5.0
+
+                meta = cb.request_metadata
+                assert meta.get("bos_batch_id") == bos_batch_id
+                assert "essay_a_id" in meta
+                assert "essay_b_id" in meta
+
+                # Validate that batching hints round-trip as-is.
+                expected_mode = batching_mode_by_batch[bos_batch_id]
+                assert meta.get("cj_llm_batching_mode") == expected_mode
+
+                a_id = str(meta["essay_a_id"])
+                b_id = str(meta["essay_b_id"])
+                pair: tuple[str, str] = (a_id, b_id) if a_id <= b_id else (b_id, a_id)
+                batch_unique_pairs.add(pair)
+                global_unique_pairs.add(pair)
+
+            per_batch_unique_pairs[bos_batch_id] = batch_unique_pairs
+            assert len(batch_unique_pairs) == pairs_per_batch, (
+                f"Batch {bos_batch_id} should contain {pairs_per_batch} unique pairs, "
+                f"found {len(batch_unique_pairs)}"
+            )
+
+        # Across all batches we still only see the LOWER5 net's 10 unique pairs.
+        assert len(global_unique_pairs) == pairs_per_batch
+
+        # 4. Per-batch and aggregate summaries using trace summariser
+        def _winner_proportions(summary: Mapping[str, Any]) -> dict[str, float]:
+            total = summary["total_events"]
+            if total == 0:
+                return {"Essay A": 0.0, "Essay B": 0.0}
+            counts = summary["winner_counts"]
+            return {
+                "Essay A": counts.get("Essay A", 0) / total,
+                "Essay B": counts.get("Essay B", 0) / total,
+            }
+
+        def _mean_tokens(summary: Mapping[str, Any], field: str) -> float:
+            return float(summary["token_usage"][field]["mean"])
+
+        def _assert_summary_within_parity(summary: Mapping[str, Any]) -> None:
+            """Assert that a live LOWER5 summary is within parity bands."""
+
+            assert (
+                summary["total_events"] == pairs_per_batch * num_batches
+                or summary["total_events"] == pairs_per_batch
+            )
+            assert summary["error_count"] == 0
+
+            # Winner distribution parity (same tolerance as baseline LOWER5 test).
+            recorded_props = _winner_proportions(recorded_summary)
+            live_props = _winner_proportions(summary)
+
+            for label in ("Essay A", "Essay B"):
+                diff = abs(live_props[label] - recorded_props[label])
+                assert diff <= 0.30, (
+                    f"Winner proportion for {label} outside tolerance in LOWER5 diagnostics: "
+                    f"live={live_props[label]:.3f}, "
+                    f"recorded={recorded_props[label]:.3f}"
+                )
+
+            # Token usage parity (same tolerance as baseline LOWER5 test).
+            for field in ("prompt_tokens", "completion_tokens", "total_tokens"):
+                recorded_mean = _mean_tokens(recorded_summary, field)
+                live_mean = _mean_tokens(summary, field)
+
+                tolerance = max(5.0, recorded_mean * 0.5)
+                assert abs(live_mean - recorded_mean) <= tolerance, (
+                    f"{field} mean outside tolerance in LOWER5 diagnostics: "
+                    f"live={live_mean}, recorded={recorded_mean}, tolerance={tolerance}"
+                )
+
+            # Latency parity (same additive band as baseline LOWER5 test).
+            recorded_rt = recorded_summary["response_time_ms"]
+            live_rt = summary["response_time_ms"]
+
+            assert live_rt["mean_ms"] >= 0.0
+            assert live_rt["p95_ms"] >= 0.0
+
+            assert live_rt["mean_ms"] <= recorded_rt["mean_ms"] + 100.0
+            assert live_rt["p95_ms"] <= recorded_rt["p95_ms"] + 200.0
+
+        per_batch_summaries: dict[str, Mapping[str, Any]] = {}
+
+        for bos_batch_id, batch_callbacks in callbacks_by_batch.items():
+            batch_summary = compute_llm_trace_summary(
+                batch_callbacks,
+                scenario_id=f"eng5_lower5_mock_diagnostics_{bos_batch_id}",
+            )
+            assert batch_summary["total_events"] == pairs_per_batch
+            per_batch_summaries[bos_batch_id] = batch_summary
+            _assert_summary_within_parity(batch_summary)
+
+        aggregate_summary = compute_llm_trace_summary(
+            callbacks,
+            scenario_id="eng5_lower5_mock_diagnostics_aggregate",
+        )
+        _assert_summary_within_parity(aggregate_summary)
+
+        # Lightweight diagnostics to aid future BT/coverage work.
+        print(
+            "ENG5 LOWER5 mock small-net diagnostics:",
+            {
+                "num_batches": num_batches,
+                "pairs_per_batch": pairs_per_batch,
+                "total_callbacks": len(callbacks),
+                "global_unique_pairs": len(global_unique_pairs),
+                "aggregate_response_time_ms": aggregate_summary["response_time_ms"],
+            },
+        )

@@ -48,6 +48,23 @@ from tests.utils.service_test_manager import ServiceTestManager
 class TestEng5MockParityFullAnchor:
     """Integration test: ENG5 full-anchor mock mode parity vs recorded summary."""
 
+    @staticmethod
+    def _load_env_mock_mode() -> str | None:
+        """Load LLM_PROVIDER_SERVICE_MOCK_MODE from the repo-root .env if present."""
+
+        env_path = Path(__file__).resolve().parents[2] / ".env"
+        if not env_path.exists():
+            return None
+
+        for line in env_path.read_text(encoding="utf-8").splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            if stripped.startswith("LLM_PROVIDER_SERVICE_MOCK_MODE"):
+                _, _, value = stripped.partition("=")
+                return value.strip() or None
+        return None
+
     @pytest.fixture
     async def service_manager(self) -> ServiceTestManager:
         """Service validation manager."""
@@ -92,12 +109,18 @@ class TestEng5MockParityFullAnchor:
         # to use the ENG5 anchor mock mode and mock-only provider.
         use_mock_env = os.getenv("LLM_PROVIDER_SERVICE_USE_MOCK_LLM", "").lower()
         mock_mode_env = os.getenv("LLM_PROVIDER_SERVICE_MOCK_MODE")
+        file_mock_mode = self._load_env_mock_mode()
         if use_mock_env != "true" or mock_mode_env != "eng5_anchor_gpt51_low":
             pytest.skip(
                 "LLM_PROVIDER_SERVICE_USE_MOCK_LLM must be 'true' and "
                 "LLM_PROVIDER_SERVICE_MOCK_MODE must be set to "
                 "'eng5_anchor_gpt51_low' for this test; adjust .env and restart "
                 "the dev stack before running."
+            )
+        if file_mock_mode is not None and file_mock_mode != mock_mode_env:
+            pytest.skip(
+                "Process env LLM_PROVIDER_SERVICE_MOCK_MODE does not match .env; "
+                "ensure .env and the running LPS container are using 'eng5_anchor_gpt51_low'."
             )
 
         scenario_id = "eng5_anchor_align_gpt51_low_20251201"

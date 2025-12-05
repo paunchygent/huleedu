@@ -15,7 +15,11 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../" && pwd)"
+# Resolve repository root robustly whether invoked directly or via PDM.
+SCRIPT_PATH="${BASH_SOURCE[0]:-$0}"
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+# scripts/llm_mgmt/mock_profile_helper.sh → repo root is two levels up
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../" && pwd)"
 
 PROFILE="${1:-}"
 if [[ -z "$PROFILE" ]]; then
@@ -26,12 +30,13 @@ fi
 
 cd "$REPO_ROOT"
 
-if [[ ! -f ".env" ]]; then
+if [[ ! -f "$REPO_ROOT/.env" ]]; then
   echo "Missing .env at $REPO_ROOT/.env – cannot manage mock profiles." >&2
   exit 1
 fi
 
-source .env
+# shellcheck disable=SC1090
+source "$REPO_ROOT/.env"
 
 case "$PROFILE" in
   cj-generic)
@@ -74,4 +79,3 @@ echo "🧪 Running parity test for profile '$PROFILE'..."
 pdm run pytest-root "$TEST_PATH" -m 'docker and integration' -v
 
 echo "✅ Profile '$PROFILE' parity test completed."
-

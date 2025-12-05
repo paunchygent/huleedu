@@ -163,6 +163,19 @@ All tests in this section:
   - [ ] `pdm run lint-fix --unsafe-fixes`
   - [ ] `pdm run typecheck-all`
 
+### 8. LPS mock-mode observability (next step)
+
+- [ ] Expose the active LPS mock configuration via a small admin endpoint:
+  - [ ] Add `GET /admin/mock-mode` on `llm_provider_service` that returns:
+    - [ ] `use_mock_llm` (bool) derived from `Settings` / env.
+    - [ ] `mock_mode` (string) derived from `Settings.MOCK_MODE.value` (e.g. `"cj_generic_batch"`, `"eng5_anchor_gpt51_low"`, `"eng5_lower5_gpt51_low"`).
+  - [ ] Add LPS API tests under `services/llm_provider_service/tests/api/` to pin this endpoint for the three mock profiles.
+- [ ] Refactor CJ/ENG5 docker parity/coverage tests to assert against `/admin/mock-mode` instead of `.env` heuristics:
+  - [ ] In `tests/integration/test_cj_mock_parity_generic.py`, `test_eng5_mock_parity_full_anchor.py`, and `test_eng5_mock_parity_lower5.py`:
+    - [ ] Use the validated `llm_provider_service` base URL from `ServiceTestManager` to call `/admin/mock-mode` at the start of each test.
+    - [ ] `pytest.skip` when `use_mock_llm` is `false` or `mock_mode` does not match the expected profile.
+    - [ ] Remove direct `.env` parsing and cross-checks between process env and `.env`; treat `/admin/mock-mode` as the single source of truth for the running container’s mock mode.
+
 ## Success Criteria
 
 - Mock provider offers explicit CJ/ENG5 modes (documented in config or README) whose behaviour is pinned by tests.
@@ -402,8 +415,11 @@ All tests in this section:
       - `.env`:
         - `LLM_PROVIDER_SERVICE_USE_MOCK_LLM=true`
         - `LLM_PROVIDER_SERVICE_MOCK_MODE=cj_generic_batch`
-      - Docker test:
-        - `pdm run pytest-root tests/integration/test_cj_mock_parity_generic.py -m 'docker and integration' -v`
+      - Docker tests (run together from the same file):
+        - Core parity vs recorded CJ trace:
+          - `pdm run pytest-root tests/integration/test_cj_mock_parity_generic.py -m 'docker and integration' -v -k 'matches_recorded_summary'`
+        - Coverage/continuation stability across multiple CJ batches:
+          - `pdm run pytest-root tests/integration/test_cj_mock_parity_generic.py -m 'docker and integration' -v -k 'stable_across_multiple_batches'`
     - ENG5 full-anchor profile:
       - `.env`:
         - `LLM_PROVIDER_SERVICE_USE_MOCK_LLM=true`
@@ -414,27 +430,34 @@ All tests in this section:
       - `.env`:
         - `LLM_PROVIDER_SERVICE_USE_MOCK_LLM=true`
         - `LLM_PROVIDER_SERVICE_MOCK_MODE=eng5_lower5_gpt51_low`
-      - Docker test:
-        - `pdm run pytest-root tests/integration/test_eng5_mock_parity_lower5.py -m 'docker and integration' -v`
+      - Docker tests (run together from the same file):
+        - Core parity vs recorded LOWER5 trace:
+          - `pdm run pytest-root tests/integration/test_eng5_mock_parity_lower5.py -m 'docker and integration' -v -k 'matches_recorded_summary'`
+        - LOWER5 small-net coverage/diagnostics across batches:
+          - `pdm run pytest-root tests/integration/test_eng5_mock_parity_lower5.py -m 'docker and integration' -v -k 'small_net_diagnostics_across_batches'`
   - Each docker test includes a small `os.getenv(...)` guard to **skip** when the host env does not match its profile
     (for example, CJ generic will not run when the ENG5 mock profile is active). This prevents accidental cross-profile
     runs (e.g. CJ test under ENG5 anchor tokens) and keeps parity assertions tight and meaningful.
 
-- Progress (2025-12-05 – mock profiles + parity helpers pinned):
+– Progress (2025-12-05 – mock profiles + parity helpers + coverage/diagnostics layer):
   - All three mock profiles now have:
     - Green unit tests in `services/llm_provider_service/tests/unit/test_mock_provider.py`.
-    - Green docker-backed parity tests under their respective profiles:
-      - CJ generic → `test_cj_mock_parity_generic.py` (fast ~4s, 30s callback budget).
-      - ENG5 full-anchor → `test_eng5_mock_parity_full_anchor.py` (≈110s wall clock, 120s callback budget).
-      - ENG5 LOWER5 → `test_eng5_mock_parity_lower5.py` (≈16s wall clock, 60s callback budget).
-    - Explicit skip guards on `LLM_PROVIDER_SERVICE_USE_MOCK_LLM` + `LLM_PROVIDER_SERVICE_MOCK_MODE` to prevent
+    - Docker-backed profile tests under their respective profiles:
+      - CJ generic → `test_cj_mock_parity_generic.py`:
+        - `test_cj_mock_parity_generic_mode_matches_recorded_summary` (parity vs `cj_lps_roundtrip_mock_20251205`, ~4s, 30s callback budget).
+        - `test_cj_mock_parity_generic_mode_stable_across_multiple_batches` (coverage/continuation-style check over 3×12 CJ-shaped requests; asserts 100% Essay A winners, per-batch and aggregate token/latency metrics within the same bands as the recorded CJ summary, and zero variance in token means across batches).
+      - ENG5 full-anchor → `test_eng5_mock_parity_full_anchor.py` (≈110s wall clock, 120s callback budget; unchanged in this session but still the canonical ENG5 full-anchor parity test).
+      - ENG5 LOWER5 → `test_eng5_mock_parity_lower5.py`:
+        - `test_eng5_mock_parity_lower5_mode_matches_recorded_summary` (parity vs `eng5_lower5_gpt51_low_20251202`, ~16s runtime, 60s callback budget).
+        - `test_eng5_mock_lower5_small_net_diagnostics_across_batches` (three LOWER5-shaped batches with varying `bos_batch_id` and `cj_llm_batching_mode` hints; checks unique pair coverage per batch and globally, winner proportions vs the recorded LOWER5 trace, and token/latency parity using `compute_llm_trace_summary`).
+    - All docker tests include explicit skip guards on `LLM_PROVIDER_SERVICE_USE_MOCK_LLM` + `LLM_PROVIDER_SERVICE_MOCK_MODE` to prevent
       silent passes under the wrong profile.
-  - Helper script added for profile switching + parity runs:
+  - Helper script for profile switching + docker tests:
     - File: `scripts/llm_mgmt/mock_profile_helper.sh`.
     - PDM alias: `pdm run llm-mock-profile <profile>`.
-    - Supported profiles:
-      - `cj-generic` → validates `.env` for `cj_generic_batch`, restarts `llm_provider_service`, runs CJ parity test.
-      - `eng5-anchor` → validates `.env` for `eng5_anchor_gpt51_low`, restarts `llm_provider_service`, runs ENG5 anchor parity test.
-      - `eng5-lower5` → validates `.env` for `eng5_lower5_gpt51_low`, restarts `llm_provider_service`, runs ENG5 LOWER5 parity test.
-    - The helper is thin: it only orchestrates `.env` validation, a targeted dev container restart, and the appropriate
-      `pytest-root` invocation; all behavioural guarantees remain in the tests and mock provider implementation.
+    - Supported profiles (each target now effectively runs the full profile-specific suite in the corresponding file):
+      - `cj-generic` → validates `.env` for `cj_generic_batch`, restarts `llm_provider_service`, runs all CJ mock profile docker tests in `test_cj_mock_parity_generic.py`.
+      - `eng5-anchor` → validates `.env` for `eng5_anchor_gpt51_low`, restarts `llm_provider_service`, runs ENG5 anchor docker tests in `test_eng5_mock_parity_full_anchor.py`.
+      - `eng5-lower5` → validates `.env` for `eng5_lower5_gpt51_low`, restarts `llm_provider_service`, runs all LOWER5 docker tests in `test_eng5_mock_parity_lower5.py`.
+    - The helper remains thin: it only orchestrates `.env` validation, a targeted dev container restart, and the appropriate
+      `pytest-root` invocation; behavioural guarantees live in the tests and mock provider implementation.
