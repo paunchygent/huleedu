@@ -5,7 +5,7 @@ from uuid import uuid4
 
 import pytest
 
-from services.llm_provider_service.config import Settings
+from services.llm_provider_service.config import MockMode, Settings
 from services.llm_provider_service.exceptions import HuleEduError
 from services.llm_provider_service.implementations.mock_provider_impl import MockProviderImpl
 from services.llm_provider_service.internal_models import LLMProviderResponse
@@ -16,6 +16,7 @@ def _base_settings(**overrides: Any) -> Settings:
     return Settings(
         ALLOW_MOCK_PROVIDER=overrides.get("ALLOW_MOCK_PROVIDER", True),
         USE_MOCK_LLM=overrides.get("USE_MOCK_LLM", False),
+        MOCK_MODE=overrides.get("MOCK_MODE", MockMode.DEFAULT.value),
         MOCK_PROVIDER_SEED=overrides.get("MOCK_PROVIDER_SEED", 123),
         MOCK_LATENCY_MS=overrides.get("MOCK_LATENCY_MS", 0),
         MOCK_LATENCY_JITTER_MS=overrides.get("MOCK_LATENCY_JITTER_MS", 0),
@@ -45,6 +46,25 @@ async def test_mock_provider_raises_when_error_rate_one() -> None:
 
 
 @pytest.mark.asyncio
+async def test_cj_generic_batch_mode_disables_error_simulation() -> None:
+    """cj_generic_batch mode should not simulate provider errors even with error_rate=1.0."""
+    settings = _base_settings(
+        MOCK_MODE=MockMode.CJ_GENERIC_BATCH.value,
+        MOCK_ERROR_RATE=1.0,
+        MOCK_ERROR_CODES=[503],
+    )
+    provider = MockProviderImpl(settings=settings)
+
+    # Should not raise, despite error_rate=1.0, because cj_generic_batch is pinned-success.
+    resp: LLMProviderResponse = await provider.generate_comparison(
+        user_prompt="test", correlation_id=uuid4()
+    )
+
+    assert isinstance(resp, LLMProviderResponse)
+    assert resp.winner is not None
+
+
+@pytest.mark.asyncio
 async def test_mock_provider_respects_cache_hit_rate() -> None:
     settings = _base_settings(MOCK_CACHE_HIT_RATE=1.0)
     provider = MockProviderImpl(settings=settings)
@@ -70,3 +90,26 @@ async def test_mock_provider_success_when_error_rate_zero() -> None:
     assert resp.winner is not None
     assert 0.0 <= resp.confidence <= 1.0
     assert resp.metadata.get("prompt_sha256")
+
+
+@pytest.mark.asyncio
+async def test_eng5_anchor_mode_produces_successful_responses() -> None:
+    """ENG5 anchor mock mode should be pinned-success and scaled for large tokens."""
+    settings = _base_settings(
+        MOCK_MODE=MockMode.ENG5_ANCHOR_GPT51_LOW.value,
+        MOCK_ERROR_RATE=1.0,
+        MOCK_ERROR_CODES=[503],
+    )
+    provider = MockProviderImpl(settings=settings)
+
+    resp: LLMProviderResponse = await provider.generate_comparison(
+        user_prompt="ENG5 anchor comparison prompt",
+        correlation_id=uuid4(),
+    )
+
+    # Despite error_rate=1.0, ENG5 anchor mode disables simulated errors.
+    assert isinstance(resp, LLMProviderResponse)
+    assert resp.winner is not None
+    # Token scaling for ENG5 anchor mode should approximate large ENG5 prompts.
+    assert resp.prompt_tokens >= 1100
+    assert resp.completion_tokens >= 40

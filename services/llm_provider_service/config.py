@@ -35,6 +35,14 @@ class BatchApiMode(StrEnum):
     OPPORTUNISTIC = "opportunistic"
 
 
+class MockMode(StrEnum):
+    """Behavioural modes for the mock LLM provider."""
+
+    DEFAULT = "default"
+    CJ_GENERIC_BATCH = "cj_generic_batch"
+    ENG5_ANCHOR_GPT51_LOW = "eng5_anchor_gpt51_low"
+
+
 class ProviderConfig(BaseSettings):
     """Per-provider configuration with dynamic override support."""
 
@@ -91,6 +99,7 @@ class Settings(SecureServiceSettings):
     MOCK_TOKENIZER: str = "simple"  # simple | tiktoken
     MOCK_TOKENS_PER_WORD: float = 0.75  # used when tokenizer unavailable
     MOCK_OUTCOME_MODE: str = "heuristic"  # heuristic | fixed
+    MOCK_MODE: MockMode = MockMode.DEFAULT
     MOCK_CONFIDENCE_BASE: float = 4.5  # 1-5 scale
     MOCK_CONFIDENCE_JITTER: float = 0.3  # additive jitter around base
     MOCK_STREAMING_METADATA: bool = False

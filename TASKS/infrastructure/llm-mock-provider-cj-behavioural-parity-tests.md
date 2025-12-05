@@ -10,7 +10,7 @@ owner_team: 'agents'
 owner: ''
 program: 'eng5'
 created: '2025-12-04'
-last_updated: '2025-12-04'
+last_updated: '2025-12-05'
 related: ['EPIC-005', 'EPIC-008', 'llm-provider-openai-gpt-5x-reasoning-controls', 'llm-provider-anthropic-thinking-controls', 'cj-small-net-coverage-and-continuation-docker-validation']
 labels: ['llm-provider', 'cj', 'eng5', 'mock-provider', 'parity']
 ---
@@ -191,3 +191,183 @@ All tests in this section:
   - `TASKS/assessment/cj-small-net-coverage-and-continuation-docker-validation.md` (to be created)
   - `TASKS/programs/eng5-gpt-51-reasoning-effort-alignment-experiment.md`
   - `TASKS/architecture/cj-lps-reasoning-verbosity-metadata-contract.md`
+
+## Progress (2025-12-05)
+
+- Trace capture harness implemented:
+  - Script: `scripts/llm_traces/eng5_cj_trace_capture.py`
+  - Responsibilities:
+    - Connects to Kafka and filters `LLMComparisonResultV1` callbacks by `request_metadata.bos_batch_id`.
+    - Persists raw callbacks to JSONL fixtures and computes a compact metrics summary:
+      - Winner counts and error code counts.
+      - Latency stats (`min`, `mean`, `p95`, `p99`).
+      - Token usage stats for prompt/completion/total tokens (`min` / `mean` / `max`).
+    - Leaves BT diagnostics (`bt_se_summary`, `bt_quality_flags`) as placeholders to be populated via CJ metadata in a later phase.
+  - Unit test:
+    - `scripts/tests/test_eng5_cj_trace_capture.py` pins down the summarizer’s aggregate behaviour on synthetic callbacks.
+
+- First canonical trace captured (generic CJ ↔ LPS mock roundtrip):
+  - Scenario id: `cj_lps_roundtrip_mock_20251205`
+  - Source flow:
+    - `tests/integration/test_cj_lps_metadata_roundtrip.py::TestCJLPSMetadataRoundtrip::test_metadata_preserved_through_http_kafka_roundtrip`
+    - Uses `callback_topic="test.llm.callback.roundtrip.v1"`, `bos_batch_id="bos-roundtrip-001"`, and `LLMProviderType.MOCK` to avoid real provider calls.
+  - Fixtures:
+    - Directory: `tests/data/llm_traces/cj_lps_roundtrip_mock_20251205/`
+    - Files:
+      - `llm_callbacks.jsonl` – currently 4 validated `LLMComparisonResultV1` events.
+      - `summary.json` – aggregate metrics for this scenario (all-success, `winner_counts={"Essay A": 4}`, no errors, stable token usage).
+
+- How to regenerate this scenario (with dev stack running):
+  - Ensure services and Kafka are up:
+    - `pdm run dev-build-start`
+  - Trigger the CJ ↔ LPS roundtrip once:
+    - `pdm run pytest-root tests/integration/test_cj_lps_metadata_roundtrip.py::TestCJLPSMetadataRoundtrip::test_metadata_preserved_through_http_kafka_roundtrip -m 'docker and integration' -v`
+  - Capture callbacks and summary:
+    - ```bash
+      pdm run python -m scripts.llm_traces.eng5_cj_trace_capture \
+        --scenario-id cj_lps_roundtrip_mock_20251205 \
+        --bos-batch-id bos-roundtrip-001 \
+        --callback-topic test.llm.callback.roundtrip.v1 \
+        --expected-count 1 \
+        --timeout-seconds 30 \
+        --output-dir tests/data/llm_traces
+      ```
+
+- Next recommended step from this task:
+  - Define the first explicit mock mode (for a generic CJ scenario, e.g. `"cj_generic_batch"`) in the LLM mock provider and add a docker-backed integration test (e.g. `tests/integration/test_cj_mock_parity_generic.py`) that:
+    - Replays a small batch of CJ-shaped requests using this mode.
+    - Collects callbacks and compares winner distribution, error profile, and token/latency bands against `summary.json` from `cj_lps_roundtrip_mock_20251205`, within tolerances.
+
+- Progress (2025-12-05 – cj_generic_batch mode + parity test implemented):
+  - Mock mode:
+    - New enum: `MockMode` in `services/llm_provider_service/config.py` with values `default` and `cj_generic_batch`.
+    - New setting: `MOCK_MODE: MockMode = MockMode.DEFAULT` (exposed via `LLM_PROVIDER_SERVICE_MOCK_MODE`).
+    - Dev default: `.env` now sets `LLM_PROVIDER_SERVICE_MOCK_MODE=cj_generic_batch` so the mock provider runs in the CJ generic mode in the standard dev stack.
+    - Behaviour for `cj_generic_batch`:
+      - `MockProviderImpl` disables simulated errors (`_maybe_raise_error` is a no-op in this mode) to guarantee all-success callbacks.
+      - `_pick_winner` always returns `Essay A`, pinning winner distribution for CJ parity scenarios while leaving token estimation, confidence, and metadata behaviour unchanged.
+  - New docker-backed integration test:
+    - File: `tests/integration/test_cj_mock_parity_generic.py`
+    - Flow:
+      - Uses `ServiceTestManager` to ensure `llm_provider_service` is healthy.
+      - Ensures a dedicated callback topic: `test.llm.mock_parity.generic.v1` via `KafkaTestManager.ensure_topics(...)`.
+      - Sends a small batch (currently 12) of CJ-shaped `LLMComparisonRequest`s with:
+        - `LLMProviderType.MOCK` overrides.
+        - CJ-style metadata (`essay_a_id`, `essay_b_id`, `bos_batch_id`, `cj_llm_batching_mode="per_request"`).
+      - Consumes `LLMComparisonResultV1` callbacks from Kafka and computes a live summary using the same helper as the trace harness: `compute_llm_trace_summary` from `scripts.llm_traces.eng5_cj_trace_capture`.
+    - Metrics compared against `tests/data/llm_traces/cj_lps_roundtrip_mock_20251205/summary.json`:
+      - Winners:
+        - Recorded fixture: `winner_counts={"Essay A": 4}`, `error_count=0`.
+        - Test assertion: all callbacks succeed, and at least 90% of winners are `"Essay A"` (in practice 100% with `cj_generic_batch`).
+      - Errors:
+        - Both recorded and live summaries must have `error_count == 0`.
+      - Token usage:
+        - For each field (`prompt_tokens`, `completion_tokens`, `total_tokens`), the live mean is required to be within a tolerance band of the recorded mean:
+          - `tolerance = max(5 tokens, 50% of recorded mean)`.
+        - This pins the mock to the same order-of-magnitude token usage as the captured scenario while allowing small drift if the prompt or justification strings change slightly.
+      - Latency:
+        - Live `mean_ms` and `p95_ms` must both be non-negative and within an additive band of the recorded trace:
+          - `mean_ms <= recorded_mean_ms + 100ms`.
+          - `p95_ms <= recorded_p95_ms + 200ms`.
+        - This keeps the mock’s latency profile within a reasonable multiple of the fixture while tolerating container and host variability.
+  - How to run:
+    - Start dev stack (with Kafka + LPS mock mode active):
+      - `pdm run dev-build-start`
+    - Run the parity test:
+      - `pdm run pytest-root tests/integration/test_cj_mock_parity_generic.py -m 'docker and integration' -v`
+
+- Progress (2025-12-05 – ENG5 full-anchor trace + mock mode and parity test implemented):
+  - ENG5 anchor trace (reusing existing GPT‑5.1 low run):
+    - Scenario id: `eng5_anchor_align_gpt51_low_20251201`.
+    - Source run:
+      - Runner batch label: `eng5-gpt51-low-20251201-142416`.
+      - BOS batch UUID: `ddc3f259-b125-4a08-97fb-f4907fa50b3d`.
+      - `cj_batch_id`: `138`.
+    - Capture command (with dev stack and Kafka up, using the standard CJ → LPS callback topic):
+      - ```bash
+        pdm run python -m scripts.llm_traces.eng5_cj_trace_capture \
+          --scenario-id eng5_anchor_align_gpt51_low_20251201 \
+          --bos-batch-id ddc3f259-b125-4a08-97fb-f4907fa50b3d \
+          --callback-topic huleedu.llm_provider.comparison_result.v1 \
+          --expected-count 0 \
+          --timeout-seconds 120 \
+          --output-dir tests/data/llm_traces
+        ```
+    - Fixtures:
+      - Directory: `tests/data/llm_traces/eng5_anchor_align_gpt51_low_20251201/`.
+      - Files:
+        - `llm_callbacks.jsonl` – 66 validated `LLMComparisonResultV1` events (12 anchors → 66 comparisons).
+        - `summary.json` – aggregate metrics for this ENG5 GPT‑5.1 low full-anchor scenario:
+          - `total_events=66`, `success_count=66`, `error_count=0`.
+          - `winner_counts={"Essay A": 35, "Essay B": 31}`.
+          - Token usage (means): `prompt_tokens≈1445.5`, `completion_tokens≈53.5`, `total_tokens≈1499.0`.
+          - Latency (means): `mean_ms≈1609.9`, `p95_ms≈2231.0`, `p99_ms≈2323.3`.
+  - New ENG5-specific mock mode:
+    - Enum: `MockMode.ENG5_ANCHOR_GPT51_LOW` added in `services/llm_provider_service/config.py`.
+    - Settings:
+      - `MOCK_MODE: MockMode = MockMode.DEFAULT` (default remains unchanged).
+      - Dev/test override for ENG5 anchor parity: `LLM_PROVIDER_SERVICE_MOCK_MODE=eng5_anchor_gpt51_low`.
+    - Behaviour in `MockProviderImpl` (`services/llm_provider_service/implementations/mock_provider_impl.py`):
+      - Helper: `_is_eng5_anchor_mode` detects `ENG5_ANCHOR_GPT51_LOW`.
+      - Error simulation:
+        - `_maybe_raise_error` is a no-op when `ENG5_ANCHOR_GPT51_LOW` is active, mirroring the all-success ENG5 trace (`error_count=0`).
+      - Winners:
+        - `_pick_winner` uses a hash-biased mapping from `prompt_sha256` to winners to approximate the recorded ENG5 distribution:
+          - `Essay A` when `int(prompt_sha256[:8], 16) % 66 < 35`, else `Essay B`.
+          - This yields ~35/66 vs 31/66 proportions over a full 66-comparison batch while remaining deterministic.
+      - Tokens:
+        - `_estimate_tokens` retains the generic estimator but, in ENG5 mode, enforces a higher token scale:
+          - `prompt_tokens >= 1100`.
+          - `completion_tokens >= 40`.
+        - This keeps ENG5 mock callbacks in the same order-of-magnitude token band as the recorded ENG5 trace (large prompts with moderately sized completions) without tying behaviour to the exact original prompts.
+      - Latency:
+        - `_apply_latency` uses a higher-latency profile when ENG5 mode is active and no explicit latency settings are configured:
+          - Defaults to `base_ms=1200`, `jitter_ms=800` when `MOCK_LATENCY_MS`/`MOCK_LATENCY_JITTER_MS` are zero.
+        - This approximates the 1.6–2.3s latency band observed in the ENG5 GPT‑5.1 low trace while still allowing explicit overrides via settings.
+  - New unit test:
+    - File: `services/llm_provider_service/tests/unit/test_mock_provider.py`.
+    - Test: `test_eng5_anchor_mode_produces_successful_responses`:
+      - Creates `Settings` with `MOCK_MODE=ENG5_ANCHOR_GPT51_LOW` and `MOCK_ERROR_RATE=1.0`.
+      - Asserts that:
+        - `generate_comparison(...)` returns a valid `LLMProviderResponse` without raising, confirming error simulation is disabled in ENG5 mode.
+        - `prompt_tokens >= 1100` and `completion_tokens >= 40`, pinning the ENG5 mock mode to a large-token regime.
+  - New docker-backed ENG5 full-anchor parity test:
+    - File: `tests/integration/test_eng5_mock_parity_full_anchor.py`.
+    - Flow:
+      - Uses `ServiceTestManager` to ensure `llm_provider_service` is healthy and `KafkaTestManager` to manage topics.
+      - Loads `summary.json` from `tests/data/llm_traces/eng5_anchor_align_gpt51_low_20251201/` as the recorded ENG5 baseline.
+      - Ensures a dedicated callback topic: `test.llm.mock_parity.eng5_anchor.v1`.
+      - Constructs 12 synthetic ENG5 anchor IDs and all unordered pairs (C(12, 2) = 66 comparisons) to mimic the shape of the recorded full-anchor trace.
+      - For each pair:
+        - Builds a CJ-shaped `ComparisonTask` + `CJLLMComparisonMetadata` with `bos_batch_id="bos-eng5-anchor-mock-parity-001"` and `cj_llm_batching_mode="per_request"`.
+        - Sends an `LLMComparisonRequest` to LPS via HTTP with:
+          - `user_prompt` describing the anchor pair.
+          - `callback_topic="test.llm.mock_parity.eng5_anchor.v1"`.
+          - `llm_config_overrides=LLMConfigOverridesHTTP(provider_override=LLMProviderType.MOCK)`.
+      - Consumes callbacks from Kafka, filters by `request_id`, and computes a live summary via `compute_llm_trace_summary(..., scenario_id="eng5_anchor_mock_parity")`.
+    - Metrics compared vs recorded ENG5 summary:
+      - Preconditions:
+        - Test is guarded to only run when `LLM_PROVIDER_SERVICE_MOCK_MODE=eng5_anchor_gpt51_low` in the host environment; otherwise it is skipped with an explicit message (LPS container must be restarted with this mode).
+      - Total events and errors:
+        - Require `live_summary["total_events"] == 66` and `live_summary["error_count"] == 0`.
+      - Winners:
+        - Computes proportions of `"Essay A"` / `"Essay B"` for recorded vs live summaries.
+        - Asserts per-label proportions are within ±20 percentage points, reflecting that ENG5 mode is hash-biased towards the recorded 35/31 split but not a strict replay.
+      - Tokens:
+        - For `prompt_tokens` and `total_tokens`, uses the generic tolerance:
+          - `tolerance = max(5 tokens, 50% of recorded mean)`.
+        - For `completion_tokens`, uses a slightly more forgiving band to account for shorter mock justifications:
+          - `tolerance = max(10 tokens, recorded_mean)`.
+      - Latency:
+        - Requires non-negative `mean_ms` and `p95_ms`.
+        - Enforces upper bounds:
+          - `mean_ms <= recorded_mean_ms + 100ms`.
+          - `p95_ms <= recorded_p95_ms + 200ms`.
+    - How to run:
+      - Configure ENG5 mock mode for LPS (in `.env`):
+        - `LLM_PROVIDER_SERVICE_USE_MOCK_LLM=true`
+        - `LLM_PROVIDER_SERVICE_MOCK_MODE=eng5_anchor_gpt51_low`
+      - Restart dev stack (or at least LPS) to pick up new env:
+        - `pdm run dev-build-start` (or `pdm run dev-restart llm_provider_service`).
+      - Run the ENG5 full-anchor parity test:
+        - `pdm run pytest-root tests/integration/test_eng5_mock_parity_full_anchor.py -m 'docker and integration' -v`

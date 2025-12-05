@@ -15,7 +15,7 @@ Use this file to coordinate what the very next agent should focus on.
 
 ---
 
-## 🎯 ACTIVE WORK (2025-12-04)
+## 🎯 ACTIVE WORK (2025-12-05)
 
 - EPIC-007 US-007.3 COMPLETE - creation scripts added:
   - `scripts/docs_mgmt/new_doc.py` - creates runbooks, ADRs, epics (`pdm run new-doc`)
@@ -25,7 +25,7 @@ Use this file to coordinate what the very next agent should focus on.
   - DecisionFrontmatter.id pattern fixed to `^ADR-\d{4}$` for consistency with EpicFrontmatter
   - Next: US-007.4 (Indexing Scripts) or US-007.5 (Unified Validation)
 
-  - ENG5 GPT‑5.1 usage/content parity experiments (006/007 prompts, reasoning_effort in {\"low\",\"none\"}) + LOWER5 tail-only loop:
+- ENG5 GPT‑5.1 usage/content parity experiments (006/007 prompts, reasoning_effort in {\"low\",\"none\"}) + LOWER5 tail-only loop:
       - Tasks:
         - `TASKS/programs/eng5-gpt-51-reasoning-effort-alignment-experiment.md`
         - `TASKS/programs/eng5/eng5-runner-assumption-hardening.md`
@@ -100,6 +100,114 @@ Use this file to coordinate what the very next agent should focus on.
 - Optional future work (keep in TASKS, not this session):
   - Refine Anthropic thinking controls and logging (`services/llm_provider_service/implementations/anthropic_provider_impl.py`, `services/llm_provider_service/tests/integration/test_anthropic_prompt_cache_blocks.py`).
   - Design and implement Google Gemini `thinkingConfig` mapping driven by `reasoning_effort` (see `TASKS/infrastructure/llm-provider-anthropic-thinking-controls.md` for current thinking patterns).
+
+- LLM mock provider CJ behavioural parity tests (trace capture harness + first generic scenario):
+  - Task:
+    - `TASKS/infrastructure/llm-mock-provider-cj-behavioural-parity-tests.md`
+  - New tooling implemented this session:
+    - Trace capture harness:
+      - `scripts/llm_traces/eng5_cj_trace_capture.py`
+        - Connects to Kafka, filters `LLMComparisonResultV1` callbacks by `request_metadata.bos_batch_id`, and persists:
+          - Raw callbacks as JSONL fixtures.
+          - Aggregate metrics summary (winner counts, error profile, response time stats, token usage stats; BT fields left as placeholders).
+      - Unit test:
+        - `scripts/tests/test_eng5_cj_trace_capture.py` – verifies summariser behaviour on synthetic callbacks.
+    - First canonical trace for a generic CJ ↔ LPS path:
+      - Scenario id: `cj_lps_roundtrip_mock_20251205`
+      - Source flow:
+        - `tests/integration/test_cj_lps_metadata_roundtrip.py::TestCJLPSMetadataRoundtrip::test_metadata_preserved_through_http_kafka_roundtrip`
+        - Uses `callback_topic="test.llm.callback.roundtrip.v1"`, `bos_batch_id="bos-roundtrip-001"`, `LLMProviderType.MOCK`.
+      - Fixtures:
+        - Directory: `tests/data/llm_traces/cj_lps_roundtrip_mock_20251205/`
+        - Files:
+          - `llm_callbacks.jsonl` – 4 validated `LLMComparisonResultV1` callbacks.
+          - `summary.json` – aggregate metrics for this scenario (all successes, `winner_counts={"Essay A": 4}`, no errors, stable token usage bands).
+  - How to regenerate this scenario:
+    - Ensure dev stack is running:
+      - `pdm run dev-build-start`
+    - Trigger the CJ ↔ LPS roundtrip once:
+      - `pdm run pytest-root tests/integration/test_cj_lps_metadata_roundtrip.py::TestCJLPSMetadataRoundtrip::test_metadata_preserved_through_http_kafka_roundtrip -m 'docker and integration' -v`
+    - Capture callbacks and summary:
+      - ```bash
+        pdm run python -m scripts.llm_traces.eng5_cj_trace_capture \
+          --scenario-id cj_lps_roundtrip_mock_20251205 \
+          --bos-batch-id bos-roundtrip-001 \
+          --callback-topic test.llm.callback.roundtrip.v1 \
+          --expected-count 1 \
+          --timeout-seconds 30 \
+          --output-dir tests/data/llm_traces
+        ```
+  - Latest progress on this stream (2025-12-05):
+    - Mock mode:
+      - New `MockMode` enum and `MOCK_MODE` setting added to `services/llm_provider_service/config.py` (`default` | `cj_generic_batch`).
+      - `.env` now sets `LLM_PROVIDER_SERVICE_MOCK_MODE=cj_generic_batch`, so the dev stack runs LPS in the CJ generic mock mode by default when `LLM_PROVIDER_SERVICE_USE_MOCK_LLM=true`.
+      - `MockProviderImpl` treats `cj_generic_batch` as:
+        - Always-success (no simulated provider errors, regardless of `MOCK_ERROR_RATE`).
+        - Winner pinned to `Essay A` (confidence still derived from existing base/jitter settings), keeping behaviour aligned with the `cj_lps_roundtrip_mock_20251205` fixture while preserving existing metadata and token estimation semantics.
+    - New docker-backed parity test:
+      - File: `tests/integration/test_cj_mock_parity_generic.py`
+      - Behaviour:
+        - Uses `ServiceTestManager` and `KafkaTestManager` to send a small batch (12) of CJ-shaped `LLMComparisonRequest`s through LPS with `LLMProviderType.MOCK` and `callback_topic="test.llm.mock_parity.generic.v1"`.
+        - Consumes `LLMComparisonResultV1` callbacks from Kafka and computes a live summary via `compute_llm_trace_summary` from `scripts.llm_traces.eng5_cj_trace_capture`.
+        - Compares live metrics against `tests/data/llm_traces/cj_lps_roundtrip_mock_20251205/summary.json`:
+          - Winners: require all-success callbacks and ≥90% `"Essay A"` winners (currently 100% with `cj_generic_batch`).
+          - Errors: require `error_count == 0` (mirrors fixture).
+          - Token usage: live mean prompt/completion/total tokens must stay within `max(5 tokens, 50% of recorded mean)` of the recorded means.
+          - Latency: live `mean_ms` and `p95_ms` must be non-negative and within `+100ms` and `+200ms` respectively of the recorded summary, bounding the mock’s latency profile while tolerating container variance.
+      - How to run:
+        - Ensure dev stack (including Kafka + LPS) is running:
+          - `pdm run dev-build-start`
+        - Run the parity test:
+          - `pdm run pytest-root tests/integration/test_cj_mock_parity_generic.py -m 'docker and integration' -v`
+      - Caveats:
+        - Assumes `LLM_PROVIDER_SERVICE_USE_MOCK_LLM=true` and `LLM_PROVIDER_SERVICE_MOCK_MODE=cj_generic_batch` are in effect for the LPS container (set via `.env` + standard compose).
+        - Generic parity test assumes `LLM_PROVIDER_SERVICE_MOCK_MODE=cj_generic_batch`; ENG5-specific mock modes and traces are handled separately (see ENG5 full-anchor parity notes below).
+  - ENG5 full-anchor mock parity status (2025-12-05):
+    - Trace:
+      - Scenario id: `eng5_anchor_align_gpt51_low_20251201`.
+      - Runner batch label: `eng5-gpt51-low-20251201-142416` (cj_batch_id `138`).
+      - BOS batch UUID: `ddc3f259-b125-4a08-97fb-f4907fa50b3d`.
+      - Callback topic used for capture: `huleedu.llm_provider.comparison_result.v1`.
+      - Fixture path: `tests/data/llm_traces/eng5_anchor_align_gpt51_low_20251201/`.
+    - Mock mode:
+      - Name: `ENG5_ANCHOR_GPT51_LOW` in `services/llm_provider_service/config.py` (`MockMode` enum).
+      - Behaviour (in `MockProviderImpl`):
+        - `_is_eng5_anchor_mode` gates ENG5-specific behaviour.
+        - `_maybe_raise_error` is disabled in ENG5 mode (all-success callbacks), matching the recorded ENG5 anchor trace.
+        - `_pick_winner` uses a hash-biased mapping (`int(prompt_sha256[:8], 16) % 66 < 35`) to approximate the recorded 35/31 winner split for Essay A/B over a 66-comparison batch.
+        - `_estimate_tokens` enforces a large-token regime for ENG5 mode (`prompt_tokens >= 1100`, `completion_tokens >= 40`) while still using the generic estimator as a base.
+        - `_apply_latency` defaults to a higher-latency profile (`base_ms=1200`, `jitter_ms=800`) when no explicit mock latency is configured, approximating the 1.6–2.3s ENG5 latency band.
+      - Env wiring:
+        - Default dev stack remains `LLM_PROVIDER_SERVICE_MOCK_MODE=cj_generic_batch`.
+        - ENG5 full-anchor parity test expects:
+          - `LLM_PROVIDER_SERVICE_USE_MOCK_LLM=true`
+          - `LLM_PROVIDER_SERVICE_MOCK_MODE=eng5_anchor_gpt51_low`
+          - LPS restarted with those env vars applied.
+    - Test:
+      - File: `tests/integration/test_eng5_mock_parity_full_anchor.py`.
+      - Pattern:
+        - Uses `ServiceTestManager` and `KafkaTestManager` to validate services and create topic `test.llm.mock_parity.eng5_anchor.v1`.
+        - Builds 12 synthetic ENG5 anchor IDs and all unordered pairs (C(12, 2) = 66) to mimic a full-anchor batch shape.
+        - For each pair:
+          - Constructs a CJ-shaped `ComparisonTask` / `CJLLMComparisonMetadata` with `bos_batch_id="bos-eng5-anchor-mock-parity-001"` and `cj_llm_batching_mode="per_request"`.
+          - Sends an `LLMComparisonRequest` to LPS with `LLMProviderType.MOCK` override and the ENG5 parity callback topic.
+        - Consumes `LLMComparisonResultV1` callbacks, filters by `request_id`, and computes a live summary via `compute_llm_trace_summary(..., scenario_id="eng5_anchor_mock_parity")`.
+        - Compares live metrics against `summary.json` from the ENG5 trace fixture:
+          - Requires 66/66 successes and `error_count == 0`.
+          - Winner proportions for `"Essay A"` / `"Essay B"` must be within ±20 percentage points of the recorded 35/31 split.
+          - Prompt/total token means must lie within `max(5 tokens, 50% of recorded mean)` of the recorded means.
+          - Completion token means use a slightly more forgiving band (`tolerance = max(10 tokens, recorded_mean)`).
+          - Latency mean and p95 must be non-negative and within `+100ms` / `+200ms` of the recorded ENG5 trace.
+      - Run command (with ENG5 mock mode configured as above):
+        - `pdm run pytest-root tests/integration/test_eng5_mock_parity_full_anchor.py -m 'docker and integration' -v`
+      - Caveats:
+        - The ENG5 full-anchor parity test is skipped unless `LLM_PROVIDER_SERVICE_MOCK_MODE=eng5_anchor_gpt51_low` is present in the test environment (matching the LPS container env).
+        - Assumes the ENG5 GPT‑5.1 low full-anchor trace remains captured under `eng5_anchor_align_gpt51_low_20251201`; if storage is reset, re-run `eng5_cj_trace_capture` using the documented BOS batch id and callback topic.
+  - Next recommended step for this stream (future session lead):
+    - Extend parity from ENG5 full-anchor runs to ENG5 LOWER5 small-net runs, by:
+      - Adding an ENG5 LOWER5-specific mock mode (e.g. `eng5_lower5_gpt51_low`) tuned against a LOWER5 GPT‑5.1 low trace (usage guard 007 + 006 rubric, 5 weakest anchors).
+      - Capturing a LOWER5 trace fixture + `summary.json` into `tests/data/llm_traces/<eng5_lower5_scenario_id>/` using the same trace harness (`eng5_cj_trace_capture`) with the appropriate `bos_batch_id` and callback topic.
+      - Adding a docker-backed integration test (e.g. `tests/integration/test_eng5_mock_parity_lower5.py`) that replays a LOWER5 CJ-shaped batch through LPS with the LOWER5 mock mode and compares winners, token usage, latency, and especially coverage / small-net metadata (Phase‑2 resampling and BT/coverage diagnostics) against the recorded LOWER5 fixture.
 
 - Anthropic / thinking controls status (2025-12-02):
   - `AnthropicProviderImpl` now maps `reasoning_effort` to an Anthropic `thinking` block for models that advertise `extended_thinking` in the manifest (e.g. `claude-haiku-4-5-20251001`), with `budget_tokens` derived from `max_tokens` and clamped to the `[1024, max_tokens)` interval.

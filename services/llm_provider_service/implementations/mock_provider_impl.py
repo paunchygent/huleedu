@@ -10,7 +10,7 @@ from uuid import UUID
 from common_core import EssayComparisonWinner, LLMProviderType
 from huleedu_service_libs.logging_utils import create_service_logger
 
-from services.llm_provider_service.config import Settings
+from services.llm_provider_service.config import MockMode, Settings
 from services.llm_provider_service.exceptions import raise_external_service_error
 from services.llm_provider_service.internal_models import LLMProviderResponse
 from services.llm_provider_service.protocols import LLMProviderProtocol
@@ -32,6 +32,8 @@ class MockProviderImpl(LLMProviderProtocol):
         self.settings = settings
         self.performance_mode = performance_mode
         self.base_seed = seed if seed is not None else settings.MOCK_PROVIDER_SEED
+        # Capture mock mode once for quick checks; fall back safely if missing.
+        self.mock_mode: MockMode = getattr(settings, "MOCK_MODE", MockMode.DEFAULT)
 
     async def generate_comparison(
         self,
@@ -126,6 +128,22 @@ class MockProviderImpl(LLMProviderProtocol):
         )
         return response
 
+    def _is_cj_generic_batch_mode(self) -> bool:
+        """Return True when running in cj_generic_batch mock mode."""
+        try:
+            return self.mock_mode == MockMode.CJ_GENERIC_BATCH
+        except Exception:
+            # Defensive fallback if settings were partially constructed
+            return False
+
+    def _is_eng5_anchor_mode(self) -> bool:
+        """Return True when running in ENG5 anchor GPT-5.1 low mock mode."""
+        try:
+            return self.mock_mode == MockMode.ENG5_ANCHOR_GPT51_LOW
+        except Exception:
+            # Defensive fallback if settings were partially constructed
+            return False
+
     def _rng(self, correlation_id: UUID) -> random.Random:
         """Create a deterministic RNG per request based on seed + correlation ID."""
         combined_seed = hash((self.base_seed, str(correlation_id))) & 0xFFFFFFFF
@@ -134,13 +152,21 @@ class MockProviderImpl(LLMProviderProtocol):
     async def _apply_latency(self, rng: random.Random) -> None:
         base_ms = max(0, self.settings.MOCK_LATENCY_MS)
         jitter_ms = max(0, self.settings.MOCK_LATENCY_JITTER_MS)
+
+        # For ENG5 anchor mode, default to a higher-latency profile that
+        # approximates the recorded GPT-5.1 low anchor run when no
+        # explicit latency overrides are configured.
+        if self._is_eng5_anchor_mode() and base_ms == 0 and jitter_ms == 0:
+            base_ms = 1200
+            jitter_ms = 800
+
         if base_ms == 0 and jitter_ms == 0:
             return
         delay_ms = base_ms + rng.uniform(0, jitter_ms)
         await asyncio.sleep(delay_ms / 1000.0)
 
     def _maybe_raise_error(self, rng: random.Random, correlation_id: UUID, model: str) -> None:
-        if self.performance_mode:
+        if self.performance_mode or self._is_cj_generic_batch_mode() or self._is_eng5_anchor_mode():
             return
 
         # Burst mode: if enabled, occasionally force a short run of failures
@@ -173,6 +199,22 @@ class MockProviderImpl(LLMProviderProtocol):
         )
 
     def _pick_winner(self, prompt_sha256: str) -> EssayComparisonWinner:
+        if self._is_cj_generic_batch_mode():
+            # For CJ generic batch mode, keep behaviour pinned: always favour Essay A
+            # to mirror winner_counts={"Essay A": N} in reference traces.
+            return EssayComparisonWinner.ESSAY_A
+
+        if self._is_eng5_anchor_mode():
+            # Bias winner selection to approximate the ENG5 full-anchor
+            # GPT-5.1 low distribution (35/66 Essay A vs 31/66 Essay B)
+            # using a stable hash-based mapping.
+            value = int(prompt_sha256[:8], 16)
+            return (
+                EssayComparisonWinner.ESSAY_A
+                if (value % 66) < 35
+                else EssayComparisonWinner.ESSAY_B
+            )
+
         value = int(prompt_sha256[:8], 16)
         return EssayComparisonWinner.ESSAY_A if value % 2 == 0 else EssayComparisonWinner.ESSAY_B
 
@@ -227,6 +269,14 @@ class MockProviderImpl(LLMProviderProtocol):
 
         prompt_tokens = estimate(prompt)
         completion_tokens = estimate(justification) + 10
+
+        # ENG5 anchor mode uses a higher token scale to approximate
+        # large ENG5 prompts and longer justifications observed in
+        # the GPT-5.1 low full-anchor traces.
+        if self._is_eng5_anchor_mode():
+            prompt_tokens = max(prompt_tokens, 1100)
+            completion_tokens = max(completion_tokens, 40)
+
         return prompt_tokens, completion_tokens
 
     def _cache_metadata(self, rng: random.Random, prompt_tokens: int) -> dict[str, Any]:
