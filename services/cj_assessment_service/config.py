@@ -243,6 +243,14 @@ class Settings(SecureServiceSettings, JWTValidationSettings):
             "unique pairwise coverage is complete."
         ),
     )
+    MAX_RESAMPLING_PASSES_FOR_REGULAR_BATCH: int = Field(
+        default=1,
+        description=(
+            "Maximum number of Phase-2 resampling passes allowed for non-small nets. "
+            "Acts as a conservative cap so regular batches cannot over-consume budget "
+            "via RESAMPLING and should be less than or equal to the small-net cap."
+        ),
+    )
 
     # Pair generation configuration
     PAIR_GENERATION_SEED: int | None = Field(
@@ -250,6 +258,15 @@ class Settings(SecureServiceSettings, JWTValidationSettings):
         description=(
             "Optional seed for deterministic pair position randomization. "
             "Leave unset in production to preserve unbiased ordering."
+        ),
+    )
+
+    # Pair orientation strategy configuration (DI-swappable)
+    PAIR_ORIENTATION_STRATEGY: str = Field(
+        default="fair_complement",
+        description=(
+            "Orientation strategy for A/B positions in COVERAGE and RESAMPLING. "
+            "Options: 'fair_complement' (per-essay skew + pair complement)."
         ),
     )
 

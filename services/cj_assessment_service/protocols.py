@@ -613,3 +613,30 @@ class PairMatchingStrategyProtocol(Protocol):
             Tuple of (filtered_essays, excluded_essay or None)
         """
         ...
+
+
+class PairOrientationStrategyProtocol(Protocol):
+    """Strategy for deciding A/B orientation for comparison pairs.
+
+    Centralises positional fairness decisions for both COVERAGE and RESAMPLING
+    modes while remaining DI-swappable for experiments.
+    """
+
+    def choose_coverage_orientation(
+        self,
+        pair: tuple["EssayForComparison", "EssayForComparison"],
+        per_essay_position_counts: dict[str, tuple[int, int]],
+        rng: Any,
+    ) -> tuple["EssayForComparison", "EssayForComparison"]:
+        """Return (essay_a, essay_b) orientation for COVERAGE mode."""
+        ...
+
+    def choose_resampling_orientation(
+        self,
+        pair: tuple["EssayForComparison", "EssayForComparison"],
+        per_pair_orientation_counts: dict[tuple[str, str], tuple[int, int]],
+        per_essay_position_counts: dict[str, tuple[int, int]],
+        rng: Any,
+    ) -> tuple["EssayForComparison", "EssayForComparison"]:
+        """Return (essay_a, essay_b) orientation for RESAMPLING mode."""
+        ...

@@ -38,6 +38,9 @@ from services.cj_assessment_service.cj_core_logic.grade_projector import GradePr
 from services.cj_assessment_service.cj_core_logic.matching_strategies import (
     OptimalGraphMatchingStrategy,
 )
+from services.cj_assessment_service.cj_core_logic.pair_orientation import (
+    FairComplementOrientationStrategy,
+)
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.config import settings as service_settings
 from services.cj_assessment_service.implementations.anchor_repository import (
@@ -85,6 +88,7 @@ from services.cj_assessment_service.protocols import (
     LLMInteractionProtocol,
     LLMProviderProtocol,
     PairMatchingStrategyProtocol,
+    PairOrientationStrategyProtocol,
     RetryManagerProtocol,
     SessionProviderProtocol,
 )
@@ -387,6 +391,19 @@ class CJAssessmentServiceProvider(Provider):
         # elif settings.PAIR_MATCHING_STRATEGY == "d_optimal":
         #     return DOptimalDesignStrategy()
         raise ValueError(f"Unknown matching strategy: {settings.PAIR_MATCHING_STRATEGY}")
+
+    @provide(scope=Scope.APP)
+    def provide_pair_orientation_strategy(
+        self,
+        settings: Settings,
+    ) -> PairOrientationStrategyProtocol:
+        """Provide pair orientation strategy based on configuration.
+
+        Centralises all A/B positional decisions for both COVERAGE and RESAMPLING.
+        """
+        if settings.PAIR_ORIENTATION_STRATEGY == "fair_complement":
+            return FairComplementOrientationStrategy()
+        raise ValueError(f"Unknown pair orientation strategy: {settings.PAIR_ORIENTATION_STRATEGY}")
 
     @provide(scope=Scope.APP)
     def provide_batch_retry_processor(
