@@ -6,6 +6,7 @@ All setup logic is delegated to startup_setup.py.
 
 from quart import Quart
 
+from services.llm_provider_service.api.admin_routes import admin_bp
 from services.llm_provider_service.api.health_routes import health_bp
 from services.llm_provider_service.api.llm_routes import llm_bp
 from services.llm_provider_service.config import settings
@@ -29,6 +30,7 @@ async def shutdown() -> None:
 
 # Register blueprints
 app.register_blueprint(health_bp)
+app.register_blueprint(admin_bp)
 app.register_blueprint(llm_bp, url_prefix="/api/v1")
 
 if __name__ == "__main__":
