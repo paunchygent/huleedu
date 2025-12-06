@@ -50,7 +50,7 @@ class FairComplementOrientationStrategy(PairOrientationStrategyProtocol):
         skew_b = a_b - b_b
 
         if skew_a == 0 and skew_b == 0:
-            return self._deterministic_fallback(pair, rng)
+            return self._random_fallback(pair, rng)
 
         if skew_a > 0 and skew_b < 0:
             return essay_b, essay_a
@@ -69,7 +69,7 @@ class FairComplementOrientationStrategy(PairOrientationStrategyProtocol):
         if combined_skew_b_first < combined_skew_a_first:
             return essay_b, essay_a
 
-        return self._deterministic_fallback(pair, rng)
+        return self._random_fallback(pair, rng)
 
     def choose_resampling_orientation(
         self,
@@ -98,16 +98,16 @@ class FairComplementOrientationStrategy(PairOrientationStrategyProtocol):
         return self.choose_coverage_orientation(pair, per_essay_position_counts, rng)
 
     @staticmethod
-    def _deterministic_fallback(
+    def _random_fallback(
         pair: Tuple[EssayForComparison, EssayForComparison],
         rng: RandomLike,
     ) -> Tuple[EssayForComparison, EssayForComparison]:
-        essay_a, essay_b = pair
-        if essay_a.id < essay_b.id:
-            return essay_a, essay_b
-        if essay_b.id < essay_a.id:
-            return essay_b, essay_a
+        """Random 50/50 orientation when skew provides no guidance.
 
+        Used when both essays have equal positional skew, ensuring no
+        systematic bias based on ID naming patterns.
+        """
+        essay_a, essay_b = pair
         if rng.random() < 0.5:
             return essay_a, essay_b
         return essay_b, essay_a

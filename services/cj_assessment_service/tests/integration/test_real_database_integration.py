@@ -48,6 +48,7 @@ from services.cj_assessment_service.protocols import (
     CJComparisonRepositoryProtocol,
     CJEssayRepositoryProtocol,
     ContentClientProtocol,
+    PairOrientationStrategyProtocol,
     SessionProviderProtocol,
 )
 from services.cj_assessment_service.tests.fixtures.database_fixtures import PostgresDataAccess
@@ -198,7 +199,10 @@ class TestRealDatabaseIntegration:
             ),
         )
 
-        orientation_strategy = MagicMock()
+        orientation_strategy = MagicMock(spec=PairOrientationStrategyProtocol)
+        # Return pair unchanged - pass-through orientation for testing
+        orientation_strategy.choose_coverage_orientation.side_effect = lambda pair, *_: pair
+        orientation_strategy.choose_resampling_orientation.side_effect = lambda pair, *_: pair
 
         result = await process_single_message(
             kafka_msg,
@@ -490,7 +494,10 @@ class TestRealDatabaseIntegration:
             ),
         )
 
-        orientation_strategy = MagicMock()
+        orientation_strategy = MagicMock(spec=PairOrientationStrategyProtocol)
+        # Return pair unchanged - pass-through orientation for testing
+        orientation_strategy.choose_coverage_orientation.side_effect = lambda pair, *_: pair
+        orientation_strategy.choose_resampling_orientation.side_effect = lambda pair, *_: pair
 
         result = await process_single_message(
             kafka_msg,

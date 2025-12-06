@@ -51,9 +51,11 @@ def test_coverage_orientation_reduces_skew_for_underused_a_position() -> None:
     assert oriented_b.id == "essay-b"
 
 
-def test_coverage_orientation_uses_deterministic_fallback_on_equal_skew() -> None:
+def test_coverage_orientation_uses_random_fallback_on_equal_skew() -> None:
+    """When skew is equal, RNG determines orientation (no ID-based bias)."""
     strategy = FairComplementOrientationStrategy()
-    rng = _DeterministicRandom()
+    # rng.random() returns 0.1 < 0.5 → (essay_a, essay_b) returned
+    rng = _DeterministicRandom([0.1])
 
     essay_a = _make_essay("e1")
     essay_b = _make_essay("e2")
@@ -71,6 +73,31 @@ def test_coverage_orientation_uses_deterministic_fallback_on_equal_skew() -> Non
 
     assert oriented_a.id == "e1"
     assert oriented_b.id == "e2"
+
+
+def test_coverage_orientation_random_fallback_respects_rng() -> None:
+    """Random fallback uses RNG value to determine orientation."""
+    strategy = FairComplementOrientationStrategy()
+    # rng.random() returns 0.9 >= 0.5 → (essay_b, essay_a) returned
+    rng = _DeterministicRandom([0.9])
+
+    essay_a = _make_essay("e1")
+    essay_b = _make_essay("e2")
+
+    per_essay_counts: PerEssayPositionCounts = {
+        "e1": (1, 1),
+        "e2": (2, 2),
+    }
+
+    oriented_a, oriented_b = strategy.choose_coverage_orientation(
+        (essay_a, essay_b),
+        per_essay_counts,
+        rng,
+    )
+
+    # With rng=0.9 >= 0.5, the second essay should be in A position
+    assert oriented_a.id == "e2"
+    assert oriented_b.id == "e1"
 
 
 @pytest.mark.parametrize(

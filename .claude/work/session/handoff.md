@@ -17,6 +17,69 @@ Use this file to coordinate what the very next agent should focus on.
 
 ## 🎯 ACTIVE WORK (2025-12-06)
 
+### Session Summary: DB Integration Test for Per-Pair Orientation Counts
+
+**Current session (continued from prior context compaction):**
+
+| Item | Status |
+|------|--------|
+| `test_pair_generation_orientation_counts.py` | ✅ Created (7 tests, all pass) |
+| typecheck-all | ✅ 1382 source files, no errors |
+| CJ service test suite | ⚠️ 747 passed, 3 failed (pre-existing) |
+
+**Test file created:** `services/cj_assessment_service/tests/unit/test_pair_generation_orientation_counts.py`
+- Tests `_fetch_per_pair_orientation_counts()` helper against real PostgreSQL (testcontainers)
+- Validates AB/BA orientation counting semantics:
+  - AB count = times lower-ID essay was in A position
+  - BA count = times higher-ID essay was in A position
+- Parametrized tests for only-AB, only-BA, mixed orientations
+- UUID-format ID test to catch sorting edge cases
+- Rule 075/070 compliant: <500 LoC, testcontainers, parametrized
+
+**Integration test failures fixed this session:**
+
+| Test | Root Cause | Fix Applied |
+|------|-----------|-------------|
+| `test_anchor_positions_are_balanced_in_db` | `_deterministic_fallback` used ID ordering instead of RNG, causing systematic bias | Renamed to `_random_fallback`, now uses RNG for true 50/50 |
+| `test_full_batch_lifecycle_with_real_database` | `MagicMock()` without spec/side_effect | Added `spec=PairOrientationStrategyProtocol` + `side_effect` |
+| `test_all_failed_comparisons_move_batch_to_error_state` | Same MagicMock issue | Same fix |
+
+**Files modified:**
+- `services/cj_assessment_service/cj_core_logic/pair_orientation.py` - `_deterministic_fallback` → `_random_fallback`
+- `services/cj_assessment_service/tests/integration/test_real_database_integration.py` - Added import + mock configuration
+- `services/cj_assessment_service/tests/unit/test_pair_orientation_strategy.py` - Renamed test + added RNG verification test
+- `services/cj_assessment_service/tests/integration/test_llm_payload_construction_integration.py` - Updated assertions to accept any orientation
+
+**Validation:**
+- `pdm run typecheck-all`: 1382 source files, no errors
+- `pdm run pytest-root services/cj_assessment_service/tests/`: 751 passed, 2 skipped
+
+### Prior Session Summary: CJ Positional Orientation Strategy - Code Review & Fixes
+
+**Commits created prior session:**
+
+| Commit | Type | Description |
+|--------|------|-------------|
+| `3cd39b0a` | chore | Remove obsolete `task_frontmatter_schema.py` reference |
+| `5b04f533` | feat | Add `PairOrientationStrategy` layer (protocol, impl, DI, config) |
+| `e2e2f7cc` | feat | Integrate orientation strategy into pair generation |
+| `59819b1a` | feat | Generalize RESAMPLING for regular (non-small) batches |
+| `0dd4c3e1` | test | Add positional fairness helper for A/B count analysis |
+| `8185b384` | test | Expand docker integration tests for continuation and resampling |
+| `cb2fc240` | docs | Update CJ task tracking and runbooks for orientation strategy |
+| `109c2a01` | fix | Complete orientation_strategy DI wiring and fix argument order |
+
+**Code review findings (all resolved in commit `109c2a01`):**
+- Fixed incomplete DI wiring where `orientation_strategy` wasn't threaded through all call paths
+- Fixed argument order in `event_processor.py` (grade_projector must come before orientation_strategy)
+- Updated 21 files including all affected test files to include `mock_orientation_strategy` fixture
+- Added inline comment explaining the combined_skew formula in `pair_orientation.py:61-65`
+- `pdm run typecheck-all` passes with no errors (1381→1382 source files after test addition)
+
+---
+
+### CJ Assessment Positional Orientation Strategy Details
+
 - CJ Assessment positional orientation strategy for COVERAGE and RESAMPLING:
 
   - Current state:
@@ -252,11 +315,17 @@ Use this file to coordinate what the very next agent should focus on.
 
 ## NEXT SESSION INSTRUCTION (for the next developer)
 
-Role: You are the lead developer and architect of HuleEdu. Your scope on the CJ
-side is to **tighten positional fairness behaviour (COVERAGE + RESAMPLING) and
-begin lifting positional diagnostics from unit-level helpers into docker/ENG5
-harnesses**, without regressing existing PR‑2/PR‑7 semantics or the ENG5 LOWER5
-docker harness.
+Role: You are the lead developer and architect of HuleEdu. Your **primary objective**
+is to **validate positional fairness via docker harnesses** - this validates the business
+requirement that LLM positional bias cannot accumulate across continuation cycles and
+corrupt BT rankings.
+
+**Why harness validation is critical:**
+- Without fair A/B distribution, essays that consistently land in LLM's "preferred" position
+  (typically Essay A) accumulate wins they shouldn't have
+- Over multiple comparison waves, this bias compounds and distorts final BT scores
+- The `_random_fallback` fix ensures 50/50 orientation when skew is equal, but we need
+  harness-level validation that this produces fair distributions in real batch scenarios
 
 Before touching code:
 - From repo root, read:

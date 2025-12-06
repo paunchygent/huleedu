@@ -90,9 +90,11 @@ class TestLLMPayloadConstructionIntegration:
         )
 
         user_prompt = http_request["user_prompt"]
-        assert f"**Essay A (ID: {essays[0].id}):**" in user_prompt
+        # Both essays must appear in prompt - orientation may vary due to random fallback
+        essay_ids = {essays[0].id, essays[1].id}
+        assert any(f"**Essay A (ID: {eid}):**" in user_prompt for eid in essay_ids)
+        assert any(f"**Essay B (ID: {eid}):**" in user_prompt for eid in essay_ids)
         assert essays[0].text_content in user_prompt
-        assert f"**Essay B (ID: {essays[1].id}):**" in user_prompt
         assert essays[1].text_content in user_prompt
         assert "prompt_blocks" in http_request
         assert len(http_request["prompt_blocks"]) == 3  # essay A, essay B, instructions
@@ -315,8 +317,11 @@ class TestLLMPayloadConstructionIntegration:
         assert llm_config["system_prompt_override"] == test_settings.SYSTEM_PROMPT
 
         metadata = http_request["metadata"]
-        assert metadata["essay_a_id"] == essays[0].id
-        assert metadata["essay_b_id"] == essays[1].id
+        # Orientation may vary due to random fallback - verify both essays present
+        essay_ids = {essays[0].id, essays[1].id}
+        assert metadata["essay_a_id"] in essay_ids
+        assert metadata["essay_b_id"] in essay_ids
+        assert metadata["essay_a_id"] != metadata["essay_b_id"]
         assert metadata["bos_batch_id"] == bos_batch_id
 
         assert http_request["callback_topic"] == test_settings.LLM_PROVIDER_CALLBACK_TOPIC
