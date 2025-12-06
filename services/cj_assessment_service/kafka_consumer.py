@@ -36,6 +36,7 @@ from services.cj_assessment_service.protocols import (
     ContentClientProtocol,
     LLMInteractionProtocol,
     PairMatchingStrategyProtocol,
+    PairOrientationStrategyProtocol,
     SessionProviderProtocol,
 )
 
@@ -58,6 +59,7 @@ class CJAssessmentKafkaConsumer:
         event_publisher: CJEventPublisherProtocol,
         llm_interaction: LLMInteractionProtocol,
         matching_strategy: PairMatchingStrategyProtocol,
+        orientation_strategy: PairOrientationStrategyProtocol,
         redis_client: RedisClientProtocol,
         grade_projector: GradeProjector,
         tracer: "Tracer | None" = None,
@@ -74,6 +76,7 @@ class CJAssessmentKafkaConsumer:
         self.event_publisher = event_publisher
         self.llm_interaction = llm_interaction
         self.matching_strategy = matching_strategy
+        self.orientation_strategy = orientation_strategy
         self.redis_client = redis_client
         self.grade_projector = grade_projector
         self.tracer = tracer
@@ -104,6 +107,7 @@ class CJAssessmentKafkaConsumer:
                 event_publisher=self.event_publisher,
                 llm_interaction=self.llm_interaction,
                 matching_strategy=self.matching_strategy,
+                orientation_strategy=self.orientation_strategy,
                 settings_obj=self.settings,
                 grade_projector=self.grade_projector,
                 tracer=self.tracer,
@@ -126,6 +130,7 @@ class CJAssessmentKafkaConsumer:
                 content_client=self.content_client,
                 llm_interaction=self.llm_interaction,
                 matching_strategy=self.matching_strategy,
+                orientation_strategy=self.orientation_strategy,
                 settings_obj=self.settings,
                 instruction_repository=self.instruction_repository,
                 grade_projector=self.grade_projector,

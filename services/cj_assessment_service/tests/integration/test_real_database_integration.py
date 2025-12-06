@@ -198,6 +198,8 @@ class TestRealDatabaseIntegration:
             ),
         )
 
+        orientation_strategy = MagicMock()
+
         result = await process_single_message(
             kafka_msg,
             postgres_session_provider,
@@ -212,6 +214,7 @@ class TestRealDatabaseIntegration:
             mock_matching_strategy,  # matching_strategy
             test_settings,  # settings_obj
             grade_projector,
+            orientation_strategy,
         )
 
         # Assert - Verify message processed successfully
@@ -252,6 +255,7 @@ class TestRealDatabaseIntegration:
             instruction_repository=postgres_instruction_repository,
             matching_strategy=mock_matching_strategy,
             grade_projector=grade_projector,
+            orientation_strategy=orientation_strategy,
         )
 
         # Verify callbacks were processed
@@ -291,6 +295,7 @@ class TestRealDatabaseIntegration:
                 matching_strategy=mock_matching_strategy,
                 retry_processor=None,
                 grade_projector=grade_projector,
+                orientation_strategy=orientation_strategy,
             )
 
         # Verify database operations occurred
@@ -485,6 +490,8 @@ class TestRealDatabaseIntegration:
             ),
         )
 
+        orientation_strategy = MagicMock()
+
         result = await process_single_message(
             kafka_msg,
             postgres_session_provider,
@@ -499,6 +506,7 @@ class TestRealDatabaseIntegration:
             mock_matching_strategy,
             test_settings,
             grade_projector,
+            orientation_strategy,
         )
 
         assert result is True
@@ -545,6 +553,7 @@ class TestRealDatabaseIntegration:
             matching_strategy=mock_matching_strategy,
             retry_processor=None,
             grade_projector=grade_projector,
+            orientation_strategy=orientation_strategy,
         )
 
         # Assert: under PR-2 semantics, the batch should be in an explicit

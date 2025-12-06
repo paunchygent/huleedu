@@ -27,6 +27,7 @@ from services.cj_assessment_service.protocols import (
     ContentClientProtocol,
     LLMInteractionProtocol,
     PairMatchingStrategyProtocol,
+    PairOrientationStrategyProtocol,
     SessionProviderProtocol,
 )
 
@@ -86,6 +87,12 @@ def mock_comparison_repository() -> AsyncMock:
 def mock_matching_strategy() -> MagicMock:
     """Create mock matching strategy protocol."""
     return MagicMock(spec=PairMatchingStrategyProtocol)
+
+
+@pytest.fixture
+def mock_orientation_strategy() -> MagicMock:
+    """Create mock orientation strategy protocol."""
+    return MagicMock(spec=PairOrientationStrategyProtocol)
 
 
 def create_llm_callback_message(
@@ -193,6 +200,7 @@ class TestLLMCallbackProcessing:
         mock_comparison_repository: AsyncMock,
         mock_grade_projector_local: AsyncMock,
         mock_matching_strategy: MagicMock,
+        mock_orientation_strategy: MagicMock,
     ) -> None:
         """Test successful processing of LLM comparison result."""
         # Arrange
@@ -225,6 +233,7 @@ class TestLLMCallbackProcessing:
             llm_interaction=mock_llm_interaction,
             settings_obj=mock_settings,
             matching_strategy=mock_matching_strategy,
+            orientation_strategy=mock_orientation_strategy,
             grade_projector=mock_grade_projector_local,
             tracer=None,
         )
@@ -242,6 +251,7 @@ class TestLLMCallbackProcessing:
         assert comparison_result.winner == "Essay A"
         assert comparison_result.justification == "Clear and concise"
         assert comparison_result.confidence == 4.8
+        assert call_args["orientation_strategy"] is mock_orientation_strategy
 
     @patch(
         "services.cj_assessment_service.message_handlers.llm_callback_handler.continue_cj_assessment_workflow"
@@ -258,6 +268,7 @@ class TestLLMCallbackProcessing:
         mock_comparison_repository: AsyncMock,
         mock_grade_projector_local: AsyncMock,
         mock_matching_strategy: MagicMock,
+        mock_orientation_strategy: MagicMock,
     ) -> None:
         """Test processing of error callback from LLM provider."""
         # Arrange
@@ -287,6 +298,7 @@ class TestLLMCallbackProcessing:
             llm_interaction=mock_llm_interaction,
             settings_obj=mock_settings,
             matching_strategy=mock_matching_strategy,
+            orientation_strategy=mock_orientation_strategy,
             grade_projector=mock_grade_projector_local,
             tracer=None,
         )
@@ -318,6 +330,7 @@ class TestLLMCallbackProcessing:
         mock_comparison_repository: AsyncMock,
         mock_grade_projector_local: AsyncMock,
         mock_matching_strategy: MagicMock,
+        mock_orientation_strategy: MagicMock,
     ) -> None:
         """Ensure additive metadata is available to downstream workflow logic."""
         request_metadata = {
@@ -344,6 +357,7 @@ class TestLLMCallbackProcessing:
             llm_interaction=mock_llm_interaction,
             settings_obj=mock_settings,
             matching_strategy=mock_matching_strategy,
+            orientation_strategy=mock_orientation_strategy,
             grade_projector=mock_grade_projector_local,
             tracer=None,
         )
@@ -366,6 +380,7 @@ class TestLLMCallbackProcessing:
         mock_comparison_repository: AsyncMock,
         mock_grade_projector_local: AsyncMock,
         mock_matching_strategy: MagicMock,
+        mock_orientation_strategy: MagicMock,
     ) -> None:
         """Test handling of invalid callback messages."""
         # Create invalid message (not proper JSON)
@@ -399,6 +414,7 @@ class TestLLMCallbackProcessing:
             llm_interaction=mock_llm_interaction,
             settings_obj=mock_settings,
             matching_strategy=mock_matching_strategy,
+            orientation_strategy=mock_orientation_strategy,
             grade_projector=mock_grade_projector_local,
             tracer=None,
         )
@@ -424,6 +440,7 @@ class TestLLMCallbackProcessing:
         mock_comparison_repository: AsyncMock,
         mock_grade_projector_local: AsyncMock,
         mock_matching_strategy: MagicMock,
+        mock_orientation_strategy: MagicMock,
     ) -> None:
         """Test handling when workflow processing fails."""
         # Arrange
@@ -456,6 +473,7 @@ class TestLLMCallbackProcessing:
             llm_interaction=mock_llm_interaction,
             settings_obj=mock_settings,
             matching_strategy=mock_matching_strategy,
+            orientation_strategy=mock_orientation_strategy,
             grade_projector=mock_grade_projector_local,
             tracer=None,
         )
@@ -479,6 +497,7 @@ class TestLLMCallbackProcessing:
         mock_comparison_repository: AsyncMock,
         mock_grade_projector_local: AsyncMock,
         mock_matching_strategy: MagicMock,
+        mock_orientation_strategy: MagicMock,
     ) -> None:
         """Test processing multiple callbacks in sequence."""
         # Arrange
@@ -509,6 +528,7 @@ class TestLLMCallbackProcessing:
                 llm_interaction=mock_llm_interaction,
                 settings_obj=mock_settings,
                 matching_strategy=mock_matching_strategy,
+                orientation_strategy=mock_orientation_strategy,
                 grade_projector=mock_grade_projector_local,
                 tracer=None,
             )

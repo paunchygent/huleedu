@@ -126,6 +126,7 @@ async def test_high_failure_rate_does_not_finalize_with_zero_successes(
     mock_essay_repository.get_essays_for_cj_batch = AsyncMock(return_value=essays)
     mock_grade_projector = AsyncMock()
     mock_matching_strategy = make_real_matching_strategy_mock()
+    mock_orientation_strategy = AsyncMock()
 
     await wc.trigger_existing_workflow_continuation(
         batch_id=42,
@@ -141,6 +142,7 @@ async def test_high_failure_rate_does_not_finalize_with_zero_successes(
         llm_interaction=llm_interaction,
         matching_strategy=mock_matching_strategy,
         grade_projector=mock_grade_projector,
+        orientation_strategy=mock_orientation_strategy,
     )
 
     finalize_failure_called.assert_awaited_once()
@@ -233,6 +235,7 @@ async def test_low_success_rate_does_not_finalize_despite_some_successes(
     mock_essay_repository.get_essays_for_cj_batch = AsyncMock(return_value=essays)
     mock_grade_projector = AsyncMock()
     mock_matching_strategy = make_real_matching_strategy_mock()
+    mock_orientation_strategy = AsyncMock()
 
     await wc.trigger_existing_workflow_continuation(
         batch_id=43,
@@ -248,6 +251,7 @@ async def test_low_success_rate_does_not_finalize_despite_some_successes(
         llm_interaction=llm_interaction,
         matching_strategy=mock_matching_strategy,
         grade_projector=mock_grade_projector,
+        orientation_strategy=mock_orientation_strategy,
     )
 
     finalize_failure_called.assert_awaited_once()

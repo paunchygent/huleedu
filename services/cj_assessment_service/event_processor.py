@@ -44,6 +44,7 @@ from services.cj_assessment_service.protocols import (
     ContentClientProtocol,
     LLMInteractionProtocol,
     PairMatchingStrategyProtocol,
+    PairOrientationStrategyProtocol,
     SessionProviderProtocol,
 )
 
@@ -102,6 +103,7 @@ async def process_single_message(
     matching_strategy: PairMatchingStrategyProtocol,
     settings_obj: Settings,
     grade_projector: GradeProjector,
+    orientation_strategy: PairOrientationStrategyProtocol,
     tracer: "Tracer | None" = None,
 ) -> bool:
     """Process a single Kafka message containing CJ assessment request.
@@ -122,6 +124,7 @@ async def process_single_message(
         llm_interaction: LLM interaction protocol
         matching_strategy: DI-injected strategy for computing optimal pairs
         settings_obj: Application settings
+        orientation_strategy: DI-injected strategy for pair orientation (A/B positions)
         tracer: Optional OpenTelemetry tracer
 
     Returns:
@@ -177,6 +180,7 @@ async def process_single_message(
                     matching_strategy,
                     settings_obj,
                     grade_projector,
+                    orientation_strategy,
                     tracer,
                 )
     else:
@@ -196,6 +200,7 @@ async def process_single_message(
             matching_strategy,
             settings_obj,
             grade_projector,
+            orientation_strategy,
             tracer,
         )
 
@@ -210,6 +215,7 @@ async def process_llm_result(
     content_client: ContentClientProtocol,
     llm_interaction: LLMInteractionProtocol,
     matching_strategy: PairMatchingStrategyProtocol,
+    orientation_strategy: PairOrientationStrategyProtocol,
     settings_obj: Settings,
     instruction_repository: AssessmentInstructionRepositoryProtocol,
     grade_projector: GradeProjector,
@@ -229,6 +235,7 @@ async def process_llm_result(
         content_client: Content client for fetching anchor essays
         llm_interaction: LLM interaction protocol
         matching_strategy: DI-injected strategy for computing optimal pairs
+        orientation_strategy: DI-injected strategy for pair orientation (A/B positions)
         settings_obj: Application settings
         instruction_repository: Instruction repository for assessment instructions
         tracer: Optional OpenTelemetry tracer
@@ -249,5 +256,6 @@ async def process_llm_result(
         settings_obj,
         instruction_repository,
         grade_projector,
+        orientation_strategy,
         tracer,
     )

@@ -216,6 +216,8 @@ async def test_process_message_increments_prompt_success_metric(
         SERVICE_NAME="cj_assessment_service",
     )
 
+    orientation_strategy = MagicMock()
+
     # Act
     await process_single_message(
         msg=kafka_msg,
@@ -229,6 +231,7 @@ async def test_process_message_increments_prompt_success_metric(
         event_publisher=event_publisher,
         llm_interaction=llm_interaction,
         matching_strategy=mock_matching_strategy,
+        orientation_strategy=orientation_strategy,
         grade_projector=Mock(spec=GradeProjector),
         settings_obj=settings,
     )
@@ -240,6 +243,7 @@ async def test_process_message_increments_prompt_success_metric(
     converted_request_data = workflow_mock.call_args.kwargs["request_data"]
     assert converted_request_data.assignment_id == "assignment-909"
     assert converted_request_data.student_prompt_text == "Prompt body"
+    assert workflow_mock.call_args.kwargs["orientation_strategy"] is orientation_strategy
 
 
 @pytest.mark.asyncio
@@ -319,6 +323,8 @@ async def test_process_message_hydrates_judge_rubric_text(
         SERVICE_NAME="cj_assessment_service",
     )
 
+    orientation_strategy = MagicMock()
+
     await process_single_message(
         msg=kafka_msg,
         session_provider=session_provider,
@@ -331,6 +337,7 @@ async def test_process_message_hydrates_judge_rubric_text(
         event_publisher=event_publisher,
         llm_interaction=llm_interaction,
         matching_strategy=mock_matching_strategy,
+        orientation_strategy=orientation_strategy,
         grade_projector=Mock(spec=GradeProjector),
         settings_obj=settings,
     )

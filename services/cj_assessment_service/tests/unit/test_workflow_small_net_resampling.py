@@ -137,6 +137,7 @@ async def test_small_net_phase2_requests_additional_comparisons_before_resamplin
 
     mock_grade_projector = AsyncMock()
     mock_matching_strategy = make_real_matching_strategy_mock()
+    mock_orientation_strategy = AsyncMock()
 
     await wc.trigger_existing_workflow_continuation(
         batch_id=50,
@@ -152,6 +153,7 @@ async def test_small_net_phase2_requests_additional_comparisons_before_resamplin
         llm_interaction=llm_interaction,
         matching_strategy=mock_matching_strategy,
         grade_projector=mock_grade_projector,
+        orientation_strategy=mock_orientation_strategy,
     )
 
     request_additional.assert_awaited_once()
@@ -319,6 +321,7 @@ async def test_small_net_phase2_tracks_resampling_pass_count(monkeypatch: Any) -
 
     mock_grade_projector = AsyncMock()
     mock_matching_strategy = make_real_matching_strategy_mock()
+    mock_orientation_strategy = AsyncMock()
 
     await wc.trigger_existing_workflow_continuation(
         batch_id=51,
@@ -334,6 +337,7 @@ async def test_small_net_phase2_tracks_resampling_pass_count(monkeypatch: Any) -
         llm_interaction=llm_interaction,
         matching_strategy=mock_matching_strategy,
         grade_projector=mock_grade_projector,
+        orientation_strategy=mock_orientation_strategy,
     )
 
     merge_metadata.assert_awaited_once()
@@ -440,6 +444,7 @@ async def test_small_net_resampling_respects_resampling_pass_cap(monkeypatch: An
 
     mock_grade_projector = AsyncMock()
     mock_matching_strategy = make_real_matching_strategy_mock()
+    mock_orientation_strategy = AsyncMock()
 
     await wc.trigger_existing_workflow_continuation(
         batch_id=52,
@@ -455,6 +460,7 @@ async def test_small_net_resampling_respects_resampling_pass_cap(monkeypatch: An
         llm_interaction=llm_interaction,
         matching_strategy=mock_matching_strategy,
         grade_projector=mock_grade_projector,
+        orientation_strategy=mock_orientation_strategy,
     )
 
     assert request_additional.await_count == 0
@@ -563,6 +569,7 @@ async def test_regular_batch_resampling_branch_requests_resampling(monkeypatch: 
 
     mock_grade_projector = AsyncMock()
     mock_matching_strategy = make_real_matching_strategy_mock()
+    mock_orientation_strategy = AsyncMock()
 
     await wc.trigger_existing_workflow_continuation(
         batch_id=200,
@@ -578,6 +585,7 @@ async def test_regular_batch_resampling_branch_requests_resampling(monkeypatch: 
         llm_interaction=llm_interaction,
         matching_strategy=mock_matching_strategy,
         grade_projector=mock_grade_projector,
+        orientation_strategy=mock_orientation_strategy,
     )
 
     # Regular-batch resampling should be attempted once, using RESAMPLING mode.

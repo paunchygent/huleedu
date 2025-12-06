@@ -38,6 +38,7 @@ from services.cj_assessment_service.protocols import (
     ContentClientProtocol,
     LLMInteractionProtocol,
     PairMatchingStrategyProtocol,
+    PairOrientationStrategyProtocol,
     SessionProviderProtocol,
 )
 
@@ -57,6 +58,7 @@ async def handle_llm_comparison_callback(
     settings: Settings,
     instruction_repository: AssessmentInstructionRepositoryProtocol,
     grade_projector: GradeProjector,
+    orientation_strategy: PairOrientationStrategyProtocol,
     tracer: "Tracer | None" = None,
 ) -> bool:
     """Handle LLM comparison result callback from LLM Provider Service.
@@ -73,6 +75,7 @@ async def handle_llm_comparison_callback(
         matching_strategy: DI-injected strategy for computing optimal pairs
         settings: Application settings
         instruction_repository: Instruction repository for assessment instructions
+        orientation_strategy: DI-injected strategy for deciding A/B orientation
         tracer: Optional OpenTelemetry tracer for distributed tracing
 
     Returns:
@@ -183,6 +186,7 @@ async def handle_llm_comparison_callback(
                         instruction_repository=instruction_repository,
                         matching_strategy=matching_strategy,
                         grade_projector=grade_projector,
+                        orientation_strategy=orientation_strategy,
                     )
         else:
             # No parent context, process without it
@@ -200,6 +204,7 @@ async def handle_llm_comparison_callback(
                 instruction_repository=instruction_repository,
                 matching_strategy=matching_strategy,
                 grade_projector=grade_projector,
+                orientation_strategy=orientation_strategy,
             )
 
         # Record callback processing metrics

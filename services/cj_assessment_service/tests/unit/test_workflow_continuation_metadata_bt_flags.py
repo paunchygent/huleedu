@@ -145,6 +145,7 @@ async def test_trigger_continuation_metadata_serializable_without_previous_score
     mock_essay_repository.get_essays_for_cj_batch = AsyncMock(return_value=essays)
     mock_grade_projector = AsyncMock()
     mock_matching_strategy = make_real_matching_strategy_mock()
+    mock_orientation_strategy = AsyncMock()
 
     await wc.trigger_existing_workflow_continuation(
         batch_id=11,
@@ -160,6 +161,7 @@ async def test_trigger_continuation_metadata_serializable_without_previous_score
         llm_interaction=llm_interaction,
         matching_strategy=mock_matching_strategy,
         grade_projector=mock_grade_projector,
+        orientation_strategy=mock_orientation_strategy,
     )
 
     merge_metadata.assert_awaited_once()
@@ -341,6 +343,7 @@ async def test_bt_quality_flags_derived_from_bt_se_summary(monkeypatch: Any) -> 
     mock_essay_repository.get_essays_for_cj_batch = AsyncMock(return_value=essays)
     mock_grade_projector = AsyncMock()
     mock_matching_strategy = make_real_matching_strategy_mock()
+    mock_orientation_strategy = AsyncMock()
 
     for _ in se_summaries:
         await wc.trigger_existing_workflow_continuation(
@@ -357,6 +360,7 @@ async def test_bt_quality_flags_derived_from_bt_se_summary(monkeypatch: Any) -> 
             llm_interaction=llm_interaction,
             matching_strategy=mock_matching_strategy,
             grade_projector=mock_grade_projector,
+            orientation_strategy=mock_orientation_strategy,
         )
 
     assert merge_metadata.await_count == len(se_summaries)

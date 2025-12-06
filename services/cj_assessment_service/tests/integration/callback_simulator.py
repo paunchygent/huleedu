@@ -37,6 +37,7 @@ if TYPE_CHECKING:
         CJEventPublisherProtocol,
         ContentClientProtocol,
         PairMatchingStrategyProtocol,
+        PairOrientationStrategyProtocol,
         SessionProviderProtocol,
     )
 
@@ -65,6 +66,7 @@ class CallbackSimulator:
         instruction_repository: AssessmentInstructionRepositoryProtocol,
         matching_strategy: "PairMatchingStrategyProtocol",
         grade_projector: "GradeProjector",
+        orientation_strategy: "PairOrientationStrategyProtocol",
         cj_batch_id: int | None = None,
     ) -> int:
         """Process mock LLM results as if they were callbacks.
@@ -86,6 +88,8 @@ class CallbackSimulator:
             essay_repository: Repository for essay operations
             comparison_repository: Repository for comparison operations
             instruction_repository: Repository for instruction metadata
+            matching_strategy: Matching strategy used for pair generation
+            orientation_strategy: Orientation strategy used for A/B positioning
             cj_batch_id: Optional CJ batch ID (will be retrieved if not provided)
 
         Returns:
@@ -208,6 +212,7 @@ class CallbackSimulator:
                 matching_strategy=matching_strategy,
                 grade_projector=grade_projector,
                 retry_processor=None,  # Not needed for successful callbacks
+                orientation_strategy=orientation_strategy,
             )
 
             callbacks_processed += 1

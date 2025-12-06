@@ -58,6 +58,9 @@ class FairComplementOrientationStrategy(PairOrientationStrategyProtocol):
         if skew_a < 0 and skew_b > 0:
             return essay_a, essay_b
 
+        # Simulate placing each essay in A position: essay_a's skew increases by 1
+        # (one more A appearance), essay_b's skew decreases by 1 (one more B appearance).
+        # Choose the orientation that minimizes total absolute skew after the comparison.
         combined_skew_a_first = abs(skew_a + 1) + abs(skew_b - 1)
         combined_skew_b_first = abs(skew_a - 1) + abs(skew_b + 1)
 

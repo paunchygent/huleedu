@@ -31,6 +31,7 @@ from services.cj_assessment_service.protocols import (
     ContentClientProtocol,
     LLMInteractionProtocol,
     PairMatchingStrategyProtocol,
+    PairOrientationStrategyProtocol,
     SessionProviderProtocol,
 )
 from services.cj_assessment_service.tests.fixtures.database_fixtures import PostgresDataAccess
@@ -46,6 +47,11 @@ def mock_llm_interaction() -> AsyncMock:
 @pytest.fixture
 def mock_grade_projector() -> AsyncMock:
     return AsyncMock(spec=GradeProjector)
+
+
+@pytest.fixture
+def mock_orientation_strategy() -> AsyncMock:
+    return AsyncMock(spec=PairOrientationStrategyProtocol)
 
 
 @pytest.mark.integration
@@ -183,6 +189,7 @@ class TestErrorHandlingIntegration:
         mock_llm_interaction: AsyncMock,
         mock_grade_projector: AsyncMock,
         mock_matching_strategy: MagicMock,
+        mock_orientation_strategy: AsyncMock,
     ) -> None:
         """Test handling of orphaned callbacks."""
         # Arrange - Use a correlation_id that has no corresponding comparison pair in database
@@ -212,6 +219,7 @@ class TestErrorHandlingIntegration:
             mock_content_client,
             mock_llm_interaction,
             mock_matching_strategy,
+            mock_orientation_strategy,
             test_settings,
             instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
             grade_projector=mock_grade_projector,
@@ -242,6 +250,7 @@ class TestErrorHandlingIntegration:
         mock_llm_interaction: AsyncMock,
         mock_grade_projector: AsyncMock,
         mock_matching_strategy: MagicMock,
+        mock_orientation_strategy: AsyncMock,
     ) -> None:
         """Test idempotent handling of duplicate callbacks."""
         # Arrange - Create real database setup with incomplete comparison pair
@@ -321,6 +330,7 @@ class TestErrorHandlingIntegration:
             mock_content_client,
             mock_llm_interaction,
             mock_matching_strategy,
+            mock_orientation_strategy,
             test_settings,
             instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
             grade_projector=mock_grade_projector,
@@ -335,6 +345,7 @@ class TestErrorHandlingIntegration:
             mock_content_client,
             mock_llm_interaction,
             mock_matching_strategy,
+            mock_orientation_strategy,
             test_settings,
             instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
             grade_projector=mock_grade_projector,
@@ -375,6 +386,7 @@ class TestErrorHandlingIntegration:
         mock_llm_interaction: AsyncMock,
         mock_grade_projector: AsyncMock,
         mock_matching_strategy: MagicMock,
+        mock_orientation_strategy: AsyncMock,
     ) -> None:
         """Test batch failure when error rate exceeds threshold."""
         # Arrange - Create real database setup with multiple comparison pairs
@@ -458,6 +470,7 @@ class TestErrorHandlingIntegration:
                 mock_content_client,
                 mock_llm_interaction,
                 mock_matching_strategy,
+                mock_orientation_strategy,
                 test_settings,
                 instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
                 grade_projector=mock_grade_projector,
@@ -484,6 +497,7 @@ class TestErrorHandlingIntegration:
                 mock_content_client,
                 mock_llm_interaction,
                 mock_matching_strategy,
+                mock_orientation_strategy,
                 test_settings,
                 instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
                 grade_projector=mock_grade_projector,
@@ -534,6 +548,7 @@ class TestErrorHandlingIntegration:
         mock_llm_interaction: AsyncMock,
         mock_grade_projector: AsyncMock,
         mock_matching_strategy: MagicMock,
+        mock_orientation_strategy: AsyncMock,
     ) -> None:
         """Test handling of malformed callback messages with real repository.
 
@@ -574,6 +589,7 @@ class TestErrorHandlingIntegration:
             mock_content_client,
             mock_llm_interaction,
             mock_matching_strategy,
+            mock_orientation_strategy,
             test_settings,
             instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
             grade_projector=mock_grade_projector,
@@ -601,6 +617,7 @@ class TestErrorHandlingIntegration:
         mock_llm_interaction: AsyncMock,
         mock_grade_projector: AsyncMock,
         mock_matching_strategy: MagicMock,
+        mock_orientation_strategy: AsyncMock,
     ) -> None:
         """Test handling of database connection failures with real repository.
 
@@ -644,6 +661,7 @@ class TestErrorHandlingIntegration:
             mock_content_client,
             mock_llm_interaction,
             mock_matching_strategy,
+            mock_orientation_strategy,
             test_settings,
             instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
             grade_projector=mock_grade_projector,
@@ -670,6 +688,7 @@ class TestErrorHandlingIntegration:
         mock_llm_interaction: AsyncMock,
         mock_grade_projector: AsyncMock,
         mock_matching_strategy: MagicMock,
+        mock_orientation_strategy: AsyncMock,
     ) -> None:
         """Test handling of event publishing failures with real database operations.
 
@@ -756,6 +775,7 @@ class TestErrorHandlingIntegration:
             mock_content_client,
             mock_llm_interaction,
             mock_matching_strategy,
+            mock_orientation_strategy,
             test_settings,
             instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
             grade_projector=mock_grade_projector,

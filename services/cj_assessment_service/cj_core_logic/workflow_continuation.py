@@ -40,6 +40,7 @@ from services.cj_assessment_service.protocols import (
     ContentClientProtocol,
     LLMInteractionProtocol,
     PairMatchingStrategyProtocol,
+    PairOrientationStrategyProtocol,
     SessionProviderProtocol,
 )
 
@@ -137,11 +138,16 @@ async def trigger_existing_workflow_continuation(
     matching_strategy: PairMatchingStrategyProtocol,
     retry_processor: "BatchRetryProcessor | None" = None,
     grade_projector: GradeProjector | None = None,
+    orientation_strategy: PairOrientationStrategyProtocol | None = None,
 ) -> None:
     """Continue workflow after callback if conditions allow.
 
     - Checks completion thresholds and triggers finalization via BatchFinalizer
     - Requests additional comparisons when budget remains and stability not reached
+
+    The same DI-provided PairOrientationStrategyProtocol is threaded into both
+    COVERAGE and RESAMPLING continuation paths. When orientation_strategy is
+    None (legacy callers), FairComplementOrientationStrategy will be used.
     """
     log_extra = {"correlation_id": str(correlation_id), "batch_id": batch_id}
     logger.info("Triggering workflow continuation", extra=log_extra)
@@ -321,6 +327,7 @@ async def trigger_existing_workflow_continuation(
             instruction_repository=instruction_repository,
             llm_interaction=llm_interaction,
             matching_strategy=matching_strategy,
+            orientation_strategy=orientation_strategy,
             settings=settings,
             correlation_id=correlation_id,
             log_extra=log_extra,
@@ -483,6 +490,7 @@ async def trigger_existing_workflow_continuation(
             instruction_repository=instruction_repository,
             llm_interaction=llm_interaction,
             matching_strategy=matching_strategy,
+            orientation_strategy=orientation_strategy,
             settings=settings,
             correlation_id=correlation_id,
             log_extra=log_extra,

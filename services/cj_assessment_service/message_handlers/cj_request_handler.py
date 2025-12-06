@@ -54,6 +54,7 @@ from services.cj_assessment_service.protocols import (
     ContentClientProtocol,
     LLMInteractionProtocol,
     PairMatchingStrategyProtocol,
+    PairOrientationStrategyProtocol,
     SessionProviderProtocol,
 )
 
@@ -75,6 +76,7 @@ async def handle_cj_assessment_request(
     matching_strategy: PairMatchingStrategyProtocol,
     settings: Settings,
     grade_projector: GradeProjector,
+    orientation_strategy: PairOrientationStrategyProtocol,
     tracer: "Tracer | None" = None,
 ) -> bool:
     """Handle CJ assessment request message from ELS.
@@ -94,6 +96,7 @@ async def handle_cj_assessment_request(
         matching_strategy: DI-injected strategy for computing optimal pairs
         settings: Application settings
         grade_projector: Grade projector for grade predictions
+        orientation_strategy: DI-injected strategy for deciding A/B orientation
         tracer: Optional OpenTelemetry tracer
 
     Returns:
@@ -239,6 +242,7 @@ async def handle_cj_assessment_request(
             event_publisher=event_publisher,
             settings=settings,
             grade_projector=grade_projector,
+            orientation_strategy=orientation_strategy,
         )
 
         # ALL workflows are async - comparisons submitted, results come via callbacks

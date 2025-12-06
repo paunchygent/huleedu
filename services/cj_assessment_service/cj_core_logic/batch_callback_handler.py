@@ -31,6 +31,7 @@ from services.cj_assessment_service.protocols import (
     ContentClientProtocol,
     LLMInteractionProtocol,
     PairMatchingStrategyProtocol,
+    PairOrientationStrategyProtocol,
     SessionProviderProtocol,
 )
 
@@ -64,6 +65,7 @@ async def continue_cj_assessment_workflow(
     instruction_repository: AssessmentInstructionRepositoryProtocol,
     matching_strategy: PairMatchingStrategyProtocol,
     grade_projector: "GradeProjector",
+    orientation_strategy: PairOrientationStrategyProtocol,
     retry_processor: BatchRetryProcessor | None = None,
 ) -> None:
     """Process LLM callback and continue existing workflow.
@@ -84,6 +86,7 @@ async def continue_cj_assessment_workflow(
         llm_interaction: LLM interaction protocol
         instruction_repository: Instruction repository for assessment instructions
         matching_strategy: DI-injected strategy for computing optimal pairs
+        orientation_strategy: DI-injected strategy for deciding A/B orientation
         retry_processor: Optional retry processor for failed comparison handling
     """
     # Lazy imports to avoid scipy/coverage conflict at module initialization
@@ -167,6 +170,7 @@ async def continue_cj_assessment_workflow(
                 matching_strategy=matching_strategy,
                 retry_processor=retry_processor,
                 grade_projector=grade_projector,
+                orientation_strategy=orientation_strategy,
             )
         else:
             logger.info(

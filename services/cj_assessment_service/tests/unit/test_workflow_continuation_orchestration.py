@@ -106,6 +106,7 @@ async def test_trigger_continuation_finalizes_when_callbacks_hit_cap(monkeypatch
     mock_essay_repository.get_essays_for_cj_batch = AsyncMock(return_value=essays)
     mock_grade_projector = AsyncMock()
     mock_matching_strategy = make_real_matching_strategy_mock()
+    mock_orientation_strategy = AsyncMock()
 
     await wc.trigger_existing_workflow_continuation(
         batch_id=9,
@@ -121,6 +122,7 @@ async def test_trigger_continuation_finalizes_when_callbacks_hit_cap(monkeypatch
         llm_interaction=llm_interaction,
         matching_strategy=mock_matching_strategy,
         grade_projector=mock_grade_projector,
+        orientation_strategy=mock_orientation_strategy,
     )
 
     finalize_called.assert_awaited_once()
@@ -207,6 +209,7 @@ async def test_trigger_continuation_requests_more_when_not_finalized(
     mock_essay_repository.get_essays_for_cj_batch = AsyncMock(return_value=essays)
     mock_grade_projector = AsyncMock()
     mock_matching_strategy = make_real_matching_strategy_mock()
+    mock_orientation_strategy = AsyncMock()
 
     await wc.trigger_existing_workflow_continuation(
         batch_id=10,
@@ -222,6 +225,7 @@ async def test_trigger_continuation_requests_more_when_not_finalized(
         llm_interaction=llm_interaction,
         matching_strategy=mock_matching_strategy,
         grade_projector=mock_grade_projector,
+        orientation_strategy=mock_orientation_strategy,
     )
 
     request_additional.assert_awaited_once()

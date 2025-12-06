@@ -27,6 +27,7 @@ from services.cj_assessment_service.protocols import (
     CJComparisonRepositoryProtocol,
     CJEssayRepositoryProtocol,
     PairMatchingStrategyProtocol,
+    PairOrientationStrategyProtocol,
 )
 from services.cj_assessment_service.tests.unit.test_mocks import (
     MockRedisClient,
@@ -123,6 +124,7 @@ def mock_boundary_services() -> dict[str, Any]:
     mock_event_publisher.publish_assessment_completed = AsyncMock()
     mock_event_publisher.publish_assessment_failed = AsyncMock()
     mock_llm_interaction = AsyncMock()
+    mock_orientation_strategy = AsyncMock(spec=PairOrientationStrategyProtocol)
 
     class Settings:
         MAX_PAIRWISE_COMPARISONS = 100
@@ -141,6 +143,7 @@ def mock_boundary_services() -> dict[str, Any]:
         "content_client": mock_content_client,
         "event_publisher": mock_event_publisher,
         "llm_interaction": mock_llm_interaction,
+        "orientation_strategy": mock_orientation_strategy,
         "settings": settings,
     }
 
@@ -193,6 +196,7 @@ async def test_processing_failure_keeps_lock(
             event_publisher=event_publisher,
             llm_interaction=llm_interaction,
             matching_strategy=mock_matching_strategy,
+            orientation_strategy=mock_boundary_services["orientation_strategy"],
             grade_projector=Mock(spec=GradeProjector),
             settings_obj=settings,
         )

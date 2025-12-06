@@ -32,6 +32,7 @@ from services.cj_assessment_service.protocols import (
     ContentClientProtocol,
     LLMInteractionProtocol,
     PairMatchingStrategyProtocol,
+    PairOrientationStrategyProtocol,
     SessionProviderProtocol,
 )
 
@@ -68,6 +69,7 @@ async def run_cj_assessment_workflow(
     event_publisher: CJEventPublisherProtocol,
     settings: Settings,
     grade_projector: GradeProjector,
+    orientation_strategy: PairOrientationStrategyProtocol,
 ) -> CJAssessmentWorkflowResult:
     """Run the complete CJ assessment workflow for a batch of essays.
 
@@ -86,6 +88,7 @@ async def run_cj_assessment_workflow(
         event_publisher: Event publisher protocol implementation
         settings: Application settings
         grade_projector: Grade projector for grade predictions
+        orientation_strategy: DI-injected strategy for deciding A/B orientation
 
     Raises:
         Exception: If the workflow encounters an unrecoverable error
@@ -164,6 +167,7 @@ async def run_cj_assessment_workflow(
             instruction_repository=instruction_repository,
             llm_interaction=llm_interaction,
             matching_strategy=matching_strategy,
+            orientation_strategy=orientation_strategy,
             request_data=request_data,
             settings=settings,
             correlation_id=correlation_id,

@@ -16,6 +16,9 @@ from services.cj_assessment_service.cj_core_logic.grade_projection.projection_re
     GradeProjectionRepository,
 )
 from services.cj_assessment_service.cj_core_logic.grade_projector import GradeProjector
+from services.cj_assessment_service.cj_core_logic.pair_orientation import (
+    FairComplementOrientationStrategy,
+)
 from services.cj_assessment_service.cj_core_logic.workflow_orchestrator import (
     run_cj_assessment_workflow,
 )
@@ -133,6 +136,7 @@ async def test_original_request_metadata_persists_and_rehydrates(
             anchor_repository=postgres_anchor_repository,
         ),
         settings=test_settings,
+        orientation_strategy=FairComplementOrientationStrategy(),
     )
 
     batch_id = int(workflow_result.batch_id)
