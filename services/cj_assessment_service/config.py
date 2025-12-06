@@ -231,8 +231,9 @@ class Settings(SecureServiceSettings, JWTValidationSettings):
     MIN_RESAMPLING_NET_SIZE: int = Field(
         default=3,
         description=(
-            "Nets with expected_essay_count below this threshold are treated as small and "
-            "eligible for limited Phase-2 resampling semantics."
+            "Maximum essay count for nets to be treated as small; nets with "
+            "expected_essay_count <= MIN_RESAMPLING_NET_SIZE use small-net "
+            "Phase-2 resampling semantics."
         ),
     )
     MAX_RESAMPLING_PASSES_FOR_SMALL_NET: int = Field(

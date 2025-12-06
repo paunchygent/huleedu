@@ -140,10 +140,14 @@ def build_small_net_context(
       MAX_RESAMPLING_PASSES_FOR_SMALL_NET.
     """
 
-    # Normalize essay count to keep behaviour identical to previous logic.
+    # Normalize essay count.
     normalized_expected_essay_count = expected_essay_count or 0
 
-    is_small_net = normalized_expected_essay_count < min_resampling_net_size
+    # Treat nets with essay_count <= MIN_RESAMPLING_NET_SIZE as small nets.
+    # This aligns with ENG5 LOWER5 semantics where a "small batch" size of N
+    # means all nets with N or fewer essays should follow small-net resampling
+    # behaviour.
+    is_small_net = normalized_expected_essay_count <= min_resampling_net_size
 
     # Prefer metadata coverage metrics but allow repository-derived
     # coverage_metrics to update them when coverage progresses between
