@@ -8,6 +8,9 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.cj_assessment_service.cj_core_logic import pair_generation
+from services.cj_assessment_service.cj_core_logic.pair_orientation import (
+    PairOrientationStrategyProtocol,
+)
 from services.cj_assessment_service.models_api import EssayForComparison
 from services.cj_assessment_service.protocols import (
     AssessmentInstructionRepositoryProtocol,
@@ -17,6 +20,31 @@ from services.cj_assessment_service.protocols import (
 from services.cj_assessment_service.tests.helpers.matching_strategies import (
     make_real_matching_strategy_mock,
 )
+
+
+class RandomOrientationStrategy(PairOrientationStrategyProtocol):
+    """Test-only orientation strategy that randomizes A/B positions."""
+
+    def choose_coverage_orientation(
+        self,
+        pair: tuple[EssayForComparison, EssayForComparison],
+        per_essay_position_counts: dict[str, tuple[int, int]],
+        rng: object,
+    ) -> tuple[EssayForComparison, EssayForComparison]:
+        essay_a, essay_b = pair
+        random = getattr(rng, "random")
+        if callable(random) and random() < 0.5:
+            return essay_a, essay_b
+        return essay_b, essay_a
+
+    def choose_resampling_orientation(
+        self,
+        pair: tuple[EssayForComparison, EssayForComparison],
+        per_pair_orientation_counts: dict[tuple[str, str], tuple[int, int]],
+        per_essay_position_counts: dict[str, tuple[int, int]],
+        rng: object,
+    ) -> tuple[EssayForComparison, EssayForComparison]:
+        return self.choose_coverage_orientation(pair, per_essay_position_counts, rng)
 
 
 @pytest.fixture(autouse=True)
@@ -39,6 +67,25 @@ def stub_db_helpers(monkeypatch: pytest.MonkeyPatch) -> None:
         pair_generation,
         "_fetch_comparison_counts",
         AsyncMock(return_value={}),
+    )
+
+    async def fake_per_essay_counts(*_: object, **__: object) -> dict[str, tuple[int, int]]:
+        return {}
+
+    async def fake_per_pair_counts(
+        *_: object, **__: object
+    ) -> dict[tuple[str, str], tuple[int, int]]:
+        return {}
+
+    monkeypatch.setattr(
+        pair_generation,
+        "_fetch_per_essay_position_counts",
+        fake_per_essay_counts,
+    )
+    monkeypatch.setattr(
+        pair_generation,
+        "_fetch_per_pair_orientation_counts",
+        fake_per_pair_counts,
     )
 
 
@@ -71,12 +118,15 @@ async def test_seed_produces_deterministic_pair_order(
 ) -> None:
     """Generating with the same seed should return identical ordering."""
 
+    orientation_strategy = RandomOrientationStrategy()
+
     tasks_first = await pair_generation.generate_comparison_tasks(
         essays_for_comparison=sample_essays,
         session_provider=AsyncMock(spec=SessionProviderProtocol),
         comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
         instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
         matching_strategy=mock_matching_strategy,
+        orientation_strategy=orientation_strategy,
         cj_batch_id=99,
         correlation_id=None,
         randomization_seed=42,
@@ -88,6 +138,7 @@ async def test_seed_produces_deterministic_pair_order(
         comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
         instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
         matching_strategy=mock_matching_strategy,
+        orientation_strategy=orientation_strategy,
         cj_batch_id=99,
         correlation_id=None,
         randomization_seed=42,
@@ -116,12 +167,23 @@ async def test_randomization_swaps_positions_when_triggered(
 
     monkeypatch.setattr(pair_generation, "_should_swap_positions", never_swap)
 
+    baseline_orientation = RandomOrientationStrategy()
+    flip_orientation = MagicMock(spec=PairOrientationStrategyProtocol)
+
+    def flip_coverage_orientation(pair, per_essay_counts, rng):  # type: ignore[no-untyped-def]
+        essay_a, essay_b = pair
+        return essay_b, essay_a
+
+    flip_orientation.choose_coverage_orientation.side_effect = flip_coverage_orientation
+    flip_orientation.choose_resampling_orientation.side_effect = flip_coverage_orientation
+
     baseline_tasks = await pair_generation.generate_comparison_tasks(
         essays_for_comparison=sample_essays,
         session_provider=AsyncMock(spec=SessionProviderProtocol),
         comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
         instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
         matching_strategy=mock_matching_strategy,
+        orientation_strategy=baseline_orientation,
         cj_batch_id=1,
         correlation_id=None,
         randomization_seed=7,
@@ -145,6 +207,7 @@ async def test_randomization_swaps_positions_when_triggered(
         comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
         instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
         matching_strategy=mock_matching_strategy,
+        orientation_strategy=flip_orientation,
         cj_batch_id=1,
         correlation_id=None,
         randomization_seed=7,
@@ -166,6 +229,8 @@ async def test_anchor_positions_are_balanced(
 ) -> None:
     """Across diverse seeds, anchors should occupy essay_a about half the time."""
 
+    orientation_strategy = RandomOrientationStrategy()
+
     anchor_a_total = 0
     anchor_pair_total = 0
 
@@ -176,6 +241,7 @@ async def test_anchor_positions_are_balanced(
             comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
             instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
             matching_strategy=mock_matching_strategy,
+            orientation_strategy=orientation_strategy,
             cj_batch_id=2,
             randomization_seed=seed,
         )
@@ -224,6 +290,8 @@ async def test_anchor_position_chi_squared(
     mock_matching_strategy.compute_wave_pairs.side_effect = constant_pairs
     mock_matching_strategy.compute_wave_size.side_effect = lambda n_essays: max(0, n_essays // 2)
 
+    orientation_strategy = RandomOrientationStrategy()
+
     anchor_a_count = 0
     anchor_b_count = 0
 
@@ -236,6 +304,7 @@ async def test_anchor_position_chi_squared(
             comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
             instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
             matching_strategy=mock_matching_strategy,
+            orientation_strategy=orientation_strategy,
             cj_batch_id=seed,
             randomization_seed=seed,
         )

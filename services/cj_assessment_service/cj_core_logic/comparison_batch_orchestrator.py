@@ -20,6 +20,9 @@ from services.cj_assessment_service.cj_core_logic.llm_batching_service import (
     BatchingModeService,
 )
 from services.cj_assessment_service.cj_core_logic.pair_generation import PairGenerationMode
+from services.cj_assessment_service.cj_core_logic.pair_orientation import (
+    PairOrientationStrategyProtocol,
+)
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
 from services.cj_assessment_service.models_api import (
@@ -50,6 +53,7 @@ class ComparisonBatchOrchestrator:
         instruction_repository: AssessmentInstructionRepositoryProtocol,
         llm_interaction: LLMInteractionProtocol,
         matching_strategy: PairMatchingStrategyProtocol,
+        orientation_strategy: PairOrientationStrategyProtocol,
         settings: Settings,
         batching_service: BatchingModeService,
         request_normalizer: ComparisonRequestNormalizer,
@@ -60,6 +64,7 @@ class ComparisonBatchOrchestrator:
         self.instruction_repository = instruction_repository
         self.llm_interaction = llm_interaction
         self.matching_strategy = matching_strategy
+        self.orientation_strategy = orientation_strategy
         self.settings = settings
         self.batching_service = batching_service
         self.request_normalizer = request_normalizer
@@ -111,6 +116,7 @@ class ComparisonBatchOrchestrator:
                 comparison_repository=self.comparison_repository,
                 instruction_repository=self.instruction_repository,
                 matching_strategy=self.matching_strategy,
+                orientation_strategy=self.orientation_strategy,
                 cj_batch_id=cj_batch_id,
                 max_pairwise_comparisons=normalized.max_pairs_cap,
                 correlation_id=correlation_id,

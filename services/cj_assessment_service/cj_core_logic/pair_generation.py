@@ -14,6 +14,11 @@ from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from services.cj_assessment_service.cj_core_logic.pair_orientation import (
+    PairOrientationStrategyProtocol,
+    PerEssayPositionCounts,
+    PerPairOrientationCounts,
+)
 from services.cj_assessment_service.cj_core_logic.prompt_templates import PromptTemplateBuilder
 from services.cj_assessment_service.models_api import ComparisonTask, EssayForComparison
 from services.cj_assessment_service.models_db import ComparisonPair as CJ_ComparisonPair
@@ -54,6 +59,7 @@ async def generate_comparison_tasks(
     comparison_repository: CJComparisonRepositoryProtocol,
     instruction_repository: AssessmentInstructionRepositoryProtocol,
     matching_strategy: PairMatchingStrategyProtocol,
+    orientation_strategy: PairOrientationStrategyProtocol,
     cj_batch_id: int,
     max_pairwise_comparisons: int | None = None,
     correlation_id: UUID | None = None,
@@ -124,7 +130,7 @@ async def generate_comparison_tasks(
             remaining_budget = max_pairwise_comparisons - budget_consumed
             if remaining_budget <= 0:
                 logger.warning(
-                    "Global comparison cap reached; no new pairs will be generated",
+                    "Global comparison budget exhausted; no new pairs will be generated",
                     extra={
                         "cj_batch_id": cj_batch_id,
                         "mode": mode.name,
@@ -246,7 +252,7 @@ async def generate_comparison_tasks(
             matched_pairs = [(essay_a, essay_b) for _, _, _, essay_a, essay_b in selected]
 
             logger.info(
-                "Selected resampling pairs for small-net Phase-2 wave",
+                "Selected resampling pairs for Phase-2 wave",
                 extra={
                     "cj_batch_id": cj_batch_id,
                     "mode": mode.name,
@@ -267,14 +273,40 @@ async def generate_comparison_tasks(
             )
             return []
 
-        # Build ComparisonTasks from matched pairs
+        # Build ComparisonTasks from matched pairs using orientation strategy.
         comparison_tasks: list[ComparisonTask] = []
         randomizer = _build_pair_randomizer(randomization_seed)
 
+        if mode is PairGenerationMode.COVERAGE:
+            per_essay_position_counts = await _fetch_per_essay_position_counts(
+                session=session,
+                cj_batch_id=cj_batch_id,
+            )
+            per_pair_orientation_counts = {}
+        else:
+            per_essay_position_counts = await _fetch_per_essay_position_counts(
+                session=session,
+                cj_batch_id=cj_batch_id,
+            )
+            per_pair_orientation_counts = await _fetch_per_pair_orientation_counts(
+                session=session,
+                cj_batch_id=cj_batch_id,
+            )
+
         for essay_a, essay_b in matched_pairs:
-            # Randomize position to avoid systematic bias
-            if _should_swap_positions(randomizer):
-                essay_a, essay_b = essay_b, essay_a
+            if mode is PairGenerationMode.COVERAGE:
+                essay_a, essay_b = orientation_strategy.choose_coverage_orientation(
+                    (essay_a, essay_b),
+                    per_essay_position_counts,
+                    randomizer,
+                )
+            else:
+                essay_a, essay_b = orientation_strategy.choose_resampling_orientation(
+                    (essay_a, essay_b),
+                    per_pair_orientation_counts,
+                    per_essay_position_counts,
+                    randomizer,
+                )
 
             prompt_blocks = PromptTemplateBuilder.assemble_full_prompt(
                 assessment_context=assessment_context,
@@ -322,6 +354,68 @@ def _should_swap_positions(randomizer: Random) -> bool:
     """Return True when essay positions should be swapped."""
 
     return randomizer.random() < 0.5
+
+
+async def _fetch_per_essay_position_counts(
+    session: AsyncSession,
+    cj_batch_id: int,
+) -> PerEssayPositionCounts:
+    """Return per-essay A/B positional counts for a CJ batch."""
+
+    from services.cj_assessment_service.models_db import ComparisonPair as CJ_ComparisonPair
+
+    stmt_a = (
+        select(CJ_ComparisonPair.essay_a_els_id, func.count())
+        .where(CJ_ComparisonPair.cj_batch_id == cj_batch_id)
+        .group_by(CJ_ComparisonPair.essay_a_els_id)
+    )
+    result_a = await session.execute(stmt_a)
+    counts_a: dict[str, int] = {row[0]: int(row[1]) for row in result_a.all()}
+
+    stmt_b = (
+        select(CJ_ComparisonPair.essay_b_els_id, func.count())
+        .where(CJ_ComparisonPair.cj_batch_id == cj_batch_id)
+        .group_by(CJ_ComparisonPair.essay_b_els_id)
+    )
+    result_b = await session.execute(stmt_b)
+    counts_b: dict[str, int] = {row[0]: int(row[1]) for row in result_b.all()}
+
+    positional_counts: PerEssayPositionCounts = {}
+    for essay_id in set(counts_a.keys()) | set(counts_b.keys()):
+        positional_counts[essay_id] = (counts_a.get(essay_id, 0), counts_b.get(essay_id, 0))
+
+    return positional_counts
+
+
+async def _fetch_per_pair_orientation_counts(
+    session: AsyncSession,
+    cj_batch_id: int,
+) -> PerPairOrientationCounts:
+    """Return per-pair AB/BA orientation counts for a CJ batch."""
+
+    from services.cj_assessment_service.models_db import ComparisonPair as CJ_ComparisonPair
+
+    stmt = select(
+        CJ_ComparisonPair.essay_a_els_id,
+        CJ_ComparisonPair.essay_b_els_id,
+        func.count(),
+    ).where(CJ_ComparisonPair.cj_batch_id == cj_batch_id)
+    stmt = stmt.group_by(
+        CJ_ComparisonPair.essay_a_els_id,
+        CJ_ComparisonPair.essay_b_els_id,
+    )
+
+    result = await session.execute(stmt)
+    per_pair_counts: PerPairOrientationCounts = {}
+    for essay_a_id, essay_b_id, count in result.all():
+        key = tuple(sorted((essay_a_id, essay_b_id)))
+        ab, ba = per_pair_counts.get(key, (0, 0))
+        if essay_a_id <= essay_b_id:
+            per_pair_counts[key] = (ab + int(count), ba)
+        else:
+            per_pair_counts[key] = (ab, ba + int(count))
+
+    return per_pair_counts
 
 
 async def _fetch_existing_comparison_ids(

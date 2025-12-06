@@ -98,6 +98,7 @@ async def test_request_additional_comparisons_no_essays(
     submit_mock = AsyncMock()
     monkeypatch.setattr(cp, "submit_comparisons_for_async_processing", submit_mock)
     mock_matching_strategy = MagicMock(spec=PairMatchingStrategyProtocol)
+    mock_orientation_strategy = MagicMock()
 
     result = await cp.request_additional_comparisons_for_batch(
         cj_batch_id=7,
@@ -108,6 +109,7 @@ async def test_request_additional_comparisons_no_essays(
         instruction_repository=AsyncMock(spec=cp.AssessmentInstructionRepositoryProtocol),
         llm_interaction=llm_interaction,
         matching_strategy=mock_matching_strategy,
+        orientation_strategy=mock_orientation_strategy,
         settings=settings,
         correlation_id=uuid4(),
         log_extra={"batch_id": 7},
@@ -165,6 +167,7 @@ async def test_request_additional_comparisons_submits_new_iteration(
     settings = Mock(spec=Settings)
     settings.MAX_PAIRWISE_COMPARISONS = 500
     mock_matching_strategy = MagicMock(spec=PairMatchingStrategyProtocol)
+    mock_orientation_strategy = MagicMock()
 
     llm_overrides_payload = {
         "model_override": "claude-3-sonnet",
@@ -190,6 +193,7 @@ async def test_request_additional_comparisons_submits_new_iteration(
         instruction_repository=AsyncMock(spec=cp.AssessmentInstructionRepositoryProtocol),
         llm_interaction=llm_interaction,
         matching_strategy=mock_matching_strategy,
+        orientation_strategy=mock_orientation_strategy,
         settings=settings,
         correlation_id=uuid4(),
         log_extra={"batch_id": 42},
@@ -212,6 +216,7 @@ async def test_request_additional_comparisons_submits_new_iteration(
     assert submit_kwargs["cj_batch_id"] == 42
     assert submit_kwargs["session_provider"] is mock_session_provider
     assert submit_kwargs["llm_interaction"] is llm_interaction
+    assert submit_kwargs["orientation_strategy"] is mock_orientation_strategy
     # Continuation path defaults to COVERAGE mode for large-net / Phase-1 flows.
     assert (
         submit_kwargs["mode"] == cp.pair_generation.PairGenerationMode.COVERAGE  # type: ignore[attr-defined]

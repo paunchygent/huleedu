@@ -25,6 +25,10 @@ from services.cj_assessment_service.cj_core_logic.comparison_request_normalizer 
 from services.cj_assessment_service.cj_core_logic.llm_batching_service import (
     BatchingModeService,
 )
+from services.cj_assessment_service.cj_core_logic.pair_orientation import (
+    FairComplementOrientationStrategy,
+    PairOrientationStrategyProtocol,
+)
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.models_api import (
     CJAssessmentRequestData,
@@ -73,6 +77,7 @@ async def submit_comparisons_for_async_processing(
     correlation_id: UUID,
     log_extra: dict[str, Any],
     mode: pair_generation.PairGenerationMode = pair_generation.PairGenerationMode.COVERAGE,
+    orientation_strategy: PairOrientationStrategyProtocol | None = None,
 ) -> bool:
     """Submit initial comparison batch for async LLM processing.
 
@@ -85,6 +90,8 @@ async def submit_comparisons_for_async_processing(
         instruction_repository: Repository for assessment instruction operations
         llm_interaction: LLM interaction protocol
         matching_strategy: DI-injected strategy for computing optimal pairs
+        orientation_strategy: DI-injected strategy for deciding A/B orientation.
+            When None (or omitted), a default FairComplementOrientationStrategy is used.
         request_data: CJ assessment request data
         settings: Application settings
         correlation_id: Request correlation ID
@@ -94,6 +101,9 @@ async def submit_comparisons_for_async_processing(
     Returns:
         True if submission successful, False otherwise
     """
+    if orientation_strategy is None:
+        orientation_strategy = FairComplementOrientationStrategy()
+
     batching_service = BatchingModeService(settings)
     orchestrator = ComparisonBatchOrchestrator(
         batch_repository=batch_repository,
@@ -102,6 +112,7 @@ async def submit_comparisons_for_async_processing(
         instruction_repository=instruction_repository,
         llm_interaction=llm_interaction,
         matching_strategy=matching_strategy,
+        orientation_strategy=orientation_strategy,
         settings=settings,
         batching_service=batching_service,
         request_normalizer=ComparisonRequestNormalizer(settings),
@@ -175,6 +186,7 @@ async def request_additional_comparisons_for_batch(
     instruction_repository: AssessmentInstructionRepositoryProtocol,
     llm_interaction: LLMInteractionProtocol,
     matching_strategy: PairMatchingStrategyProtocol,
+    orientation_strategy: PairOrientationStrategyProtocol | None = None,
     settings: Settings,
     correlation_id: UUID,
     log_extra: dict[str, Any],
@@ -194,6 +206,8 @@ async def request_additional_comparisons_for_batch(
         instruction_repository: Repository for assessment instruction operations
         llm_interaction: LLM interaction protocol
         matching_strategy: DI-injected strategy for computing optimal pairs
+        orientation_strategy: DI-injected strategy for deciding A/B orientation.
+            When None (or omitted), a default FairComplementOrientationStrategy is used.
         settings: Application settings
         correlation_id: Request correlation ID
         log_extra: Logging context
@@ -316,6 +330,9 @@ async def request_additional_comparisons_for_batch(
         extra={**log_extra, "cj_batch_id": cj_batch_id},
     )
 
+    if orientation_strategy is None:
+        orientation_strategy = FairComplementOrientationStrategy()
+
     return await submit_comparisons_for_async_processing(
         essays_for_api_model=essays_for_api_model,
         cj_batch_id=cj_batch_id,
@@ -325,6 +342,7 @@ async def request_additional_comparisons_for_batch(
         instruction_repository=instruction_repository,
         llm_interaction=llm_interaction,
         matching_strategy=matching_strategy,
+        orientation_strategy=orientation_strategy,
         request_data=request_data,
         settings=settings,
         correlation_id=correlation_id,
