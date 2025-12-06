@@ -269,7 +269,7 @@ class TestCJSmallNetContinuation:
         """
         Validate that an ENG5 LOWER5 small-net batch reaches COMPLETED state
         and that CJBatchState/processing_metadata reflect full small-net
-        coverage and continuation semantics.
+        coverage plus Phase-2 resampling semantics up to the configured cap.
         """
         # Use an explicit test user so we can provision credits deterministically.
         test_user = service_manager.create_test_user()
@@ -290,6 +290,7 @@ class TestCJSmallNetContinuation:
             )
 
         expected_essay_count = 5
+        expected_max_pairs = _expected_max_pairs(expected_essay_count)
 
         # 1. Create ENG5 batch via API Gateway with expected_essay_count=5
         bos_batch_id, correlation_id = await service_manager.create_batch_via_agw(
@@ -358,6 +359,13 @@ class TestCJSmallNetContinuation:
         assert batch_state.state == CJBatchStateEnum.COMPLETED, (
             f"Expected COMPLETED, got {batch_state.state}"
         )
+        # Explicitly confirm the expected net size for this batch.
+        assert batch_state.batch_upload is not None, (
+            "batch_upload relationship should be populated for CJBatchState"
+        )
+        assert batch_state.batch_upload.expected_essay_count == expected_essay_count, (
+            "ENG5 LOWER5 docker path should use a 5-essay small net"
+        )
 
         # Completion invariants and callback accounting (PR-2/PR-7).
         total_comparisons = batch_state.total_comparisons
@@ -375,6 +383,12 @@ class TestCJSmallNetContinuation:
         assert callbacks_received <= denominator
 
         assert total_comparisons == submitted == completed
+        # Small-net Phase-2 semantics: total comparisons should exceed pure
+        # coverage (nC2 pairs) once resampling passes have been applied.
+        assert total_comparisons > expected_max_pairs, (
+            "Expected extra comparisons beyond initial coverage for small-net resampling"
+        )
+
         if batch_state.total_budget is not None:
             assert total_comparisons <= batch_state.total_budget
 
@@ -386,8 +400,6 @@ class TestCJSmallNetContinuation:
         unique_coverage_complete = processing.get("unique_coverage_complete")
         resampling_pass_count = processing.get("resampling_pass_count", 0)
 
-        expected_max_pairs = _expected_max_pairs(expected_essay_count)
-
         assert isinstance(max_possible_pairs, int)
         assert isinstance(successful_pairs_count, int)
         assert isinstance(unique_coverage_complete, bool)
@@ -396,7 +408,9 @@ class TestCJSmallNetContinuation:
         assert max_possible_pairs == expected_max_pairs
         assert successful_pairs_count == expected_max_pairs
         assert unique_coverage_complete is True
-        assert resampling_pass_count >= 0
+        # Phase-2 resampling must have been exercised at least once for this
+        # ENG5 LOWER5 small-net docker profile.
+        assert resampling_pass_count > 0, "Expected at least one Phase-2 small-net resampling pass"
 
         # 5. BT metadata presence and shape
         bt_se_summary = processing.get("bt_se_summary")
@@ -452,11 +466,19 @@ class TestCJSmallNetContinuation:
             coverage_metrics=None,
         )
 
+        # The LOWER5 docker configuration should classify this batch as a
+        # small net and drive resampling all the way to the configured cap.
+        assert _normalized_expected_essay_count == expected_essay_count
+        assert is_small_net is True
         assert small_net_max_pairs == expected_max_pairs
         assert small_net_successful_pairs == expected_max_pairs
         assert small_net_unique_complete is True
         assert small_net_resampling_pass_count == resampling_pass_count
-        assert small_net_resampling_cap >= 0
+        assert small_net_resampling_cap == settings.MAX_RESAMPLING_PASSES_FOR_SMALL_NET
+        # For ENG5 LOWER5 in docker we expect the small-net resampling cap to
+        # be reached (currently 3 passes, but asserted via config).
+        assert resampling_pass_count == small_net_resampling_cap
+        assert small_net_cap_reached is True
 
         # No failure reason should be recorded for a successful batch.
         assert "failed_reason" not in processing
