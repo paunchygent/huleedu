@@ -143,7 +143,23 @@ pdm run pytest-root tests/integration/  # Cross-service tests
     - Full 12-anchor (66 comparison) parity test in `tests/integration/test_eng5_mock_parity_full_anchor.py` (mock profile `eng5_anchor_gpt51_low`, trace `eng5_anchor_align_gpt51_low_20251201`).
   - ENG5 LOWER5:
     - LOWER5 parity + small-net diagnostics tests in `tests/integration/test_eng5_mock_parity_lower5.py` (mock profile `eng5_lower5_gpt51_low`, trace `eng5_lower5_gpt51_low_20251202`).
-- Use `pdm run llm-mock-profile <profile>` (with `.env` set to the desired mock mode and `./scripts/dev-shell.sh` for env loading) as the entry point for per-profile docker test runs (CJ generic, ENG5 anchor, ENG5 LOWER5).
+- LPS admin mock-mode endpoint:
+  - `GET /admin/mock-mode` (implemented in `services/llm_provider_service/api/admin_routes.py`, registered in `services/llm_provider_service/app.py`).
+  - Payload:
+    - `use_mock_llm`: current value of `Settings.USE_MOCK_LLM` in the running container.
+    - `mock_mode`: current mock profile (`"cj_generic_batch"`, `"eng5_anchor_gpt51_low"`, `"eng5_lower5_gpt51_low"`) or `null` when `MockMode.DEFAULT` is active.
+    - `default_provider`: string form of `Settings.DEFAULT_LLM_PROVIDER`.
+  - Availability:
+    - Enabled when `Settings.ADMIN_API_ENABLED` is `True` (default in dev/CI).
+    - Returns `404` with `{"error": "admin_api_disabled"}` when `ADMIN_API_ENABLED=False`.
+- Docker-backed CJ/ENG5 parity tests now:
+  - Use `ServiceTestManager`’s validated `base_url` for `llm_provider_service`.
+  - Call `/admin/mock-mode` at the start of each test to assert profile correctness and `pytest.skip` when `use_mock_llm` is `false` or `mock_mode` does not match the expected profile.
+  - Use the same `base_url` for `/api/v1/comparison`, keeping profile detection and traffic routing aligned.
+- Use `pdm run llm-mock-profile <profile>` (with `.env` set to the desired mock mode and `./scripts/dev-shell.sh` for env loading) as the entry point for per-profile docker test runs (CJ generic, ENG5 anchor, ENG5 LOWER5). This helper:
+  - Validates `.env` profile settings.
+  - Recreates `llm_provider_service` so `/admin/mock-mode` reflects the intended profile.
+  - Runs the corresponding docker-backed parity tests, which rely on `/admin/mock-mode` as the single source of truth for the running container’s mock mode.
 
 ## Architecture Decisions
 
