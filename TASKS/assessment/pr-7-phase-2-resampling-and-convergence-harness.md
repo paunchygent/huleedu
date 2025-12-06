@@ -66,6 +66,9 @@ Connects to: “Coverage metrics & metadata on CJBatchState”.
   - [x] Assert `max_possible_pairs` matches `nC2` for a simple 3‑essay batch.
   - [x] Assert `successful_pairs_count` behaviour is documented against current schema (enum vs string winner); adjust expectation if winner representation is normalised in future.
 - [x] Extend `test_workflow_continuation.py` to assert coverage metadata keys are present and updated after a continuation iteration (via small‑net Phase‑2 tests).
+- [ ] Ensure future tests can be parameterised by net size:
+  - [ ] Small‑net scenarios (`expected_essay_count < MIN_RESAMPLING_NET_SIZE`) should continue to drive the existing small‑net Phase‑2 path.
+  - [ ] Regular/large‑net scenarios (`expected_essay_count >= MIN_RESAMPLING_NET_SIZE`) should be easy to add by reusing the same helpers and assertions, differing only in configuration and expected resampling behaviour.
 
 #### Phase 1 Progress (2025‑11‑30)
 
@@ -143,6 +146,11 @@ Connects to: “Resampling mode in pair generation”.
 - [x] Extend `test_pair_generation_context.py`:
   - [x] Assert RESAMPLING mode never introduces new essay IDs compared to the batch’s `ProcessedEssay` set.
   - [x] Assert basic fairness (no single essay dominates comparisons across multiple RESAMPLING waves under reasonable settings).
+- [ ] Plan for dual-path testing (small-net vs regular batches):
+  - [ ] Define parameterised test cases where:
+    - [ ] Small-net configurations (e.g. 3–5 essays) exercise the current small-net resampling semantics.
+    - [ ] Regular-net configurations (e.g. 20+ essays) can be introduced later to exercise generalised RESAMPLING semantics without changing helper structure.
+  - [ ] Keep test helpers (e.g. synthetic nets, builder functions) net-size agnostic so they can be used by both small-net and regular-batch tests.
 
 #### Phase 3 Progress (2025‑11‑30)
 
@@ -151,6 +159,7 @@ Connects to: “Resampling mode in pair generation”.
 - Wired the mode through `comparison_processing.submit_comparisons_for_async_processing` and `request_additional_comparisons_for_batch`, and updated `workflow_continuation.trigger_existing_workflow_continuation` so small‑net Phase‑2 flows invoke RESAMPLING while large‑net/Phase‑1 flows remain on COVERAGE.
 - Extended `test_pair_generation_context.py` with a RESAMPLING fairness test and updated `test_workflow_continuation.py` wiring tests to assert the correct mode is used; ran `pdm run pytest-root services/cj_assessment_service/tests/unit/test_pair_generation_context.py` and targeted workflow continuation tests successfully.
 - Ran the broader CJ unit suite via `pdm run pytest-root services/cj_assessment_service/tests/unit`; all tests related to pair generation and workflow continuation passed, with one pre‑existing failure remaining in `test_batch_finalizer_scoring_state.py::test_finalize_scoring_transitions_state` (BatchFinalizer dual‑event publishing), which was not modified in this phase.
+- Added a docker-backed CJ small-net continuation test (`tests/integration/test_cj_small_net_continuation_docker.py`) that reuses the production ENG5 LOWER5 mock profile and asserts PR‑2/PR‑7 completion, coverage, and small-net metadata invariants from `CJBatchState`, using a net-size-agnostic helper that can later be reused for regular-batch RESAMPLING scenarios without harness rewrites.
 
 ### 4. Convergence Harness (Checklist §5)
 

@@ -163,18 +163,47 @@ All tests in this section:
   - [ ] `pdm run lint-fix --unsafe-fixes`
   - [ ] `pdm run typecheck-all`
 
-### 8. LPS mock-mode observability (next step)
+### 8. LPS mock-mode observability (implemented)
 
-- [ ] Expose the active LPS mock configuration via a small admin endpoint:
-  - [ ] Add `GET /admin/mock-mode` on `llm_provider_service` that returns:
-    - [ ] `use_mock_llm` (bool) derived from `Settings` / env.
-    - [ ] `mock_mode` (string) derived from `Settings.MOCK_MODE.value` (e.g. `"cj_generic_batch"`, `"eng5_anchor_gpt51_low"`, `"eng5_lower5_gpt51_low"`).
-  - [ ] Add LPS API tests under `services/llm_provider_service/tests/api/` to pin this endpoint for the three mock profiles.
-- [ ] Refactor CJ/ENG5 docker parity/coverage tests to assert against `/admin/mock-mode` instead of `.env` heuristics:
-  - [ ] In `tests/integration/test_cj_mock_parity_generic.py`, `test_eng5_mock_parity_full_anchor.py`, and `test_eng5_mock_parity_lower5.py`:
-    - [ ] Use the validated `llm_provider_service` base URL from `ServiceTestManager` to call `/admin/mock-mode` at the start of each test.
-    - [ ] `pytest.skip` when `use_mock_llm` is `false` or `mock_mode` does not match the expected profile.
-    - [ ] Remove direct `.env` parsing and cross-checks between process env and `.env`; treat `/admin/mock-mode` as the single source of truth for the running container’s mock mode.
+- [x] Expose the active LPS mock configuration via a small admin endpoint:
+  - [x] Add `GET /admin/mock-mode` on `llm_provider_service` that returns:
+    - [x] `use_mock_llm` (bool) derived from `Settings.USE_MOCK_LLM`.
+    - [x] `mock_mode` (string or `null`) derived from `Settings.MOCK_MODE` (e.g. `"cj_generic_batch"`, `"eng5_anchor_gpt51_low"`, `"eng5_lower5_gpt51_low"`; `MockMode.DEFAULT` is surfaced as `null`).
+    - [x] `default_provider` (string) derived from `Settings.DEFAULT_LLM_PROVIDER`.
+  - [x] Add LPS API tests under `services/llm_provider_service/tests/api/` to pin this endpoint for the three mock profiles and the admin-disabled guard.
+- [x] Refactor CJ/ENG5 docker parity/coverage tests to assert against `/admin/mock-mode` instead of `.env` heuristics:
+  - [x] In `tests/integration/test_cj_mock_parity_generic.py`, `tests/integration/test_eng5_mock_parity_full_anchor.py`, and `tests/integration/test_eng5_mock_parity_lower5.py`:
+    - [x] Use the validated `llm_provider_service` base URL from `ServiceTestManager` to call `/admin/mock-mode` at the start of each test.
+    - [x] `pytest.skip` when `use_mock_llm` is `false` or `mock_mode` does not match the expected profile.
+    - [x] Remove direct `.env` parsing and cross-checks between process env and `.env`; treat `/admin/mock-mode` as the single source of truth for the running container’s mock mode. `.env` is still validated by `scripts/llm_mgmt/mock_profile_helper.sh`, but tests rely exclusively on the HTTP admin endpoint.
+
+#### Admin endpoint contract
+
+- Path: `GET /admin/mock-mode`
+- Availability:
+  - Enabled when `Settings.ADMIN_API_ENABLED` is `True` (default in dev/CI).
+  - Returns `404` with `{"error": "admin_api_disabled"}` when `ADMIN_API_ENABLED` is `False`.
+- Sample response (CJ generic profile):
+
+```json
+{
+  "use_mock_llm": true,
+  "mock_mode": "cj_generic_batch",
+  "default_provider": "anthropic"
+}
+```
+
+All CJ/ENG5 docker-backed mock parity tests now:
+
+- Assert profile correctness by calling `/admin/mock-mode` on the running `llm_provider_service` container.
+- Skip gracefully with clear messages when `use_mock_llm` is `false` or `mock_mode` does not match the expected profile.
+- Use `ServiceTestManager`’s validated `base_url` for both the admin endpoint and the `/api/v1/comparison` HTTP surface.
+
+`pdm run llm-mock-profile <profile>` (via `scripts/llm_mgmt/mock_profile_helper.sh`) remains the recommended orchestrator for:
+
+- Validating `.env` mock profile settings (`LLM_PROVIDER_SERVICE_USE_MOCK_LLM=true`, `LLM_PROVIDER_SERVICE_MOCK_MODE=<expected>`).
+- Restarting only the `llm_provider_service` dev container.
+- Running the appropriate docker-backed parity tests, which now rely on `/admin/mock-mode` as the single source of truth for the running container’s mock mode.
 
 ## Success Criteria
 
@@ -439,7 +468,7 @@ All tests in this section:
     (for example, CJ generic will not run when the ENG5 mock profile is active). This prevents accidental cross-profile
     runs (e.g. CJ test under ENG5 anchor tokens) and keeps parity assertions tight and meaningful.
 
-– Progress (2025-12-05 – mock profiles + parity helpers + coverage/diagnostics layer):
+- Progress (2025-12-06 - mock profiles + parity helpers + coverage/diagnostics layer):
   - All three mock profiles now have:
     - Green unit tests in `services/llm_provider_service/tests/unit/test_mock_provider.py`.
     - Docker-backed profile tests under their respective profiles:
@@ -448,10 +477,13 @@ All tests in this section:
         - `test_cj_mock_parity_generic_mode_stable_across_multiple_batches` (coverage/continuation-style check over 3×12 CJ-shaped requests; asserts 100% Essay A winners, per-batch and aggregate token/latency metrics within the same bands as the recorded CJ summary, and zero variance in token means across batches).
       - ENG5 full-anchor → `test_eng5_mock_parity_full_anchor.py` (≈110s wall clock, 120s callback budget; unchanged in this session but still the canonical ENG5 full-anchor parity test).
       - ENG5 LOWER5 → `test_eng5_mock_parity_lower5.py`:
-        - `test_eng5_mock_parity_lower5_mode_matches_recorded_summary` (parity vs `eng5_lower5_gpt51_low_20251202`, ~16s runtime, 60s callback budget).
-        - `test_eng5_mock_lower5_small_net_diagnostics_across_batches` (three LOWER5-shaped batches with varying `bos_batch_id` and `cj_llm_batching_mode` hints; checks unique pair coverage per batch and globally, winner proportions vs the recorded LOWER5 trace, and token/latency parity using `compute_llm_trace_summary`).
+        - `test_eng5_mock_parity_lower5_mode_matches_recorded_summary` (parity vs `eng5_lower5_gpt51_low_20251202`, ~16s runtime, 60s callback budget; winner, token, and latency tolerances are now documented explicitly in the test docstring).
+        - `test_eng5_mock_lower5_small_net_diagnostics_across_batches` (three LOWER5-shaped batches with varying `bos_batch_id` and `cj_llm_batching_mode` hints; checks unique pair coverage per batch and globally, winner proportions vs the recorded LOWER5 trace, token/latency parity using `compute_llm_trace_summary`, and now explicit small-net style diagnostics:
+          - Each unique LOWER5 pair appears exactly once per batch and exactly `num_batches` times across the test.
+          - Winners for a given pair are stable across batches under the deterministic ENG5 LOWER5 mock profile.
+          - Cross-batch winner proportions (particularly Essay B proportions) remain within a tight band (≤ 10 percentage points drift) to approximate stable resampling behaviour.)
     - All docker tests include explicit skip guards on `LLM_PROVIDER_SERVICE_USE_MOCK_LLM` + `LLM_PROVIDER_SERVICE_MOCK_MODE` to prevent
-      silent passes under the wrong profile.
+      silent passes under the wrong profile, and all updated tests are green under `pdm run pytest-root ... -m "docker and integration"`.
   - Helper script for profile switching + docker tests:
     - File: `scripts/llm_mgmt/mock_profile_helper.sh`.
     - PDM alias: `pdm run llm-mock-profile <profile>`.
@@ -461,3 +493,30 @@ All tests in this section:
       - `eng5-lower5` → validates `.env` for `eng5_lower5_gpt51_low`, restarts `llm_provider_service`, runs all LOWER5 docker tests in `test_eng5_mock_parity_lower5.py`.
     - The helper remains thin: it only orchestrates `.env` validation, a targeted dev container restart, and the appropriate
       `pytest-root` invocation; behavioural guarantees live in the tests and mock provider implementation.
+
+- New CJ/ENG5 profile suite harness (2025-12-06):
+  - File: `tests/integration/test_eng5_profile_suite.py`.
+  - Purpose:
+    - Provide a single high-level docker-backed entry point that orchestrates CJ generic + ENG5 anchor + ENG5 LOWER5 mock profiles, using `/admin/mock-mode` as the profile oracle and delegating deep behaviour checks to the existing per-profile tests.
+  - Structure:
+    - Uses `ServiceTestManager` and `KafkaTestManager` fixtures for service discovery and Kafka topic management.
+    - Internal helper `_get_lps_mock_mode(...)` queries `llm_provider_service`’s `/admin/mock-mode` endpoint and skips tests gracefully when the admin surface is disabled or the expected profile is not active.
+    - Suite-level tests:
+      - `test_profile_suite_cj_generic`:
+        - Requires `use_mock_llm=true` and `mock_mode="cj_generic_batch"` from `/admin/mock-mode`, otherwise `pytest.skip`.
+        - Delegates to:
+          - `TestCJMockParityGeneric.test_cj_mock_parity_generic_mode_matches_recorded_summary`.
+          - `TestCJMockParityGeneric.test_cj_mock_parity_generic_mode_stable_across_multiple_batches`.
+      - `test_profile_suite_eng5_anchor`:
+        - Requires `use_mock_llm=true` and `mock_mode="eng5_anchor_gpt51_low"`, otherwise `pytest.skip`.
+        - Delegates to:
+          - `TestEng5MockParityFullAnchor.test_eng5_mock_parity_anchor_mode_matches_recorded_summary`.
+      - `test_profile_suite_eng5_lower5`:
+        - Requires `use_mock_llm=true` and `mock_mode="eng5_lower5_gpt51_low"`, otherwise `pytest.skip`.
+        - Delegates to:
+          - `TestEng5MockParityLower5.test_eng5_mock_parity_lower5_mode_matches_recorded_summary`.
+          - `TestEng5MockParityLower5.test_eng5_mock_lower5_small_net_diagnostics_across_batches`.
+  - How to use:
+    - After selecting a profile via `pdm run llm-mock-profile <profile>` (which validates `.env` and restarts LPS), run:
+      - `pdm run pytest-root tests/integration/test_eng5_profile_suite.py -m "docker and integration" -v`
+    - This keeps `/admin/mock-mode` as the canonical source of truth for the active mock profile while providing a single orchestrated entry point for CJ/ENG5 docker validation.
