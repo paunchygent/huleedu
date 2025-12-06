@@ -246,13 +246,14 @@ semantics. This work is **merged and in production** as of 2025‑11‑29.
 ### US-005.X: RESAMPLING A/B Positional Fairness and Mode Generalization
 
 **As a** psychometrics-aware platform owner  
-**I want** RESAMPLING mode to (a) maintain fair A/B positional usage per essay and (b) be available as a controlled continuation tool for non‑small‑net batches  
+**I want** RESAMPLING mode to (a) maintain fair A/B positional usage per essay and per unordered pair and (b) be available as a controlled continuation tool for non‑small‑net batches  
 **So that** large-scale comparison statistics remain unbiased and convergence behaviour is consistent across batch sizes.
 
 **Acceptance Criteria (positional fairness)**:
-- [ ] RESAMPLING mode’s pair generation (`PairGenerationMode.RESAMPLING`) explicitly accounts for per‑essay A vs B positional counts when selecting candidate pairs.
-- [ ] Over multiple RESAMPLING waves on a stable net, each essay’s A/B positional share converges toward 50/50 within an agreed tolerance band (e.g. ≤ 1–3 percentage points drift for ENG5/LOWER5), verified by unit tests.
-- [ ] Docker/E2E validation (follow‑up) demonstrates that for an ENG5 LOWER5 small net under mock profiles, A/B positional skew per essay stays within the configured band across resampling passes.
+- [ ] RESAMPLING mode’s pair generation (`PairGenerationMode.RESAMPLING`) is **pair-history aware** and enforces, where budget allows, that each unordered pair `{e1, e2}` is observed in both orientations `(A=e1,B=e2)` and `(A=e2,B=e1)` at least once.
+- [ ] COVERAGE mode’s orientation decisions actively work to balance per‑essay A/B positional counts over time, using persisted `ComparisonPair` history rather than pure randomness.
+- [ ] Over multiple COVERAGE + RESAMPLING waves on a stable net, each essay’s A/B positional share converges toward 50/50 within an agreed tolerance band (e.g. ≤ 1–3 percentage points drift for ENG5/LOWER5), verified by unit tests.
+- [ ] Docker/E2E validation (follow‑up) demonstrates that for an ENG5 LOWER5 small net under mock profiles, A/B positional skew per essay stays within the configured band across resampling passes, and that per‑pair AB/BA complements are realised when budget and caps permit.
 
 **Acceptance Criteria (mode generalization)**:
 - [ ] RESAMPLING mode can be invoked for larger/non‑small‑net batches under well-defined conditions (e.g. after a minimum coverage/stability cadence), not only when `ContinuationContext.is_small_net` is true.
@@ -269,6 +270,7 @@ semantics. This work is **merged and in production** as of 2025‑11‑29.
 **Tasks**:
 - `TASKS/assessment/cj-resampling-a-b-positional-fairness.md`
 - `TASKS/assessment/cj-resampling-mode-generalization-for-all-batch-sizes.md`
+- `TASKS/assessment/cj-positional-orientation-strategy-for-coverage-and-resampling.md`
 ## PR-2 Completion Notes
 
 PR-2 (US‑005.1, US‑005.2, US‑005.4 foundations) wires the following

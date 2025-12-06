@@ -27,7 +27,7 @@ Consolidate and extend the documentation/task/rules management scripts to achiev
 
 | Domain | Create | Validate | Index | Schema |
 |--------|--------|----------|-------|--------|
-| Tasks | `new_task.py` (exists) | `validate_front_matter.py` | `index_tasks.py` | `task_frontmatter_schema.py` |
+| Tasks | `new_task.py` (exists) | `validate_front_matter.py` | `index_tasks.py` | `task_frontmatter_schema.py` → realised as `scripts/schemas/task_schema.py` |
 | Docs | `new_doc.py` (new) | `validate_docs_structure.py` | `index_docs.py` (new) | `docs_frontmatter_schema.py` (new) |
 | Rules | `new_rule.py` (new) | `validate_claude_structure.py` | `index_rules.py` (new) | `rule_frontmatter_schema.py` |
 

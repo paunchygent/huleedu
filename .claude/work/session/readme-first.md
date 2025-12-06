@@ -160,6 +160,10 @@ pdm run pytest-root tests/integration/  # Cross-service tests
   - Validates `.env` profile settings.
   - Recreates `llm_provider_service` so `/admin/mock-mode` reflects the intended profile.
   - Runs the corresponding docker-backed parity tests, which rely on `/admin/mock-mode` as the single source of truth for the running container’s mock mode.
+- CJ small-net continuation harness (ENG5 LOWER5):
+  - `tests/integration/test_cj_small_net_continuation_docker.py` drives a 5-essay ENG5 LOWER5 batch end-to-end (AGW → BOS/BCS/ELS → CJ → LPS mock) under the `eng5_lower5_gpt51_low` profile and asserts CJ-side completion semantics.
+  - Asserts `CJBatchState.state == COMPLETED`, `failed_comparisons == 0`, `total_comparisons == submitted_comparisons == completed_comparisons == 40`, and `callbacks_received <= completion_denominator()` with `total_comparisons <= total_budget`.
+  - Confirms small-net coverage and Phase‑2 resampling semantics: `max_possible_pairs == successful_pairs_count == 10`, `unique_coverage_complete is True`, and `resampling_pass_count == settings.MAX_RESAMPLING_PASSES_FOR_SMALL_NET` (currently 3), proving that small-net resampling runs to cap and performs extra comparisons beyond initial coverage (`total_comparisons > C(5,2)`), while `_wait_for_cj_batch_final_state(...)` remains net-size agnostic for future regular-batch RESAMPLING tests.
 
 ## Architecture Decisions
 

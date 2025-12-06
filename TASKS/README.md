@@ -23,7 +23,7 @@ frontmatter schema, and the validation scripts under `scripts/task_mgmt/`.
 For full machine-readable rules, see:
 
 - `TASKS/_REORGANIZATION_PROPOSAL.md`
-- `scripts/task_mgmt/task_frontmatter_schema.py`
+- `scripts/schemas/task_schema.py`
 
 Those documents and this README describe the **same** source of truth.
 
@@ -117,9 +117,9 @@ The `TASKS/` tree is the execution layer in the documentation-as-code stack:
   - Tasks reference the code and tests they touch via paths inside the body.
 - **PRs** – reference specific task IDs and ADRs in their descriptions.
 
-Validation scripts (`validate_front_matter.py`, `task_frontmatter_schema.py`,
-`index_tasks.py`) and CI enforce that the TASKS tree stays consistent with this
-model.
+Validation scripts (`validate_front_matter.py`, `index_tasks.py`) and CI enforce
+that the TASKS tree stays consistent with this model. The underlying schema is
+centralised in `scripts/schemas/task_schema.py` and imported by these scripts.
 
 ## Integration with other docs
 

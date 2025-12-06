@@ -39,12 +39,24 @@ Connects to:
    - [ ] Quantify current A/B positional distributions in RESAMPLING mode using existing ENG5/LOWER5 traces (e.g. via a small analysis script or convergence harness extensions).
    - [ ] Document any observed skews for typical small-net and medium-sized batches.
    - [ ] Use the new ENG5 LOWER5 docker small‑net continuation path (5 essays, small-net resampling to cap with `total_comparisons ≈ 40`) as one of the primary empirical baselines for positional usage under RESAMPLING.
+   - [x] Treat the LOWER5 docker harness as the initial “shape” for fairness diagnostics: 5 essays, 10 coverage pairs, 3 resampling passes, ~40 total comparisons with deterministic CJ/LPS mock profiles.
 
 2. **Design positional fairness strategy**
-   - [ ] Define a target fairness notion for A/B positions (e.g. per essay, proportion of A vs B appearances stays within a configurable band over all comparisons).
-   - [ ] Decide whether fairness is enforced:
-     - Per resampling wave, or
-     - Over cumulative comparisons (preferred).
+   - [x] Define a target fairness notion for A/B positions (e.g. per essay, proportion of A vs B appearances stays within a configurable band over all comparisons).
+     - For each essay `e`, let `A_e` and `B_e` denote the number of times `e`
+       appears in positions A and B, respectively, across all comparisons in
+       a batch. Define positional skew
+       `skew_e = |A_e - B_e| / (A_e + B_e)` (0 → perfectly balanced).
+     - For LOWER5 small nets (5 essays, 40 total comparisons), aim for
+       `skew_e <= 0.25` (i.e. per‑essay A/B counts within a ±25% band) as an
+       initial docker guardrail, to be refined once empirical distributions
+       from traces are available.
+     - For larger nets, the same definition applies, but acceptable skew
+       bands can be tighter thanks to higher sample sizes; the band should be
+       configurable via settings or test parameters.
+   - [x] Decide whether fairness is enforced:
+     - Over cumulative comparisons for the batch (preferred); per‑wave
+       fairness may be used as a diagnostic but not a hard requirement.
    - [ ] Align this with the existing matching strategy abstractions so we do not duplicate logic.
 
 3. **Implement fairness-aware RESAMPLING**
@@ -52,12 +64,38 @@ Connects to:
      - [ ] Incorporate per-essay position counts into the scoring/selection process.
      - [ ] Ensure that, when randomization is applied (`_should_swap_positions`), the long-run distribution per essay approaches 50/50 A/B within a tolerable band.
    - [ ] Add configuration knobs if needed (e.g. max tolerated positional skew per essay) but keep sensible defaults for ENG5/LOWER5.
+   - [x] Implement a helper to compute per‑essay A/B positional counts for a CJ batch (test-side only for now):
+     - Helper shape (test‑ and repository‑friendly):
+       - `async def get_positional_counts_for_batch(session: AsyncSession, cj_batch_id: int) -> dict[str, dict[str, int]]`
+       - Returns a mapping: `{essay_id: {"A": count_as_A, "B": count_as_B}}`.
+     - Implementation:
+       - Live in `services/cj_assessment_service/tests/helpers/positional_fairness.py`.
+       - Queries `ComparisonPair` rows for the given `cj_batch_id`.
+       - Groups by `essay_a_els_id` and `essay_b_els_id` separately to derive
+         counts per position using SQLAlchemy aggregation (no raw SQL).
+       - Normalises into the `{essay_id: {"A": ..., "B": ...}}` structure.
+     - Ownership options:
+       - Starts as a small, pure helper in CJ tests to avoid changing service
+         code while diagnostics are experimental.
+       - Can be promoted to `CJComparisonRepositoryProtocol` later (e.g.
+         `get_positional_counts_for_batch(...)`) if service‑level metrics or
+         observability endpoints need the same data.
 
 4. **Testing and observability**
-   - [ ] Add unit tests (or extend existing ones) under `services/cj_assessment_service/tests/unit/test_pair_generation_context.py` to:
-     - [ ] Simulate multiple RESAMPLING waves and assert that per-essay A/B counts remain within the configured fairness band.
+   - [x] Add unit tests (or extend existing ones) under `services/cj_assessment_service/tests/unit/test_pair_generation_context.py` to:
+     - [x] Simulate multiple RESAMPLING waves and assert that per-essay A/B counts remain within a configurable fairness band (currently a generous `MAX_ALLOWED_SKEW=0.5` for a 3‑essay synthetic net; to be tightened once ENG5/LOWER5 trace data is analysed).
    - [ ] Optionally extend `test_workflow_small_net_resampling.py` with a scenario that inspects persisted comparison pairs to validate positional fairness in a small-net setting.
    - [ ] Add basic logging in RESAMPLING mode (debug level) to help diagnose positional skew if tests fail.
+   - [x] Plan a LOWER5 docker‑level fairness check building on the existing continuation harness:
+     - Use the ENG5 LOWER5 docker path (`test_cj_small_net_continuation_docker.py`) to
+       run a 5‑essay, 40‑comparison small net under the `eng5_lower5_gpt51_low`
+       profile.
+     - Reuse the positional‑counts helper against `CJComparisonPair` for the
+       resulting `CJBatchState.batch_id`.
+     - Assert, per essay, that `skew_e` stays within the initial LOWER5 band
+       (e.g. ≤ 0.25) while keeping the harness parameterised by
+       `expected_essay_count` and caps so that the same scaffolding can be
+       reused for larger nets once RESAMPLING generalisation is in place.
 
 5. **Docker/E2E validation (follow-up)**
    - [ ] Once ENG5 docker profiles are stable, add an integration test (or extend `test_eng5_mock_parity_lower5.py`) to:

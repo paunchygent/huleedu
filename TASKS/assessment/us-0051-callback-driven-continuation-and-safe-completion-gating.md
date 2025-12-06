@@ -109,7 +109,7 @@ Validated behaviour: A LOWER5 small-net batch (ENG5) reaches a completed-success
   - [x] Assert:
     - [x] `failed_comparisons == 0`.
     - [x] `callbacks_received > 0`.
-    - [x] `callbacks_received == denominator` (PR‑2 completion invariant).
+    - [x] `callbacks_received <= denominator` (completion math now driven by `total_budget` via `completion_denominator()`; callbacks must stay within budget but no longer need to equal it exactly).
     - [x] `total_comparisons == submitted_comparisons == completed_comparisons`.
     - [x] `total_comparisons <= total_budget`.
 
@@ -124,7 +124,7 @@ Validated behaviour: A LOWER5 small-net batch (ENG5) reaches a completed-success
     - [x] `max_possible_pairs == 10` (C(5,2)).
     - [x] `successful_pairs_count == 10`.
     - [x] `unique_coverage_complete is True`.
-    - [x] `resampling_pass_count >= 0` (and optionally ≤ configured cap).
+    - [x] `resampling_pass_count == settings.MAX_RESAMPLING_PASSES_FOR_SMALL_NET` (ENG5 LOWER5 docker profile currently runs small-net Phase‑2 resampling all the way to the configured cap; with MIN_RESAMPLING_NET_SIZE=5 and MAX_RESAMPLING_PASSES_FOR_SMALL_NET=3 this yields three resampling passes).
 
 - [x] **BT quality metadata (shape, not exact values)**
   - [x] From `metadata`, read:
@@ -141,31 +141,30 @@ Validated behaviour: A LOWER5 small-net batch (ENG5) reaches a completed-success
     - [x] `success_rate` is effectively `1.0` (or within tight tolerance).
     - [x] `callbacks_received <= completion_denominator()` (total budget semantics) and `total_comparisons <= total_budget` when budget is set.
     - [x] There is no failure marker in state/metadata (consistent with `ContinuationDecision.FINALIZE_SCORING` for successful runs).
-    - [x] For the ENG5 LOWER5 docker profile, confirm that a 5‑essay batch is treated as a **small net** (using the `MIN_RESAMPLING_NET_SIZE` threshold) and that coverage metadata (`max_possible_pairs == successful_pairs_count == 10`, `unique_coverage_complete is True`) plus `resampling_pass_count` are consistent with the current PR‑7 resampling configuration (e.g. `resampling_pass_count == 0` when Phase‑2 has not yet been exercised).
+    - [x] For the ENG5 LOWER5 docker profile, confirm that a 5‑essay batch is treated as a **small net** (using the `MIN_RESAMPLING_NET_SIZE` threshold) and that coverage metadata (`max_possible_pairs == successful_pairs_count == 10`, `unique_coverage_complete is True`) plus `resampling_pass_count` are consistent with the current PR‑7 resampling configuration (in docker: `resampling_pass_count == settings.MAX_RESAMPLING_PASSES_FOR_SMALL_NET` and small‑net resampling runs to its cap with `total_comparisons ≈ 40`).
 
-### Test 2: `test_cj_small_net_continuation_requests_more_before_completion`
+### Test 2: `test_cj_small_net_continuation_requests_more_before_completion` (semantics covered by Test 1)
 
-Validated behaviour: There exists at least one realistic small-net scenario (ENG5 LOWER5 profile active) where CJ **requests more comparisons** before eventually finalizing – i.e. the real system exercises `REQUEST_MORE_COMPARISONS` on the path to completion.
+Validated behaviour: There exists at least one realistic small-net scenario (ENG5 LOWER5 profile active) where CJ **requests more comparisons** before eventually finalizing – i.e. the real system exercises `REQUEST_MORE_COMPARISONS` and small‑net Phase‑2 resampling on the path to completion. As of 2025‑12‑06 these invariants are asserted by `test_cj_small_net_continuation_metadata_completed_successful`; a dedicated second test can be added later if we need separate coverage.
 
-- [ ] **Environment & gating (same as Test 1)**
-  - [ ] Use `ServiceTestManager` to validate endpoints.
-  - [ ] Gate on `/admin/mock-mode` for `use_mock_llm=true` and `mock_mode="eng5_lower5_gpt51_low"`.
+- [x] **Environment & gating (same as Test 1)**
+  - [x] Use `ServiceTestManager` to validate endpoints.
+  - [x] Gate on `/admin/mock-mode` for `use_mock_llm=true` and `mock_mode="eng5_lower5_gpt51_low"`.
 
-- [ ] **Batch creation encouraging "request more"**
-  - [ ] Create a 5-essay ENG5 batch via `create_batch_via_agw(...)` as above.
-  - [ ] Ensure configuration or environment for this test is such that:
-    - [ ] First iteration cannot satisfy stability or completion conditions alone (e.g. higher `MIN_COMPARISONS_FOR_STABILITY_CHECK`, or a budget that allows multiple iterations).
+- [x] **Batch creation encouraging "request more"**
+  - [x] Create a 5-essay ENG5 batch via `create_batch_via_agw(...)` as above.
+  - [x] Rely on the ENG5 LOWER5 docker profile configuration (`MIN_RESAMPLING_NET_SIZE=5`, `MAX_RESAMPLING_PASSES_FOR_SMALL_NET=3`, small-net budget) so that a single coverage wave is insufficient for finalization and Phase‑2 resampling is exercised.
 
 - [ ] **Observe intermediate vs final comparison counts**
   - [ ] Optionally, snapshot an early state (pre-final) where:
-    - [ ] `submitted_comparisons` equals the initial small-net wave (≈10), and batch is not yet complete.
-  - [ ] Poll for final success state (≤ 60s) as in Test 1.
+    - [ ] `submitted_comparisons` equals the initial small-net wave (≈10), and batch is not yet complete. (Not yet instrumented; current harness focuses on final-state assertions.)
+  - [x] Poll for final success state (≤ 360s) as in Test 1.
   - [x] On final state, read:
     - [x] `submitted_comparisons_final`, `total_comparisons_final`, `completed_comparisons_final`, `failed_comparisons_final`.
   - [x] Assert:
     - [x] `failed_comparisons_final == 0`.
-    - [x] `submitted_comparisons_final` and/or `total_comparisons_final` are **greater** than the initial expected small-net count (e.g. `> 10`), proving that extra comparisons were requested.
-    - [x] For the ENG5 LOWER5 docker profile (5 essays, `MIN_RESAMPLING_NET_SIZE=5`, `MAX_RESAMPLING_PASSES_FOR_SMALL_NET=3`), observe that the current configuration drives **Phase‑2 small‑net resampling** to its cap, yielding `total_comparisons_final ≈ 40` (10 coverage pairs + resampling waves).
+    - [x] `submitted_comparisons_final` and/or `total_comparisons_final` are **greater** than the initial expected small-net count (for LOWER5: `total_comparisons_final > 10`), proving that extra comparisons were requested.
+    - [x] For the ENG5 LOWER5 docker profile (5 essays, `MIN_RESAMPLING_NET_SIZE=5`, `MAX_RESAMPLING_PASSES_FOR_SMALL_NET=3`), observe that the current configuration drives **Phase‑2 small‑net resampling** to its cap, yielding `total_comparisons_final ≈ 40` (10 coverage pairs + three resampling passes).
     - [x] `completed_comparisons_final == total_comparisons_final` (no pending work at completion).
 
 - [x] **Final metadata and small-net flags**
@@ -173,7 +172,7 @@ Validated behaviour: There exists at least one realistic small-net scenario (ENG
     - [x] `max_possible_pairs == 10`.
     - [x] `successful_pairs_count == 10`.
     - [x] `unique_coverage_complete is True`.
-    - [x] `resampling_pass_count >= 1` (ENG5 LOWER5 docker profile currently reaches `resampling_pass_count == 3`, matching `MAX_RESAMPLING_PASSES_FOR_SMALL_NET`).
+    - [x] `resampling_pass_count == settings.MAX_RESAMPLING_PASSES_FOR_SMALL_NET` and `resampling_pass_count >= 1` (ENG5 LOWER5 docker profile currently reaches `resampling_pass_count == 3`, matching `MAX_RESAMPLING_PASSES_FOR_SMALL_NET`).
 
 - [x] **Final decision consistency**
   - [x] Recompute decision invariants as in Test 1:
@@ -181,6 +180,70 @@ Validated behaviour: There exists at least one realistic small-net scenario (ENG
     - [x] `callbacks_received_final <= completion_denominator_final` and `total_comparisons_final <= total_budget_final`.
   - [x] Assert:
     - [x] Final state is success (consistent with `ContinuationDecision.FINALIZE_SCORING`).
-    - [x] Combined with the increased comparison counts and `resampling_pass_count >= 1`, this demonstrates a real `REQUEST_MORE_COMPARISONS → RESAMPLING → FINALIZE_SCORING` path under docker for a 5‑essay ENG5 LOWER5 small net.
+    - [x] Combined with the increased comparison counts and `resampling_pass_count == settings.MAX_RESAMPLING_PASSES_FOR_SMALL_NET`, this demonstrates a real `REQUEST_MORE_COMPARISONS → RESAMPLING → FINALIZE_SCORING` path under docker for a 5‑essay ENG5 LOWER5 small net.
 
 > Implementation note: the current ENG5 LOWER5 docker profile (5 essays, `MIN_RESAMPLING_NET_SIZE=5`, `MAX_RESAMPLING_PASSES_FOR_SMALL_NET=3`) reliably produces this path, with coverage (10 pairs), three small‑net resampling passes, and finalization after ~40 successful comparisons.
+
+### Future docker scenarios: regular batches and positional fairness
+
+As of 2025‑12‑06, `test_cj_small_net_continuation_metadata_completed_successful` is the
+only CJ docker test wired into this story. It asserts:
+
+- Callback-driven continuation semantics (PR‑2):
+  - Continuation only after all callbacks for a wave have arrived.
+  - `completion_denominator()` derived from `total_budget`, with
+    `callbacks_received <= completion_denominator()` at finalization.
+- Small‑net coverage and Phase‑2 semantics (PR‑7):
+  - LOWER5 small-net classification via `MIN_RESAMPLING_NET_SIZE`.
+  - Complete small-net coverage (`max_possible_pairs == successful_pairs_count == 10`,
+    `unique_coverage_complete is True`).
+  - Phase‑2 RESAMPLING to the configured small-net cap
+    (`resampling_pass_count == MAX_RESAMPLING_PASSES_FOR_SMALL_NET`,
+    `total_comparisons ≈ 40`).
+- BT metadata presence and success‑rate/budget sanity checks.
+
+Planned follow-ups (partially implemented as of 2025‑12‑06):
+
+- **Regular-batch RESAMPLING docker harness (non-small nets)**  
+  - Design skeleton lives in
+    `tests/integration/test_cj_regular_batch_resampling_docker.py` and reuses
+    `_wait_for_cj_batch_final_state(...)` plus the ENG5 LOWER5 harness helpers.
+  - Target scenario: `expected_essay_count ≈ 20–30` so that
+    `ContinuationContext.is_small_net is False` under default thresholds.
+  - Generalised RESAMPLING semantics and a separate
+    `MAX_RESAMPLING_PASSES_FOR_REGULAR_BATCH` cap are now wired into
+    `workflow_decision` / `workflow_continuation`, with unit coverage in
+    `test_workflow_small_net_resampling.py`; the docker test remains skipped
+    until these semantics are exercised end‑to‑end under ENG5/CJ profiles.
+  - Future docker assertions (once enabled) should include:
+    - Final state is COMPLETED with `callbacks_received > 0` and
+      `callbacks_received <= completion_denominator()`.
+    - Coverage metadata reflects a larger net where full coverage is not a
+      hard requirement (no `max_possible_pairs == successful_pairs_count`
+      invariant).
+    - `resampling_pass_count` is bounded by the regular‑batch cap
+      `MAX_RESAMPLING_PASSES_FOR_REGULAR_BATCH`, distinct from
+      `MAX_RESAMPLING_PASSES_FOR_SMALL_NET`.
+    - All expectations remain parameterised by `expected_essay_count` and
+      caps, keeping the harness net-size agnostic.
+
+- **Positional fairness diagnostics on top of LOWER5**  
+  - Companion task `TASKS/assessment/cj-resampling-a-b-positional-fairness.md`
+    defines A/B positional fairness requirements for RESAMPLING mode.
+  - A test-only positional counts helper now lives in
+    `services/cj_assessment_service/tests/helpers/positional_fairness.py`,
+    with initial unit coverage in
+    `test_positional_fairness_helper.py` and an exploratory RESAMPLING
+    positional-skew test in `test_pair_generation_context.py`.
+  - Planned docker extension (built on this story’s LOWER5 harness) remains:
+    - Reuse the ENG5 LOWER5 small-net path (5 essays, 10 coverage pairs,
+      3 resampling passes, ~40 comparisons).
+    - Apply the positional-counts helper against `CJComparisonPair` for the
+      resulting CJ batch and compute per‑essay A/B counts.
+    - Assert that each essay’s positional skew
+      `skew_e = |A_e - B_e| / (A_e + B_e)` remains within an agreed LOWER5
+      band (targeting ≤ 0.25 once calibrated against real ENG5/LOWER5 traces).
+  - These positional-fairness checks are explicitly **out of scope** for
+    `test_cj_small_net_continuation_metadata_completed_successful` and will
+    live in dedicated fairness-focused tests once docker-level thresholds are
+    validated.

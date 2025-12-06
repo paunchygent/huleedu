@@ -1,7 +1,8 @@
+---
 type: runbook
 service: cj_assessment_service
 severity: high
-last_reviewed: 2025-11-30
+last_reviewed: 2025-12-06
 ---
 
 # CJ Assessment & LLM Provider Foundation (Working Reference)
@@ -68,6 +69,7 @@ Purpose: single reference for defaults, reasoning, metrics, and open work across
 | completion_denominator | total_budget (per-batch comparison budget) | Single source of truth for how many comparisons a batch is allowed to perform; derived from either a per-request override or `MAX_PAIRWISE_COMPARISONS` and used purely as a budget-based denominator. | Keep as the budget scalar; treat missing/zero total_budget as a bug and use small-net metadata (`max_possible_pairs`, coverage flags, resampling caps) for coverage semantics instead of clamping to nC2 (see ADR-0020). |
 | MIN_RESAMPLING_NET_SIZE | 10 | Nets smaller than this are treated as “small nets” for Phase‑2 resampling semantics. | Tune per exam if small nets routinely need more or fewer Phase‑2 passes. |
 | MAX_RESAMPLING_PASSES_FOR_SMALL_NET | 2 | Caps resampling passes for small nets once unique coverage is complete. | Adjust cautiously; monitor BT SE diagnostics and coverage metrics before increasing. |
+| MAX_RESAMPLING_PASSES_FOR_REGULAR_BATCH | 1 | Caps Phase‑2 RESAMPLING passes for non‑small‑net batches, preventing larger nets from over‑consuming budget via RESAMPLING while still allowing limited stability/fairness improvements. | Start with a conservative value (≤ small‑net cap); increase only after validating coverage, stability, and positional fairness metrics in CJ/ENG5 traces. |
 | BatchMonitor timeout_hours | prod: 4h; dev: 1h | Recovery-only safety net; generous for prod, tight for dev. | Remove 80% heuristic; keep timeout-only once validated. |
 | PROMPT_CACHE_TTL_SECONDS | ad-hoc/dev: 300–600s; assignment_id/batch: 3600s | Short TTL for rapid iteration; longer for stable, repeated prompts in batch runs. | Raise to 4–6h if cache hit rate is high and safety acceptable. |
 | ENABLE_PROMPT_CACHING | true for assignment_id/batch; optional for ad-hoc | Reduce cost on repeated static context; avoid surprises in highly dynamic prompts. | Keep on for curated exams; monitor hits/misses. |

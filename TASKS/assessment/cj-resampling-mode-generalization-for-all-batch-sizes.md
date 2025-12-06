@@ -36,56 +36,85 @@ Connects to:
 ## Plan
 
 1. **Requirements & design**
-   - [ ] Clarify desired semantics of RESAMPLING for:
-     - [ ] Small nets (e.g. LOWER5: 5–10 essays).
-     - [ ] Regular/larger batches (30+ essays).
+   - [x] Clarify desired semantics of RESAMPLING for:
+     - [x] Small nets (e.g. LOWER5: 5–10 essays).
+       - Completed coverage is an invariant for small nets when budget allows:
+         `unique_coverage_complete is True` and `successful_pairs_count == max_possible_pairs`
+         at finalization.
+       - Phase‑2 RESAMPLING is allowed only when `is_small_net is True`,
+         `unique_coverage_complete is True`, success‑rate gates pass, and budget remains.
+       - For ENG5 LOWER5 in docker (5 essays), the reference path is:
+         10 coverage pairs + `MAX_RESAMPLING_PASSES_FOR_SMALL_NET` resampling passes
+         (currently 3) → `total_comparisons ≈ 40`, `failed_comparisons == 0`,
+         `success_rate == 1.0`.
+     - [x] Regular/larger batches (e.g. 20–30+ essays).
+       - For regular nets we do **not** require complete coverage before finalization;
+         instead, we target a “high but configurable” coverage band plus a small number
+         of RESAMPLING passes when stability still has not passed.
+       - A future `MAX_RESAMPLING_PASSES_FOR_REGULAR_BATCH` cap must be strictly
+         ≤ `MAX_RESAMPLING_PASSES_FOR_SMALL_NET` so that large nets cannot consume
+         disproportionate budget via Phase‑2.
+       - RESAMPLING for regular nets should only be considered once:
+         `callbacks_received > 0`, success‑rate gates pass, sufficient budget remains,
+         and either
+           - `successful_pairs_count` exceeds a configurable fraction of
+             `max_possible_pairs` (e.g. 60–80%), or
+           - a minimum number of stability iterations has been attempted.
    - [ ] Decide whether non-small nets:
-     - [ ] Use RESAMPLING only after some minimum coverage and/or stability attempts, or
+     - [x] Use RESAMPLING only after some minimum coverage and/or stability attempts, or
      - [ ] Can mix COVERAGE and RESAMPLING in a more flexible pattern (e.g. occasional resampling waves).
-  - [ ] Define separate configuration knobs:
-     - [ ] `MAX_RESAMPLING_PASSES_FOR_SMALL_NET` (existing).
-     - [ ] `MAX_RESAMPLING_PASSES_FOR_REGULAR_BATCH` (new).
+   - [x] Define separate configuration knobs:
+     - [x] `MAX_RESAMPLING_PASSES_FOR_SMALL_NET` (existing).
+     - [x] `MAX_RESAMPLING_PASSES_FOR_REGULAR_BATCH` (new).
      - [ ] Optional: per-batch overrides via `batch_config_overrides`.
-  - [ ] Use the ENG5 LOWER5 small‑net docker configuration as the baseline reference for small‑net behaviour:
-    - [x] `MIN_RESAMPLING_NET_SIZE=5` and `expected_essay_count <= MIN_RESAMPLING_NET_SIZE` → small net.
-    - [x] Coverage semantics pinned by docker: `max_possible_pairs == successful_pairs_count == 10`, `unique_coverage_complete is True` for 5‑essay LOWER5.
-    - [x] Phase‑2 resampling semantics pinned by docker: `resampling_pass_count` reaches the configured small‑net cap (currently 3) with `total_comparisons ≈ 40`, `failed_comparisons == 0`, and `success_rate == 1.0`.
+   - [ ] Use the ENG5 LOWER5 small‑net docker configuration as the baseline reference for small‑net behaviour:
+     - [x] `MIN_RESAMPLING_NET_SIZE=5` and `expected_essay_count <= MIN_RESAMPLING_NET_SIZE` → small net.
+     - [x] Coverage semantics pinned by docker: `max_possible_pairs == successful_pairs_count == 10`, `unique_coverage_complete is True` for 5‑essay LOWER5.
+     - [x] Phase‑2 resampling semantics pinned by docker: `resampling_pass_count` reaches the configured small‑net cap (currently 3) with `total_comparisons ≈ 40`, `failed_comparisons == 0`, and `success_rate == 1.0`.
 
 2. **Orchestration changes**
-   - [ ] Update `_can_attempt_small_net_resampling(ctx)` or introduce a more general predicate (e.g. `_can_attempt_resampling(ctx)`) that:
-     - [ ] Retains current small-net semantics when `is_small_net` is true.
-     - [ ] Adds a general-resampling branch for larger batches, gated by:
-       - [ ] `callbacks_received > 0` and not failing on success rate.
-       - [ ] Sufficient budget remaining.
-       - [ ] A configurable max resampling pass cap for regular batches.
-   - [ ] Adjust `workflow_continuation.trigger_existing_workflow_continuation` so that:
-     - [ ] Small nets continue to use the existing small-net resampling caps.
-     - [ ] Larger nets can enter RESAMPLING mode under well-defined conditions, before falling back to `REQUEST_MORE_COMPARISONS` / `FINALIZE_SCORING`.
+   - [x] Update `_can_attempt_small_net_resampling(ctx)` or introduce a more general predicate (e.g. `_can_attempt_resampling(ctx)`) that:
+     - [x] Retains current small-net semantics when `is_small_net` is true.
+     - [x] Adds a general-resampling branch for larger batches, gated by:
+       - [x] `callbacks_received > 0` and not failing on success rate.
+       - [x] Sufficient budget remaining.
+       - [x] A configurable max resampling pass cap for regular batches.
+   - [x] Adjust `workflow_continuation.trigger_existing_workflow_continuation` so that:
+     - [x] Small nets continue to use the existing small-net resampling caps.
+     - [x] Larger nets can enter RESAMPLING mode under well-defined conditions, before falling back to `REQUEST_MORE_COMPARISONS` / `FINALIZE_SCORING`.
 
 3. **Configuration & settings**
-   - [ ] Add new settings to `services/cj_assessment_service/config.py`:
-     - [ ] `MAX_RESAMPLING_PASSES_FOR_REGULAR_BATCH` (with a sensible default, e.g. 0 or 1).
-   - [ ] Ensure these settings are documented in:
-     - [ ] `docs/operations/cj-assessment-runbook.md`.
-     - [ ] CJ Stability & Reliability epic.
+   - [x] Add new settings to `services/cj_assessment_service/config.py`:
+     - [x] `MAX_RESAMPLING_PASSES_FOR_REGULAR_BATCH` (with a sensible default, e.g. 0 or 1).
+   - [x] Ensure these settings are documented in:
+     - [x] `docs/operations/cj-assessment-runbook.md`.
+     - [x] CJ Stability & Reliability epic.
    - [ ] Consider exposing per-program or per-pipeline defaults for ENG5 vs generic CJ.
 
 4. **Testing**
-   - [ ] Extend unit tests in `services/cj_assessment_service/tests/unit/test_workflow_small_net_resampling.py` or add a new test module to cover:
-     - [ ] RESAMPLING invoked for a non-small-net batch once certain conditions are met (e.g. coverage threshold, iterations, or budget state).
-     - [ ] Respect for `MAX_RESAMPLING_PASSES_FOR_REGULAR_BATCH` (no more than N resampling passes).
-   - [ ] Add unit tests in `test_pair_generation_context.py` to confirm RESAMPLING remains fair and budget-aware for larger nets.
+   - [x] Extend unit tests in `services/cj_assessment_service/tests/unit/test_workflow_small_net_resampling.py` or add a new test module to cover:
+     - [x] RESAMPLING invoked for a non-small-net batch once certain conditions are met (e.g. coverage threshold, iterations, or budget state).
+     - [x] Respect for `MAX_RESAMPLING_PASSES_FOR_REGULAR_BATCH` (no more than N resampling passes).
+   - [x] Add unit tests in `test_pair_generation_context.py` to confirm RESAMPLING remains fair and budget-aware for larger nets.
 
 5. **Docker/E2E validation (follow-up)**
-  - [ ] After unit semantics are stable, add or extend integration tests (potentially a second test in `tests/integration/test_cj_small_net_continuation_docker.py` or a new `test_cj_regular_batch_resampling_docker.py`) to:
-     - [ ] Run a realistic CJ batch (non-small-net) under ENG5 or generic CJ configuration.
+   - [ ] After unit semantics are stable, add or extend integration tests (potentially a second test in `tests/integration/test_cj_small_net_continuation_docker.py` or a new `test_cj_regular_batch_resampling_docker.py`) to:
+     - [x] Sketch a realistic CJ regular‑batch scenario under ENG5 or generic CJ configuration in a new docker test module that reuses the LOWER5 helpers.
+     - [ ] Run the regular‑batch scenario once RESAMPLING orchestration for non-small nets is implemented and stabilised under docker.
      - [ ] Verify that:
        - [ ] RESAMPLING is invoked at least once (e.g. via metadata, counts, or metrics).
        - [ ] The batch still finalizes correctly when caps or stability conditions are met.
-  - Note: a LOWER5-focused small-net continuation harness already exists in `tests/integration/test_cj_small_net_continuation_docker.py`; it is structured to be net-size agnostic so that regular-batch RESAMPLING tests can reuse the same helpers once the generalized settings and orchestration changes are in place. As of 2025‑12‑06, this harness verifies:
-    - Small‑net classification for 5‑essay ENG5 LOWER5 batches (`expected_essay_count <= MIN_RESAMPLING_NET_SIZE`).
-    - Coverage metadata (`max_possible_pairs == successful_pairs_count == 10`, `unique_coverage_complete is True`).
-    - Phase‑2 small‑net resampling hitting the configured cap (`resampling_pass_count == MAX_RESAMPLING_PASSES_FOR_SMALL_NET`, `total_comparisons ≈ 40`) and finalization via `FINALIZE_SCORING` with `success_rate == 1.0` and `failed_comparisons == 0`.
+   - Note: a LOWER5-focused small-net continuation harness already exists in `tests/integration/test_cj_small_net_continuation_docker.py`; it is structured to be net-size agnostic so that regular-batch RESAMPLING tests can reuse the same helpers once the generalized settings and orchestration changes are in place. As of 2025‑12‑06, this harness verifies:
+     - Small‑net classification for 5‑essay ENG5 LOWER5 batches (`expected_essay_count <= MIN_RESAMPLING_NET_SIZE`).
+     - Coverage metadata (`max_possible_pairs == successful_pairs_count == 10`, `unique_coverage_complete is True`).
+     - Phase‑2 small‑net resampling hitting the configured cap (`resampling_pass_count == MAX_RESAMPLING_PASSES_FOR_SMALL_NET`, `total_comparisons ≈ 40`) and finalization via `FINALIZE_SCORING` with `success_rate == 1.0` and `failed_comparisons == 0`.
+   - Design sketch (2025‑12‑06): `tests/integration/test_cj_regular_batch_resampling_docker.py`
+     outlines a future regular‑batch docker test using:
+     - `expected_essay_count ≈ 24` (so `is_small_net is False` under default thresholds).
+     - The shared `_wait_for_cj_batch_final_state(...)` helper to assert completion.
+     - Parameterised expectations for `total_comparisons`, coverage metadata, and
+       `resampling_pass_count <= MAX_RESAMPLING_PASSES_FOR_REGULAR_BATCH` once that
+       setting and orchestration branch exist.
 
 ## Success Criteria
 
