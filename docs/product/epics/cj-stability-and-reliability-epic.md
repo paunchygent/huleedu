@@ -269,7 +269,6 @@ semantics. This work is **merged and in production** as of 2025‑11‑29.
 **Tasks**:
 - `TASKS/assessment/cj-resampling-a-b-positional-fairness.md`
 - `TASKS/assessment/cj-resampling-mode-generalization-for-all-batch-sizes.md`
-
 ## PR-2 Completion Notes
 
 PR-2 (US‑005.1, US‑005.2, US‑005.4 foundations) wires the following
