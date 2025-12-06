@@ -241,6 +241,35 @@ semantics. This work is **merged and in production** as of 2025‑11‑29.
 
 **Task**: `TASKS/assessment/pr-7-phase-2-resampling-and-convergence-harness.md`
 
+---
+
+### US-005.X: RESAMPLING A/B Positional Fairness and Mode Generalization
+
+**As a** psychometrics-aware platform owner  
+**I want** RESAMPLING mode to (a) maintain fair A/B positional usage per essay and (b) be available as a controlled continuation tool for non‑small‑net batches  
+**So that** large-scale comparison statistics remain unbiased and convergence behaviour is consistent across batch sizes.
+
+**Acceptance Criteria (positional fairness)**:
+- [ ] RESAMPLING mode’s pair generation (`PairGenerationMode.RESAMPLING`) explicitly accounts for per‑essay A vs B positional counts when selecting candidate pairs.
+- [ ] Over multiple RESAMPLING waves on a stable net, each essay’s A/B positional share converges toward 50/50 within an agreed tolerance band (e.g. ≤ 1–3 percentage points drift for ENG5/LOWER5), verified by unit tests.
+- [ ] Docker/E2E validation (follow‑up) demonstrates that for an ENG5 LOWER5 small net under mock profiles, A/B positional skew per essay stays within the configured band across resampling passes.
+
+**Acceptance Criteria (mode generalization)**:
+- [ ] RESAMPLING mode can be invoked for larger/non‑small‑net batches under well-defined conditions (e.g. after a minimum coverage/stability cadence), not only when `ContinuationContext.is_small_net` is true.
+- [ ] Configuration includes distinct caps:
+  - `MAX_RESAMPLING_PASSES_FOR_SMALL_NET` (existing) for small nets.
+  - `MAX_RESAMPLING_PASSES_FOR_REGULAR_BATCH` (new) for larger batches.
+- [ ] Orchestration logic in `workflow_continuation.trigger_existing_workflow_continuation`:
+  - Continues to route small nets through the existing small‑net Phase‑2 resampling path.
+  - Introduces a general‑resampling branch for non‑small‑net batches that respects the new regular‑batch resampling cap and overall budget.
+- [ ] Unit tests cover:
+  - Small‑net resampling semantics (unchanged in spirit from PR‑7, but now tested alongside positional fairness).
+  - RESAMPLING behaviour for larger nets, including adherence to the regular‑batch resampling cap.
+
+**Tasks**:
+- `TASKS/assessment/cj-resampling-a-b-positional-fairness.md`
+- `TASKS/assessment/cj-resampling-mode-generalization-for-all-batch-sizes.md`
+
 ## PR-2 Completion Notes
 
 PR-2 (US‑005.1, US‑005.2, US‑005.4 foundations) wires the following

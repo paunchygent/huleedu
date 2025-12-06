@@ -169,6 +169,7 @@ The whitebox score can be used to:
 
 ## Related
 
-- EPIC-010: ML Essay Scoring Pipeline
+- EPIC-010: ML Essay Scoring Pipeline (`docs/product/epics/ml-essay-scoring-pipeline.md`)
+- Source Traceability Matrix (`docs/research/epic-010-ml-essay-scoring-source-traceability.md`)
 - Rule 020.15: NLP Service Architecture
 - Rule 020.7: CJ Assessment Service Architecture

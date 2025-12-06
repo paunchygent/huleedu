@@ -274,8 +274,9 @@ params = {
 
 **Validation**: 5-fold stratified CV with QWK scoring
 
-## Related ADRs
-- ADR-0021: ML Scoring Integration in NLP Service
+## Related Documents
+- ADR-0021: ML Scoring Integration in NLP Service (`docs/decisions/0021-ml-scoring-integration-in-nlp-service.md`)
+- Source Traceability Matrix (`docs/research/epic-010-ml-essay-scoring-source-traceability.md`)
 
 ## Dependencies
 
