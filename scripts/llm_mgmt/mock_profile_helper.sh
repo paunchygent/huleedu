@@ -11,6 +11,12 @@
 #   - Validates .env mock profile settings for the requested profile
 #   - Restarts only the llm_provider_service dev container
 #   - Runs the matching docker-backed parity test
+#
+# Profile correctness for tests is enforced by the
+# llm_provider_service /admin/mock-mode endpoint, which reports the
+# active mock configuration of the running container. This helper is
+# the recommended way to keep .env and the running container in sync
+# before invoking those docker-backed tests.
 
 set -euo pipefail
 IFS=$'\n\t'

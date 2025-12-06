@@ -18,10 +18,9 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
 from itertools import combinations
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, cast
 from uuid import uuid4
 
 import aiohttp
@@ -48,23 +47,6 @@ from tests.utils.service_test_manager import ServiceTestManager
 class TestEng5MockParityLower5:
     """Integration test: ENG5 LOWER5 mock mode parity vs recorded summary."""
 
-    @staticmethod
-    def _load_env_mock_mode() -> str | None:
-        """Load LLM_PROVIDER_SERVICE_MOCK_MODE from the repo-root .env if present."""
-
-        env_path = Path(__file__).resolve().parents[2] / ".env"
-        if not env_path.exists():
-            return None
-
-        for line in env_path.read_text(encoding="utf-8").splitlines():
-            stripped = line.strip()
-            if not stripped or stripped.startswith("#"):
-                continue
-            if stripped.startswith("LLM_PROVIDER_SERVICE_MOCK_MODE"):
-                _, _, value = stripped.partition("=")
-                return value.strip() or None
-        return None
-
     @pytest.fixture
     async def service_manager(self) -> ServiceTestManager:
         """Service validation manager."""
@@ -85,12 +67,30 @@ class TestEng5MockParityLower5:
 
         return endpoints
 
+    async def _get_lps_mock_mode(self, validated_services: dict) -> dict[str, Any]:
+        """Query LPS /admin/mock-mode to determine active mock configuration."""
+        base_url = validated_services["llm_provider_service"]["base_url"]
+        admin_url = f"{base_url}/admin/mock-mode"
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                admin_url,
+                timeout=aiohttp.ClientTimeout(total=5.0),
+            ) as resp:
+                if resp.status != 200:
+                    pytest.skip(
+                        "/admin/mock-mode not available on LPS; "
+                        "ensure dev config exposes this endpoint"
+                    )
+                data = await resp.json()
+                return cast(dict[str, Any], data)
+
     @pytest.mark.docker
     @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_eng5_mock_parity_lower5_mode_matches_recorded_summary(
         self,
-        validated_services: dict,  # noqa: ARG002 - ensures services are running
+        validated_services: dict,
         kafka_manager: KafkaTestManager,
     ) -> None:
         """
@@ -99,28 +99,27 @@ class TestEng5MockParityLower5:
         and compare live callbacks against the recorded summary for
         ``eng5_lower5_gpt51_low_20251202``.
 
-        Behavioural parity expectations:
+        Behavioural parity expectations (tolerances pinned for clarity):
         - All callbacks succeed (no errors).
-        - Winner distribution approximates the recorded GPT-5.1 low LOWER5 run.
-        - Token usage means remain in the same order of magnitude.
-        - Latency stays within a reasonable band of the recorded trace.
+        - Winner distribution approximates the recorded GPT-5.1 low LOWER5 run
+          with per-label proportion differences ≤ 0.30 (30 percentage points).
+        - Token usage means remain in the same order of magnitude with
+          per-field mean differences ≤ max(5 tokens, 50% of the recorded mean).
+        - Latency stays within a reasonable band of the recorded trace with
+          live mean ≤ recorded mean + 100 ms and live p95 ≤ recorded p95 + 200 ms.
         """
-        # This test is only valid when the LPS container is configured
-        # to use the ENG5 LOWER5 mock mode and mock-only provider.
-        use_mock_env = os.getenv("LLM_PROVIDER_SERVICE_USE_MOCK_LLM", "").lower()
-        mock_mode_env = os.getenv("LLM_PROVIDER_SERVICE_MOCK_MODE")
-        file_mock_mode = self._load_env_mock_mode()
-        if use_mock_env != "true" or mock_mode_env != "eng5_lower5_gpt51_low":
+        mode_info = await self._get_lps_mock_mode(validated_services)
+
+        if not mode_info.get("use_mock_llm", False):
             pytest.skip(
-                "LLM_PROVIDER_SERVICE_USE_MOCK_LLM must be 'true' and "
-                "LLM_PROVIDER_SERVICE_MOCK_MODE must be set to "
-                "'eng5_lower5_gpt51_low' for this test; adjust .env and restart "
-                "the dev stack before running."
+                "LPS reports USE_MOCK_LLM = false; enable mock mode before running this test"
             )
-        if file_mock_mode is not None and file_mock_mode != mock_mode_env:
+
+        if mode_info.get("mock_mode") != "eng5_lower5_gpt51_low":
             pytest.skip(
-                "Process env LLM_PROVIDER_SERVICE_MOCK_MODE does not match .env; "
-                "ensure .env and the running LPS container are using 'eng5_lower5_gpt51_low'."
+                "LPS mock_mode is not 'eng5_lower5_gpt51_low'; restart "
+                "llm_provider_service with this profile before running "
+                "ENG5 LOWER5 parity tests."
             )
 
         scenario_id = "eng5_lower5_gpt51_low_20251202"
@@ -151,7 +150,8 @@ class TestEng5MockParityLower5:
         assert num_requests == 10
 
         bos_batch_id = "bos-eng5-lower5-mock-parity-001"
-        lps_url = "http://localhost:8090/api/v1/comparison"
+        base_url = validated_services["llm_provider_service"]["base_url"]
+        lps_url = f"{base_url}/api/v1/comparison"
 
         # 3. Send ENG5 LOWER5-shaped LLM comparison requests to LPS
         request_ids: list[str] = []
@@ -326,7 +326,7 @@ class TestEng5MockParityLower5:
     @pytest.mark.asyncio
     async def test_eng5_mock_lower5_small_net_diagnostics_across_batches(
         self,
-        validated_services: dict,  # noqa: ARG002 - ensures services are running
+        validated_services: dict,
         kafka_manager: KafkaTestManager,
     ) -> None:
         """
@@ -338,21 +338,21 @@ class TestEng5MockParityLower5:
         - Winner distribution and error rate per batch.
         - Response time statistics using the same trace summariser as the
           recorded ENG5 LOWER5 trace.
+        - Cross-batch stability of winner proportions and per-pair winners to
+          approximate small-net resampling behaviour under a fixed mock profile.
         """
-        use_mock_env = os.getenv("LLM_PROVIDER_SERVICE_USE_MOCK_LLM", "").lower()
-        mock_mode_env = os.getenv("LLM_PROVIDER_SERVICE_MOCK_MODE")
-        file_mock_mode = self._load_env_mock_mode()
-        if use_mock_env != "true" or mock_mode_env != "eng5_lower5_gpt51_low":
+        mode_info = await self._get_lps_mock_mode(validated_services)
+
+        if not mode_info.get("use_mock_llm", False):
             pytest.skip(
-                "LLM_PROVIDER_SERVICE_USE_MOCK_LLM must be 'true' and "
-                "LLM_PROVIDER_SERVICE_MOCK_MODE must be set to "
-                "'eng5_lower5_gpt51_low' for this test; adjust .env and restart "
-                "the dev stack before running."
+                "LPS reports USE_MOCK_LLM = false; enable mock mode before running this test"
             )
-        if file_mock_mode is not None and file_mock_mode != mock_mode_env:
+
+        if mode_info.get("mock_mode") != "eng5_lower5_gpt51_low":
             pytest.skip(
-                "Process env LLM_PROVIDER_SERVICE_MOCK_MODE does not match .env; "
-                "ensure .env and the running LPS container are using 'eng5_lower5_gpt51_low'."
+                "LPS mock_mode is not 'eng5_lower5_gpt51_low'; restart "
+                "llm_provider_service with this profile before running "
+                "ENG5 LOWER5 diagnostics tests."
             )
 
         scenario_id = "eng5_lower5_gpt51_low_20251202"
@@ -555,6 +555,28 @@ class TestEng5MockParityLower5:
         # Across all batches we still only see the LOWER5 net's 10 unique pairs.
         assert len(global_unique_pairs) == pairs_per_batch
 
+        # Lightweight resampling diagnostics: each unique pair should be seen
+        # exactly once per batch, and the mock provider's deterministic winner
+        # selection should keep the winner for a given pair stable across
+        # batches under this profile.
+        winners_by_pair: dict[tuple[str, str], set[str]] = {}
+        counts_by_pair: dict[tuple[str, str], int] = {}
+
+        for batch_callbacks in callbacks_by_batch.values():
+            for cb in batch_callbacks:
+                meta = cb.request_metadata
+                a_id = str(meta["essay_a_id"])
+                b_id = str(meta["essay_b_id"])
+                pair_key = (a_id, b_id) if a_id <= b_id else (b_id, a_id)
+
+                counts_by_pair[pair_key] = counts_by_pair.get(pair_key, 0) + 1
+                winner = cb.winner
+                assert winner is not None
+                winners_by_pair.setdefault(pair_key, set()).add(winner.value)
+
+        assert set(counts_by_pair.values()) == {num_batches}
+        assert all(len(winners) == 1 for winners in winners_by_pair.values())
+
         # 4. Per-batch and aggregate summaries using trace summariser
         def _winner_proportions(summary: Mapping[str, Any]) -> dict[str, float]:
             total = summary["total_events"]
@@ -627,6 +649,17 @@ class TestEng5MockParityLower5:
             scenario_id="eng5_lower5_mock_diagnostics_aggregate",
         )
         _assert_summary_within_parity(aggregate_summary)
+
+        # Cross-batch winner distribution stability diagnostics: ensure that
+        # the proportion of Essay B winners does not drift across batches
+        # under the deterministic LOWER5 mock profile.
+        per_batch_winner_props = {
+            bos_batch_id: _winner_proportions(summary)
+            for bos_batch_id, summary in per_batch_summaries.items()
+        }
+        essay_b_props = [props["Essay B"] for props in per_batch_winner_props.values()]
+        if essay_b_props:
+            assert max(essay_b_props) - min(essay_b_props) <= 0.10
 
         # Lightweight diagnostics to aid future BT/coverage work.
         print(

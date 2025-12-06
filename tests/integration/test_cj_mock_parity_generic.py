@@ -9,10 +9,9 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
 from pathlib import Path
 from statistics import mean
-from typing import Any
+from typing import Any, cast
 from uuid import uuid4
 
 import aiohttp
@@ -42,23 +41,6 @@ from tests.utils.service_test_manager import ServiceTestManager
 class TestCJMockParityGeneric:
     """Integration test: LPS mock provider generic CJ mode parity vs recorded summary."""
 
-    @staticmethod
-    def _load_env_mock_mode() -> str | None:
-        """Load LLM_PROVIDER_SERVICE_MOCK_MODE from the repo-root .env if present."""
-
-        env_path = Path(__file__).resolve().parents[2] / ".env"
-        if not env_path.exists():
-            return None
-
-        for line in env_path.read_text(encoding="utf-8").splitlines():
-            stripped = line.strip()
-            if not stripped or stripped.startswith("#"):
-                continue
-            if stripped.startswith("LLM_PROVIDER_SERVICE_MOCK_MODE"):
-                _, _, value = stripped.partition("=")
-                return value.strip() or None
-        return None
-
     @pytest.fixture
     async def service_manager(self) -> ServiceTestManager:
         """Service validation manager."""
@@ -79,12 +61,30 @@ class TestCJMockParityGeneric:
 
         return endpoints
 
+    async def _get_lps_mock_mode(self, validated_services: dict) -> dict[str, Any]:
+        """Query LPS /admin/mock-mode to determine active mock configuration."""
+        base_url = validated_services["llm_provider_service"]["base_url"]
+        admin_url = f"{base_url}/admin/mock-mode"
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                admin_url,
+                timeout=aiohttp.ClientTimeout(total=5.0),
+            ) as resp:
+                if resp.status != 200:
+                    pytest.skip(
+                        "/admin/mock-mode not available on LPS; "
+                        "ensure dev config exposes this endpoint"
+                    )
+                data = await resp.json()
+                return cast(dict[str, Any], data)
+
     @pytest.mark.docker
     @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_cj_mock_parity_generic_mode_matches_recorded_summary(
         self,
-        validated_services: dict,  # noqa: ARG002 - ensures services are running
+        validated_services: dict,
         kafka_manager: KafkaTestManager,
     ) -> None:
         """
@@ -98,22 +98,18 @@ class TestCJMockParityGeneric:
         - Token usage means remain close to the recorded fixture.
         - Latency stays within a reasonable band of the recorded trace.
         """
-        # This test is only valid when the LPS container is configured
-        # to use the CJ generic mock mode and mock-only provider.
-        use_mock_env = os.getenv("LLM_PROVIDER_SERVICE_USE_MOCK_LLM", "").lower()
-        mock_mode_env = os.getenv("LLM_PROVIDER_SERVICE_MOCK_MODE")
-        file_mock_mode = self._load_env_mock_mode()
-        if use_mock_env != "true" or mock_mode_env != "cj_generic_batch":
+        mode_info = await self._get_lps_mock_mode(validated_services)
+
+        if not mode_info.get("use_mock_llm", False):
             pytest.skip(
-                "LLM_PROVIDER_SERVICE_USE_MOCK_LLM must be 'true' and "
-                "LLM_PROVIDER_SERVICE_MOCK_MODE must be set to "
-                "'cj_generic_batch' for this test; adjust .env and restart "
-                "the dev stack before running."
+                "LPS reports USE_MOCK_LLM = false; enable mock mode before running this test"
             )
-        if file_mock_mode is not None and file_mock_mode != mock_mode_env:
+
+        if mode_info.get("mock_mode") != "cj_generic_batch":
             pytest.skip(
-                "Process env LLM_PROVIDER_SERVICE_MOCK_MODE does not match .env; "
-                "ensure .env and the running LPS container are using 'cj_generic_batch'."
+                "LPS mock_mode is not 'cj_generic_batch'; restart "
+                "llm_provider_service with this profile before running "
+                "CJ generic parity tests."
             )
 
         scenario_id = "cj_lps_roundtrip_mock_20251205"
@@ -158,7 +154,8 @@ class TestCJMockParityGeneric:
         # 4. Send a small batch of LLMComparisonRequests to LPS
         request_ids: list[str] = []
 
-        lps_url = "http://localhost:8090/api/v1/comparison"
+        base_url = validated_services["llm_provider_service"]["base_url"]
+        lps_url = f"{base_url}/api/v1/comparison"
 
         async with aiohttp.ClientSession() as session:
             for _ in range(num_requests):
@@ -290,7 +287,7 @@ class TestCJMockParityGeneric:
     @pytest.mark.asyncio
     async def test_cj_mock_parity_generic_mode_stable_across_multiple_batches(
         self,
-        validated_services: dict,  # noqa: ARG002 - ensures services are running
+        validated_services: dict,
         kafka_manager: KafkaTestManager,
     ) -> None:
         """
@@ -304,20 +301,18 @@ class TestCJMockParityGeneric:
         - Aggregate metrics across batches remain within those bands,
           making flakiness and regressions easier to detect.
         """
-        use_mock_env = os.getenv("LLM_PROVIDER_SERVICE_USE_MOCK_LLM", "").lower()
-        mock_mode_env = os.getenv("LLM_PROVIDER_SERVICE_MOCK_MODE")
-        file_mock_mode = self._load_env_mock_mode()
-        if use_mock_env != "true" or mock_mode_env != "cj_generic_batch":
+        mode_info = await self._get_lps_mock_mode(validated_services)
+
+        if not mode_info.get("use_mock_llm", False):
             pytest.skip(
-                "LLM_PROVIDER_SERVICE_USE_MOCK_LLM must be 'true' and "
-                "LLM_PROVIDER_SERVICE_MOCK_MODE must be set to "
-                "'cj_generic_batch' for this test; adjust .env and restart "
-                "the dev stack before running."
+                "LPS reports USE_MOCK_LLM = false; enable mock mode before running this test"
             )
-        if file_mock_mode is not None and file_mock_mode != mock_mode_env:
+
+        if mode_info.get("mock_mode") != "cj_generic_batch":
             pytest.skip(
-                "Process env LLM_PROVIDER_SERVICE_MOCK_MODE does not match .env; "
-                "ensure .env and the running LPS container are using 'cj_generic_batch'."
+                "LPS mock_mode is not 'cj_generic_batch'; restart "
+                "llm_provider_service with this profile before running "
+                "CJ generic coverage tests."
             )
 
         scenario_id = "cj_lps_roundtrip_mock_20251205"
@@ -352,7 +347,8 @@ class TestCJMockParityGeneric:
             prompt="Compare these two essays for quality",
         )
 
-        lps_url = "http://localhost:8090/api/v1/comparison"
+        base_url = validated_services["llm_provider_service"]["base_url"]
+        lps_url = f"{base_url}/api/v1/comparison"
 
         request_ids_by_batch: dict[str, list[str]] = {}
         callbacks_by_batch: dict[str, list[LLMComparisonResultV1]] = {}
