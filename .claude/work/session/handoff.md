@@ -69,41 +69,46 @@ Use this file to coordinate what the very next agent should focus on.
       - Any new mock profiles or docker tests MUST gate on `/admin/mock-mode` rather than `.env` heuristics.
       - `mock_profile_helper.sh` should remain the documented path for aligning `.env` with the running container before invoking docker tests.
 
-- CJ small-net continuation docker tests (ENG5 LOWER5):
+  - CJ small-net continuation docker tests (ENG5 LOWER5):
 
-  - Current state:
-    - New docker-backed CJ continuation test added in `tests/integration/test_cj_small_net_continuation_docker.py`.
-    - The test creates a 5-essay ENG5 batch via `ServiceTestManager.create_batch_via_agw(...)`, uploads five ENG5-like essays through AGW/File Service, and then:
-      - Polls CJ’s database (via `CJSettings.DATABASE_URL` + `CJBatchUpload`/`CJBatchState` ORM) to locate the corresponding CJ batch by `bos_batch_id`.
-      - Waits until `CJBatchState.state` reaches a terminal state (`COMPLETED`/`FAILED`/`CANCELLED`) or a hard 60s timeout, asserting that callbacks have been received before treating the batch as final.
-      - Asserts PR‑2 completion invariants (`callbacks_received == completion_denominator()`, `failed_comparisons == 0`, `total_comparisons == submitted == completed <= total_budget` when budget is set).
+  - Current state (updated 2025‑12‑06):
+    - Docker-backed CJ continuation tests live in `tests/integration/test_cj_small_net_continuation_docker.py`.
+    - The primary test (`test_cj_small_net_continuation_metadata_completed_successful`) now exercises the full ENG5 LOWER5 small-net path end-to-end:
+      - Creates a 5-essay ENG5 batch via `ServiceTestManager.create_batch_via_agw(...)`, uploads five ENG5-like essays through AGW/File Service, and waits for `BatchContentProvisioningCompleted` via `KafkaTestManager` to ensure `READY_FOR_PIPELINE_EXECUTION`.
+      - Requests the CJ pipeline through AGW and polls CJ’s database (via `CJSettings.DATABASE_URL` + `CJBatchUpload`/`CJBatchState` ORM) for the corresponding batch by `bos_batch_id` until:
+        - `CJBatchState.state == COMPLETED`, and
+        - `callbacks_received > 0` (no reliance on the BatchMonitor completion sweep).
+      - Asserts PR‑2/PR‑7 completion invariants:
+        - `failed_comparisons == 0`.
+        - `total_comparisons == submitted_comparisons == completed_comparisons`.
+        - `callbacks_received <= completion_denominator()` and `total_comparisons <= total_budget` when budget is set.
       - Asserts small-net coverage metadata on `CJBatchState.processing_metadata`:
         - `max_possible_pairs == 10`, `successful_pairs_count == 10`, `unique_coverage_complete is True`.
-        - `resampling_pass_count` is an integer with `resampling_pass_count >= 0` (small-net Phase‑2 resampling friendly).
+        - `resampling_pass_count` is an integer with `resampling_pass_count >= 0` (in the current ENG5 LOWER5 docker config, this stabilizes at `resampling_pass_count == 3` for 5-essay nets).
       - Asserts BT quality metadata shape:
         - `bt_se_summary` present with keys `mean_se`, `max_se`, `mean_comparisons_per_item`, `isolated_items`.
         - `bt_quality_flags` present with boolean keys `bt_se_inflated`, `comparison_coverage_sparse`, `has_isolated_items`.
       - Recomputes decision-level invariants from the final CJ state:
         - `success_rate ≈ 1.0` (all callbacks succeed under LOWER5 mock profile).
-        - Derives `callbacks_reached_cap`, `pairs_remaining`, and `budget_exhausted` from comparison budget metadata.
-        - Uses `build_small_net_context(...)` to recompute `is_small_net`, `small_net_max_pairs`, `small_net_resampling_cap`, and `small_net_cap_reached` from persisted metadata, asserting that at least one of `callbacks_reached_cap`, `budget_exhausted`, or `small_net_cap_reached` is `True` and that there is no `failed_reason` marker in metadata.
-    - Gating is aligned with the ENG5 mock profile suite:
+        - `total_comparisons` within the configured comparison budget (`comparison_budget.max_pairs_requested` / `total_budget`).
+    - CJ service semantics have been aligned with the ENG5 LOWER5 story definition of “small batch size = 5”:
+      - In `build_small_net_context(...)`, nets with `expected_essay_count <= MIN_RESAMPLING_NET_SIZE` are now treated as small nets.
+      - With `MIN_RESAMPLING_NET_SIZE=5` in docker, 5-essay ENG5 LOWER5 batches are flagged as `is_small_net=True`.
+      - Under this profile, the docker test shows:
+        - Phase‑1 coverage: 10 unique pairs (`max_possible_pairs == successful_pairs_count == 10`).
+        - Phase‑2 small-net resampling: `resampling_pass_count == 3` (matching `MAX_RESAMPLING_PASSES_FOR_SMALL_NET`), yielding `total_comparisons == submitted_comparisons == completed_comparisons ≈ 40`.
+        - Finalization via `ContinuationDecision.FINALIZE_SCORING` from the callback-driven continuation path (no dependence on the 5-minute BatchMonitor sweep).
+    - Gating remains aligned with the ENG5 mock profile suite:
       - The test uses `ServiceTestManager.get_validated_endpoints()` to verify `llm_provider_service`, `cj_assessment_service`, and `api_gateway_service` health.
       - It calls `GET /admin/mock-mode` on LPS and `pytest.skip`s unless `use_mock_llm=true` and `mock_mode=="eng5_lower5_gpt51_low"`, keeping `/admin/mock-mode` as the only source of truth for profile activation (no `.env` reads).
       - In the current dev stack the test is expected to skip unless `llm_provider_service` is explicitly started in the `eng5_lower5_gpt51_low` profile (same gating behaviour as the existing LOWER5 docker tests).
     - The helper `_wait_for_cj_batch_final_state(...)` is intentionally net-size agnostic and parameterised by `expected_essay_count`; it can be reused later for regular (non-small-net) batches by varying net size and expectations, without changing the test plumbing.
 
-  - Gaps / follow-ups:
-    - The new test currently covers only the “completed-successful small net” path; it does not yet assert that CJ exercises `REQUEST_MORE_COMPARISONS` before finalization for LOWER5 (i.e. no docker verification yet that resampling / extra iterations occur before the final decision).
-    - The helper polls CJ’s database directly; if we later add a CJ admin/status HTTP surface that exposes `CJBatchState`/coverage metadata, future work could migrate the polling to that API to avoid DB coupling in tests.
-    - There is no docker test yet for regular-sized nets exercising generalized RESAMPLING semantics (see PR‑7 task); current helpers are structured to support this but additional tests still need to be added.
-
   - Next steps for the very next session (CJ side):
-    - Implement a second docker test, `test_cj_small_net_continuation_requests_more_before_completion`, that:
-      - Uses the same harness to create a LOWER5 batch under the `eng5_lower5_gpt51_low` mock profile.
-      - Demonstrates at least one LOWER5 run where `submitted_comparisons_final` and `total_comparisons_final` are strictly greater than the first small-net wave (≈10 comparisons), while `failed_comparisons_final == 0` and `completed_comparisons_final == total_comparisons_final`.
-      - Confirms via metadata that `resampling_pass_count >= 1` while coverage fields still show `max_possible_pairs == successful_pairs_count == 10`.
-    - Decide whether that second test should be hard-asserted or initially marked `xfail` depending on how reliably the current docker ENG5 LOWER5 configuration produces an extra iteration before finalization.
+    - Extend `tests/integration/test_cj_small_net_continuation_docker.py` so that the **Phase‑2 resampling path and cap behaviour** are first-class assertions (either as a second test or by broadening the existing one):
+      - Use the same harness to create a LOWER5 batch under the `eng5_lower5_gpt51_low` mock profile.
+      - Assert explicitly that `total_comparisons_final > 10`, `completed_comparisons_final == total_comparisons_final`, `failed_comparisons_final == 0`, and `resampling_pass_count_final == MAX_RESAMPLING_PASSES_FOR_SMALL_NET` with `max_possible_pairs == successful_pairs_count == 10`.
+      - Keep the assertions net-size agnostic so that the same helper scaffolding can later be used for regular nets with generalized RESAMPLING semantics.
     - Begin planning the extension of this harness to regular-sized nets:
       - Reuse `_wait_for_cj_batch_final_state(...)` and the metadata assertion scaffolding.
       - Thread configuration knobs (e.g. `MAX_RESAMPLING_PASSES_FOR_REGULAR_BATCH` once implemented) into expectations so that PR‑7’s generalized RESAMPLING semantics can be exercised without major harness rewrites.
@@ -112,7 +117,7 @@ Use this file to coordinate what the very next agent should focus on.
 
 ## NEXT SESSION INSTRUCTION (for the next developer)
 
-Role: You are the lead developer and architet of HuleEdu. Your scope is to extend the new docker-backed CJ small-net continuation harness for ENG5 LOWER5 so that it (a) proves that CJ can request additional comparisons before finalization for at least one LOWER5 scenario, and (b) is ready to be lifted to regular (non-small-net) batches and generalized RESAMPLING semantics under PR‑7.
+Role: You are the lead developer and architet of HuleEdu. Your scope is to **tighten and extend** the docker-backed CJ small-net continuation harness for ENG5 LOWER5 so that (a) the Phase‑2 small‑net resampling path and cap semantics are explicitly asserted in tests, and (b) the harness is ready to be lifted to regular (non-small-net) batches and generalized RESAMPLING semantics under PR‑7.
 
 Before touching code:
 - From repo root, read:
