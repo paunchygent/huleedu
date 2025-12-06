@@ -42,10 +42,14 @@ Connects to:
    - [ ] Decide whether non-small nets:
      - [ ] Use RESAMPLING only after some minimum coverage and/or stability attempts, or
      - [ ] Can mix COVERAGE and RESAMPLING in a more flexible pattern (e.g. occasional resampling waves).
-   - [ ] Define separate configuration knobs:
+  - [ ] Define separate configuration knobs:
      - [ ] `MAX_RESAMPLING_PASSES_FOR_SMALL_NET` (existing).
      - [ ] `MAX_RESAMPLING_PASSES_FOR_REGULAR_BATCH` (new).
      - [ ] Optional: per-batch overrides via `batch_config_overrides`.
+  - [ ] Use the ENG5 LOWER5 small‑net docker configuration as the baseline reference for small‑net behaviour:
+    - [x] `MIN_RESAMPLING_NET_SIZE=5` and `expected_essay_count <= MIN_RESAMPLING_NET_SIZE` → small net.
+    - [x] Coverage semantics pinned by docker: `max_possible_pairs == successful_pairs_count == 10`, `unique_coverage_complete is True` for 5‑essay LOWER5.
+    - [x] Phase‑2 resampling semantics pinned by docker: `resampling_pass_count` reaches the configured small‑net cap (currently 3) with `total_comparisons ≈ 40`, `failed_comparisons == 0`, and `success_rate == 1.0`.
 
 2. **Orchestration changes**
    - [ ] Update `_can_attempt_small_net_resampling(ctx)` or introduce a more general predicate (e.g. `_can_attempt_resampling(ctx)`) that:
@@ -73,12 +77,15 @@ Connects to:
    - [ ] Add unit tests in `test_pair_generation_context.py` to confirm RESAMPLING remains fair and budget-aware for larger nets.
 
 5. **Docker/E2E validation (follow-up)**
-   - [ ] After unit semantics are stable, add or extend integration tests (potentially a second test in `tests/integration/test_cj_small_net_continuation_docker.py` or a new `test_cj_regular_batch_resampling_docker.py`) to:
+  - [ ] After unit semantics are stable, add or extend integration tests (potentially a second test in `tests/integration/test_cj_small_net_continuation_docker.py` or a new `test_cj_regular_batch_resampling_docker.py`) to:
      - [ ] Run a realistic CJ batch (non-small-net) under ENG5 or generic CJ configuration.
      - [ ] Verify that:
        - [ ] RESAMPLING is invoked at least once (e.g. via metadata, counts, or metrics).
        - [ ] The batch still finalizes correctly when caps or stability conditions are met.
-   - Note: a LOWER5-focused small-net continuation harness already exists in `tests/integration/test_cj_small_net_continuation_docker.py`; it is structured to be net-size agnostic so that regular-batch RESAMPLING tests can reuse the same helpers once the generalized settings and orchestration changes are in place.
+  - Note: a LOWER5-focused small-net continuation harness already exists in `tests/integration/test_cj_small_net_continuation_docker.py`; it is structured to be net-size agnostic so that regular-batch RESAMPLING tests can reuse the same helpers once the generalized settings and orchestration changes are in place. As of 2025‑12‑06, this harness verifies:
+    - Small‑net classification for 5‑essay ENG5 LOWER5 batches (`expected_essay_count <= MIN_RESAMPLING_NET_SIZE`).
+    - Coverage metadata (`max_possible_pairs == successful_pairs_count == 10`, `unique_coverage_complete is True`).
+    - Phase‑2 small‑net resampling hitting the configured cap (`resampling_pass_count == MAX_RESAMPLING_PASSES_FOR_SMALL_NET`, `total_comparisons ≈ 40`) and finalization via `FINALIZE_SCORING` with `success_rate == 1.0` and `failed_comparisons == 0`.
 
 ## Success Criteria
 

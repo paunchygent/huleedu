@@ -66,9 +66,9 @@ Connects to: “Coverage metrics & metadata on CJBatchState”.
   - [x] Assert `max_possible_pairs` matches `nC2` for a simple 3‑essay batch.
   - [x] Assert `successful_pairs_count` behaviour is documented against current schema (enum vs string winner); adjust expectation if winner representation is normalised in future.
 - [x] Extend `test_workflow_continuation.py` to assert coverage metadata keys are present and updated after a continuation iteration (via small‑net Phase‑2 tests).
-- [ ] Ensure future tests can be parameterised by net size:
-  - [ ] Small‑net scenarios (`expected_essay_count < MIN_RESAMPLING_NET_SIZE`) should continue to drive the existing small‑net Phase‑2 path.
-  - [ ] Regular/large‑net scenarios (`expected_essay_count >= MIN_RESAMPLING_NET_SIZE`) should be easy to add by reusing the same helpers and assertions, differing only in configuration and expected resampling behaviour.
+- [x] Ensure future tests can be parameterised by net size:
+  - [x] Small‑net scenarios (`expected_essay_count <= MIN_RESAMPLING_NET_SIZE`) drive the small‑net Phase‑2 path.
+  - [ ] Regular/large‑net scenarios (`expected_essay_count > MIN_RESAMPLING_NET_SIZE`) should be easy to add by reusing the same helpers and assertions, differing only in configuration and expected resampling behaviour.
 
 #### Phase 1 Progress (2025‑11‑30)
 
@@ -152,7 +152,7 @@ Connects to: “Resampling mode in pair generation”.
     - [ ] Regular-net configurations (e.g. 20+ essays) can be introduced later to exercise generalised RESAMPLING semantics without changing helper structure.
   - [ ] Keep test helpers (e.g. synthetic nets, builder functions) net-size agnostic so they can be used by both small-net and regular-batch tests.
 
-#### Phase 3 Progress (2025‑11‑30)
+#### Phase 3 Progress (2025‑11‑30, updated 2025‑12‑06)
 
 - Added `PairGenerationMode` with `COVERAGE` and `RESAMPLING` in `pair_generation.py` and extended `generate_comparison_tasks` to accept a `mode` parameter while preserving existing COVERAGE behaviour (duplicate avoidance, matching‑strategy usage, and global cap enforcement).
 - Implemented RESAMPLING mode to build candidate pairs exclusively from existing comparison edges, score them using per‑essay `comparison_count`, and select a capped subset that avoids introducing new essay IDs and favours under‑sampled essays.
@@ -160,6 +160,12 @@ Connects to: “Resampling mode in pair generation”.
 - Extended `test_pair_generation_context.py` with a RESAMPLING fairness test and updated `test_workflow_continuation.py` wiring tests to assert the correct mode is used; ran `pdm run pytest-root services/cj_assessment_service/tests/unit/test_pair_generation_context.py` and targeted workflow continuation tests successfully.
 - Ran the broader CJ unit suite via `pdm run pytest-root services/cj_assessment_service/tests/unit`; all tests related to pair generation and workflow continuation passed, with one pre‑existing failure remaining in `test_batch_finalizer_scoring_state.py::test_finalize_scoring_transitions_state` (BatchFinalizer dual‑event publishing), which was not modified in this phase.
 - Added a docker-backed CJ small-net continuation test (`tests/integration/test_cj_small_net_continuation_docker.py`) that reuses the production ENG5 LOWER5 mock profile and asserts PR‑2/PR‑7 completion, coverage, and small-net metadata invariants from `CJBatchState`, using a net-size-agnostic helper that can later be reused for regular-batch RESAMPLING scenarios without harness rewrites.
+- As of 2025‑12‑06, the docker ENG5 LOWER5 configuration (`MIN_RESAMPLING_NET_SIZE=5`, `MAX_RESAMPLING_PASSES_FOR_SMALL_NET=3`) has been aligned with the **“small batch size = 5”** story semantics:
+  - Nets with `expected_essay_count <= MIN_RESAMPLING_NET_SIZE` are treated as **small nets** in `build_small_net_context(...)`.
+  - The 5‑essay ENG5 LOWER5 docker batch follows the small‑net path:
+    - Phase‑1 coverage: `max_possible_pairs == successful_pairs_count == 10`, `unique_coverage_complete is True`.
+    - Phase‑2 resampling: `resampling_pass_count` increases up to the configured cap (currently 3), resulting in `total_comparisons ≈ 40`.
+    - Finalization: `ContinuationDecision.FINALIZE_SCORING` is taken from the callback‑driven continuation path (no reliance on the BatchMonitor sweep), and `CJBatchState.state` transitions to `COMPLETED` with `failed_comparisons == 0`, `success_rate == 1.0`, and `total_comparisons <= total_budget`.
 
 ### 4. Convergence Harness (Checklist §5)
 

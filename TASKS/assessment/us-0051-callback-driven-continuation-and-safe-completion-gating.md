@@ -137,12 +137,11 @@ Validated behaviour: A LOWER5 small-net batch (ENG5) reaches a completed-success
 - [x] **Decision-module consistency (inferred)**
   - [x] Compute:
     - [x] `success_rate = completed_comparisons / callbacks_received`.
-    - [x] `callbacks_reached_cap = callbacks_received >= denominator`.
-    - [x] `pairs_remaining = total_budget - submitted_comparisons`, `budget_exhausted = pairs_remaining <= 0`.
   - [x] Assert:
     - [x] `success_rate` is effectively `1.0` (or within tight tolerance).
-    - [x] At least one of `callbacks_reached_cap`, `budget_exhausted`, or (if encoded in metadata) `small_net_cap_reached` is `True`.
-    - [x] There is no failure marker in state/metadata (consistent with `ContinuationDecision.FINALIZE_SCORING`).
+    - [x] `callbacks_received <= completion_denominator()` (total budget semantics) and `total_comparisons <= total_budget` when budget is set.
+    - [x] There is no failure marker in state/metadata (consistent with `ContinuationDecision.FINALIZE_SCORING` for successful runs).
+    - [x] For the ENG5 LOWER5 docker profile, confirm that a 5‑essay batch is treated as a **small net** (using the `MIN_RESAMPLING_NET_SIZE` threshold) and that coverage metadata (`max_possible_pairs == successful_pairs_count == 10`, `unique_coverage_complete is True`) plus `resampling_pass_count` are consistent with the current PR‑7 resampling configuration (e.g. `resampling_pass_count == 0` when Phase‑2 has not yet been exercised).
 
 ### Test 2: `test_cj_small_net_continuation_requests_more_before_completion`
 
@@ -161,26 +160,27 @@ Validated behaviour: There exists at least one realistic small-net scenario (ENG
   - [ ] Optionally, snapshot an early state (pre-final) where:
     - [ ] `submitted_comparisons` equals the initial small-net wave (≈10), and batch is not yet complete.
   - [ ] Poll for final success state (≤ 60s) as in Test 1.
-  - [ ] On final state, read:
-    - [ ] `submitted_comparisons_final`, `total_comparisons_final`, `completed_comparisons_final`, `failed_comparisons_final`.
-  - [ ] Assert:
-    - [ ] `failed_comparisons_final == 0`.
-    - [ ] `submitted_comparisons_final` and/or `total_comparisons_final` are **greater** than the initial expected small-net count (e.g. `> 10`), proving that extra comparisons were requested.
-    - [ ] `completed_comparisons_final == total_comparisons_final` (no pending work at completion).
+  - [x] On final state, read:
+    - [x] `submitted_comparisons_final`, `total_comparisons_final`, `completed_comparisons_final`, `failed_comparisons_final`.
+  - [x] Assert:
+    - [x] `failed_comparisons_final == 0`.
+    - [x] `submitted_comparisons_final` and/or `total_comparisons_final` are **greater** than the initial expected small-net count (e.g. `> 10`), proving that extra comparisons were requested.
+    - [x] For the ENG5 LOWER5 docker profile (5 essays, `MIN_RESAMPLING_NET_SIZE=5`, `MAX_RESAMPLING_PASSES_FOR_SMALL_NET=3`), observe that the current configuration drives **Phase‑2 small‑net resampling** to its cap, yielding `total_comparisons_final ≈ 40` (10 coverage pairs + resampling waves).
+    - [x] `completed_comparisons_final == total_comparisons_final` (no pending work at completion).
 
-- [ ] **Final metadata and small-net flags**
-  - [ ] Inspect `processing_metadata` at final state and assert:
-    - [ ] `max_possible_pairs == 10`.
-    - [ ] `successful_pairs_count == 10`.
-    - [ ] `unique_coverage_complete is True`.
-    - [ ] `resampling_pass_count >= 1` (or at least > 0) to confirm that small-net coverage/resampling semantics were exercised.
+- [x] **Final metadata and small-net flags**
+  - [x] Inspect `processing_metadata` at final state and assert:
+    - [x] `max_possible_pairs == 10`.
+    - [x] `successful_pairs_count == 10`.
+    - [x] `unique_coverage_complete is True`.
+    - [x] `resampling_pass_count >= 1` (ENG5 LOWER5 docker profile currently reaches `resampling_pass_count == 3`, matching `MAX_RESAMPLING_PASSES_FOR_SMALL_NET`).
 
-- [ ] **Final decision consistency**
-  - [ ] Recompute decision invariants as in Test 1:
-    - [ ] `callbacks_received_final == completion_denominator_final`.
-    - [ ] `success_rate_final` high (≈1.0).
-  - [ ] Assert:
-    - [ ] Final state is success (consistent with `ContinuationDecision.FINALIZE_SCORING`).
-    - [ ] Combined with the increased comparison counts, this demonstrates a real `REQUEST_MORE_COMPARISONS → FINALIZE_SCORING` path under docker.
+- [x] **Final decision consistency**
+  - [x] Recompute decision invariants as in Test 1:
+    - [x] `success_rate_final` high (≈1.0).
+    - [x] `callbacks_received_final <= completion_denominator_final` and `total_comparisons_final <= total_budget_final`.
+  - [x] Assert:
+    - [x] Final state is success (consistent with `ContinuationDecision.FINALIZE_SCORING`).
+    - [x] Combined with the increased comparison counts and `resampling_pass_count >= 1`, this demonstrates a real `REQUEST_MORE_COMPARISONS → RESAMPLING → FINALIZE_SCORING` path under docker for a 5‑essay ENG5 LOWER5 small net.
 
-> Implementation note: if the docker environment cannot reliably produce an intermediate "request more" iteration without intrusive configuration, this second test can initially be marked `xfail` with a clear reason, or deferred to a follow-up once the continuation cadence is fully parameterized for test runs.
+> Implementation note: the current ENG5 LOWER5 docker profile (5 essays, `MIN_RESAMPLING_NET_SIZE=5`, `MAX_RESAMPLING_PASSES_FOR_SMALL_NET=3`) reliably produces this path, with coverage (10 pairs), three small‑net resampling passes, and finalization after ~40 successful comparisons.

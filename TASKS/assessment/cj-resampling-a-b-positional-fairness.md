@@ -38,6 +38,7 @@ Connects to:
 1. **Baseline analysis**
    - [ ] Quantify current A/B positional distributions in RESAMPLING mode using existing ENG5/LOWER5 traces (e.g. via a small analysis script or convergence harness extensions).
    - [ ] Document any observed skews for typical small-net and medium-sized batches.
+   - [ ] Use the new ENG5 LOWER5 docker small‑net continuation path (5 essays, small-net resampling to cap with `total_comparisons ≈ 40`) as one of the primary empirical baselines for positional usage under RESAMPLING.
 
 2. **Design positional fairness strategy**
    - [ ] Define a target fairness notion for A/B positions (e.g. per essay, proportion of A vs B appearances stays within a configurable band over all comparisons).
