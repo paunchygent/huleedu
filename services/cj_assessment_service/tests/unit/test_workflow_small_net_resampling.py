@@ -262,6 +262,8 @@ async def test_small_net_phase2_tracks_resampling_pass_count(monkeypatch: Any) -
         resampling_pass_count=resampling_pass_count,
         small_net_resampling_cap=small_net_resampling_cap,
         small_net_cap_reached=small_net_cap_reached,
+        regular_batch_resampling_cap=0,
+        regular_batch_cap_reached=False,
         bt_se_summary=None,
         bt_quality_flags=None,
         bt_se_inflated=False,
@@ -458,3 +460,138 @@ async def test_small_net_resampling_respects_resampling_pass_cap(monkeypatch: An
     assert request_additional.await_count == 0
     total_finalize_calls = finalize_scoring_called.await_count + finalize_failure_called.await_count
     assert total_finalize_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_regular_batch_resampling_branch_requests_resampling(monkeypatch: Any) -> None:
+    """Non-small nets should be able to enter RESAMPLING with a separate cap."""
+
+    settings = Mock(spec=Settings)
+    settings.MAX_PAIRWISE_COMPARISONS = 200
+    settings.MIN_COMPARISONS_FOR_STABILITY_CHECK = 3
+    settings.SCORE_STABILITY_THRESHOLD = 0.01
+    settings.MIN_SUCCESS_RATE_THRESHOLD = 0.0
+    settings.MIN_RESAMPLING_NET_SIZE = 5
+    settings.MAX_RESAMPLING_PASSES_FOR_SMALL_NET = 3
+    settings.MAX_RESAMPLING_PASSES_FOR_REGULAR_BATCH = 1
+
+    event_publisher = AsyncMock()
+    content_client = AsyncMock()
+    llm_interaction = AsyncMock()
+
+    # Regular net: expected_essay_count > MIN_RESAMPLING_NET_SIZE with partial but
+    # substantial coverage (successful_pairs_count / max_possible_pairs >= 0.6).
+    batch_state = CJBatchState()
+    batch_state.batch_id = 200
+    batch_state.submitted_comparisons = 40
+    batch_state.completed_comparisons = 40
+    batch_state.failed_comparisons = 0
+    batch_state.total_comparisons = 40
+    batch_state.total_budget = 200
+    batch_state.current_iteration = 2
+    batch_state.processing_metadata = {
+        "comparison_budget": {"max_pairs_requested": 200, "source": "service_default"},
+        "bt_scores": {"e1": 0.1, "e2": -0.1},
+        "successful_pairs_count": 60,
+        "max_possible_pairs": 80,
+        "unique_coverage_complete": False,
+        "resampling_pass_count": 0,
+    }
+    batch_state.batch_upload = _make_upload(expected_count=20)
+
+    essays = [
+        Mock(
+            els_essay_id=f"essay-{i}",
+            assessment_input_text=f"essay-{i}",
+            current_bt_score=0.0,
+            comparison_count=2,
+            is_anchor=False,
+        )
+        for i in range(20)
+    ]
+
+    # Keep stability pending so continuation prefers more work.
+    monkeypatch.setattr(
+        wc.scoring_ranking,
+        "record_comparisons_and_update_scores",
+        AsyncMock(return_value={"e1": 0.12, "e2": -0.08}),
+    )
+    monkeypatch.setattr(
+        wc.scoring_ranking,
+        "check_score_stability",
+        Mock(return_value=0.05),
+    )
+
+    merge_metadata = AsyncMock()
+    monkeypatch.setattr(wc, "merge_batch_processing_metadata", merge_metadata)
+
+    request_additional = AsyncMock(return_value=True)
+    monkeypatch.setattr(
+        wc.comparison_processing,
+        "request_additional_comparisons_for_batch",
+        request_additional,
+    )
+
+    finalize_scoring_called = AsyncMock()
+    finalize_failure_called = AsyncMock()
+
+    class _Finalizer:
+        def __init__(self, *_args: Any, **_kwargs: Any) -> None:
+            pass
+
+        async def finalize_scoring(self, *_args: Any, **_kwargs: Any) -> None:
+            await finalize_scoring_called()
+
+        async def finalize_failure(self, *_args: Any, **_kwargs: Any) -> None:
+            await finalize_failure_called()
+
+    monkeypatch.setattr(wc, "BatchFinalizer", _Finalizer)
+
+    @asynccontextmanager
+    async def mock_session_ctx() -> AsyncGenerator[AsyncSession, None]:
+        yield AsyncMock(spec=AsyncSession)
+
+    mock_session_provider = AsyncMock()
+    mock_session_provider.session = mock_session_ctx
+    mock_batch_repository = AsyncMock(spec=CJBatchRepositoryProtocol)
+    mock_batch_repository.get_batch_state = AsyncMock(return_value=batch_state)
+    mock_essay_repository = AsyncMock(spec=CJEssayRepositoryProtocol)
+    mock_essay_repository.get_essays_for_cj_batch = AsyncMock(return_value=essays)
+
+    comparison_repo = AsyncMock(spec=CJComparisonRepositoryProtocol)
+    comparison_repo.get_coverage_metrics_for_batch = AsyncMock(return_value=(80, 60))
+
+    mock_grade_projector = AsyncMock()
+    mock_matching_strategy = make_real_matching_strategy_mock()
+
+    await wc.trigger_existing_workflow_continuation(
+        batch_id=200,
+        session_provider=mock_session_provider,
+        batch_repository=mock_batch_repository,
+        comparison_repository=comparison_repo,
+        essay_repository=mock_essay_repository,
+        instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
+        event_publisher=event_publisher,
+        settings=settings,
+        content_client=content_client,
+        correlation_id=uuid4(),
+        llm_interaction=llm_interaction,
+        matching_strategy=mock_matching_strategy,
+        grade_projector=mock_grade_projector,
+    )
+
+    # Regular-batch resampling should be attempted once, using RESAMPLING mode.
+    merge_metadata.assert_awaited_once()
+    merge_call: Any = merge_metadata.await_args
+    metadata_updates = merge_call.kwargs["metadata_updates"]
+    assert metadata_updates.get("resampling_pass_count") == 1
+    assert metadata_updates.get("successful_pairs_count") == 60
+    assert metadata_updates.get("max_possible_pairs") == 80
+
+    request_additional.assert_awaited_once()
+    cont_args: Any = request_additional.await_args
+    assert cont_args is not None
+    assert cont_args.kwargs["mode"] == wc.PairGenerationMode.RESAMPLING
+
+    # The configured regular-batch cap must be respected.
+    assert settings.MAX_RESAMPLING_PASSES_FOR_REGULAR_BATCH == 1

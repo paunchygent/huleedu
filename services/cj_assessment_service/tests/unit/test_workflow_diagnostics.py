@@ -65,6 +65,8 @@ def _make_ctx(**overrides: Any) -> workflow_context.ContinuationContext:
         resampling_pass_count=0,
         small_net_resampling_cap=0,
         small_net_cap_reached=False,
+        regular_batch_resampling_cap=0,
+        regular_batch_cap_reached=False,
         bt_se_summary={"mean_se": 0.1},
         bt_quality_flags=None,
         bt_se_inflated=False,

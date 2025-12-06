@@ -45,6 +45,8 @@ class ContinuationContext:
     resampling_pass_count: int
     small_net_resampling_cap: int
     small_net_cap_reached: bool
+    regular_batch_resampling_cap: int
+    regular_batch_cap_reached: bool
 
     bt_se_summary: dict[str, float | int] | None
     bt_quality_flags: dict[str, bool] | None

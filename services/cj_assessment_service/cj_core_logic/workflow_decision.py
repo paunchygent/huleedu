@@ -256,6 +256,26 @@ async def _build_continuation_context(
         log_extra=log_extra,
     )
 
+    # Regular-batch resampling cap is derived from settings but enforced so that
+    # non-small nets can never exceed the small-net resampling cap. Small nets
+    # rely solely on small_net_resampling_cap and ignore the regular-batch cap.
+    raw_regular_cap = int(
+        _get_numeric_setting(settings, "MAX_RESAMPLING_PASSES_FOR_REGULAR_BATCH", 0.0) or 0
+    )
+    if is_small_net:
+        regular_batch_resampling_cap = 0
+    else:
+        if small_net_resampling_cap > 0 and raw_regular_cap > small_net_resampling_cap:
+            regular_batch_resampling_cap = small_net_resampling_cap
+        else:
+            regular_batch_resampling_cap = raw_regular_cap
+
+    regular_batch_cap_reached = (
+        not is_small_net
+        and regular_batch_resampling_cap > 0
+        and resampling_pass_count >= regular_batch_resampling_cap
+    )
+
     # Only finalize on stability, completion denominator, global budget
     # exhaustion, or small-net Phase-2 resampling cap.
     should_finalize = (
@@ -318,6 +338,8 @@ async def _build_continuation_context(
         resampling_pass_count=resampling_pass_count,
         small_net_resampling_cap=small_net_resampling_cap,
         small_net_cap_reached=small_net_cap_reached,
+        regular_batch_resampling_cap=regular_batch_resampling_cap,
+        regular_batch_cap_reached=regular_batch_cap_reached,
         bt_se_summary=bt_se_summary,
         bt_quality_flags=bt_quality_flags,
         bt_se_inflated=bt_se_inflated,
@@ -342,6 +364,61 @@ def _can_attempt_small_net_resampling(ctx: ContinuationContext) -> bool:
         and ctx.pairs_remaining > 0
         and ctx.small_net_resampling_cap > 0
     )
+
+
+def _can_attempt_resampling(ctx: ContinuationContext) -> bool:
+    """General resampling predicate for both small and regular nets.
+
+    - Small nets delegate to the existing small-net predicate, preserving PR-7
+      semantics and relying on small_net_resampling_cap.
+    - Non-small nets use a conservative gating strategy that requires:
+      - At least one callback received.
+      - Success-rate guard not triggered.
+      - Remaining budget and denominator headroom.
+      - A positive regular-batch resampling cap and resampling_pass_count
+        strictly below that cap.
+      - Coverage sufficiently progressed relative to max_possible_pairs.
+    """
+    # Preserve existing behaviour for small nets.
+    if ctx.is_small_net:
+        return _can_attempt_small_net_resampling(ctx)
+
+    # Non-small nets: require some signal before attempting resampling.
+    if ctx.callbacks_received <= 0:
+        return False
+
+    if ctx.should_fail_due_to_success_rate:
+        return False
+
+    if ctx.stability_passed:
+        return False
+
+    if ctx.pairs_remaining <= 0 or ctx.budget_exhausted:
+        return False
+
+    if ctx.callbacks_reached_cap:
+        return False
+
+    # Enforce regular-batch resampling cap.
+    regular_cap = getattr(ctx, "regular_batch_resampling_cap", 0)
+    if regular_cap <= 0:
+        return False
+
+    if ctx.resampling_pass_count >= regular_cap:
+        return False
+
+    # Coverage/stability condition: require a minimum fraction of the potential
+    # comparison graph to have at least one successful comparison before we
+    # start resampling existing edges.
+    if ctx.max_possible_pairs <= 0:
+        return False
+
+    coverage_fraction = ctx.successful_pairs_count / ctx.max_possible_pairs
+    MIN_COVERAGE_FRACTION_FOR_REGULAR_RESAMPLING = 0.6
+    if coverage_fraction < MIN_COVERAGE_FRACTION_FOR_REGULAR_RESAMPLING:
+        return False
+
+    return True
 
 
 def _decide_continuation_action(ctx: ContinuationContext) -> ContinuationDecision:

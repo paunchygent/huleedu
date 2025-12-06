@@ -23,7 +23,7 @@ from services.cj_assessment_service.cj_core_logic.scoring_ranking import BTScori
 from services.cj_assessment_service.cj_core_logic.workflow_decision import (
     ContinuationDecision,
     _build_continuation_context,
-    _can_attempt_small_net_resampling,
+    _can_attempt_resampling,
     _compute_success_metrics,
     decide,
 )
@@ -289,8 +289,12 @@ async def trigger_existing_workflow_continuation(
     # Outside the DB session: persist metadata and drive actions.
     metadata_already_merged = False
 
-    can_attempt_resampling = _can_attempt_small_net_resampling(ctx)
-    if can_attempt_resampling and ctx.resampling_pass_count < ctx.small_net_resampling_cap:
+    can_attempt_resampling = _can_attempt_resampling(ctx)
+    # Select the appropriate resampling cap based on net size.
+    resampling_cap = (
+        ctx.small_net_resampling_cap if ctx.is_small_net else ctx.regular_batch_resampling_cap
+    )
+    if can_attempt_resampling and resampling_cap > 0 and ctx.resampling_pass_count < resampling_cap:
         metadata_updates = dict(ctx.metadata_updates)
         metadata_updates.update(
             {
@@ -358,14 +362,26 @@ async def trigger_existing_workflow_continuation(
     )
 
     if not metadata_already_merged:
-        if can_attempt_resampling and ctx.resampling_pass_count >= ctx.small_net_resampling_cap:
+        if (
+            can_attempt_resampling
+            and resampling_cap > 0
+            and ctx.resampling_pass_count >= resampling_cap
+        ):
+            if ctx.is_small_net:
+                log_message = (
+                    "Small-net Phase-2 resampling cap reached; falling back to finalization"
+                )
+            else:
+                log_message = (
+                    "Regular-batch resampling cap reached; falling back to continuation caps"
+                )
             logger.info(
-                "Small-net Phase-2 resampling cap reached; falling back to finalization",
+                log_message,
                 extra={
                     **log_extra,
                     "expected_essay_count": ctx.expected_essay_count,
                     "resampling_pass_count": ctx.resampling_pass_count,
-                    "small_net_phase2_entered": True,
+                    "small_net_phase2_entered": ctx.is_small_net,
                 },
             )
 
