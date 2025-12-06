@@ -15,9 +15,14 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Tuple
 
-from pydantic import ValidationError
+# Ensure repo root is in sys.path for CI environments
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
-from scripts.schemas.task_schema import TaskFrontmatter
+from pydantic import ValidationError  # noqa: E402
+
+from scripts.schemas.task_schema import TaskFrontmatter  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 TASKS_DIR = ROOT / "TASKS"
