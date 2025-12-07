@@ -363,6 +363,7 @@ markers = [
     "timeout: marks tests with specific timeout requirements",
     "no_prometheus_clear: marks tests that should not have their Prometheus registry cleared",
     "unit: marks tests as unit tests for isolated component testing",
+    "mock_profile(profile): marks tests requiring a specific LLM mock profile (use pdm run llm-mock-profile to switch)",
 ]
 
 filterwarnings = [
