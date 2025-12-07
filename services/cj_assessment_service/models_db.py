@@ -207,6 +207,14 @@ class ComparisonPair(Base):
     # Processing metadata
     processing_metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
+    # Pair generation mode for per-mode positional fairness observability
+    pair_generation_mode: Mapped[str | None] = mapped_column(
+        String(20),
+        nullable=True,
+        index=True,
+        doc="Generation mode: 'coverage' (Phase-1) or 'resampling' (Phase-2)",
+    )
+
     # Relationships
     cj_batch: Mapped[CJBatchUpload] = relationship(back_populates="comparison_pairs")
     essay_a: Mapped[ProcessedEssay] = relationship(
@@ -447,6 +455,18 @@ class EventOutbox(Base):
         Text,
         nullable=True,
         comment="Last error message if publishing failed",
+    )
+
+    __table_args__ = (
+        # Partial unique index prevents duplicate unpublished completion events
+        # for the same aggregate_id and event_type. Added in migration 20251121_1800.
+        Index(
+            "idx_outbox_unique_unpublished",
+            "aggregate_id",
+            "event_type",
+            unique=True,
+            postgresql_where=text("published_at IS NULL"),
+        ),
     )
 
     def __repr__(self) -> str:
