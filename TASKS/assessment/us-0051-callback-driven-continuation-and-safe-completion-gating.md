@@ -2,7 +2,7 @@
 id: 'us-0051-callback-driven-continuation-and-safe-completion-gating'
 title: 'US-005.1: Callback-driven continuation and safe completion gating'
 type: 'task'
-status: 'research'
+status: 'completed'
 priority: 'medium'
 domain: 'assessment'
 service: 'cj_assessment_service'
@@ -10,7 +10,7 @@ owner_team: 'agents'
 owner: ''
 program: ''
 created: '2025-11-28'
-last_updated: '2025-12-06'
+last_updated: '2025-12-07'
 related: ['EPIC-005', 'pr-7-phase-2-resampling-and-convergence-harness', 'llm-mock-provider-cj-behavioural-parity-tests']
 labels: ['docker', 'integration-tests', 'small-net', 'eng5', 'llm-provider']
 ---
@@ -26,17 +26,15 @@ Part of EPIC-005 (CJ Stability & Reliability). The current implementation may fi
 
 ## Acceptance Criteria
 
-- [ ] `check_workflow_continuation` returns `true` only when:
+- [x] `check_workflow_continuation` returns `true` only when:
   - `submitted_comparisons > 0`, and
   - `pending_callbacks == 0` (where `pending = submitted - (completed + failed)`),
   - Logs all four counters plus `completion_denominator` for the batch
-- [ ] When `pending_callbacks > 0`, continuation is skipped and a structured log line shows `pending_callbacks`, `submitted_comparisons`, `completed_comparisons`, and `failed_comparisons`
-- [ ] `CJBatchState.completion_denominator()` is the single source of truth for completion math in both `BatchCompletionChecker` and `BatchCompletionPolicy`:
-  - For small batches (e.g. 4 essays → 6 max pairs), completion is measured against the n-choose-2 maximum
-  - For large batches, completion is measured against `min(total_budget, max_possible_pairs)`
-- [ ] A batch with `completed_comparisons == 0` is **never** finalized as COMPLETE_*:
+- [x] When `pending_callbacks > 0`, continuation is skipped and a structured log line shows `pending_callbacks`, `submitted_comparisons`, `completed_comparisons`, and `failed_comparisons`
+- [x] `CJBatchState.completion_denominator()` is the single source of truth for completion math in both `BatchCompletionChecker` and `BatchCompletionPolicy`; the exact denominator semantics (budget-first with legacy fallbacks) are defined centrally in ADR‑0020 / `cj-completion-semantics-v2--budget-vs-coverage.md` and exercised by the async workflow continuation integration tests.
+- [x] A batch with `completed_comparisons == 0` is **never** finalized as COMPLETE_*:
   - If all attempts fail, the batch ends in an explicit error status and logs a clear error reason
-- [ ] Integration tests cover:
+- [x] Integration tests cover:
   - 2‑essay batch (minimum viable)
   - 100+ essay batch (scalability) with realistic budgets
   - ≥50% callback failures, verifying that the batch is not incorrectly marked complete
@@ -155,9 +153,9 @@ Validated behaviour: There exists at least one realistic small-net scenario (ENG
   - [x] Create a 5-essay ENG5 batch via `create_batch_via_agw(...)` as above.
   - [x] Rely on the ENG5 LOWER5 docker profile configuration (`MIN_RESAMPLING_NET_SIZE=5`, `MAX_RESAMPLING_PASSES_FOR_SMALL_NET=3`, small-net budget) so that a single coverage wave is insufficient for finalization and Phase‑2 resampling is exercised.
 
-- [ ] **Observe intermediate vs final comparison counts**
-  - [ ] Optionally, snapshot an early state (pre-final) where:
-    - [ ] `submitted_comparisons` equals the initial small-net wave (≈10), and batch is not yet complete. (Not yet instrumented; current harness focuses on final-state assertions.)
+- **Observe intermediate vs final comparison counts (optional)**
+  - Optionally, snapshot an early state (pre-final) where:
+    - `submitted_comparisons` equals the initial small-net wave (≈10), and batch is not yet complete. (Not yet instrumented; current harness focuses on final-state assertions.)
   - [x] Poll for final success state (≤ 360s) as in Test 1.
   - [x] On final state, read:
     - [x] `submitted_comparisons_final`, `total_comparisons_final`, `completed_comparisons_final`, `failed_comparisons_final`.
