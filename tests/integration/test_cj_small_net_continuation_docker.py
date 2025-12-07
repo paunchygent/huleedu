@@ -22,6 +22,10 @@ from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async
 from services.cj_assessment_service.cj_core_logic.workflow_context import build_small_net_context
 from services.cj_assessment_service.config import Settings as CJSettings
 from services.cj_assessment_service.models_db import CJBatchState, CJBatchUpload
+from services.cj_assessment_service.tests.helpers.positional_fairness import (
+    get_pair_orientation_counts_for_batch,
+    get_positional_counts_for_batch,
+)
 from tests.utils.auth_manager import AuthTestUser
 from tests.utils.kafka_test_manager import KafkaTestManager
 from tests.utils.service_test_manager import ServiceTestManager
@@ -260,16 +264,19 @@ class TestCJSmallNetContinuation:
 
     @pytest.mark.docker
     @pytest.mark.integration
+    @pytest.mark.mock_profile("eng5_lower5_gpt51_low")
     @pytest.mark.asyncio
     async def test_cj_small_net_continuation_metadata_completed_successful(
         self,
         service_manager: ServiceTestManager,
         validated_services: dict,
     ) -> None:
-        """
-        Validate that an ENG5 LOWER5 small-net batch reaches COMPLETED state
-        and that CJBatchState/processing_metadata reflect full small-net
-        coverage plus Phase-2 resampling semantics up to the configured cap.
+        """Validate ENG5 LOWER5 small-net batch completes with PR-2/PR-7 semantics.
+
+        This test validates that CJBatchState/processing_metadata reflect full
+        small-net coverage plus Phase-2 resampling semantics up to the configured cap.
+
+        Run with: pdm run llm-mock-profile eng5-lower5
         """
         # Use an explicit test user so we can provision credits deterministically.
         test_user = service_manager.create_test_user()
@@ -482,3 +489,197 @@ class TestCJSmallNetContinuation:
 
         # No failure reason should be recorded for a successful batch.
         assert "failed_reason" not in processing
+
+    @pytest.mark.docker
+    @pytest.mark.integration
+    @pytest.mark.mock_profile("eng5_lower5_gpt51_low")
+    @pytest.mark.asyncio
+    async def test_lower5_positional_fairness_after_continuation(
+        self,
+        service_manager: ServiceTestManager,
+        validated_services: dict,
+    ) -> None:
+        """Validate per-essay A/B positional distribution after small-net continuation.
+
+        This test drives an ENG5 LOWER5 batch (5 essays) through the CJ pipeline
+        under the eng5_lower5_gpt51_low mock profile and validates that:
+
+        1. Each essay appears in both A and B positions multiple times.
+        2. Per-essay positional skew (|A - B| / (A + B)) stays within acceptable bounds.
+        3. The FairComplementOrientationStrategy is functioning correctly.
+
+        Expected data for a 5-essay LOWER5 batch:
+        - 10 coverage pairs (5C2)
+        - 3 resampling passes (MAX_RESAMPLING_PASSES_FOR_SMALL_NET in docker)
+        - ~40 total comparisons
+        - Each essay should appear in both positions with reasonable balance.
+
+        Run with: pdm run llm-mock-profile eng5-lower5
+        """
+        # Tightened threshold after validating positional fairness implementation.
+        # LOWER5 (5 essays) achieves 0% skew with full coverage + resampling.
+        # Threshold of 0.1 allows minimal variance while catching regressions.
+        MAX_ALLOWED_SKEW = 0.1
+
+        test_user = service_manager.create_test_user()
+        kafka_manager = KafkaTestManager()
+
+        mode_info = await _get_lps_mock_mode(validated_services)
+
+        if not mode_info.get("use_mock_llm", False):
+            pytest.skip(
+                "LPS reports USE_MOCK_LLM = false; enable mock mode before running this test"
+            )
+
+        if mode_info.get("mock_mode") != "eng5_lower5_gpt51_low":
+            pytest.skip(
+                "LPS mock_mode is not 'eng5_lower5_gpt51_low'; restart "
+                "llm_provider_service with this profile before running "
+                "ENG5 LOWER5 positional fairness tests."
+            )
+
+        expected_essay_count = 5
+
+        # 1. Create ENG5 batch via API Gateway with expected_essay_count=5
+        bos_batch_id, correlation_id = await service_manager.create_batch_via_agw(
+            expected_essay_count=expected_essay_count,
+            course_code=CourseCode.ENG5,
+            user=test_user,
+        )
+
+        # 2. Upload five ENG5 LOWER5-shaped essays via AGW/File Service
+        files = [
+            {
+                "name": f"eng5-lower5-fairness-essay-{i + 1}.txt",
+                "content": (
+                    f"ENG5 LOWER5 essay for positional fairness test, student {i + 1}. "
+                    "This text is intentionally simple for docker tests."
+                ),
+            }
+            for i in range(expected_essay_count)
+        ]
+
+        await service_manager.upload_files(
+            batch_id=bos_batch_id,
+            files=files,
+            user=test_user,
+            correlation_id=correlation_id,
+        )
+
+        # 3. Wait for BOS/ELS content provisioning to complete.
+        await _wait_for_batch_ready_via_kafka(
+            kafka_manager,
+            bos_batch_id=bos_batch_id,
+            correlation_id=correlation_id,
+        )
+
+        # 4. Ensure entitlements allow CJ execution for this user/org.
+        await _ensure_sufficient_credits(service_manager, user=test_user)
+
+        # 5. Request CJ pipeline execution for this batch.
+        try:
+            await _request_cj_pipeline_execution(
+                service_manager,
+                bos_batch_id=bos_batch_id,
+                correlation_id=correlation_id,
+                user=test_user,
+            )
+        except RuntimeError as exc:
+            msg = str(exc)
+            if "402" in msg and "insufficient_credits" in msg:
+                pytest.skip(
+                    "CJ pipeline request denied due to insufficient credits; "
+                    "adjust entitlements or credit config before running this test"
+                )
+            raise
+
+        # 6. Poll CJ until the batch reaches COMPLETED state.
+        batch_state = await _wait_for_cj_batch_final_state(
+            bos_batch_id=bos_batch_id,
+            expected_essay_count=expected_essay_count,
+            timeout_seconds=360.0,
+        )
+
+        assert batch_state.state == CJBatchStateEnum.COMPLETED, (
+            f"Expected COMPLETED, got {batch_state.state}"
+        )
+
+        # 7. Query ComparisonPair rows for positional fairness analysis.
+        settings = CJSettings()
+        engine: AsyncEngine = create_async_engine(settings.DATABASE_URL, echo=False)
+        session_factory = async_sessionmaker(engine, expire_on_commit=False)
+
+        try:
+            async with session_factory() as session:
+                positional_counts = await get_positional_counts_for_batch(
+                    session=session,
+                    cj_batch_id=batch_state.batch_id,
+                )
+                pair_orientation_counts = await get_pair_orientation_counts_for_batch(
+                    session=session,
+                    cj_batch_id=batch_state.batch_id,
+                )
+
+            # --- Per-essay skew analysis ---
+            skew_violations: list[tuple[str, float]] = []
+            max_observed_skew = 0.0
+
+            for essay_id, counts in positional_counts.items():
+                a_count = counts["A"]
+                b_count = counts["B"]
+                total = a_count + b_count
+
+                if total == 0:
+                    continue
+
+                skew = abs(a_count - b_count) / total
+                max_observed_skew = max(max_observed_skew, skew)
+
+                if skew > MAX_ALLOWED_SKEW:
+                    skew_violations.append((essay_id, skew))
+
+            # --- Per-pair complement analysis ---
+            # For pairs seen more than once, validate AB/BA complement enforcement.
+            pairs_missing_complement: list[tuple[tuple[str, str], int, int]] = []
+            resampled_pair_count = 0
+
+            for pair_key, (ab_count, ba_count) in pair_orientation_counts.items():
+                total_for_pair = ab_count + ba_count
+                if total_for_pair > 1:
+                    # This pair was resampled; expect both AB and BA.
+                    resampled_pair_count += 1
+                    if ab_count == 0 or ba_count == 0:
+                        pairs_missing_complement.append((pair_key, ab_count, ba_count))
+
+            # Diagnostic output for threshold calibration.
+            print(
+                "LOWER5 positional fairness diagnostics:",
+                {
+                    "essay_count": len(positional_counts),
+                    "total_comparisons": batch_state.total_comparisons,
+                    "max_observed_skew": round(max_observed_skew, 3),
+                    "positional_counts": positional_counts,
+                    "pair_count": len(pair_orientation_counts),
+                    "resampled_pair_count": resampled_pair_count,
+                    "pairs_missing_complement": len(pairs_missing_complement),
+                },
+            )
+
+            # Assert no per-essay skew violations.
+            assert len(skew_violations) == 0, (
+                f"Positional skew exceeded MAX_ALLOWED_SKEW={MAX_ALLOWED_SKEW} "
+                f"for essays: {skew_violations}"
+            )
+
+            # Assert each essay appears in both A and B positions.
+            for essay_id, counts in positional_counts.items():
+                assert counts["A"] > 0, f"Essay {essay_id} never appeared in position A"
+                assert counts["B"] > 0, f"Essay {essay_id} never appeared in position B"
+
+            # Assert per-pair complement enforcement for resampled pairs.
+            assert len(pairs_missing_complement) == 0, (
+                f"Resampled pairs missing AB/BA complement: {pairs_missing_complement}"
+            )
+
+        finally:
+            await engine.dispose()
