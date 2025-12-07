@@ -296,8 +296,18 @@ async def trigger_existing_workflow_continuation(
     # Outside the DB session: persist metadata and drive actions.
     metadata_already_merged = False
 
+    # RESAMPLING semantics:
+    # - Each increment of resampling_pass_count represents a full continuation
+    #   iteration executed in RESAMPLING mode (PairGenerationMode.RESAMPLING),
+    #   not a single pair-level wave.
+    # - That iteration may schedule many comparisons across the existing
+    #   coverage graph, using FairComplementOrientationStrategy to realise
+    #   AB/BA complements and stabilise per-essay A/B positions.
+    # - Resampling passes are therefore a scarce, batch-level stability
+    #   resource; the decision to enter RESAMPLING must be driven by
+    #   empirical CJ/LLM behaviour, not unit-test convenience.
     can_attempt_resampling = _can_attempt_resampling(ctx)
-    # Select the appropriate resampling cap based on net size.
+    # Select the appropriate resampling cap based on net size (small nets vs regular nets).
     resampling_cap = (
         ctx.small_net_resampling_cap if ctx.is_small_net else ctx.regular_batch_resampling_cap
     )
@@ -308,6 +318,11 @@ async def trigger_existing_workflow_continuation(
                 "max_possible_pairs": ctx.max_possible_pairs,
                 "successful_pairs_count": ctx.successful_pairs_count,
                 "unique_coverage_complete": ctx.unique_coverage_complete,
+                # Incrementing resampling_pass_count here commits the batch
+                # to another full RESAMPLING iteration over the current
+                # coverage graph. This is intentionally coarse-grained:
+                # a small number of passes, each potentially touching many
+                # pairs, rather than per-pair tweaks.
                 "resampling_pass_count": ctx.resampling_pass_count + 1,
             }
         )

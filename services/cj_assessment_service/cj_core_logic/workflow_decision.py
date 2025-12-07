@@ -407,15 +407,23 @@ def _can_attempt_resampling(ctx: ContinuationContext) -> bool:
     if ctx.resampling_pass_count >= regular_cap:
         return False
 
-    # Coverage/stability condition: require a minimum fraction of the potential
-    # comparison graph to have at least one successful comparison before we
-    # start resampling existing edges.
+    # Coverage/stability condition for regular nets:
+    # - We require a minimum fraction of the potential comparison graph to
+    #   have at least one successful comparison before we commit an entire
+    #   RESAMPLING pass (see workflow_continuation.trigger_existing_workflow_continuation).
+    # - Because each resampling_pass_count increment drives a full Phase-2
+    #   iteration over the *current* coverage graph, this threshold controls
+    #   when we spend one of a small number of global "stability passes"
+    #   for the batch. It MUST be calibrated empirically using convergence
+    #   harness + ENG5/LOWER5 traces, not treated as an arbitrary test knob.
     if ctx.max_possible_pairs <= 0:
         return False
 
     coverage_fraction = ctx.successful_pairs_count / ctx.max_possible_pairs
-    # Require full coverage before RESAMPLING for regular batches.
-    # This ensures even essay participation before resampling begins.
+    # Regular nets: require full coverage before we commit a RESAMPLING pass.
+    # Because each resampling_pass_count increment represents a full Phase-2
+    # iteration over the current coverage graph, we only spend that pass once
+    # every unordered pair that matters has at least one successful comparison.
     MIN_COVERAGE_FRACTION_FOR_REGULAR_RESAMPLING = 1.0
     if coverage_fraction < MIN_COVERAGE_FRACTION_FOR_REGULAR_RESAMPLING:
         return False

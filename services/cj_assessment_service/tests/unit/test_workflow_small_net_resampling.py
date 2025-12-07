@@ -565,7 +565,8 @@ async def test_regular_batch_resampling_branch_requests_resampling(monkeypatch: 
     mock_essay_repository.get_essays_for_cj_batch = AsyncMock(return_value=essays)
 
     comparison_repo = AsyncMock(spec=CJComparisonRepositoryProtocol)
-    comparison_repo.get_coverage_metrics_for_batch = AsyncMock(return_value=(80, 60))
+    # Full coverage for regular net: 80 possible pairs, all successful.
+    comparison_repo.get_coverage_metrics_for_batch = AsyncMock(return_value=(80, 80))
 
     mock_grade_projector = AsyncMock()
     mock_matching_strategy = make_real_matching_strategy_mock()
@@ -593,7 +594,7 @@ async def test_regular_batch_resampling_branch_requests_resampling(monkeypatch: 
     merge_call: Any = merge_metadata.await_args
     metadata_updates = merge_call.kwargs["metadata_updates"]
     assert metadata_updates.get("resampling_pass_count") == 1
-    assert metadata_updates.get("successful_pairs_count") == 60
+    assert metadata_updates.get("successful_pairs_count") == 80
     assert metadata_updates.get("max_possible_pairs") == 80
 
     request_additional.assert_awaited_once()
