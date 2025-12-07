@@ -56,6 +56,7 @@ class TestBatchCompletionChecker:
         batch_state = CJBatchState()
         batch_state.batch_id = 1
         batch_state.state = CJBatchStateEnum.WAITING_CALLBACKS
+        batch_state.total_budget = 100  # Required for completion_denominator()
         batch_state.total_comparisons = 100
         batch_state.completed_comparisons = 80
         batch_state.completion_threshold_pct = 95
@@ -350,6 +351,7 @@ class TestBatchCompletionChecker:
         correlation_id = uuid4()
 
         # Test exact threshold match
+        sample_batch_state.total_budget = 50  # Use total_budget for completion_denominator()
         sample_batch_state.total_comparisons = 50
         sample_batch_state.completed_comparisons = 48  # 96% exactly
         sample_batch_state.completion_threshold_pct = 96  # 96% threshold
@@ -379,6 +381,7 @@ class TestBatchCompletionChecker:
         correlation_id = uuid4()
 
         # Test 90% completion with 85% threshold
+        sample_batch_state.total_budget = 200  # Use total_budget for completion_denominator()
         sample_batch_state.total_comparisons = 200
         sample_batch_state.completed_comparisons = 180  # 90%
         sample_batch_state.completion_threshold_pct = 85  # 85% threshold

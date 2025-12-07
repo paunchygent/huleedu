@@ -84,7 +84,24 @@ class BatchCompletionChecker:
                     return True
 
                 # Check completion threshold
-                denominator = batch_state.completion_denominator()
+                try:
+                    denominator = batch_state.completion_denominator()
+                except RuntimeError as e:
+                    # Missing/invalid total_budget indicates a bug in batch setup.
+                    # Log the error and return False (batch not complete) to prevent
+                    # cascading failures while surfacing the issue in observability.
+                    logger.error(
+                        "Cannot check completion: %s",
+                        e,
+                        extra={
+                            "correlation_id": str(correlation_id),
+                            "cj_batch_id": cj_batch_id,
+                            "total_budget": batch_state.total_budget,
+                            "error_type": "missing_total_budget",
+                        },
+                    )
+                    return False
+
                 if denominator > 0:
                     completion_rate = batch_state.completed_comparisons / denominator
 

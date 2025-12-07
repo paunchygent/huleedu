@@ -25,14 +25,13 @@ class TestCheckBatchCompletionConditions:
     """Behavioral tests for the 80% completion heuristic."""
 
     @pytest.mark.parametrize(
-        "completed, denominator, expected",
+        "completed, budget, expected",
         [
             (0, 10, False),
             (7, 10, False),  # 70%
             (8, 10, True),  # 80%
             (9, 10, True),  # 90%
             (10, 10, True),  # 100%
-            (5, 0, False),  # zero denominator
         ],
     )
     @pytest.mark.asyncio
@@ -40,12 +39,13 @@ class TestCheckBatchCompletionConditions:
         self,
         policy: BatchCompletionPolicy,
         completed: int,
-        denominator: int,
+        budget: int,
         expected: bool,
     ) -> None:
-        """Return True only when completed_comparisons reach 80% of denominator."""
+        """Return True only when completed_comparisons reach 80% of total_budget."""
         batch_state = create_batch_state(
-            total_comparisons=denominator,
+            total_budget=budget,
+            total_comparisons=budget,
             completed_comparisons=completed,
         )
         session = AsyncMock(spec=AsyncSession)
@@ -182,6 +182,7 @@ class TestUpdateBatchCompletionCounters:
         expected_flag: bool,
     ) -> None:
         batch_state = create_batch_state(
+            total_budget=10,
             total_comparisons=10,
             completed_comparisons=completed_before,
             completion_threshold_pct=80,
@@ -207,6 +208,7 @@ class TestUpdateBatchCompletionCounters:
     ) -> None:
         """Flag stays True after being triggered once."""
         batch_state = create_batch_state(
+            total_budget=10,
             total_comparisons=10,
             completed_comparisons=8,
             completion_threshold_pct=80,

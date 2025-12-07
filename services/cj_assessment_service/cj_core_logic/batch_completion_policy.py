@@ -27,7 +27,23 @@ class BatchCompletionPolicy:
             if not batch_state:
                 return False
 
-            denominator = batch_state.completion_denominator()
+            try:
+                denominator = batch_state.completion_denominator()
+            except RuntimeError as e:
+                # Missing/invalid total_budget indicates a bug in batch setup.
+                # Log the error and return False to prevent cascading failures.
+                logger.error(
+                    "Cannot check completion conditions: %s",
+                    e,
+                    extra={
+                        "correlation_id": str(correlation_id),
+                        "batch_id": batch_id,
+                        "total_budget": batch_state.total_budget,
+                        "error_type": "missing_total_budget",
+                    },
+                )
+                return False
+
             if denominator > 0 and batch_state.completed_comparisons >= denominator * 0.8:
                 completion_rate = batch_state.completed_comparisons / denominator
                 logger.info(
@@ -89,18 +105,26 @@ class BatchCompletionPolicy:
                 )
 
             batch_state.last_activity_at = datetime.now(UTC)
-            if (
-                batch_state.total_comparisons > 0
-                and not batch_state.partial_scoring_triggered
-                and batch_state.completed_comparisons
-                >= batch_state.total_comparisons * batch_state.completion_threshold_pct / 100
-            ):
-                batch_state.partial_scoring_triggered = True
-                logger.info(
-                    "Batch %s partial scoring triggered at %s%% completion",
-                    batch_id,
-                    batch_state.completion_threshold_pct,
-                )
+
+            # Check if partial scoring should be triggered using total_budget
+            # (via completion_denominator) instead of legacy total_comparisons
+            try:
+                denominator = batch_state.completion_denominator()
+                if (
+                    not batch_state.partial_scoring_triggered
+                    and batch_state.completed_comparisons
+                    >= denominator * batch_state.completion_threshold_pct / 100
+                ):
+                    batch_state.partial_scoring_triggered = True
+                    logger.info(
+                        "Batch %s partial scoring triggered at %s%% completion",
+                        batch_id,
+                        batch_state.completion_threshold_pct,
+                    )
+            except RuntimeError:
+                # Skip partial scoring trigger if batch has missing/invalid total_budget.
+                # The error will be surfaced when other completion checks are attempted.
+                pass
         except Exception as exc:  # pragma: no cover - defensive
             logger.error(
                 "Failed to update batch completion counters for batch %s: %s",

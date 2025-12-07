@@ -2,7 +2,7 @@
 id: 'cj-completion-semantics-v2-enforce-total-budget-and-remove-nc2-fallback'
 title: 'CJ completion semantics v2: enforce total_budget and remove nC2 fallback'
 type: 'task'
-status: 'research'
+status: 'completed'
 priority: 'medium'
 domain: 'assessment'
 service: ''
@@ -10,7 +10,7 @@ owner_team: 'agents'
 owner: ''
 program: ''
 created: '2025-12-03'
-last_updated: '2025-12-04'
+last_updated: '2025-12-07'
 related: []
 labels: []
 ---
@@ -128,3 +128,48 @@ Make CJ completion semantics v2 fully budget-only by:
   - `test_workflow_small_net_resampling.py` (Phase-2 small-net resampling and `resampling_pass_count` caps).
   - `test_workflow_continuation_metadata_bt_flags.py` (BT SE summaries and `bt_quality_flags` propagation).
 - These changes ensure coverage (`max_possible_pairs`, `successful_pairs_count`, `unique_coverage_complete`) is fully decoupled from `completion_denominator()` and owned by explicit helpers/metadata, paving the way for enforcing the strict `total_budget`-only denominator described in this task.
+
+## Completed (2025-12-07)
+
+### 1. Tightened `completion_denominator()` contract
+
+**File:** `services/cj_assessment_service/models_db.py:315-334`
+
+- `completion_denominator()` now returns `total_budget` only
+- Raises `RuntimeError` when `total_budget` is missing or invalid (None, 0, negative)
+- Removed all fallback logic (total_comparisons, nC2)
+- Updated `_max_possible_comparisons()` docstring to clarify coverage-only usage
+
+### 2. Updated callers to handle RuntimeError gracefully
+
+All callers now wrap `completion_denominator()` in try/except with structured logging:
+
+| File | Line | Error Handling Strategy |
+|------|------|-------------------------|
+| `batch_completion_checker.py` | L86-103 | Return `False` (batch not complete) |
+| `batch_completion_policy.py` | L30-45, L107-127 | Return `False` / skip partial_scoring_triggered |
+| `batch_monitor.py` | L241-257 | Treat as 0% progress (surfaces via stuck batch alerting) |
+| `workflow_continuation.py` | L76-91, L216-230 | Return early (cannot continue) |
+
+### 3. Updated tests
+
+- Added explicit `RuntimeError` tests in `test_completion_threshold.py`:
+  - `test_completion_denominator_raises_when_total_budget_missing()`
+  - `test_completion_denominator_raises_when_total_budget_zero()`
+- Updated all test fixtures to explicitly set `total_budget`:
+  - `test_callback_state_manager.py`: `create_batch_state(total_budget=10)`
+  - `test_batch_monitor_unit.py`: `create_stuck_batch_state(total_budget=total)`
+  - `test_callback_state_manager_extended.py`: `create_test_batch_state(total_budget=10)`
+  - `test_batch_completion_checker.py`: `sample_batch_state.total_budget = 100`
+  - `test_batch_completion_policy.py`: parametrized tests use `total_budget`
+  - `test_workflow_continuation_check.py`: `batch_state.total_budget = 10`
+
+### 4. Updated documentation
+
+- `docs/architecture/cj-assessment-service-map.md:34`: Changed `min(total_budget, nC2)` to `total_budget per ADR-0020 v2`
+- `docs/product/epics/cj-stability-and-reliability-epic.md`: Updated Phase-1 semantics to describe pure budget-based completion
+- `docs/decisions/0020-cj-assessment-completion-semantics-v2.md`: Set status to "accepted"
+
+### Verification
+
+All unit tests pass. Type checking clean.

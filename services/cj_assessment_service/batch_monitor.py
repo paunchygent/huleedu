@@ -239,7 +239,23 @@ class BatchMonitor:
         """
         try:
             # Calculate progress percentage
-            denominator = batch_state.completion_denominator()
+            try:
+                denominator = batch_state.completion_denominator()
+            except RuntimeError as e:
+                # Missing/invalid total_budget indicates a bug in batch setup.
+                # Treat as 0% progress so the batch gets marked as stuck/failed,
+                # which surfaces the issue via monitoring/alerting.
+                logger.error(
+                    "Cannot calculate progress for stuck batch: %s",
+                    e,
+                    extra={
+                        "batch_id": batch_state.batch_id,
+                        "total_budget": batch_state.total_budget,
+                        "error_type": "missing_total_budget",
+                    },
+                )
+                denominator = 0
+
             callbacks_recorded = batch_state.completed_comparisons + batch_state.failed_comparisons
             progress_pct = (callbacks_recorded / denominator) * 100 if denominator else 0
 

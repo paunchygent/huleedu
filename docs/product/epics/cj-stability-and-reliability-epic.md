@@ -328,10 +328,11 @@ decisions (now implemented) are:
     "mode" (coverage vs resampling) via its inputs but does not manage
     coverage metadata itself.
 - **Phase-1 vs Phase-2 semantics**:
-  - Phase-1 (coverage) behaviour is unchanged for large nets and still uses
-    `completion_denominator()` as the effective coverage cap
-    (`min(total_budget, nC2)`), with stability and success-rate checks as in
-    PR-2.
+  - Phase-1 (coverage) behaviour is unchanged for large nets and uses
+    `completion_denominator()` (`total_budget` per ADR-0020 v2) for completion
+    gating, with stability and success-rate checks as in PR-2. Coverage metrics
+    (`max_possible_pairs`, `successful_pairs_count`) are handled via explicit
+    metadata, not by clamping the denominator.
   - For small nets (`expected_essay_count < MIN_RESAMPLING_NET_SIZE`), the
     *first* time `callbacks_received >= completion_denominator()` with
     stability not yet passed is treated as a **phase boundary**:

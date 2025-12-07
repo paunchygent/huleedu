@@ -131,6 +131,7 @@ class TestAsyncWorkflowContinuation:
             if batch_state:
                 batch_state.state = CJBatchStateEnum.WAITING_CALLBACKS
                 batch_state.total_comparisons = pair_count
+                batch_state.total_budget = pair_count  # Required for completion_denominator()
                 batch_state.submitted_comparisons = pair_count
                 batch_state.completed_comparisons = 0
                 batch_state.failed_comparisons = 0

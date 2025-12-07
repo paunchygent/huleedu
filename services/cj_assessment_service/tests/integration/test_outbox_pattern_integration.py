@@ -503,6 +503,9 @@ class TestOutboxPatternIntegration:
                     assert published_event["key"] == str(cj_batch_id)
 
                     # Verify event marked as published in outbox
+                    # Expire cached object to force fresh read from database
+                    # (relay worker updates in separate session/transaction)
+                    session.expire(unpublished_events[0])
                     await session.refresh(unpublished_events[0])
                     assert unpublished_events[0].published_at is not None
 
@@ -653,7 +656,9 @@ class TestOutboxPatternIntegration:
                     assert len(mock_kafka_bus.published_events) == 5
 
                     # Verify all marked as published
+                    # Expire cached objects to force fresh read from database
                     for event in unpublished_events:
+                        session.expire(event)
                         await session.refresh(event)
                         assert event.published_at is not None
 

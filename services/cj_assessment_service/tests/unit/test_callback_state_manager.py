@@ -292,15 +292,22 @@ def create_comparison_pair(
 def create_batch_state(
     batch_id: int = 1,
     state: CJBatchStateEnum = CJBatchStateEnum.WAITING_CALLBACKS,
+    total_budget: int | None = 10,
     total_comparisons: int = 10,
     completed_comparisons: int = 0,
     failed_comparisons: int = 0,
     completion_threshold_pct: int = 80,
 ) -> CJBatchState:
-    """Create test batch state."""
+    """Create test batch state.
+
+    Args:
+        total_budget: The comparison budget for completion_denominator().
+            Required per ADR-0020 v2. Defaults to same as total_comparisons.
+    """
     batch_state = CJBatchState()
     batch_state.batch_id = batch_id
     batch_state.state = state
+    batch_state.total_budget = total_budget
     batch_state.total_comparisons = total_comparisons
     batch_state.completed_comparisons = completed_comparisons
     batch_state.failed_comparisons = failed_comparisons

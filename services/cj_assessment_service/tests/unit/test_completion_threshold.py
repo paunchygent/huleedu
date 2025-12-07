@@ -97,3 +97,27 @@ def test_completion_denominator_uses_small_batch_nc2_cap() -> None:
     # semantics are handled via explicit small-net metadata instead of
     # clamping the denominator to nC2.
     assert batch_state.completion_denominator() == 350
+
+
+def test_completion_denominator_raises_when_total_budget_missing() -> None:
+    """Completion denominator raises RuntimeError when total_budget is missing/invalid.
+
+    Per ADR-0020 v2, total_budget is the only valid denominator for completion
+    math. Missing or invalid values indicate a bug in batch setup and must
+    raise an explicit error rather than silently falling back to nC2 or
+    total_comparisons.
+    """
+    state = _build_batch_state()
+    state.total_budget = None
+
+    with pytest.raises(RuntimeError, match="total_budget is missing or invalid"):
+        _ = state.completion_denominator()
+
+
+def test_completion_denominator_raises_when_total_budget_zero() -> None:
+    """Completion denominator raises RuntimeError when total_budget is zero."""
+    state = _build_batch_state()
+    state.total_budget = 0
+
+    with pytest.raises(RuntimeError, match="total_budget is missing or invalid"):
+        _ = state.completion_denominator()

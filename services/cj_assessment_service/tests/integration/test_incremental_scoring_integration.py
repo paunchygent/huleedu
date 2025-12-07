@@ -654,6 +654,7 @@ class TestIncrementalScoring:
             .values(
                 state=CJBatchStateEnum.WAITING_CALLBACKS,
                 total_comparisons=total_comparisons,
+                total_budget=total_comparisons,  # Required for completion_denominator()
                 completed_comparisons=0,
             )
         )
@@ -757,6 +758,7 @@ class TestIncrementalScoring:
             .values(
                 state=CJBatchStateEnum.WAITING_CALLBACKS,
                 total_comparisons=total_comparisons,
+                total_budget=total_comparisons,  # Required for completion_denominator()
                 completed_comparisons=0,
                 submitted_comparisons=0,
                 failed_comparisons=0,

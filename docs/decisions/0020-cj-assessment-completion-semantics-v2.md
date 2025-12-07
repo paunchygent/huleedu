@@ -1,15 +1,15 @@
 ---
 type: decision
 id: ADR-0020
-status: proposed
+status: accepted
 created: 2025-12-02
-last_updated: 2025-12-02
+last_updated: 2025-12-07
 ---
 
 # ADR-0020: CJ Assessment Completion Semantics V2 (Budget vs Coverage)
 
 ## Status
-Proposed
+Accepted
 
 ## Context
 

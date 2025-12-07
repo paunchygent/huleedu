@@ -73,7 +73,22 @@ async def check_workflow_continuation(
         pending_callbacks = max(batch_state.submitted_comparisons - callbacks_received, 0)
         iteration_complete = bool(batch_state.submitted_comparisons > 0 and pending_callbacks == 0)
 
-        denominator = batch_state.completion_denominator()
+        try:
+            denominator = batch_state.completion_denominator()
+        except RuntimeError as e:
+            # Missing/invalid total_budget indicates a bug in batch setup.
+            # Cannot determine completion - log error and return False.
+            logger.error(
+                "Cannot check workflow continuation: %s",
+                e,
+                extra={
+                    "correlation_id": str(correlation_id),
+                    "batch_id": batch_id,
+                    "total_budget": batch_state.total_budget,
+                    "error_type": "missing_total_budget",
+                },
+            )
+            return False
 
         logger.info(
             "Continuation check computed",
@@ -198,7 +213,22 @@ async def trigger_existing_workflow_continuation(
         pairs_remaining = max(0, max_pairs_cap - pairs_submitted)
         budget_exhausted = pairs_remaining <= 0
 
-        denominator = batch_state.completion_denominator()
+        try:
+            denominator = batch_state.completion_denominator()
+        except RuntimeError as e:
+            # Missing/invalid total_budget indicates a bug in batch setup.
+            # Cannot continue workflow without valid budget.
+            logger.error(
+                "Cannot trigger workflow continuation: %s",
+                e,
+                extra={
+                    **log_extra,
+                    "total_budget": batch_state.total_budget,
+                    "error_type": "missing_total_budget",
+                },
+            )
+            return
+
         callbacks_reached_cap = denominator > 0 and callbacks_received >= denominator
 
         (

@@ -153,6 +153,7 @@ class TestBatchMonitorRecoveryStrategy:
         return CJBatchState(
             batch_id=batch_id,
             state=state,
+            total_budget=total,  # Required for completion_denominator()
             completed_comparisons=completed,
             total_comparisons=total,
             submitted_comparisons=total,

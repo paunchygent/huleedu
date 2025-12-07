@@ -30,8 +30,8 @@ When an iteration completes, `trigger_existing_workflow_continuation` decides
 between three paths:
 
 - **Finalize successfully** when stability has passed, or when the callback
-  count has reached the batch’s `completion_denominator()` (which is derived
-  from `min(total_budget, nC2)`), or when the global comparison budget is
+  count has reached the batch's `completion_denominator()` (which is derived
+  from `total_budget` per ADR-0020 v2), or when the global comparison budget is
   exhausted.
 - **Finalize as failure** when caps/budgets are hit but the success‑rate gate
   fails (zero successes, or a success‑rate below `MIN_SUCCESS_RATE_THRESHOLD`).

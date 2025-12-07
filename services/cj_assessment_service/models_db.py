@@ -313,32 +313,35 @@ class CJBatchState(Base):
     )
 
     def completion_denominator(self) -> int:
-        """Return the denominator to use for completion math."""
-        if self.total_budget and self.total_budget > 0:
-            # total_budget is the single source of truth for how many
-            # comparisons this batch is allowed to perform. Coverage and
-            # small-net semantics use explicit metadata (max_possible_pairs,
-            # successful_pairs_count, etc.) instead of clamping this value to
-            # nC2. See ADR-0020.
+        """Return the denominator to use for completion math.
+
+        Per ADR-0020 v2, total_budget is the single source of truth for
+        completion math. Coverage and small-net semantics use explicit
+        metadata (max_possible_pairs, successful_pairs_count, etc.) instead
+        of clamping this value to nC2.
+
+        Raises:
+            RuntimeError: If total_budget is missing or invalid. This
+                indicates a bug in batch setup - all real CJ batches must
+                have total_budget > 0 set during submission.
+        """
+        if isinstance(self.total_budget, int) and self.total_budget > 0:
             return self.total_budget
 
-        if self.total_comparisons and self.total_comparisons > 0:
-            # Fallback for legacy/synthetic batches that have not yet been
-            # migrated to explicit total_budget semantics.
-            return self.total_comparisons
-
-        # As a final fallback, approximate using nC2 so that monitoring and
-        # tests continue to have a non-zero denominator even when state is
-        # partially populated. Real CJ batches are expected to set
-        # total_budget explicitly during submission.
-        return self._max_possible_comparisons()
+        raise RuntimeError(
+            f"CJBatchState.total_budget is missing or invalid ({self.total_budget}); "
+            "this is a bug in batch setup. All real CJ batches must have total_budget > 0."
+        )
 
     def _max_possible_comparisons(self) -> int:
-        """Compute the n-choose-2 upper bound for this batch.
+        """Compute the n-choose-2 upper bound for coverage metadata.
 
-        Uses the expected essay count from the batch upload when available to
-        ensure small batches (e.g., 4 essays => 6 pairs) do not inherit large
-        global budgets (e.g., 350) for completion gating.
+        This helper is for coverage and small-net semantics ONLY, not for
+        completion math. Completion math uses total_budget exclusively via
+        completion_denominator(). See ADR-0020 v2.
+
+        Uses the expected essay count from the batch upload when available.
+        Returns 0 if essay count is unavailable or invalid.
         """
 
         try:

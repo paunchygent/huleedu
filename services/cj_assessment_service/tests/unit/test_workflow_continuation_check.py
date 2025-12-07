@@ -156,6 +156,7 @@ async def test_check_continuation_true_when_all_callbacks_arrived() -> None:
 
     batch_state = CJBatchState()
     batch_state.batch_id = 1
+    batch_state.total_budget = 10  # Required for completion_denominator()
     batch_state.submitted_comparisons = 5
     batch_state.completed_comparisons = 3
     batch_state.failed_comparisons = 2
@@ -179,6 +180,7 @@ async def test_check_continuation_false_when_pending() -> None:
 
     batch_state = CJBatchState()
     batch_state.batch_id = 2
+    batch_state.total_budget = 10  # Required for completion_denominator()
     batch_state.submitted_comparisons = 6
     batch_state.completed_comparisons = 4
     batch_state.failed_comparisons = 1
