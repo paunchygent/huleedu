@@ -2,17 +2,17 @@
 id: 'cj-positional-orientation-strategy-for-coverage-and-resampling'
 title: 'CJ positional orientation strategy for coverage and resampling'
 type: 'task'
-status: 'research'
+status: 'in_progress'
 priority: 'medium'
 domain: 'assessment'
-service: ''
+service: 'cj_assessment_service'
 owner_team: 'agents'
 owner: ''
 program: ''
 created: '2025-12-06'
-last_updated: '2025-12-06'
+last_updated: '2025-12-07'
 related: []
-labels: []
+labels: ['cj', 'resampling', 'fairness', 'eng5']
 ---
 # CJ positional orientation strategy for coverage and resampling
 
@@ -44,67 +44,67 @@ This task refines the EPIC‑level US‑005.X requirements (“RESAMPLING A/B Po
 ## Plan
 
 1. **Introduce orientation strategy protocol**
-   - [ ] Add `PairOrientationStrategyProtocol` in the CJ core logic (e.g. `pair_orientation.py` or adjacent to `pair_generation.py`) with:
+   - [x] Add `PairOrientationStrategyProtocol` in the CJ core logic (now defined in `services/cj_assessment_service/protocols.py`) with:
      - `choose_coverage_orientation(pair, per_essay_position_counts, rng) -> (essay_a, essay_b)`.
-     - `choose_resampling_orientation(pair, per_pair_orientation_counts, rng) -> (essay_a, essay_b)`.
-   - [ ] Add `PAIR_ORIENTATION_STRATEGY: str` to `CJ Assessment Settings` with a default name (e.g. `"fair_complement"`).
-   - [ ] Wire a DI provider in `services/cj_assessment_service/di.py` that:
+     - `choose_resampling_orientation(pair, per_pair_orientation_counts, per_essay_position_counts, rng) -> (essay_a, essay_b)`.
+   - [x] Add `PAIR_ORIENTATION_STRATEGY: str` to `CJ Assessment Settings` with a default name (`"fair_complement"`), wired via `services/cj_assessment_service/config.py`.
+   - [x] Wire a DI provider in `services/cj_assessment_service/di.py` that:
      - Resolves the configured strategy name.
-     - Provides a `PairOrientationStrategyProtocol` instance to `pair_generation.generate_comparison_tasks`.
+     - Provides a `PairOrientationStrategyProtocol` instance to `ComparisonBatchOrchestrator` / `pair_generation.generate_comparison_tasks`.
 
 2. **Implement a single FairComplementOrientationStrategy**
-   - [ ] Implement `FairComplementOrientationStrategy` that handles both COVERAGE and RESAMPLING:
+   - [x] Implement `FairComplementOrientationStrategy` that handles both COVERAGE and RESAMPLING:
      - COVERAGE:
        - Uses `per_essay_position_counts[essay_id] = (A_e, B_e)` derived from existing `ComparisonPair` rows.
-       - For each new unordered pair `(e1, e2)`, orients essays such that the essay with higher `(A_e - B_e)` skew is more likely placed in B, and vice versa, with a deterministic tie‑breaker (e.g. essay ID).
+       - For each new unordered pair `(e1, e2)`, orients essays such that the essay with higher `(A_e - B_e)` skew is more likely placed in B, and vice versa, with a randomized tie‑breaker when skew is equal.
      - RESAMPLING:
        - Uses `per_pair_orientation_counts[(id_lo,id_hi)] = (count_AB, count_BA)` built from existing `ComparisonPair` rows.
        - For each unordered pair:
          - If only AB seen → orient BA.
          - If only BA seen → orient AB.
          - If both AB and BA seen → fall back to the same essay‑level skew rule or a simple deterministic default.
-   - [ ] Ensure the implementation remains **pure and side‑effect free** aside from consuming counts and emitting orientation decisions (no DB access inside strategy).
+   - [x] Ensure the implementation remains **pure and side‑effect free** aside from consuming counts and emitting orientation decisions (no DB access inside strategy).
 
 3. **Integrate strategy into COVERAGE path**
-   - [ ] In `generate_comparison_tasks(..., mode=COVERAGE)`:
+   - [x] In `generate_comparison_tasks(..., mode=COVERAGE)`:
      - Keep existing matching logic for unordered pair selection.
      - Before building `ComparisonTask`s:
        - Compute `per_essay_position_counts` once for the batch using a small helper and the current DB session (`ComparisonPair` counts for A and B positions).
        - For each unordered pair `(essay_a, essay_b)`, call `orientation_strategy.choose_coverage_orientation(...)` and use the returned `(A,B)` order.
-   - [ ] Maintain current coverage invariants:
+   - [x] Maintain current coverage invariants:
      - No unordered pair duplicates within a batch.
      - Each essay appears at most once per wave (modulo odd essay handling).
      - Caps/budgets unchanged.
 
 4. **Integrate strategy into RESAMPLING path**
-   - [ ] In `generate_comparison_tasks(..., mode=RESAMPLING)`:
+   - [x] In `generate_comparison_tasks(..., mode=RESAMPLING)`:
      - Keep existing candidate selection (based on `existing_pairs` and `comparison_counts`), or wrap it behind a small `ResamplingSelectionStrategyProtocol` if needed for clarity.
      - Before orientation:
        - Build `per_pair_orientation_counts` for unordered pairs based on the current `ComparisonPair` rows.
        - For each selected unordered pair `(essay_a, essay_b)`, call `orientation_strategy.choose_resampling_orientation(...)` and use the returned `(A,B)` order.
-   - [ ] Confirm integration with:
+   - [x] Confirm integration with:
      - Small‑net resampling caps (`MAX_RESAMPLING_PASSES_FOR_SMALL_NET`).
      - Regular‑batch resampling caps (`MAX_RESAMPLING_PASSES_FOR_REGULAR_BATCH`).
      - Existing continuation predicates.
 
 5. **Update and extend tests**
-   - [ ] Unit tests:
+   - [x] Unit tests:
      - Extend `test_pair_generation_context.py` to simulate multiple COVERAGE waves and assert per‑essay A/B counts move toward balanced usage (`skew_e` within a generous band).
      - Extend RESAMPLING tests to confirm:
        - For a pair seen only in one orientation in COVERAGE, the first RESAMPLING wave flips orientation deterministically.
        - Subsequent RESAMPLING waves do not break convergence or existing CJ semantics.
-   - [ ] Integration tests (follow‑up, coordinated with related tasks):
+   - [x] Integration tests (follow‑up, coordinated with related tasks):
      - Use the ENG5 LOWER5 docker harness to:
        - Compute per‑essay A/B positional counts via the positional helper.
-       - Soft‑assert that skew remains within a target band once orientation strategy is active (exact thresholds to be calibrated against real traces).
+       - Assert that skew remains within a calibrated target band once orientation strategy is active (LOWER5 now pinned at 0.1 with observed 0.0 skew).
 
 6. **Document behaviour and configuration**
-   - [ ] Update `docs/product/epics/cj-stability-and-reliability-epic.md` (already partially done) to describe:
+   - [x] Update `docs/product/epics/cj-stability-and-reliability-epic.md` (already partially done) to describe:
      - Pair‑level complement in RESAMPLING.
      - Essay‑level A/B balancing in COVERAGE via an injected orientation strategy.
-   - [ ] Update `docs/operations/cj-assessment-runbook.md` to:
+   - [x] Update `docs/operations/cj-assessment-runbook.md` to:
      - Explain `PAIR_ORIENTATION_STRATEGY` and its effect on coverage/resampling.
-     - Clarify that random orientation is no longer the default and that positional fairness is intentional.
+     - Clarify that random orientation is no longer the default and that positional fairness is intentional (with budget vs skew trade-offs documented for 288 vs 552 comparison budgets).
 
 ## Success Criteria
 

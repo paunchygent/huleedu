@@ -250,10 +250,10 @@ semantics. This work is **merged and in production** as of 2025‑11‑29.
 **So that** large-scale comparison statistics remain unbiased and convergence behaviour is consistent across batch sizes.
 
 **Acceptance Criteria (positional fairness)**:
-- [ ] RESAMPLING mode’s pair generation (`PairGenerationMode.RESAMPLING`) is **pair-history aware** and enforces, where budget allows, that each unordered pair `{e1, e2}` is observed in both orientations `(A=e1,B=e2)` and `(A=e2,B=e1)` at least once.
-- [ ] COVERAGE mode’s orientation decisions actively work to balance per‑essay A/B positional counts over time, using persisted `ComparisonPair` history rather than pure randomness.
-- [ ] Over multiple COVERAGE + RESAMPLING waves on a stable net, each essay’s A/B positional share converges toward 50/50 within an agreed tolerance band (e.g. ≤ 1–3 percentage points drift for ENG5/LOWER5), verified by unit tests.
-- [ ] Docker/E2E validation (follow‑up) demonstrates that for an ENG5 LOWER5 small net under mock profiles, A/B positional skew per essay stays within the configured band across resampling passes, and that per‑pair AB/BA complements are realised when budget and caps permit.
+- [x] RESAMPLING mode’s pair generation (`PairGenerationMode.RESAMPLING`) is **pair-history aware** and enforces, where budget allows, that each unordered pair `{e1, e2}` is observed in both orientations `(A=e1,B=e2)` and `(A=e2,B=e1)` at least once. (With `MAX_PAIRWISE_COMPARISONS=552` in regular batches, all 276 unordered pairs are complemented AB+BA; with the production budget `MAX_PAIRWISE_COMPARISONS=288`, only ~4.3% of pairs are resampled, yielding a residual ≈0.167 skew that is expected from incomplete complement coverage, not an algorithm defect.)
+- [x] COVERAGE mode’s orientation decisions actively work to balance per‑essay A/B positional counts over time, using persisted `ComparisonPair` history rather than pure randomness.
+- [x] Over multiple COVERAGE + RESAMPLING waves on a stable net, each essay’s A/B positional share converges toward 50/50 within an agreed tolerance band (e.g. ≤ 1–3 percentage points drift for ENG5/LOWER5), verified by unit tests and docker harness runs (LOWER5 now observes 0.0 skew with `MAX_RESAMPLING_PASSES_FOR_SMALL_NET`).
+- [x] Docker/E2E validation demonstrates that for an ENG5 LOWER5 small net under mock profiles, A/B positional skew per essay stays within the configured band across resampling passes, and that per‑pair AB/BA complements are realised when budget and caps permit.
 
 **Acceptance Criteria (mode generalization)**:
 - [ ] RESAMPLING mode can be invoked for larger/non‑small‑net batches under well-defined conditions (e.g. after a minimum coverage/stability cadence), not only when `ContinuationContext.is_small_net` is true.
