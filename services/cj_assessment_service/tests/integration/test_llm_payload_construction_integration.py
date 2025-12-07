@@ -16,6 +16,9 @@ from sqlalchemy import select
 from services.cj_assessment_service.cj_core_logic.comparison_processing import (
     submit_comparisons_for_async_processing,
 )
+from services.cj_assessment_service.cj_core_logic.pair_orientation import (
+    FairComplementOrientationStrategy,
+)
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
 from services.cj_assessment_service.models_api import (
@@ -567,6 +570,7 @@ async def _submit_and_capture_request(
         request_data=request_data,
         llm_interaction=llm_interaction_impl,
         matching_strategy=matching_strategy,
+        orientation_strategy=FairComplementOrientationStrategy(),
         settings=test_settings,
         correlation_id=correlation_id or uuid.uuid4(),
         log_extra={"test": log_label},

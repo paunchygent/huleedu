@@ -174,6 +174,7 @@ async def test_original_request_metadata_persists_and_rehydrates(
         instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
         llm_interaction=mock_llm_interaction_async,
         matching_strategy=mock_matching_strategy,
+        orientation_strategy=FairComplementOrientationStrategy(),
         settings=test_settings,
         correlation_id=uuid4(),
         log_extra=continuation_log,

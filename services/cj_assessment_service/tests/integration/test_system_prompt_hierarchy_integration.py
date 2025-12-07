@@ -24,6 +24,9 @@ from common_core.events.cj_assessment_events import LLMConfigOverrides
 from services.cj_assessment_service.cj_core_logic.comparison_processing import (
     submit_comparisons_for_async_processing,
 )
+from services.cj_assessment_service.cj_core_logic.pair_orientation import (
+    FairComplementOrientationStrategy,
+)
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
 from services.cj_assessment_service.models_api import (
@@ -155,6 +158,7 @@ class TestSystemPromptHierarchyIntegration:
             request_data=request_data,
             llm_interaction=llm_interaction,
             matching_strategy=mock_matching_strategy,
+            orientation_strategy=FairComplementOrientationStrategy(),
             settings=test_settings,
             correlation_id=uuid.uuid4(),
             log_extra={"test": "event_override"},
@@ -262,6 +266,7 @@ class TestSystemPromptHierarchyIntegration:
             request_data=request_data,
             llm_interaction=llm_interaction,
             matching_strategy=mock_matching_strategy,
+            orientation_strategy=FairComplementOrientationStrategy(),
             settings=test_settings,
             correlation_id=uuid.uuid4(),
             log_extra={"test": "no_override"},
@@ -372,6 +377,7 @@ class TestSystemPromptHierarchyIntegration:
             request_data=request_data,
             llm_interaction=llm_interaction,
             matching_strategy=mock_matching_strategy,
+            orientation_strategy=FairComplementOrientationStrategy(),
             settings=test_settings,
             correlation_id=uuid.uuid4(),
             log_extra={"test": "none_override"},
@@ -475,6 +481,7 @@ class TestSystemPromptHierarchyIntegration:
             request_data=request_data,
             llm_interaction=llm_interaction,
             matching_strategy=mock_matching_strategy,
+            orientation_strategy=FairComplementOrientationStrategy(),
             settings=test_settings,
             correlation_id=uuid.uuid4(),
             log_extra={"test": "header_structure"},
