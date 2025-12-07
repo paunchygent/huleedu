@@ -13,6 +13,7 @@ from uuid import UUID, uuid4
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from services.cj_assessment_service.cj_core_logic.pair_generation import PairGenerationMode
 from services.cj_assessment_service.models_db import ComparisonPair
 
 if TYPE_CHECKING:
@@ -26,6 +27,7 @@ async def create_tracking_records(
     batch_tasks: list[ComparisonTask],
     cj_batch_id: int,
     correlation_id: UUID,
+    pair_generation_mode: PairGenerationMode | None = None,
 ) -> dict[tuple[str, str], UUID]:
     """Create ComparisonPair tracking records for submitted tasks.
 
@@ -37,6 +39,8 @@ async def create_tracking_records(
         batch_tasks: List of comparison tasks being submitted
         cj_batch_id: CJ batch ID
         correlation_id: Parent correlation ID for the batch
+        pair_generation_mode: Generation mode (COVERAGE or RESAMPLING).
+            If None, defaults to "coverage" for backwards compatibility.
 
     Returns:
         Dictionary mapping (essay_a_id, essay_b_id) to request_correlation_id
@@ -60,6 +64,10 @@ async def create_tracking_records(
             confidence=None,
             justification=None,
             completed_at=None,
+            # Pair generation mode for per-mode positional fairness observability
+            pair_generation_mode=(
+                pair_generation_mode.value if pair_generation_mode else "coverage"
+            ),
         )
         session.add(comparison_pair)
 

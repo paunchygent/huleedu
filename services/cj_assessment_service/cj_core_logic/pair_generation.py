@@ -228,7 +228,11 @@ async def generate_comparison_tasks(
                 )
                 return []
 
-            scored_candidates.sort(key=lambda item: (item[0], item[1], item[2]))
+            # Randomize tie-breaker to avoid systematic ID bias in selection.
+            # Pre-assign random values for deterministic, reproducible sorting.
+            rng = Random(randomization_seed)
+            tie_breakers = {(c[1], c[2]): rng.random() for c in scored_candidates}
+            scored_candidates.sort(key=lambda item: (item[0], tie_breakers[(item[1], item[2])]))
 
             # Determine how many pairs we can schedule in this resampling wave.
             if remaining_budget is None:
@@ -248,7 +252,28 @@ async def generate_comparison_tasks(
                 )
                 return []
 
-            selected = scored_candidates[:max_pairs_this_wave]
+            # Apply per-essay participation cap for fairness (mirrors COVERAGE's Blossom
+            # guarantee that each essay appears exactly once per wave). Cap ensures
+            # no essay dominates resampling selection, enabling the orientation strategy
+            # to achieve balanced A/B positions across all essays.
+            n_essays = len(essays_for_comparison)
+            max_per_essay = max(1, (2 * max_pairs_this_wave + n_essays - 1) // n_essays)
+
+            essay_participation: dict[str, int] = {}
+            selected: list[tuple[int, str, str, EssayForComparison, EssayForComparison]] = []
+
+            for candidate in scored_candidates:
+                if len(selected) >= max_pairs_this_wave:
+                    break
+                _, id_a, id_b, essay_a, essay_b = candidate
+                count_a = essay_participation.get(id_a, 0)
+                count_b = essay_participation.get(id_b, 0)
+                if count_a >= max_per_essay or count_b >= max_per_essay:
+                    continue
+                selected.append(candidate)
+                essay_participation[id_a] = count_a + 1
+                essay_participation[id_b] = count_b + 1
+
             matched_pairs = [(essay_a, essay_b) for _, _, _, essay_a, essay_b in selected]
 
             logger.info(
@@ -277,36 +302,67 @@ async def generate_comparison_tasks(
         comparison_tasks: list[ComparisonTask] = []
         randomizer = _build_pair_randomizer(randomization_seed)
 
-        if mode is PairGenerationMode.COVERAGE:
-            per_essay_position_counts = await _fetch_per_essay_position_counts(
-                session=session,
-                cj_batch_id=cj_batch_id,
-            )
-            per_pair_orientation_counts = {}
-        else:
-            per_essay_position_counts = await _fetch_per_essay_position_counts(
-                session=session,
-                cj_batch_id=cj_batch_id,
-            )
-            per_pair_orientation_counts = await _fetch_per_pair_orientation_counts(
-                session=session,
-                cj_batch_id=cj_batch_id,
-            )
+        # Fetch DB counts, then create local copies for incremental tracking.
+        # This ensures each pair decision sees accurate counts including
+        # planned assignments from earlier pairs in this wave.
+        db_essay_counts = await _fetch_per_essay_position_counts(
+            session=session,
+            cj_batch_id=cj_batch_id,
+        )
+        local_essay_counts: PerEssayPositionCounts = dict(db_essay_counts)
 
+        if mode is PairGenerationMode.RESAMPLING:
+            db_pair_counts = await _fetch_per_pair_orientation_counts(
+                session=session,
+                cj_batch_id=cj_batch_id,
+            )
+            local_pair_counts: PerPairOrientationCounts = dict(db_pair_counts)
+        else:
+            local_pair_counts = {}
+
+        # For positional fairness:
+        # - With full complement coverage in a 24-essay net
+        #   (MAX_PAIRWISE_COMPARISONS=552 → 276 coverage + 276 resampling),
+        #   FairComplementOrientationStrategy drives per-essay A/B skew to 0.0 and
+        #   ensures every unordered pair sees both AB and BA.
+        # - With the standard budget MAX_PAIRWISE_COMPARISONS=288, only ~4.3% of
+        #   pairs are resampled; the observed ≈0.167 skew in docker tests is the
+        #   natural consequence of incomplete complement coverage, not a defect in
+        #   the orientation strategy.
         for essay_a, essay_b in matched_pairs:
             if mode is PairGenerationMode.COVERAGE:
                 essay_a, essay_b = orientation_strategy.choose_coverage_orientation(
                     (essay_a, essay_b),
-                    per_essay_position_counts,
+                    local_essay_counts,
                     randomizer,
                 )
             else:
                 essay_a, essay_b = orientation_strategy.choose_resampling_orientation(
                     (essay_a, essay_b),
-                    per_pair_orientation_counts,
-                    per_essay_position_counts,
+                    local_pair_counts,
+                    local_essay_counts,
                     randomizer,
                 )
+
+            # Update local counts with this planned assignment so subsequent
+            # pairs in this wave see accurate positional skew.
+            a_pos_a, b_pos_a = local_essay_counts.get(essay_a.id, (0, 0))
+            local_essay_counts[essay_a.id] = (a_pos_a + 1, b_pos_a)
+            a_pos_b, b_pos_b = local_essay_counts.get(essay_b.id, (0, 0))
+            local_essay_counts[essay_b.id] = (a_pos_b, b_pos_b + 1)
+
+            # For RESAMPLING, also track per-pair orientation counts.
+            if mode is PairGenerationMode.RESAMPLING:
+                pair_key = (
+                    (essay_a.id, essay_b.id)
+                    if essay_a.id < essay_b.id
+                    else (essay_b.id, essay_a.id)
+                )
+                ab_count, ba_count = local_pair_counts.get(pair_key, (0, 0))
+                if essay_a.id < essay_b.id:
+                    local_pair_counts[pair_key] = (ab_count + 1, ba_count)
+                else:
+                    local_pair_counts[pair_key] = (ab_count, ba_count + 1)
 
             prompt_blocks = PromptTemplateBuilder.assemble_full_prompt(
                 assessment_context=assessment_context,

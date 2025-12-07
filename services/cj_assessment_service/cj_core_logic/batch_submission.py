@@ -17,6 +17,7 @@ from huleedu_service_libs.logging_utils import create_service_logger
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
+from services.cj_assessment_service.cj_core_logic.pair_generation import PairGenerationMode
 from services.cj_assessment_service.models_api import ComparisonTask
 from services.cj_assessment_service.protocols import (
     CJBatchRepositoryProtocol,
@@ -50,6 +51,7 @@ async def submit_batch_chunk(
     system_prompt_override: str | None = None,
     provider_override: str | None = None,
     metadata_context: dict[str, Any] | None = None,
+    pair_generation_mode: PairGenerationMode | None = None,
 ) -> None:
     """Submit a chunk of comparison tasks with tracking.
 
@@ -65,6 +67,7 @@ async def submit_batch_chunk(
         max_tokens_override: Optional max tokens override
         provider_override: Optional provider override forwarded to LPS
         metadata_context: Optional metadata injected into CJLLMComparisonMetadata
+        pair_generation_mode: Generation mode (COVERAGE or RESAMPLING) for tracking
 
     Raises:
         HuleEduError: On LLM provider communication failure
@@ -100,6 +103,7 @@ async def submit_batch_chunk(
                     batch_tasks=batch_tasks,
                     cj_batch_id=cj_batch_id,
                     correlation_id=correlation_id,
+                    pair_generation_mode=pair_generation_mode,
                 )
                 await session.commit()
                 logger.info(

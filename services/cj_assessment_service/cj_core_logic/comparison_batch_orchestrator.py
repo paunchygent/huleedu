@@ -188,6 +188,7 @@ class ComparisonBatchOrchestrator:
                 system_prompt_override=normalized.system_prompt_override,
                 provider_override=normalized.provider_override,
                 metadata_context=metadata_context,
+                pair_generation_mode=pair_generation_mode,
             )
 
             logger.info(

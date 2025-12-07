@@ -414,7 +414,9 @@ def _can_attempt_resampling(ctx: ContinuationContext) -> bool:
         return False
 
     coverage_fraction = ctx.successful_pairs_count / ctx.max_possible_pairs
-    MIN_COVERAGE_FRACTION_FOR_REGULAR_RESAMPLING = 0.6
+    # Require full coverage before RESAMPLING for regular batches.
+    # This ensures even essay participation before resampling begins.
+    MIN_COVERAGE_FRACTION_FOR_REGULAR_RESAMPLING = 1.0
     if coverage_fraction < MIN_COVERAGE_FRACTION_FOR_REGULAR_RESAMPLING:
         return False
 

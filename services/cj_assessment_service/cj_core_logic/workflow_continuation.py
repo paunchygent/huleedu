@@ -136,9 +136,9 @@ async def trigger_existing_workflow_continuation(
     correlation_id: UUID,
     llm_interaction: LLMInteractionProtocol,
     matching_strategy: PairMatchingStrategyProtocol,
+    orientation_strategy: PairOrientationStrategyProtocol,
     retry_processor: "BatchRetryProcessor | None" = None,
     grade_projector: GradeProjector | None = None,
-    orientation_strategy: PairOrientationStrategyProtocol | None = None,
 ) -> None:
     """Continue workflow after callback if conditions allow.
 
@@ -146,8 +146,9 @@ async def trigger_existing_workflow_continuation(
     - Requests additional comparisons when budget remains and stability not reached
 
     The same DI-provided PairOrientationStrategyProtocol is threaded into both
-    COVERAGE and RESAMPLING continuation paths. When orientation_strategy is
-    None (legacy callers), FairComplementOrientationStrategy will be used.
+    COVERAGE and RESAMPLING continuation paths so that changing
+    `PAIR_ORIENTATION_STRATEGY` at the settings/DI level affects initial
+    submission and all continuation waves without any internal fallbacks.
     """
     log_extra = {"correlation_id": str(correlation_id), "batch_id": batch_id}
     logger.info("Triggering workflow continuation", extra=log_extra)

@@ -34,6 +34,7 @@ from .batch_submission import (
     submit_batch_chunk,
     update_batch_state,
 )
+from .pair_generation import PairGenerationMode
 
 logger = create_service_logger("cj_assessment_service.batch_processor")
 
@@ -73,6 +74,7 @@ class BatchProcessor:
         system_prompt_override: str | None = None,
         provider_override: str | LLMProviderType | None = None,
         metadata_context: dict[str, Any] | None = None,
+        pair_generation_mode: PairGenerationMode | None = None,
     ) -> BatchSubmissionResult:
         """Submit comparison batch with configurable batch size.
 
@@ -84,6 +86,7 @@ class BatchProcessor:
             model_override: Optional model name override
             temperature_override: Optional temperature override
             max_tokens_override: Optional max tokens override
+            pair_generation_mode: Generation mode (COVERAGE or RESAMPLING) for tracking
 
         Returns:
             BatchSubmissionResult with submission details
@@ -146,6 +149,7 @@ class BatchProcessor:
                     system_prompt_override=system_prompt_override,
                     provider_override=provider_override,
                     metadata_context=metadata_context,
+                    pair_generation_mode=pair_generation_mode,
                 )
 
                 total_submitted += len(batch_tasks)
