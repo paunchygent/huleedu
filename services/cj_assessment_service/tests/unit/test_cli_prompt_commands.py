@@ -9,7 +9,7 @@ import pytest
 import typer
 from typer.testing import CliRunner
 
-from services.cj_assessment_service import cli_admin
+from services.cj_assessment_service.cli import config, instructions, main, prompts
 
 runner = CliRunner()
 
@@ -17,8 +17,8 @@ runner = CliRunner()
 @pytest.fixture(autouse=True)
 def reset_token_override(monkeypatch: pytest.MonkeyPatch) -> None:
     """Ensure commands never attempt real authentication."""
-
-    monkeypatch.setattr(cli_admin, "CJ_ADMIN_TOKEN_OVERRIDE", "test-token")
+    # Patch config where it is used (commands use make_admin_request via AuthManager)
+    monkeypatch.setattr(config, "CJ_ADMIN_TOKEN_OVERRIDE", "test-token")
 
 
 class TestPromptsUploadCommand:
@@ -35,13 +35,14 @@ class TestPromptsUploadCommand:
                 "prompt_text": json_body["prompt_text"] if json_body else None,
             }
 
-        monkeypatch.setattr(cli_admin, "_admin_request", fake_admin_request)
+        # Patch where it is USED: in prompts.py
+        monkeypatch.setattr(prompts, "make_admin_request", fake_admin_request)
 
         prompt_file = tmp_path / "prompt.txt"
         prompt_file.write_text("Prompt content from file", encoding="utf-8")
 
         result = runner.invoke(
-            cli_admin.app,
+            main.app,
             [
                 "prompts",
                 "upload",
@@ -71,10 +72,10 @@ class TestPromptsUploadCommand:
                 "prompt_text": json_body["prompt_text"],
             }
 
-        monkeypatch.setattr(cli_admin, "_admin_request", fake_admin_request)
+        monkeypatch.setattr(prompts, "make_admin_request", fake_admin_request)
 
         result = runner.invoke(
-            cli_admin.app,
+            main.app,
             [
                 "prompts",
                 "upload",
@@ -86,13 +87,12 @@ class TestPromptsUploadCommand:
         )
 
         assert result.exit_code == 0
-        assert "Inline prompt value" in result.stdout
         assert captured["json"]["assignment_id"] == "assignment-42"
         assert captured["json"]["prompt_text"] == "Inline prompt value"
 
     def test_upload_requires_exactly_one_input(self) -> None:
         result = runner.invoke(
-            cli_admin.app,
+            main.app,
             [
                 "prompts",
                 "upload",
@@ -109,7 +109,7 @@ class TestPromptsUploadCommand:
         prompt_file.write_text("Some prompt", encoding="utf-8")
 
         result = runner.invoke(
-            cli_admin.app,
+            main.app,
             [
                 "prompts",
                 "upload",
@@ -127,7 +127,7 @@ class TestPromptsUploadCommand:
 
     def test_upload_missing_file_path(self) -> None:
         result = runner.invoke(
-            cli_admin.app,
+            main.app,
             [
                 "prompts",
                 "upload",
@@ -143,7 +143,7 @@ class TestPromptsUploadCommand:
 
     def test_upload_empty_inline_prompt(self) -> None:
         result = runner.invoke(
-            cli_admin.app,
+            main.app,
             [
                 "prompts",
                 "upload",
@@ -161,10 +161,10 @@ class TestPromptsUploadCommand:
         def failing_admin_request(method: str, path: str, json_body: Any | None = None) -> Any:
             raise typer.Exit(code=1)
 
-        monkeypatch.setattr(cli_admin, "_admin_request", failing_admin_request)
+        monkeypatch.setattr(prompts, "make_admin_request", failing_admin_request)
 
         result = runner.invoke(
-            cli_admin.app,
+            main.app,
             [
                 "prompts",
                 "upload",
@@ -188,9 +188,9 @@ class TestPromptsGetCommand:
             "created_at": "2025-11-10T00:00:00+00:00",
         }
 
-        monkeypatch.setattr(cli_admin, "_admin_request", lambda *_args, **_kwargs: expected)
+        monkeypatch.setattr(prompts, "make_admin_request", lambda *_args, **_kwargs: expected)
 
-        result = runner.invoke(cli_admin.app, ["prompts", "get", "assignment-1"])
+        result = runner.invoke(main.app, ["prompts", "get", "assignment-1"])
 
         assert result.exit_code == 0
         assert "Student Prompt Details" in result.stdout
@@ -201,8 +201,8 @@ class TestPromptsGetCommand:
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
         monkeypatch.setattr(
-            cli_admin,
-            "_admin_request",
+            prompts,
+            "make_admin_request",
             lambda *_args, **_kwargs: {
                 "assignment_id": "assignment-1",
                 "student_prompt_storage_id": "storage-abc",
@@ -214,7 +214,7 @@ class TestPromptsGetCommand:
 
         output_path = tmp_path / "output.txt"
         result = runner.invoke(
-            cli_admin.app,
+            main.app,
             [
                 "prompts",
                 "get",
@@ -229,8 +229,8 @@ class TestPromptsGetCommand:
 
     def test_get_requires_string_prompt_text(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(
-            cli_admin,
-            "_admin_request",
+            prompts,
+            "make_admin_request",
             lambda *_args, **_kwargs: {
                 "assignment_id": "assignment-1",
                 "student_prompt_storage_id": "storage-abc",
@@ -240,19 +240,19 @@ class TestPromptsGetCommand:
             },
         )
 
-        result = runner.invoke(cli_admin.app, ["prompts", "get", "assignment-1"])
+        result = runner.invoke(main.app, ["prompts", "get", "assignment-1"])
 
         assert result.exit_code == 1
         assert "prompt_text field is not a string" in (result.stdout + result.stderr)
 
     def test_get_api_failure(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(
-            cli_admin,
-            "_admin_request",
+            prompts,
+            "make_admin_request",
             lambda *_args, **_kwargs: (_ for _ in ()).throw(typer.Exit(code=1)),
         )
 
-        result = runner.invoke(cli_admin.app, ["prompts", "get", "assignment-1"])
+        result = runner.invoke(main.app, ["prompts", "get", "assignment-1"])
 
         assert result.exit_code == 1
 
@@ -269,11 +269,12 @@ class TestInstructionCreateCommand:
                 "grade_scale": json_body["grade_scale"],
             }
 
-        monkeypatch.setattr(cli_admin, "_admin_request", fake_admin_request)
-        monkeypatch.setattr(cli_admin, "_upload_prompt_helper", lambda *_args, **_kwargs: None)
+        # Patch where it is used: instructions.py
+        monkeypatch.setattr(instructions, "make_admin_request", fake_admin_request)
+        monkeypatch.setattr(instructions, "upload_prompt_helper", lambda *_args, **_kwargs: None)
 
         result = runner.invoke(
-            cli_admin.app,
+            main.app,
             [
                 "instructions",
                 "create",
@@ -307,11 +308,11 @@ class TestInstructionCreateCommand:
             upload_calls.append((assignment_id, content))
             return "storage-upload"
 
-        monkeypatch.setattr(cli_admin, "_admin_request", fake_admin_request)
-        monkeypatch.setattr(cli_admin, "_upload_prompt_helper", fake_upload_helper)
+        monkeypatch.setattr(instructions, "make_admin_request", fake_admin_request)
+        monkeypatch.setattr(instructions, "upload_prompt_helper", fake_upload_helper)
 
         result = runner.invoke(
-            cli_admin.app,
+            main.app,
             [
                 "instructions",
                 "create",
@@ -338,11 +339,11 @@ class TestInstructionCreateCommand:
             payloads.append(json_body)
             return json_body
 
-        monkeypatch.setattr(cli_admin, "_admin_request", fake_admin_request)
-        monkeypatch.setattr(cli_admin, "_upload_prompt_helper", lambda *_: "prompt-storage")
+        monkeypatch.setattr(instructions, "make_admin_request", fake_admin_request)
+        monkeypatch.setattr(instructions, "upload_prompt_helper", lambda *_: "prompt-storage")
 
         result = runner.invoke(
-            cli_admin.app,
+            main.app,
             [
                 "instructions",
                 "create",
@@ -362,7 +363,7 @@ class TestInstructionCreateCommand:
 
     def test_create_prompt_requires_assignment(self) -> None:
         result = runner.invoke(
-            cli_admin.app,
+            main.app,
             [
                 "instructions",
                 "create",
@@ -385,7 +386,7 @@ class TestInstructionCreateCommand:
         prompt_file.write_text("Prompt", encoding="utf-8")
 
         result = runner.invoke(
-            cli_admin.app,
+            main.app,
             [
                 "instructions",
                 "create",

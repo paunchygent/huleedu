@@ -21,10 +21,10 @@ from quart import Quart
 from quart_dishka import QuartDishka
 from typer.testing import CliRunner
 
-from services.cj_assessment_service import cli_admin
 from services.cj_assessment_service.api.admin import common as admin_common
 from services.cj_assessment_service.api.admin import student_prompts_bp
 from services.cj_assessment_service.cj_core_logic.batch_preparation import create_cj_batch
+from services.cj_assessment_service.cli import main, prompts
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.models_api import CJAssessmentRequestData, EssayToProcess
 from services.cj_assessment_service.protocols import (
@@ -151,9 +151,9 @@ async def test_student_prompt_workflow_end_to_end(
             assert path.endswith(f"/student-prompts/assignment/{assignment_id}")
             return cli_payload
 
-        monkeypatch.setattr(cli_admin, "_admin_request", fake_admin_request)
+        monkeypatch.setattr(prompts, "make_admin_request", fake_admin_request)
 
-        result = runner.invoke(cli_admin.app, ["prompts", "get", assignment_id])
+        result = runner.invoke(main.app, ["prompts", "get", assignment_id])
         assert result.exit_code == 0
         # CLI output should reflect the storage ID and the fetched prompt text
         assert "Student Prompt Details" in result.stdout
