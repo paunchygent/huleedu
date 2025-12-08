@@ -47,15 +47,15 @@ source "$REPO_ROOT/.env"
 case "$PROFILE" in
   cj-generic)
     EXPECTED_MODE="cj_generic_batch"
-    TEST_PATH="tests/integration/test_cj_regular_batch_resampling_docker.py"
+    TEST_PATH="tests/eng5_profiles/test_cj_mock_parity_generic.py"
     ;;
   eng5-anchor)
     EXPECTED_MODE="eng5_anchor_gpt51_low"
-    TEST_PATH="tests/integration/test_eng5_mock_parity_full_anchor.py"
+    TEST_PATH="tests/eng5_profiles/test_eng5_mock_parity_full_anchor.py"
     ;;
   eng5-lower5)
     EXPECTED_MODE="eng5_lower5_gpt51_low"
-    TEST_PATH="tests/integration/test_cj_small_net_continuation_docker.py"
+    TEST_PATH="tests/eng5_profiles/test_eng5_mock_parity_lower5.py"
     ;;
   *)
     echo "Unknown profile: $PROFILE" >&2

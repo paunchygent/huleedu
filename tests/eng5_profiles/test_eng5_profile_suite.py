@@ -14,9 +14,11 @@ from typing import Any, cast
 import aiohttp
 import pytest
 
-from tests.integration.test_cj_mock_parity_generic import TestCJMockParityGeneric
-from tests.integration.test_eng5_mock_parity_full_anchor import TestEng5MockParityFullAnchor
-from tests.integration.test_eng5_mock_parity_lower5 import TestEng5MockParityLower5
+from tests.eng5_profiles.test_cj_mock_parity_generic import TestCJMockParityGeneric
+from tests.eng5_profiles.test_eng5_mock_parity_full_anchor import (
+    TestEng5MockParityFullAnchor,
+)
+from tests.eng5_profiles.test_eng5_mock_parity_lower5 import TestEng5MockParityLower5
 from tests.utils.kafka_test_manager import KafkaTestManager
 from tests.utils.service_test_manager import ServiceTestManager
 

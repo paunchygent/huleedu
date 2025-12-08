@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+
+# ENG5/CJ docker test suite orchestrator.
+#
+# Usage (from repo root, in an env-aware shell):
+#   pdm run eng5-cj-docker-suite            # run both small-net and regular-batch CJ tests
+#   pdm run eng5-cj-docker-suite small-net  # only LOWER5 small-net CJ tests
+#   pdm run eng5-cj-docker-suite regular    # only regular-batch CJ tests
+#
+# This helper:
+#   - Ensures .env exists
+#   - Recreates llm_provider_service and cj_assessment_service so they pick up current .env
+#   - Runs the heavy CJ docker tests for the selected scenario(s)
+#   - Relies on each test module’s own guards (/admin/mock-mode, settings flags) to
+#     skip quickly when the active mock profile or batching-hints config does not match.
+
+set -euo pipefail
+IFS=$'\n\t'
+
+SCRIPT_PATH="${BASH_SOURCE[0]:-$0}"
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../" && pwd)"
+
+SCENARIO="${1:-all}"
+
+cd "$REPO_ROOT"
+
+if [[ ! -f "$REPO_ROOT/.env" ]]; then
+  echo "Missing .env at $REPO_ROOT/.env – cannot run ENG5/CJ docker suite." >&2
+  exit 1
+fi
+
+echo "✅ Using .env at $REPO_ROOT/.env for ENG5/CJ docker suite"
+
+echo "🔄 Recreating llm_provider_service and cj_assessment_service containers..."
+pdm run dev-recreate llm_provider_service cj_assessment_service
+
+run_small_net_tests() {
+  echo "🧪 Running LOWER5 small-net CJ docker tests..."
+  pdm run pytest-root tests/integration/test_cj_small_net_continuation_docker.py -m 'docker and integration' -v
+}
+
+run_regular_batch_tests() {
+  echo "🧪 Running regular-batch CJ docker tests (resampling + callbacks)..."
+  pdm run pytest-root tests/integration/test_cj_regular_batch_resampling_docker.py -m 'docker and integration' -v
+  pdm run pytest-root tests/integration/test_cj_regular_batch_callbacks_docker.py -m 'docker and integration' -v
+}
+
+case "$SCENARIO" in
+  small-net|small|lower5)
+    run_small_net_tests
+    ;;
+  regular|large|generic)
+    run_regular_batch_tests
+    ;;
+  all)
+    run_small_net_tests
+    run_regular_batch_tests
+    ;;
+  *)
+    echo "Unknown scenario: $SCENARIO" >&2
+    echo "Usage: $0 [all|small-net|regular]" >&2
+    exit 1
+    ;;
+esac
+
+echo "✅ ENG5/CJ docker suite ($SCENARIO) completed."
+
