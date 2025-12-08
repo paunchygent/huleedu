@@ -904,3 +904,40 @@ services:
       timeout: 5s
       retries: 3
       start_period: 60s
+
+  bff_teacher_service:
+    build:
+      context: .
+      dockerfile: services/bff_teacher_service/Dockerfile
+    container_name: huleedu_bff_teacher_service
+    restart: unless-stopped
+    depends_on:
+      kafka_topic_setup:
+        condition: service_completed_successfully
+    networks:
+      - huleedu_internal_network
+    ports:
+      - "4101:4101"
+    volumes:
+      # Dev override: mount local frontend/dist for hot iteration
+      # In CI/production, Dockerfile COPY provides the files
+      - ./frontend/dist:/app/static:ro
+    environment:
+      - ENV_TYPE=docker
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - LOG_FORMAT=json
+      - BFF_TEACHER_SERVICE_PORT=4101
+      - BFF_TEACHER_SERVICE_HOST=0.0.0.0
+      - BFF_TEACHER_SERVICE_LOG_LEVEL=INFO
+      # Observability
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - OTEL_SERVICE_NAME=bff_teacher_service
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_METRICS_EXPORTER=none
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:4101/healthz || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s

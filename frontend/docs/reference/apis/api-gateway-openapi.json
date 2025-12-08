@@ -1,0 +1,1781 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "api-gateway-service",
+    "description": "HuleEdu API Gateway - Secure client-facing API for Svelte 5 + Vite frontend integration",
+    "contact": {
+      "name": "HuleEdu Development Team",
+      "url": "https://github.com/huledu/huledu-reboot"
+    },
+    "license": {
+      "name": "MIT"
+    },
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/healthz": {
+      "get": {
+        "tags": [
+          "Health",
+          "Health"
+        ],
+        "summary": "Health Check",
+        "description": "Health check endpoint following Rule 072 format.",
+        "operationId": "health_check_healthz_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "additionalProperties": true,
+                        "type": "object"
+                      }
+                    ]
+                  },
+                  "type": "object",
+                  "title": "Response Health Check Healthz Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metrics": {
+      "get": {
+        "tags": [
+          "Health",
+          "Health"
+        ],
+        "summary": "Metrics",
+        "description": "Prometheus metrics endpoint.",
+        "operationId": "metrics_metrics_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/classes/{path}": {
+      "post": {
+        "tags": [
+          "Classes"
+        ],
+        "summary": "Class Management Proxy",
+        "description": "Proxy all class management operations to the Class Management Service",
+        "operationId": "proxy_class_requests_v1_classes__path__post",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation (varies by endpoint)",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "examples": {
+                  "get_classes": {
+                    "summary": "GET /classes - List user's classes",
+                    "value": {
+                      "classes": [
+                        {
+                          "class_id": "class_123",
+                          "name": "Advanced Writing",
+                          "description": "Advanced essay writing course",
+                          "created_at": "2025-01-15T10:30:00Z",
+                          "student_count": 25
+                        }
+                      ],
+                      "total_count": 1
+                    }
+                  },
+                  "get_class_detail": {
+                    "summary": "GET /classes/{class_id} - Get class details",
+                    "value": {
+                      "class_id": "class_123",
+                      "name": "Advanced Writing",
+                      "description": "Advanced essay writing course",
+                      "created_at": "2025-01-15T10:30:00Z",
+                      "updated_at": "2025-01-15T11:00:00Z",
+                      "student_count": 25,
+                      "students": [
+                        {
+                          "student_id": "student_456",
+                          "name": "John Doe",
+                          "email": "john@example.com",
+                          "enrolled_at": "2025-01-10T09:00:00Z"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Resource created successfully",
+            "content": {
+              "application/json": {
+                "example": {
+                  "class_id": "class_789",
+                  "name": "Creative Writing",
+                  "description": "Creative writing workshop",
+                  "created_at": "2025-01-15T12:00:00Z",
+                  "message": "Class created successfully"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request parameters",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "validation_error": {
+                    "summary": "Missing required fields",
+                    "value": {
+                      "error_type": "ValidationError",
+                      "message": "Class name is required",
+                      "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                      "field": "name"
+                    }
+                  },
+                  "invalid_class_id": {
+                    "summary": "Invalid class identifier",
+                    "value": {
+                      "error_type": "ValidationError",
+                      "message": "Invalid class ID format",
+                      "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                      "field": "class_id"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error_type": "AuthenticationError",
+                  "message": "Valid JWT token required",
+                  "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access forbidden - insufficient permissions",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error_type": "AuthorizationError",
+                  "message": "User does not have permission to access this class",
+                  "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                  "class_id": "class_123",
+                  "user_id": "user_456"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Class not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error_type": "ResourceNotFoundError",
+                  "message": "Class not found",
+                  "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                  "resource_type": "class",
+                  "resource_id": "class_123"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict - resource already exists or operation not allowed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error_type": "ConflictError",
+                  "message": "Class with this name already exists",
+                  "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                  "conflicting_field": "name",
+                  "existing_class_id": "class_456"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service temporarily unavailable",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error_type": "ExternalServiceError",
+                  "message": "Class Management Service temporarily unavailable",
+                  "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                  "external_service": "class_management",
+                  "retry_recommended": true
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Classes"
+        ],
+        "summary": "Class Management Proxy",
+        "description": "Proxy all class management operations to the Class Management Service",
+        "operationId": "proxy_class_requests_v1_classes__path__post",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation (varies by endpoint)",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "examples": {
+                  "get_classes": {
+                    "summary": "GET /classes - List user's classes",
+                    "value": {
+                      "classes": [
+                        {
+                          "class_id": "class_123",
+                          "name": "Advanced Writing",
+                          "description": "Advanced essay writing course",
+                          "created_at": "2025-01-15T10:30:00Z",
+                          "student_count": 25
+                        }
+                      ],
+                      "total_count": 1
+                    }
+                  },
+                  "get_class_detail": {
+                    "summary": "GET /classes/{class_id} - Get class details",
+                    "value": {
+                      "class_id": "class_123",
+                      "name": "Advanced Writing",
+                      "description": "Advanced essay writing course",
+                      "created_at": "2025-01-15T10:30:00Z",
+                      "updated_at": "2025-01-15T11:00:00Z",
+                      "student_count": 25,
+                      "students": [
+                        {
+                          "student_id": "student_456",
+                          "name": "John Doe",
+                          "email": "john@example.com",
+                          "enrolled_at": "2025-01-10T09:00:00Z"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Resource created successfully",
+            "content": {
+              "application/json": {
+                "example": {
+                  "class_id": "class_789",
+                  "name": "Creative Writing",
+                  "description": "Creative writing workshop",
+                  "created_at": "2025-01-15T12:00:00Z",
+                  "message": "Class created successfully"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request parameters",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "validation_error": {
+                    "summary": "Missing required fields",
+                    "value": {
+                      "error_type": "ValidationError",
+                      "message": "Class name is required",
+                      "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                      "field": "name"
+                    }
+                  },
+                  "invalid_class_id": {
+                    "summary": "Invalid class identifier",
+                    "value": {
+                      "error_type": "ValidationError",
+                      "message": "Invalid class ID format",
+                      "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                      "field": "class_id"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error_type": "AuthenticationError",
+                  "message": "Valid JWT token required",
+                  "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access forbidden - insufficient permissions",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error_type": "AuthorizationError",
+                  "message": "User does not have permission to access this class",
+                  "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                  "class_id": "class_123",
+                  "user_id": "user_456"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Class not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error_type": "ResourceNotFoundError",
+                  "message": "Class not found",
+                  "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                  "resource_type": "class",
+                  "resource_id": "class_123"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict - resource already exists or operation not allowed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error_type": "ConflictError",
+                  "message": "Class with this name already exists",
+                  "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                  "conflicting_field": "name",
+                  "existing_class_id": "class_456"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service temporarily unavailable",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error_type": "ExternalServiceError",
+                  "message": "Class Management Service temporarily unavailable",
+                  "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                  "external_service": "class_management",
+                  "retry_recommended": true
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Classes"
+        ],
+        "summary": "Class Management Proxy",
+        "description": "Proxy all class management operations to the Class Management Service",
+        "operationId": "proxy_class_requests_v1_classes__path__post",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation (varies by endpoint)",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "examples": {
+                  "get_classes": {
+                    "summary": "GET /classes - List user's classes",
+                    "value": {
+                      "classes": [
+                        {
+                          "class_id": "class_123",
+                          "name": "Advanced Writing",
+                          "description": "Advanced essay writing course",
+                          "created_at": "2025-01-15T10:30:00Z",
+                          "student_count": 25
+                        }
+                      ],
+                      "total_count": 1
+                    }
+                  },
+                  "get_class_detail": {
+                    "summary": "GET /classes/{class_id} - Get class details",
+                    "value": {
+                      "class_id": "class_123",
+                      "name": "Advanced Writing",
+                      "description": "Advanced essay writing course",
+                      "created_at": "2025-01-15T10:30:00Z",
+                      "updated_at": "2025-01-15T11:00:00Z",
+                      "student_count": 25,
+                      "students": [
+                        {
+                          "student_id": "student_456",
+                          "name": "John Doe",
+                          "email": "john@example.com",
+                          "enrolled_at": "2025-01-10T09:00:00Z"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Resource created successfully",
+            "content": {
+              "application/json": {
+                "example": {
+                  "class_id": "class_789",
+                  "name": "Creative Writing",
+                  "description": "Creative writing workshop",
+                  "created_at": "2025-01-15T12:00:00Z",
+                  "message": "Class created successfully"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request parameters",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "validation_error": {
+                    "summary": "Missing required fields",
+                    "value": {
+                      "error_type": "ValidationError",
+                      "message": "Class name is required",
+                      "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                      "field": "name"
+                    }
+                  },
+                  "invalid_class_id": {
+                    "summary": "Invalid class identifier",
+                    "value": {
+                      "error_type": "ValidationError",
+                      "message": "Invalid class ID format",
+                      "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                      "field": "class_id"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error_type": "AuthenticationError",
+                  "message": "Valid JWT token required",
+                  "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access forbidden - insufficient permissions",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error_type": "AuthorizationError",
+                  "message": "User does not have permission to access this class",
+                  "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                  "class_id": "class_123",
+                  "user_id": "user_456"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Class not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error_type": "ResourceNotFoundError",
+                  "message": "Class not found",
+                  "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                  "resource_type": "class",
+                  "resource_id": "class_123"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict - resource already exists or operation not allowed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error_type": "ConflictError",
+                  "message": "Class with this name already exists",
+                  "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                  "conflicting_field": "name",
+                  "existing_class_id": "class_456"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service temporarily unavailable",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error_type": "ExternalServiceError",
+                  "message": "Class Management Service temporarily unavailable",
+                  "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                  "external_service": "class_management",
+                  "retry_recommended": true
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Classes"
+        ],
+        "summary": "Class Management Proxy",
+        "description": "Proxy all class management operations to the Class Management Service",
+        "operationId": "proxy_class_requests_v1_classes__path__post",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation (varies by endpoint)",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "examples": {
+                  "get_classes": {
+                    "summary": "GET /classes - List user's classes",
+                    "value": {
+                      "classes": [
+                        {
+                          "class_id": "class_123",
+                          "name": "Advanced Writing",
+                          "description": "Advanced essay writing course",
+                          "created_at": "2025-01-15T10:30:00Z",
+                          "student_count": 25
+                        }
+                      ],
+                      "total_count": 1
+                    }
+                  },
+                  "get_class_detail": {
+                    "summary": "GET /classes/{class_id} - Get class details",
+                    "value": {
+                      "class_id": "class_123",
+                      "name": "Advanced Writing",
+                      "description": "Advanced essay writing course",
+                      "created_at": "2025-01-15T10:30:00Z",
+                      "updated_at": "2025-01-15T11:00:00Z",
+                      "student_count": 25,
+                      "students": [
+                        {
+                          "student_id": "student_456",
+                          "name": "John Doe",
+                          "email": "john@example.com",
+                          "enrolled_at": "2025-01-10T09:00:00Z"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Resource created successfully",
+            "content": {
+              "application/json": {
+                "example": {
+                  "class_id": "class_789",
+                  "name": "Creative Writing",
+                  "description": "Creative writing workshop",
+                  "created_at": "2025-01-15T12:00:00Z",
+                  "message": "Class created successfully"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request parameters",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "validation_error": {
+                    "summary": "Missing required fields",
+                    "value": {
+                      "error_type": "ValidationError",
+                      "message": "Class name is required",
+                      "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                      "field": "name"
+                    }
+                  },
+                  "invalid_class_id": {
+                    "summary": "Invalid class identifier",
+                    "value": {
+                      "error_type": "ValidationError",
+                      "message": "Invalid class ID format",
+                      "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                      "field": "class_id"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error_type": "AuthenticationError",
+                  "message": "Valid JWT token required",
+                  "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access forbidden - insufficient permissions",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error_type": "AuthorizationError",
+                  "message": "User does not have permission to access this class",
+                  "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                  "class_id": "class_123",
+                  "user_id": "user_456"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Class not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error_type": "ResourceNotFoundError",
+                  "message": "Class not found",
+                  "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                  "resource_type": "class",
+                  "resource_id": "class_123"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict - resource already exists or operation not allowed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error_type": "ConflictError",
+                  "message": "Class with this name already exists",
+                  "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                  "conflicting_field": "name",
+                  "existing_class_id": "class_456"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service temporarily unavailable",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error_type": "ExternalServiceError",
+                  "message": "Class Management Service temporarily unavailable",
+                  "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                  "external_service": "class_management",
+                  "retry_recommended": true
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/test/no-auth": {
+      "get": {
+        "tags": [
+          "Status"
+        ],
+        "summary": "Test Endpoint (No Auth)",
+        "description": "Test endpoint for verifying API Gateway connectivity without authentication",
+        "operationId": "test_no_auth_v1_test_no_auth_get",
+        "responses": {
+          "200": {
+            "description": "Test successful",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "message": "Success - no auth required",
+                  "timestamp": "2025-01-15T10:30:00Z",
+                  "service": "api_gateway_service"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/test/with-auth": {
+      "get": {
+        "tags": [
+          "Status"
+        ],
+        "summary": "Test Endpoint (With Auth)",
+        "description": "Test endpoint for verifying authentication and JWT token validation",
+        "operationId": "test_with_auth_v1_test_with_auth_get",
+        "responses": {
+          "200": {
+            "description": "Authentication test successful",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "message": "Success - authenticated as user_123",
+                  "user_id": "user_123",
+                  "timestamp": "2025-01-15T10:30:00Z",
+                  "token_valid": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error_type": "AuthenticationError",
+                  "message": "Valid JWT token required",
+                  "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/batches/{batch_id}/status": {
+      "get": {
+        "tags": [
+          "Status"
+        ],
+        "summary": "Get Batch Status",
+        "description": "Retrieve current status and processing details for a batch",
+        "operationId": "get_batch_status_v1_batches__batch_id__status_get",
+        "parameters": [
+          {
+            "name": "batch_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Batch Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Batch status retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchStatusResponse"
+                },
+                "example": {
+                  "status": "processing",
+                  "details": {
+                    "batch_id": "batch_123",
+                    "created_at": "2025-01-15T10:30:00Z",
+                    "updated_at": "2025-01-15T10:45:00Z",
+                    "total_essays": 5,
+                    "processed_essays": 3,
+                    "current_phase": "CONTENT_JUDGMENT",
+                    "progress_percentage": 60,
+                    "estimated_completion": "2025-01-15T11:15:00Z"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error_type": "AuthenticationError",
+                  "message": "Valid JWT token required",
+                  "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access forbidden - user does not own this batch",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error_type": "AuthorizationError",
+                  "message": "Ownership violation: batch does not belong to user",
+                  "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                  "batch_id": "batch_123",
+                  "requested_by": "user_456",
+                  "actual_owner": "user_789"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Batch not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error_type": "ResourceNotFoundError",
+                  "message": "Batch not found",
+                  "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                  "resource_type": "batch",
+                  "resource_id": "batch_123"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service temporarily unavailable",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error_type": "ExternalServiceError",
+                  "message": "Result Aggregator Service temporarily unavailable",
+                  "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                  "external_service": "result_aggregator",
+                  "retry_recommended": true
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/batches/{batch_id}/pipelines": {
+      "post": {
+        "tags": [
+          "Batches"
+        ],
+        "summary": "Request Pipeline Execution",
+        "description": "Submit a batch for processing through the specified pipeline phase",
+        "operationId": "request_pipeline_execution_v1_batches__batch_id__pipelines_post",
+        "parameters": [
+          {
+            "name": "batch_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Batch Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchPipelineRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Request accepted and queued for processing",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "status": "accepted",
+                  "message": "Pipeline execution request received",
+                  "batch_id": "batch_123",
+                  "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request parameters",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "batch_id_mismatch": {
+                    "summary": "Batch ID mismatch between path and body",
+                    "value": {
+                      "error_type": "ValidationError",
+                      "message": "Batch ID in path must match batch ID in request body",
+                      "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                      "field": "batch_id",
+                      "expected": "batch_123",
+                      "received": "batch_456"
+                    }
+                  },
+                  "invalid_pipeline": {
+                    "summary": "Invalid pipeline phase specified",
+                    "value": {
+                      "error_type": "ValidationError",
+                      "message": "Invalid pipeline phase",
+                      "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                      "field": "requested_pipeline",
+                      "allowed_values": [
+                        "SPELLCHECK",
+                        "CONTENT_JUDGMENT",
+                        "FEEDBACK_GENERATION"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error_type": "AuthenticationError",
+                  "message": "Valid JWT token required",
+                  "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access forbidden - user does not own this batch",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error_type": "AuthorizationError",
+                  "message": "User does not have permission to access this batch",
+                  "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                  "batch_id": "batch_123",
+                  "user_id": "user_456"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error_type": "RateLimitError",
+                  "message": "Rate limit exceeded: 10 requests per minute",
+                  "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                  "retry_after": 60
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service temporarily unavailable",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error_type": "KafkaPublishError",
+                  "message": "Failed to publish pipeline request: Kafka broker unavailable",
+                  "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                  "batch_id": "batch_123",
+                  "retry_recommended": true
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/files/batch": {
+      "post": {
+        "tags": [
+          "Files"
+        ],
+        "summary": "Upload Batch Files",
+        "description": "Upload multiple files for a batch with comprehensive validation and security",
+        "operationId": "upload_batch_files_v1_files_batch_post",
+        "responses": {
+          "201": {
+            "description": "Files uploaded successfully",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "status": "success",
+                  "message": "Files uploaded successfully",
+                  "batch_id": "batch_123",
+                  "files_uploaded": 3,
+                  "total_size_bytes": 1048576,
+                  "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request parameters or file validation failed",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "missing_batch_id": {
+                    "summary": "Missing batch_id in form data",
+                    "value": {
+                      "error_type": "ValidationError",
+                      "message": "batch_id is required in form data",
+                      "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                      "field": "batch_id"
+                    }
+                  },
+                  "no_files": {
+                    "summary": "No files provided in request",
+                    "value": {
+                      "error_type": "ValidationError",
+                      "message": "At least one file is required",
+                      "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                      "field": "files"
+                    }
+                  },
+                  "file_too_large": {
+                    "summary": "File exceeds size limit",
+                    "value": {
+                      "error_type": "ValidationError",
+                      "message": "File size exceeds maximum allowed (50MB)",
+                      "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                      "field": "files",
+                      "max_size_bytes": 52428800
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error_type": "AuthenticationError",
+                  "message": "Valid JWT token required",
+                  "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access forbidden - user does not own this batch",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error_type": "AuthorizationError",
+                  "message": "User does not have permission to upload files to this batch",
+                  "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                  "batch_id": "batch_123",
+                  "user_id": "user_456"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Batch not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error_type": "ResourceNotFoundError",
+                  "message": "Batch not found",
+                  "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                  "resource_type": "batch",
+                  "resource_id": "batch_123"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request entity too large",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error_type": "ValidationError",
+                  "message": "Total upload size exceeds limit",
+                  "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                  "max_total_size_bytes": 104857600
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error_type": "RateLimitError",
+                  "message": "Rate limit exceeded: 5 uploads per minute",
+                  "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                  "retry_after": 60
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service temporarily unavailable",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error_type": "ExternalServiceError",
+                  "message": "File service temporarily unavailable",
+                  "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                  "external_service": "file_service",
+                  "retry_recommended": true
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Upload timeout",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error_type": "TimeoutError",
+                  "message": "File upload timeout - please try again with smaller files",
+                  "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                  "timeout_seconds": 60.0
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dev/mock/classes": {
+      "get": {
+        "tags": [
+          "Development",
+          "Development"
+        ],
+        "summary": "Get Mock Classes",
+        "description": "Return mock class data optimized for Svelte 5 $state() runes.\n\nProvides realistic class data with various states for UI testing.\nStructure optimized for reactive Svelte 5 patterns.",
+        "operationId": "get_mock_classes_dev_mock_classes_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Mock Classes Dev Mock Classes Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dev/mock/students/{class_id}": {
+      "get": {
+        "tags": [
+          "Development",
+          "Development"
+        ],
+        "summary": "Get Mock Students",
+        "description": "Return mock student data for a specific class.\n\nProvides student roster data with realistic variations for different UI states.",
+        "operationId": "get_mock_students_dev_mock_students__class_id__get",
+        "parameters": [
+          {
+            "name": "class_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Class Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Mock Students Dev Mock Students  Class Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dev/mock/essays/{status}": {
+      "get": {
+        "tags": [
+          "Development",
+          "Development"
+        ],
+        "summary": "Get Mock Essays By Status",
+        "description": "Return mock essays filtered by processing status.\n\nProvides essay data for different processing states to test UI workflows.",
+        "operationId": "get_mock_essays_by_status_dev_mock_essays__status__get",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Mock Essays By Status Dev Mock Essays  Status  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dev/mock/batches": {
+      "get": {
+        "tags": [
+          "Development",
+          "Development"
+        ],
+        "summary": "Get Mock Batches",
+        "description": "Return mock batch processing data with various states.\n\nProvides comprehensive batch data covering all processing states for UI testing.",
+        "operationId": "get_mock_batches_dev_mock_batches_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Mock Batches Dev Mock Batches Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dev/mock/reactive-state": {
+      "get": {
+        "tags": [
+          "Development",
+          "Development"
+        ],
+        "summary": "Get Mock Reactive State",
+        "description": "Return mock state data structured for Svelte 5 reactive patterns.\n\nOptimized data structure for Svelte 5 runes ($state, $derived, $effect).\nIncludes loading states, error states, and reactive data patterns.",
+        "operationId": "get_mock_reactive_state_dev_mock_reactive_state_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Mock Reactive State Dev Mock Reactive State Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dev/mock/websocket/trigger": {
+      "post": {
+        "tags": [
+          "Development",
+          "Development"
+        ],
+        "summary": "Trigger Mock Notification",
+        "description": "Trigger WebSocket notifications optimized for Svelte 5 reactive updates.\n\nSimulates real-time notifications for testing frontend reactive patterns.",
+        "operationId": "trigger_mock_notification_dev_mock_websocket_trigger_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MockNotificationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Trigger Mock Notification Dev Mock Websocket Trigger Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dev/auth/test-token": {
+      "post": {
+        "tags": [
+          "Development",
+          "Development"
+        ],
+        "summary": "Generate Test Token",
+        "description": "Generate a test JWT token for development with configurable claims.\n\nCreates realistic JWT tokens for testing authentication flows in development.",
+        "operationId": "generate_test_token_dev_auth_test_token_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestTokenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Generate Test Token Dev Auth Test Token Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "BatchClientStatus": {
+        "type": "string",
+        "enum": [
+          "pending_content",
+          "ready",
+          "processing",
+          "completed_successfully",
+          "completed_with_failures",
+          "failed",
+          "cancelled"
+        ],
+        "title": "BatchClientStatus",
+        "description": "Client-facing batch status values for API responses and WebSocket events.\n\nThese statuses provide a simplified, semantic view of batch processing state\nfor frontend applications. Values are synchronized between REST API and \nWebSocket notifications for consistency.\n\nProcessing Flow:\nPENDING_CONTENT → READY → PROCESSING → (COMPLETED_SUCCESSFULLY | COMPLETED_WITH_FAILURES | FAILED)\n\nTerminal States: COMPLETED_SUCCESSFULLY, COMPLETED_WITH_FAILURES, FAILED, CANCELLED"
+      },
+      "BatchPipelineRequest": {
+        "properties": {
+          "batch_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batch Id",
+            "description": "The unique identifier of the target batch (optional, taken from path)."
+          },
+          "requested_pipeline": {
+            "$ref": "#/components/schemas/PhaseName",
+            "description": "The final pipeline phase the user wants to run."
+          },
+          "is_retry": {
+            "type": "boolean",
+            "title": "Is Retry",
+            "description": "Flag indicating this is a user-initiated retry request.",
+            "default": false
+          },
+          "retry_reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retry Reason",
+            "description": "Optional user-provided reason for the retry."
+          }
+        },
+        "type": "object",
+        "required": [
+          "requested_pipeline"
+        ],
+        "title": "BatchPipelineRequest",
+        "description": "Input model for batch pipeline requests from API Gateway clients.\n\nThis is separate from ClientBatchPipelineRequestV1 to avoid requiring\nuser_id in the client request (it comes from authentication)."
+      },
+      "BatchStatusResponse": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/BatchClientStatus",
+            "description": "The current status of the batch."
+          },
+          "details": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Details",
+            "description": "The detailed status information."
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "details"
+        ],
+        "title": "BatchStatusResponse",
+        "description": "Response model for batch status requests."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "MockNotificationRequest": {
+        "properties": {
+          "notification_type": {
+            "type": "string",
+            "title": "Notification Type",
+            "description": "Type of notification to trigger"
+          },
+          "payload": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payload",
+            "description": "Optional payload data for the notification"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id",
+            "description": "Target user ID (optional)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "notification_type"
+        ],
+        "title": "MockNotificationRequest",
+        "description": "Request model for triggering mock WebSocket notifications."
+      },
+      "PhaseName": {
+        "type": "string",
+        "enum": [
+          "spellcheck",
+          "ai_feedback",
+          "cj_assessment",
+          "nlp",
+          "student_matching"
+        ],
+        "title": "PhaseName",
+        "description": "Enum defining all valid pipeline phase names for type-safe orchestration.\n\nThis enum is used as keys in the phase_initiators_map, within ProcessingPipelineState,\nand for validating requested_pipelines values, eliminating magic strings and\nproviding compile-time safety."
+      },
+      "TestTokenRequest": {
+        "properties": {
+          "user_type": {
+            "type": "string",
+            "enum": [
+              "teacher",
+              "student",
+              "admin"
+            ],
+            "title": "User Type",
+            "description": "Type of user for the token",
+            "default": "teacher"
+          },
+          "class_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Id",
+            "description": "Associated class ID (optional)"
+          },
+          "expires_minutes": {
+            "type": "integer",
+            "maximum": 1440.0,
+            "minimum": 1.0,
+            "title": "Expires Minutes",
+            "description": "Token expiration time in minutes",
+            "default": 60
+          },
+          "custom_claims": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custom Claims",
+            "description": "Custom JWT claims for testing specific scenarios"
+          }
+        },
+        "type": "object",
+        "title": "TestTokenRequest",
+        "description": "Request model for generating test JWT tokens."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <title>HuleEdu Favicon</title>
+  
+  <!-- Navy background -->
+  <rect fill="#1C2E4A" width="32" height="32" rx="4"/>
+  
+  <!-- Burgundy "e" top arc only (rising sun shape) -->
+  <path fill="#6B1C2E" fill-rule="evenodd" d="
+    M 16 4
+    C 24 4, 28 9, 28 15
+    L 28 17
+    L 4 17
+    L 4 15
+    C 4 9, 8 4, 16 4
+    Z
+    M 16 8
+    C 11 8, 8 11, 8 14
+    L 24 14
+    C 24 11, 21 8, 16 8
+    Z
+  "/>
+  
+  <!-- Wave 1 (upper) -->
+  <path fill="#F9F8F2" d="
+    M 4 20
+    C 7 20, 9 23, 13 23
+    C 17 23, 19 20, 23 20
+    C 26 20, 28 22, 28 22
+    L 28 25
+    C 28 25, 26 23, 23 23
+    C 19 23, 17 26, 13 26
+    C 9 26, 7 23, 4 23
+    Z
+  "/>
+  
+  <!-- Wave 2 (lower) -->
+  <path fill="#F9F8F2" d="
+    M 4 25
+    C 7 25, 9 28, 13 28
+    C 17 28, 19 25, 23 25
+    C 26 25, 28 27, 28 27
+    L 28 29
+    C 28 29, 26 27, 23 27
+    C 19 27, 17 30, 13 30
+    C 9 30, 7 27, 4 27
+    Z
+  "/>
+</svg>

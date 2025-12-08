@@ -67,6 +67,8 @@ monorepo-tools = [
     "pymc",
     "arviz",
     "scikit-learn",
+    # Frontend prototype CSS compilation
+    "pytailwindcss",
 ]
 
 # Install all services and common_core for unified development
@@ -159,6 +161,7 @@ ignore = [
 # RESEARCH CODE - Relaxed rules for exploratory/one-time analysis
 # ==============================================================================
 "docs/research/**/*.py" = ["E501", "E722", "F401"]  # Long lines, bare excepts, unused imports
+"frontend/docs/research/**/*.py" = ["E501", "E722", "F401"]  # Frontend research scripts
 
 # Note: Import restrictions would be enforced through custom linting rules
 # For now, rely on type system and code review to prevent standard library logging
@@ -198,6 +201,7 @@ module = [
     "services.email_service.*",
     "services.entitlements_service.*",
     "services.language_tool_service.*",
+    "services.bff_teacher_service.*",
 ]
 ignore_missing_imports = false
 disallow_untyped_defs = true
@@ -451,7 +455,7 @@ codex = "scripts/codex-exec"  # Start codex with full system access and high rea
 
 # Task Management
 new-task = {cmd = ["python", "-m", "scripts.task_mgmt.new_task"]}  # Create new task with frontmatter
-validate-tasks = "python -m scripts.task_mgmt.validate_front_matter --verbose"  # Validate task frontmatter
+validate-tasks = "python -m scripts.task_mgmt.validate_front_matter --all --verbose"  # Validate TASKS/ and frontend/TASKS/
 tasks = {cmd = ["python", "-m", "scripts.task_mgmt.filter_tasks"]}  # Filter and query tasks by frontmatter
 tasks-now = "python -m scripts.task_mgmt.filter_tasks --priority high --status in_progress"  # High priority tasks in progress
 tasks-next = "python -m scripts.task_mgmt.filter_tasks --priority high --priority medium --status research --sort priority"  # Research tasks ready to start (high priority first)
@@ -473,6 +477,25 @@ cj-admin = "python -m services.cj_assessment_service.cli_admin"
 llm-check-models = "python -m services.llm_provider_service.cli_check_models"
 llm-admin = "python -m services.llm_provider_service.admin_cli"
 prompt-cache-benchmark = "python -m scripts.prompt_cache_benchmark.cli"
+
+# Frontend Development (Vue 3 + Vite + Tailwind 4)
+fe-install.cmd = "pnpm install"
+fe-install.working_dir = "frontend"
+fe-dev.cmd = "pnpm run dev"
+fe-dev.working_dir = "frontend"
+fe-build.cmd = "pnpm run build"
+fe-build.working_dir = "frontend"
+fe-preview.cmd = "pnpm run preview"
+fe-preview.working_dir = "frontend"
+fe-prototype-build.cmd = "python -c \"import pytailwindcss; pytailwindcss.run(['-i', 'frontend/styles/src/input.css', '-o', 'frontend/styles/src/tailwind.css'], auto_install=True)\""
+fe-type-check.cmd = "pnpm run type-check"
+fe-type-check.working_dir = "frontend"
+
+# BFF Teacher Service
+bff-build = "docker compose build bff_teacher_service"
+bff-start = "docker compose up -d bff_teacher_service"
+bff-logs = "docker compose logs -f bff_teacher_service"
+bff-restart = "docker compose restart bff_teacher_service"
 
 [build-system]
 requires = ["pdm-backend"]

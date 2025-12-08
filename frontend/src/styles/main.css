@@ -1,0 +1,217 @@
+@import "tailwindcss";
+
+/* ═══════════════════════════════════════════════════════════════
+   THEME CONFIGURATION
+   Consolidated design tokens for HuleEdu
+═══════════════════════════════════════════════════════════════ */
+@theme {
+  /* Typography - IBM Plex industrial type system */
+  --font-family-sans: "IBM Plex Sans", system-ui, sans-serif;
+  --font-family-serif: "IBM Plex Serif", Georgia, serif;
+  --font-family-display: "IBM Plex Serif", Georgia, serif;
+  --font-family-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  /* Brand Colors */
+  --color-canvas: #F9F8F2;
+  --color-navy: #1C2E4A;
+  --color-burgundy: #6B1C2E;
+
+  /* Extended palette */
+  --color-brand-primary: oklch(65% 0.2 258);
+  --color-brand-accent: oklch(78% 0.16 210);
+
+  /* Spacing */
+  --spacing-handout: 1.75rem;
+
+  /* Border Radius */
+  --radius-handout-card: 18px;
+
+  /* Letter Spacing */
+  --letter-spacing-tightest: -0.02em;
+  --letter-spacing-label: 0.08em;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   BASE STYLES
+═══════════════════════════════════════════════════════════════ */
+body {
+  background-color: var(--color-canvas);
+  color: var(--color-navy);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-canvas);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-navy);
+  border-radius: 3px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LAYOUT COMPONENTS
+═══════════════════════════════════════════════════════════════ */
+
+/* The Ledger Frame – page wrapper */
+.ledger-frame {
+  border: 1px solid var(--color-navy);
+  min-height: 100vh;
+}
+
+@media (min-width: 768px) {
+  .ledger-frame {
+    margin: 1rem;
+    min-height: calc(100vh - 2rem);
+  }
+}
+
+/* Dashboard grid layout */
+.dashboard-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  min-height: 100vh;
+}
+
+@media (min-width: 768px) {
+  .dashboard-layout {
+    grid-template-columns: 240px 1fr;
+  }
+}
+
+/* Sidebar visibility */
+.sidebar {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .sidebar {
+    display: flex;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   INTERACTIVE STATES
+═══════════════════════════════════════════════════════════════ */
+
+/* Row hover effects */
+.ledger-row:hover .ledger-value {
+  color: var(--color-burgundy);
+  font-weight: 600;
+}
+
+.batch-row:hover {
+  background-color: rgba(28, 46, 74, 0.02);
+}
+
+/* Login cell hover */
+.login-cell {
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.login-cell:hover {
+  background-color: var(--color-navy);
+  color: var(--color-canvas);
+}
+
+/* Refresh indicator */
+.refresh-indicator {
+  transition: opacity 0.2s ease;
+}
+
+.refresh-indicator.loading {
+  opacity: 0.5;
+}
+
+/* Focus states for accessibility */
+a:focus-visible,
+button:focus-visible,
+select:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--color-burgundy);
+  outline-offset: 2px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   VISUAL EFFECTS
+═══════════════════════════════════════════════════════════════ */
+
+/* Wavy underline for spelling errors */
+.wavy-error {
+  text-decoration: underline wavy var(--color-burgundy);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+}
+
+/* Hero grid background */
+.grid-bg {
+  background-image:
+    linear-gradient(var(--color-navy) 1px, transparent 1px),
+    linear-gradient(90deg, var(--color-navy) 1px, transparent 1px);
+  background-size: 24px 24px;
+  opacity: 0.04;
+}
+
+/* Brutalist shadows */
+.shadow-brutal {
+  box-shadow: 6px 6px 0px 0px var(--color-navy);
+}
+
+.shadow-brutal-sm {
+  box-shadow: 4px 4px 0px 0px var(--color-navy);
+}
+
+/* Status indicator dots */
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   UTILITY CLASSES
+═══════════════════════════════════════════════════════════════ */
+
+/* Typography utilities */
+.tracking-tightest {
+  letter-spacing: var(--letter-spacing-tightest);
+}
+
+.tracking-label {
+  letter-spacing: var(--letter-spacing-label);
+}
+
+/* Color utilities */
+.bg-canvas { background-color: var(--color-canvas); }
+.bg-navy { background-color: var(--color-navy); }
+.bg-burgundy { background-color: var(--color-burgundy); }
+
+.text-canvas { color: var(--color-canvas); }
+.text-navy { color: var(--color-navy); }
+.text-burgundy { color: var(--color-burgundy); }
+
+.border-canvas { border-color: var(--color-canvas); }
+.border-navy { border-color: var(--color-navy); }
+.border-burgundy { border-color: var(--color-burgundy); }
+
+/* Skip link for accessibility */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: var(--color-navy);
+  color: var(--color-canvas);
+  padding: 8px 16px;
+  z-index: 100;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.skip-link:focus {
+  top: 0;
+}

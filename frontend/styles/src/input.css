@@ -1,0 +1,390 @@
+@import "tailwindcss";
+
+/* ═══════════════════════════════════════════════════════════════
+   THEME CONFIGURATION
+   Consolidated design tokens for HuleEdu
+═══════════════════════════════════════════════════════════════ */
+@theme {
+  /* Typography - IBM Plex industrial type system */
+  --font-family-sans: "IBM Plex Sans", system-ui, sans-serif;
+  --font-family-serif: "IBM Plex Serif", Georgia, serif;
+  --font-family-display: "IBM Plex Serif", Georgia, serif;
+  --font-family-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  /* Brand Colors */
+  --color-canvas: #F9F8F2;
+  --color-navy: #1C2E4A;
+  --color-burgundy: #6B1C2E;
+
+  /* Extended palette for PDF handouts */
+  --color-brand-primary: oklch(65% 0.2 258);
+  --color-brand-accent: oklch(78% 0.16 210);
+
+  /* Spacing */
+  --spacing-handout: 1.75rem;
+
+  /* Border Radius */
+  --radius-handout-card: 18px;
+
+  /* Letter Spacing */
+  --letter-spacing-tightest: -0.02em;
+  --letter-spacing-label: 0.08em;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   BASE STYLES
+═══════════════════════════════════════════════════════════════ */
+body {
+  background-color: var(--color-canvas);
+  color: var(--color-navy);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-canvas);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-navy);
+  border-radius: 3px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LAYOUT COMPONENTS
+═══════════════════════════════════════════════════════════════ */
+
+/* The Ledger Frame – page wrapper */
+.ledger-frame {
+  border: 1px solid var(--color-navy);
+  min-height: 100vh;
+}
+
+@media (min-width: 768px) {
+  .ledger-frame {
+    margin: 1rem;
+    min-height: calc(100vh - 2rem);
+  }
+}
+
+/* Dashboard grid layout */
+.dashboard-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  min-height: 100vh;
+}
+
+@media (min-width: 768px) {
+  .dashboard-layout {
+    grid-template-columns: 240px 1fr;
+  }
+}
+
+/* Sidebar visibility */
+.sidebar {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .sidebar {
+    display: flex;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   INTERACTIVE STATES
+═══════════════════════════════════════════════════════════════ */
+
+/* Row hover effects */
+.ledger-row:hover .ledger-value {
+  color: var(--color-burgundy);
+  font-weight: 600;
+}
+
+.batch-row:hover {
+  background-color: rgba(28, 46, 74, 0.02);
+}
+
+/* Login cell hover */
+.login-cell {
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.login-cell:hover {
+  background-color: var(--color-navy);
+  color: var(--color-canvas);
+}
+
+/* Refresh indicator */
+.refresh-indicator {
+  transition: opacity 0.2s ease;
+}
+
+.refresh-indicator.loading {
+  opacity: 0.5;
+}
+
+/* Focus states for accessibility */
+a:focus-visible,
+button:focus-visible,
+select:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--color-burgundy);
+  outline-offset: 2px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   VISUAL EFFECTS
+═══════════════════════════════════════════════════════════════ */
+
+/* Wavy underline for spelling errors */
+.wavy-error {
+  text-decoration: underline wavy var(--color-burgundy);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+}
+
+/* Hero grid background */
+.grid-bg {
+  background-image:
+    linear-gradient(var(--color-navy) 1px, transparent 1px),
+    linear-gradient(90deg, var(--color-navy) 1px, transparent 1px);
+  background-size: 24px 24px;
+  opacity: 0.04;
+}
+
+/* Brutalist shadows */
+.shadow-brutal {
+  box-shadow: 6px 6px 0px 0px var(--color-navy);
+}
+
+.shadow-brutal-sm {
+  box-shadow: 4px 4px 0px 0px var(--color-navy);
+}
+
+/* Status indicator dots */
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Subtle pulse animation */
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.analysis-badge {
+  animation: pulse-subtle 2.5s ease-in-out infinite;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   PDF HANDOUT COMPONENTS
+═══════════════════════════════════════════════════════════════ */
+.handout-card {
+  @apply rounded-[var(--radius-handout-card)] border border-slate-200/80 bg-white/95 p-6 shadow-sm;
+}
+
+.handout-heading {
+  font-family: var(--font-family-display);
+  @apply text-2xl leading-tight;
+  color: var(--color-brand-primary);
+}
+
+.handout-body {
+  font-family: var(--font-family-sans);
+  @apply leading-relaxed tracking-tight;
+  color: rgba(30, 41, 59, 0.9);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   UTILITY CLASSES
+═══════════════════════════════════════════════════════════════ */
+
+/* Typography utilities */
+.tracking-tightest {
+  letter-spacing: var(--letter-spacing-tightest);
+}
+
+.tracking-label {
+  letter-spacing: var(--letter-spacing-label);
+}
+
+/* Color utilities */
+.bg-canvas { background-color: var(--color-canvas); }
+.bg-navy { background-color: var(--color-navy); }
+.bg-burgundy { background-color: var(--color-burgundy); }
+
+.text-canvas { color: var(--color-canvas); }
+.text-navy { color: var(--color-navy); }
+.text-burgundy { color: var(--color-burgundy); }
+
+.border-canvas { border-color: var(--color-canvas); }
+.border-navy { border-color: var(--color-navy); }
+.border-burgundy { border-color: var(--color-burgundy); }
+
+/* Skip link for accessibility */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: var(--color-navy);
+  color: var(--color-canvas);
+  padding: 8px 16px;
+  z-index: 100;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.skip-link:focus {
+  top: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   FORM COMPONENTS
+   Standardized form elements for all prototypes
+═══════════════════════════════════════════════════════════════ */
+
+/* Form card container */
+.form-card {
+  border: 1px solid var(--color-navy);
+  background-color: white;
+  padding: 2rem;
+  box-shadow: 6px 6px 0px 0px var(--color-navy);
+}
+
+/* Form field label */
+.form-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-label);
+  color: rgba(28, 46, 74, 0.6);
+  margin-bottom: 0.5rem;
+}
+
+/* Form input base (text, email, password) */
+.form-input {
+  width: 100%;
+  border: 1px solid rgba(28, 46, 74, 0.3);
+  background-color: var(--color-canvas);
+  padding: 0.75rem 1rem;
+  color: var(--color-navy);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.form-input::placeholder {
+  color: rgba(28, 46, 74, 0.3);
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--color-navy);
+  box-shadow: 0 0 0 1px var(--color-navy);
+}
+
+/* Form select (styled closed state, native picker on mobile) */
+.form-select {
+  width: 100%;
+  border: 1px solid rgba(28, 46, 74, 0.3);
+  background-color: var(--color-canvas);
+  padding: 0.75rem 1rem;
+  color: var(--color-navy);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  /* Native appearance for consistent mobile UX */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  /* Custom dropdown arrow */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%231C2E4A' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 1rem center;
+  padding-right: 2.5rem;
+}
+
+.form-select:focus {
+  outline: none;
+  border-color: var(--color-navy);
+  box-shadow: 0 0 0 1px var(--color-navy);
+}
+
+/* Form textarea */
+.form-textarea {
+  width: 100%;
+  border: 1px solid rgba(28, 46, 74, 0.3);
+  background-color: var(--color-canvas);
+  padding: 0.75rem 1rem;
+  color: var(--color-navy);
+  resize: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.form-textarea::placeholder {
+  color: rgba(28, 46, 74, 0.3);
+}
+
+.form-textarea:focus {
+  outline: none;
+  border-color: var(--color-navy);
+  box-shadow: 0 0 0 1px var(--color-navy);
+}
+
+/* Primary button */
+.btn-primary {
+  display: inline-block;
+  background-color: var(--color-burgundy);
+  color: var(--color-canvas);
+  padding: 1rem 2rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-label);
+  text-decoration: none;
+  text-align: center;
+  transition: background-color 0.15s ease;
+  cursor: pointer;
+  border: none;
+}
+
+.btn-primary:hover {
+  background-color: var(--color-navy);
+}
+
+.btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-primary:disabled:hover {
+  background-color: var(--color-burgundy);
+}
+
+/* Secondary link */
+.link-secondary {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: rgba(28, 46, 74, 0.7);
+  border-bottom: 1px solid rgba(28, 46, 74, 0.4);
+  padding-bottom: 0.125rem;
+  transition: color 0.15s ease, border-color 0.15s ease;
+  text-decoration: none;
+}
+
+.link-secondary:hover {
+  color: var(--color-burgundy);
+  border-color: var(--color-burgundy);
+}
+
+.link-secondary .arrow {
+  display: inline-block;
+  transition: transform 0.15s ease;
+}
+
+.link-secondary:hover .arrow {
+  transform: translateX(4px);
+}

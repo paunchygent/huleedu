@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logga in – HuleEdu</title>
+    <meta name="description" content="Logga in på HuleEdu för att hantera bedömningar och elevtexter.">
+    
+    <!-- Fonts: IBM Plex industrial type system -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@400;600&display=swap" rel="stylesheet">
+    
+    <!-- Compiled Tailwind CSS -->
+    <link rel="stylesheet" href="tailwind.css">
+</head>
+
+<body class="font-sans min-h-screen flex flex-col">
+
+<div class="ledger-frame flex flex-col flex-grow">
+    
+    <!-- Minimal header – just logo -->
+    <header class="h-16 border-b border-navy shrink-0 flex items-center justify-center" role="banner">
+        <a href="/" aria-label="HuleEdu startsida">
+            <img src="HuleEduLogo.svg" alt="HuleEdu" class="h-8 w-auto">
+        </a>
+    </header>
+
+    <!-- Main content – centered login form -->
+    <main class="flex-grow flex items-center justify-center p-6 md:p-12" role="main">
+        
+        <div class="w-full max-w-sm">
+            
+            <!-- Form card -->
+            <form action="/api/login" method="POST" class="border border-navy bg-white p-8 shadow-brutal">
+                
+                <h1 class="text-2xl font-extrabold text-navy tracking-tightest mb-2">
+                    Logga in
+                </h1>
+                <p class="text-sm text-navy/60 mb-8">
+                    Ange dina uppgifter för att fortsätta.
+                </p>
+
+                <!-- Email field -->
+                <div class="mb-5">
+                    <label for="email" class="block text-xs font-semibold uppercase tracking-label text-navy/60 mb-2">
+                        E-post
+                    </label>
+                    <input 
+                        type="email" 
+                        id="email" 
+                        name="email" 
+                        required
+                        autocomplete="email"
+                        placeholder="namn@skola.se"
+                        class="w-full border border-navy/30 bg-canvas px-4 py-3 text-navy placeholder:text-navy/30 focus:outline-none focus:border-navy focus:ring-1 focus:ring-navy transition-colors"
+                    >
+                </div>
+
+                <!-- Password field -->
+                <div class="mb-8">
+                    <label for="password" class="block text-xs font-semibold uppercase tracking-label text-navy/60 mb-2">
+                        Lösenord
+                    </label>
+                    <input 
+                        type="password" 
+                        id="password" 
+                        name="password" 
+                        required
+                        autocomplete="current-password"
+                        placeholder="••••••••"
+                        class="w-full border border-navy/30 bg-canvas px-4 py-3 text-navy placeholder:text-navy/30 focus:outline-none focus:border-navy focus:ring-1 focus:ring-navy transition-colors"
+                    >
+                </div>
+
+                <!-- Submit button -->
+                <button 
+                    type="submit"
+                    class="w-full bg-burgundy text-canvas py-4 text-sm font-semibold uppercase tracking-label hover:bg-navy transition-colors"
+                >
+                    Logga in
+                </button>
+
+                <!-- Secondary link -->
+                <div class="mt-6 text-center">
+                    <a href="/forgot-password" class="text-sm text-navy/60 hover:text-navy underline underline-offset-2 transition-colors">
+                        Glömt lösenord?
+                    </a>
+                </div>
+            </form>
+
+            <!-- Registration prompt -->
+            <div class="mt-6 text-center border-t border-navy/20 pt-6">
+                <p class="text-sm text-navy/60">
+                    Ny användare? 
+                    <a href="/register" class="font-semibold text-navy hover:text-burgundy transition-colors">
+                        Kontakta din administratör
+                    </a>
+                </p>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Minimal footer -->
+    <footer class="border-t border-navy py-4 text-center shrink-0" role="contentinfo">
+        <p class="text-xs text-navy/40">
+            © 2025 HuleEdu · <a href="/privacy" class="hover:text-navy transition-colors">Integritet</a>
+        </p>
+    </footer>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anmäl intresse – HuleEdu</title>
+    <meta name="description" content="Anmäl dig till väntlistan för HuleEdu. Vi hör av oss när det finns plats.">
+    
+    <!-- Fonts: IBM Plex industrial type system -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@400;600&display=swap" rel="stylesheet">
+    
+    <!-- Compiled Tailwind CSS -->
+    <link rel="stylesheet" href="tailwind.css">
+    
+    <!-- 
+        NOTE: Form component styles are defined in input.css.
+        Run 'pnpm dev' to recompile tailwind.css if styles don't apply.
+        Inline fallback below for file:// protocol viewing.
+    -->
+    <style>
+        /* Fallback for file:// protocol - these are duplicated from input.css */
+        .form-input, .form-select, .form-textarea {
+            width: 100%;
+            border: 1px solid rgba(28, 46, 74, 0.3);
+            background-color: var(--color-canvas);
+            padding: 0.75rem 1rem;
+            color: var(--color-navy);
+        }
+        .form-select {
+            -webkit-appearance: none;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%231C2E4A' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 1rem center;
+            padding-right: 2.5rem;
+        }
+        .form-label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: rgba(28, 46, 74, 0.6);
+            margin-bottom: 0.5rem;
+        }
+        .btn-primary {
+            display: inline-block;
+            background-color: var(--color-burgundy);
+            color: var(--color-canvas);
+            padding: 1rem 2rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            text-align: center;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.15s ease;
+        }
+        .btn-primary:hover {
+            background-color: var(--color-navy);
+        }
+    </style>
+</head>
+
+<body class="font-sans min-h-screen flex flex-col">
+
+<div class="ledger-frame flex flex-col flex-grow">
+    
+    <!-- App header: logo left, back link right -->
+    <header class="h-16 border-b border-navy shrink-0 flex items-center justify-between px-6" role="banner">
+        <a href="huleedu-landing-final.html" aria-label="HuleEdu startsida">
+            <img src="HuleEduLogo.svg" alt="HuleEdu" class="h-8 w-auto">
+        </a>
+        <a href="huleedu-landing-final.html" class="text-xs font-semibold uppercase tracking-label text-navy/60 hover:text-navy transition-colors">
+            ← Tillbaka
+        </a>
+    </header>
+
+    <!-- Main content – centered signup form -->
+    <main class="flex-grow flex items-center justify-center p-6 md:p-12" role="main">
+        
+        <div class="w-full max-w-md">
+            
+            <!-- Form card -->
+            <form action="/api/waitlist" method="POST" class="border border-navy bg-white p-8 shadow-brutal">
+                
+                <h1 class="text-2xl font-extrabold text-navy tracking-tightest mb-2">
+                    Anmäl intresse
+                </h1>
+                <p class="text-sm text-navy/60 mb-8">
+                    Vi är i tidig fas och släpper in användare successivt. 
+                    Fyll i formuläret så hör vi av oss med en inbjudan.
+                </p>
+
+                <!-- Email field -->
+                <div class="mb-5">
+                    <label for="email" class="form-label">E-post *</label>
+                    <input 
+                        type="email" 
+                        id="email" 
+                        name="email" 
+                        required
+                        autocomplete="email"
+                        placeholder="namn@skola.se"
+                        class="form-input"
+                    >
+                </div>
+
+                <!-- Role field -->
+                <div class="mb-5">
+                    <label for="role" class="form-label">Yrkesroll *</label>
+                    <select id="role" name="role" required class="form-select" data-toggle="role-other">
+                        <option value="" disabled selected>Välj din roll</option>
+                        <option value="svensklarare">Svensklärare</option>
+                        <option value="engelskalarare">Engelsklärare</option>
+                        <option value="svensk-engelskalarare">Svensk- och engelsklärare</option>
+                        <option value="andra-amnen">Lärare i andra ämnen</option>
+                        <option value="annat">Annat</option>
+                    </select>
+                    <div id="role-other" class="hidden mt-2">
+                        <input type="text" name="role_other" placeholder="Beskriv din roll" class="form-input">
+                    </div>
+                </div>
+
+                <!-- School level field -->
+                <div class="mb-5">
+                    <label for="level" class="form-label">Skolnivå *</label>
+                    <select id="level" name="level" required class="form-select" data-toggle="level-other">
+                        <option value="" disabled selected>Välj nivå</option>
+                        <option value="lag-mellanstadiet">Låg-mellanstadiet</option>
+                        <option value="hogstadiet">Högstadiet</option>
+                        <option value="gymnasiet">Gymnasiet</option>
+                        <option value="vuxenutbildning">Vuxenutbildning</option>
+                        <option value="universitet-hogskola">Universitet eller högskola</option>
+                        <option value="annat">Annat</option>
+                    </select>
+                    <div id="level-other" class="hidden mt-2">
+                        <input type="text" name="level_other" placeholder="Beskriv skolnivå" class="form-input">
+                    </div>
+                </div>
+
+                <!-- Intended use field -->
+                <div class="mb-8">
+                    <label for="intended_use" class="form-label">Vad vill du använda tjänsten till?</label>
+                    <textarea 
+                        id="intended_use" 
+                        name="intended_use"
+                        rows="3"
+                        placeholder="T.ex. bedömning av nationella prov, formativ återkoppling, effektivisera rättning..."
+                        class="form-textarea"
+                    ></textarea>
+                    <p class="mt-1 text-xs text-navy/40">Valfritt – hjälper oss förstå dina behov</p>
+                </div>
+
+                <!-- Submit button -->
+                <button type="submit" class="btn-primary w-full">
+                    Skicka anmälan
+                </button>
+
+                <!-- Privacy note -->
+                <p class="mt-6 text-xs text-navy/40 text-center leading-relaxed">
+                    Genom att skicka anmälan godkänner du att vi sparar dina uppgifter 
+                    för att kontakta dig. Läs vår <a href="#" class="underline hover:text-navy transition-colors">integritetspolicy</a>.
+                </p>
+            </form>
+
+            <!-- Alternative for organizations -->
+            <div class="mt-6 text-center border-t border-navy/20 pt-6">
+                <p class="text-sm text-navy/60">
+                    Representerar du en skola eller kommun? 
+                    <a href="for-skolor.html" class="font-semibold text-navy hover:text-burgundy transition-colors">
+                        Kontakta oss för demo
+                    </a>
+                </p>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Minimal footer -->
+    <footer class="border-t border-navy py-4 text-center shrink-0" role="contentinfo">
+        <p class="text-xs text-navy/40">
+            © 2025 HuleEdu · <a href="#" class="hover:text-navy transition-colors">Integritet</a>
+        </p>
+    </footer>
+
+</div>
+
+<script>
+// Toggle conditional fields when "annat" is selected
+document.addEventListener('change', (e) => {
+    if (!e.target.matches('select[data-toggle]')) return;
+    const target = document.getElementById(e.target.dataset.toggle);
+    if (target) {
+        target.classList.toggle('hidden', e.target.value !== 'annat');
+    }
+});
+</script>
+</body>
+</html>

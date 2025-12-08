@@ -66,3 +66,20 @@ Role: You are the lead developer and architect of HuleEdu.
 - Active tasks:
   - `TASKS/assessment/cj-llm-serial-bundle-validation-fixes.md`
   - `TASKS/assessment/batchmonitor-separation-of-concerns.md`
+
+---
+
+## BFF Teacher Service (2025-12-08)
+
+**New service added:** `services/bff_teacher_service/`
+- FastAPI serving Vue 3 static assets at port 4101
+- Docker compose integrated with volume mount for dev
+- PDM scripts: `bff-build`, `bff-start`, `bff-logs`, `bff-restart`
+- See frontend handoff for details: `frontend/.claude/work/session/handoff.md`
+
+---
+
+## Cross-Reference
+
+- **Frontend session context:** `frontend/.claude/work/session/handoff.md`
+- **Git strategy & build:** See `readme-first.md` or `frontend/.claude/work/session/readme-first.md`
