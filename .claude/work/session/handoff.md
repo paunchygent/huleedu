@@ -79,6 +79,46 @@ Role: You are the lead developer and architect of HuleEdu.
 
 ---
 
+## API Gateway: GET /v1/batches & Batch Routes Refactor (2025-12-08)
+
+**Completed:**
+- Refactored bloated `batch_routes.py` (787 LoC) into 4 SRP-compliant modules:
+  - `_batch_utils.py` (129 LoC) – Shared utilities, status mapping, Pydantic models
+  - `batch_commands.py` (159 LoC) – `POST /batches/register`, `PATCH /batches/{batch_id}/prompt`
+  - `batch_pipelines.py` (206 LoC) – `POST /batches/{batch_id}/pipelines` (Kafka publishing)
+  - `batch_queries.py` (167 LoC) – `GET /batches` (new listing endpoint)
+- Added **internal auth headers** (`X-Internal-API-Key`, `X-Service-ID`) to RAS calls in `status_routes.py`
+- Updated `app/main.py`, `tests/conftest.py`, `tests/test_batch_preflight.py`
+- All 74 API Gateway tests pass
+
+**New endpoint: `GET /v1/batches`:**
+- JWT authentication (user_id from token)
+- Pagination (`limit`, `offset`)
+- Status filtering (client-facing values: `pending_content`, `ready`, `processing`, etc.)
+- Proxies to RAS `/internal/v1/batches/user/{user_id}` with auth headers
+
+**Next session – remaining work:**
+1. **Add tests for `GET /v1/batches`** – Create `tests/test_batch_queries.py`:
+   - `test_list_batches_success`
+   - `test_list_batches_pagination`
+   - `test_list_batches_status_filter_valid/invalid`
+   - `test_list_batches_status_mapping`
+   - `test_list_batches_ras_error`
+   - `test_list_batches_auth_headers`
+2. **Update API Gateway README** – Add endpoint docs, update file structure
+3. **Update Frontend Integration Guide** – Add batch listing example (optional)
+
+**Key files:**
+- `services/api_gateway_service/routers/_batch_utils.py`
+- `services/api_gateway_service/routers/batch_commands.py`
+- `services/api_gateway_service/routers/batch_pipelines.py`
+- `services/api_gateway_service/routers/batch_queries.py`
+- `services/api_gateway_service/routers/status_routes.py` (fixed auth headers)
+
+**Known limitation:** Status filter uses first internal status when client status maps to multiple (e.g., `processing` → 4 internal values). Full multi-status filtering would require RAS enhancement.
+
+---
+
 ## Cross-Reference
 
 - **Frontend session context:** `frontend/.claude/work/session/handoff.md`

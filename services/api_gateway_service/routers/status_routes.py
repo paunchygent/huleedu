@@ -17,6 +17,8 @@ from huleedu_service_libs.logging_utils import create_service_logger
 from services.api_gateway_service.config import settings
 from services.api_gateway_service.protocols import HttpClientProtocol, MetricsProtocol
 
+from ._batch_utils import build_internal_auth_headers
+
 router = APIRouter()
 logger = create_service_logger("api_gateway.status_routes")
 
@@ -345,11 +347,14 @@ async def get_batch_status(
                 f"{settings.RESULT_AGGREGATOR_URL}/internal/v1/batches/{batch_id}/status"
             )
 
+            # Build auth headers for internal service call
+            headers = build_internal_auth_headers(correlation_id)
+
             # Time the downstream service call
             with metrics.downstream_service_call_duration_seconds.labels(
                 service="result_aggregator", method="GET", endpoint="/internal/v1/batches/status"
             ).time():
-                response = await http_client.get(aggregator_url)
+                response = await http_client.get(aggregator_url, headers=headers)
                 response.raise_for_status()
                 data = response.json()
 

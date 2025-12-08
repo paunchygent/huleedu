@@ -110,9 +110,9 @@ async def test_pipeline_request_returns_402_on_preflight_denial():
     app = FastAPI()
     setup_dishka(container, app)
 
-    from services.api_gateway_service.routers import batch_routes
+    from services.api_gateway_service.routers import batch_pipelines
 
-    app.include_router(batch_routes.router, prefix="/v1")
+    app.include_router(batch_pipelines.router, prefix="/v1")
 
     with TestClient(app) as client:
         resp = client.post(

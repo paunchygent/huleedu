@@ -203,7 +203,14 @@ def create_test_app_with_isolated_registry(registry: CollectorRegistry):
 
     from ..app.middleware import CorrelationIDMiddleware
     from ..app.rate_limiter import limiter
-    from ..routers import batch_routes, class_routes, file_routes, status_routes
+    from ..routers import (
+        batch_commands,
+        batch_pipelines,
+        batch_queries,
+        class_routes,
+        file_routes,
+        status_routes,
+    )
     from ..routers.health_routes import router as health_router
 
     app = FastAPI(
@@ -247,7 +254,9 @@ def create_test_app_with_isolated_registry(registry: CollectorRegistry):
     app.include_router(health_router, tags=["Health"])
     app.include_router(class_routes.router, prefix="/v1", tags=["Classes"])
     app.include_router(status_routes.router, prefix="/v1", tags=["Status"])
-    app.include_router(batch_routes.router, prefix="/v1", tags=["Batches"])
+    app.include_router(batch_commands.router, prefix="/v1", tags=["Batch Commands"])
+    app.include_router(batch_pipelines.router, prefix="/v1", tags=["Batch Pipelines"])
+    app.include_router(batch_queries.router, prefix="/v1", tags=["Batch Queries"])
     app.include_router(file_routes.router, prefix="/v1", tags=["Files"])
 
     return app

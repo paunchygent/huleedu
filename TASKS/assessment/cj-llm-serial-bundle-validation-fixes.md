@@ -49,7 +49,7 @@ labels: []
 - PR3: Anthropic client hardened (429 Retry-After, 529/overloaded retryable, stop_reason=max_tokens, prompt caching hook + metadata). Integration test still to extend for 529/stop_reason cases.
 - Docs updated: CJ README (completion path) and LPS README (Anthropic ops/caching). Tests run: `pdm run pytest-root services/cj_assessment_service/tests/unit/test_workflow_continuation.py services/cj_assessment_service/tests/unit/test_completion_threshold.py services/llm_provider_service/tests/integration/test_anthropic_error_diagnostics.py`.
 
-**Progress 2025-12-07 (this session):**
+**Progress 2025-12-07 / 2025-12-08 (this session):**
 - PR1 – Completion safety & callback semantics:
   - `BatchCompletionPolicy.update_batch_completion_counters` now uses `CJBatchRepositoryProtocol.get_batch_state_for_update(..., for_update=True)` to obtain a row-locked `CJBatchState` snapshot before mutating callback counters, preventing lost updates under concurrent callbacks.
   - Tests updated in `services/cj_assessment_service/tests/unit/test_batch_completion_policy.py` to assert the `get_batch_state_for_update(..., for_update=True)` call in all counter update scenarios while preserving the existing behavioural assertions for `completed_comparisons`, `failed_comparisons`, `last_activity_at`, and `partial_scoring_triggered`.
@@ -76,6 +76,12 @@ labels: []
       - Allows CJ to send `preferred_bundle_size` in `LLMComparisonRequest.metadata`.
       - Expects `preferred_bundle_size` to be present (when provided) in `LLMComparisonResultV1.request_metadata` with invariants: `isinstance(value, int)` and `1 <= value <= 64`.
     - `services/llm_provider_service/tests/integration/test_serial_bundle_integration.py` extends the happy-path bundling test to include a `preferred_bundle_size` hint under the cap, ensuring that the size-2 bundle used in the test is compatible with the hint semantics.
+  - End-to-end validation (regular ENG5 docker suite):
+    - Wired `CJBatchUpload.completed_at` in `BatchFinalizer` for both success (`finalize_scoring`, `finalize_single_essay`) and failure (`finalize_failure`) paths, using naive UTC timestamps compatible with the `TIMESTAMP WITHOUT TIME ZONE` column.
+    - Updated `tests/integration/test_cj_regular_batch_callbacks_docker.py` to normalize callback `event_timestamp` values to naive UTC before comparison with `CJBatchUpload.completed_at`, making the “no callbacks after finalization” assertion robust against naive/aware differences.
+    - Verified that `pdm run eng5-cj-docker-suite regular` now passes end-to-end under `serial_bundle` + hint metadata:
+      - `test_cj_regular_batch_resampling_metadata_completed_successful`
+      - `test_cj_regular_batch_callbacks_and_preferred_bundle_size_invariants`
   - ENG5/CJ harness documentation:
     - `docs/operations/eng5-np-runbook.md` now includes an **ENG5/CJ serial-bundle test harness** subsection that:
       - Points at `tests/eng5_profiles/*` as ENG5 profile parity tests (separate from standard docker integration tests).
