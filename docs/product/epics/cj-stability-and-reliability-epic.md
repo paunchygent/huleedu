@@ -6,7 +6,7 @@ status: draft
 phase: 1
 sprint_target: TBD
 created: 2025-11-28
-last_updated: 2025-11-29
+last_updated: 2025-12-07
 ---
 
 # EPIC-005: CJ Stability & Reliability
@@ -25,6 +25,15 @@ Harden the CJ Assessment callback and completion flow to ensure safe finalizatio
 - PR‑1 (test harness & fixtures for CJ) and PR‑2 (stability semantics & completion safety)
   are implemented and merged into `main`. PR‑7 remains planned for Phase‑2 resampling and
   small‑net semantics.
+
+Bundling and wave semantics for CJ ↔ LLM Provider are documented in:
+- `docs/decisions/0017-cj-assessment-wave-submission-pattern.md` (ADR‑0017: wave-based
+  submission & `preferred_bundle_size` hints).
+- `docs/operations/cj-assessment-runbook.md` and
+  `services/llm_provider_service/README.md` (serial bundling, `preferred_bundle_size`,
+  and `SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL` default 64). Future work on resampling,
+  retry semantics, or provider batch APIs should treat these documents as the
+  source of truth for the CJ↔LPS bundling contract.
 
 ## User Stories
 
@@ -271,6 +280,31 @@ semantics. This work is **merged and in production** as of 2025‑11‑29.
 - `TASKS/assessment/cj-resampling-a-b-positional-fairness.md`
 - `TASKS/assessment/cj-resampling-mode-generalization-for-all-batch-sizes.md`
 - `TASKS/assessment/cj-positional-orientation-strategy-for-coverage-and-resampling.md`
+
+---
+
+### US-005.6: BatchMonitor Separation of Concerns
+
+**As a** system maintainer
+**I want** BatchMonitor to delegate all finalization logic to BatchFinalizer
+**So that** monitoring and finalization responsibilities are cleanly separated per DDD principles.
+
+**Context**:
+The `BatchMonitor` class currently violates SRP by mixing monitoring (detecting stuck batches) with finalization (implementing a full scoring pipeline via `_trigger_scoring()`). This duplicates ~200 lines of logic already present in `BatchFinalizer.finalize_scoring()` and creates state semantics divergence (`COMPLETE_STABLE` vs `COMPLETED`).
+
+**Acceptance Criteria**:
+- [ ] `BatchMonitor._trigger_scoring()` is removed (~200 lines)
+- [ ] `_handle_stuck_batch()` delegates to `BatchFinalizer.finalize_scoring()` for progress >= 80%
+- [ ] New `COMPLETE_FORCED_RECOVERY` status distinguishes monitor-forced completions
+- [ ] Identical events are published for both callback-driven and monitor-forced paths
+- [ ] Unit tests verify BatchFinalizer delegation in monitor path
+- [ ] Integration tests confirm event parity between paths
+
+**Task**: `TASKS/assessment/batchmonitor-separation-of-concerns.md`
+**ADR**: `docs/decisions/0022-batchmonitor-separation-of-concerns.md`
+
+---
+
 ## PR-2 Completion Notes
 
 PR-2 (US‑005.1, US‑005.2, US‑005.4 foundations) wires the following
