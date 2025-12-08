@@ -154,6 +154,7 @@ class ComparisonBatchOrchestrator:
                 cj_request_type=request_data.cj_request_type or "",
                 effective_mode=effective_batching_mode,
                 iteration_metadata_context=iteration_metadata_context,
+                preferred_bundle_size=len(comparison_tasks),
             )
 
             # Propagate reasoning/verbosity overrides into request metadata so that

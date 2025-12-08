@@ -196,6 +196,7 @@ class BatchRetryProcessor:
                 settings=self.settings,
                 effective_mode=effective_batching_mode,
                 iteration_metadata_context=None,
+                preferred_bundle_size=len(retry_tasks),
             )
 
             # Preserve reasoning/verbosity hints from persisted overrides so that

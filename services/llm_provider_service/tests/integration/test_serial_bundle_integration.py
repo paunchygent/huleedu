@@ -89,7 +89,12 @@ async def test_serial_bundle_happy_path_bundles_requests_and_records_metrics() -
             provider_override=LLMProviderType.MOCK,
             model_override="mock-model-v1",
         ),
-        metadata={"cj_llm_batching_mode": "serial_bundle"},
+        metadata={
+            "cj_llm_batching_mode": "serial_bundle",
+            # Under-cap preferred bundle size hint; SerialBundleStrategy should
+            # respect this but never exceed SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL.
+            "preferred_bundle_size": 2,
+        },
     )
     first_request = QueuedRequest(
         queue_id=uuid4(),

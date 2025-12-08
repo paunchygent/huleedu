@@ -102,3 +102,22 @@ class TestBuildLLMMetadataContext:
         assert result["cj_request_type"] == "cj_comparison"
         assert result["cj_llm_batching_mode"] == LLMBatchingMode.SERIAL_BUNDLE.value
         assert result["comparison_iteration"] == 2
+
+    def test_includes_capped_preferred_bundle_size(
+        self,
+        settings_stub: Settings,
+    ) -> None:
+        """Preferred bundle size hint should be present and capped."""
+
+        # Large hint should be capped to 64 in metadata.
+        result = build_llm_metadata_context(
+            cj_batch_id=456,
+            cj_source="els",
+            cj_request_type="cj_comparison",
+            settings=settings_stub,
+            effective_mode=LLMBatchingMode.SERIAL_BUNDLE,
+            iteration_metadata_context=None,
+            preferred_bundle_size=100,
+        )
+
+        assert result["preferred_bundle_size"] == 64

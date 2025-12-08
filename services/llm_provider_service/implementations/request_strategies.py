@@ -21,6 +21,7 @@ from services.llm_provider_service.implementations.execution_result_handler impo
 from services.llm_provider_service.implementations.llm_override_utils import (
     build_override_kwargs,
     get_cj_batching_mode_hint,
+    get_preferred_bundle_size_hint,
     requests_are_compatible,
     resolve_provider_from_request,
 )
@@ -199,6 +200,16 @@ class SerialBundleStrategy(RequestExecutionStrategy):
         primary_provider = resolve_provider_from_request(first_request, self.settings)
         primary_overrides = build_override_kwargs(first_request)
         primary_hint = get_cj_batching_mode_hint(first_request)
+        preferred_bundle_size = get_preferred_bundle_size_hint(first_request)
+
+        # Respect any caller-provided preferred bundle size hint, but never
+        # exceed the configured SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL. When no
+        # hint is provided, fall back to the configured limit.
+        max_requests = self.settings.SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL
+        effective_limit = max_requests
+        if preferred_bundle_size is not None and preferred_bundle_size > 0:
+            effective_limit = min(preferred_bundle_size, max_requests)
+        effective_limit = max(1, effective_limit)
 
         self.tracing_enricher.enrich_request_metadata(
             first_request,
@@ -228,7 +239,7 @@ class SerialBundleStrategy(RequestExecutionStrategy):
         )
 
         pending_request: Optional[QueuedRequest] = None
-        while len(bundle_requests) < self.settings.SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL:
+        while len(bundle_requests) < effective_limit:
             next_request = await self.result_handler.queue_manager.dequeue()
             if not next_request:
                 break

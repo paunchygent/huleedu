@@ -61,6 +61,7 @@ class BatchingModeService:
         cj_request_type: str,
         effective_mode: LLMBatchingMode,
         iteration_metadata_context: dict[str, Any] | None,
+        preferred_bundle_size: int | None = None,
     ) -> dict[str, Any]:
         return build_llm_metadata_context(
             cj_batch_id=cj_batch_id,
@@ -69,6 +70,7 @@ class BatchingModeService:
             settings=self.settings,
             effective_mode=effective_mode,
             iteration_metadata_context=iteration_metadata_context,
+            preferred_bundle_size=preferred_bundle_size,
         )
 
     def record_metrics(

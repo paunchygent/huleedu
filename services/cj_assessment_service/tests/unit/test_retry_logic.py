@@ -489,6 +489,70 @@ class TestFailedComparisonPoolSubmitRetry:
             assert kwargs["max_tokens_override"] == max_tokens_override
             assert kwargs["system_prompt_override"] is None
 
+    @pytest.mark.asyncio
+    async def test_retry_batch_metadata_includes_capped_preferred_bundle_size(
+        self,
+        batch_retry_processor: BatchRetryProcessor,
+        sample_comparison_task: ComparisonTask,
+    ) -> None:
+        """Retry batch metadata should carry capped preferred_bundle_size hint."""
+        cj_batch_id = 123
+        correlation_id = uuid4()
+
+        # Large retry wave size that should be capped at 64 in metadata.
+        retry_tasks = [sample_comparison_task] * 80
+        submission_result = BatchSubmissionResult(
+            batch_id=cj_batch_id,
+            total_submitted=len(retry_tasks),
+            submitted_at=datetime.now(UTC),
+            all_submitted=True,
+            correlation_id=correlation_id,
+        )
+
+        with (
+            patch.object(
+                batch_retry_processor.pool_manager,
+                "form_retry_batch",
+                new_callable=AsyncMock,
+            ) as mock_form_retry,
+            patch.object(
+                batch_retry_processor.batch_submitter,
+                "submit_comparison_batch",
+                new_callable=AsyncMock,
+            ) as mock_submit,
+            patch(
+                "services.cj_assessment_service.metrics.get_business_metrics"
+            ) as mock_get_metrics,
+            patch.object(
+                batch_retry_processor,
+                "_load_processing_metadata",
+                AsyncMock(
+                    return_value={
+                        "llm_overrides": {},
+                        "original_request": {"cj_source": "els"},
+                    }
+                ),
+            ),
+        ):
+            mock_form_retry.return_value = retry_tasks
+            mock_submit.return_value = submission_result
+            mock_metric = MagicMock()
+            mock_get_metrics.return_value = {"cj_retry_batches_submitted_total": mock_metric}
+
+            # Ensure metadata hints are enabled so preferred_bundle_size is emitted.
+            batch_retry_processor.settings.ENABLE_LLM_BATCHING_METADATA_HINTS = True
+
+            result = await batch_retry_processor.submit_retry_batch(
+                cj_batch_id=cj_batch_id,
+                correlation_id=correlation_id,
+            )
+
+            assert result is not None
+            call_args = mock_submit.call_args
+            assert call_args is not None
+            metadata_context = call_args[1]["metadata_context"]
+            assert metadata_context["preferred_bundle_size"] == 64
+
 
 class TestRetryBatchSizing:
     """Test retry batch sizing logic."""

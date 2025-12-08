@@ -85,6 +85,7 @@ def build_llm_metadata_context(
     settings: Settings,
     effective_mode: LLMBatchingMode,
     iteration_metadata_context: dict[str, Any] | None,
+    preferred_bundle_size: int | None = None,
 ) -> dict[str, Any]:
     """Build metadata passed to LLM requests, ensuring checklist coverage."""
 
@@ -96,6 +97,12 @@ def build_llm_metadata_context(
 
     if settings.ENABLE_LLM_BATCHING_METADATA_HINTS:
         metadata["cj_llm_batching_mode"] = effective_mode.value
+        if preferred_bundle_size is not None and preferred_bundle_size > 0:
+            # Cap the hint to a conservative upper bound to avoid unbounded
+            # bundle growth at the provider layer while still allowing CJ to
+            # steer bundle sizing per wave.
+            capped_size = min(preferred_bundle_size, 64)
+            metadata["preferred_bundle_size"] = capped_size
 
     if iteration_metadata_context:
         metadata.update(iteration_metadata_context)

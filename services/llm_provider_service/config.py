@@ -276,7 +276,7 @@ class Settings(SecureServiceSettings):
         description="Maximum number of retries for failed requests",
     )
     SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL: int = Field(
-        default=8,
+        default=64,
         description=(
             "Upper bound on how many compatible dequeued items can be bundled into a single"
             " comparison_batch call."

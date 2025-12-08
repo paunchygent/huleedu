@@ -55,6 +55,22 @@ def get_cj_batching_mode_hint(request: QueuedRequest) -> str | None:
     return None
 
 
+def get_preferred_bundle_size_hint(request: QueuedRequest) -> int | None:
+    """Return the caller-provided preferred bundle size hint if present.
+
+    The hint is considered valid only when it is an integer within the
+    inclusive range [1, 64]; out-of-range or non-integer values are ignored.
+    """
+
+    metadata = request.request_data.metadata or {}
+    value = metadata.get("preferred_bundle_size")
+    if not isinstance(value, int):
+        return None
+    if 1 <= value <= 64:
+        return value
+    return None
+
+
 def requests_are_compatible(
     *,
     base_provider: LLMProviderType,

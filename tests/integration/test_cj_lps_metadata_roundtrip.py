@@ -97,7 +97,10 @@ class TestCJLPSMetadataRoundtrip:
         metadata_adapter = CJLLMComparisonMetadata.from_comparison_task(
             task,
             bos_batch_id="bos-roundtrip-001",
-        ).with_additional_context(cj_llm_batching_mode="per_request")
+        ).with_additional_context(
+            cj_llm_batching_mode="per_request",
+            preferred_bundle_size=8,
+        )
 
         request_metadata = metadata_adapter.to_request_metadata()
 
@@ -236,6 +239,7 @@ class TestCJLPSMetadataRoundtrip:
                                 "usage",
                                 "cache_read_input_tokens",
                                 "cache_creation_input_tokens",
+                                "preferred_bundle_size",
                             }
 
                             expected_keys = set(sent_metadata.keys()) | allowed_lps_keys
@@ -244,6 +248,11 @@ class TestCJLPSMetadataRoundtrip:
                             assert not unexpected_keys, (
                                 f"LPS added unexpected metadata keys: {unexpected_keys}"
                             )
+
+                            if "preferred_bundle_size" in req_metadata:
+                                value = req_metadata["preferred_bundle_size"]
+                                assert isinstance(value, int)
+                                assert 1 <= value <= 64
 
                             callback_received = True
                             callback_data = callback_result
