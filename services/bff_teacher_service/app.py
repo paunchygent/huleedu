@@ -1,7 +1,7 @@
-"""BFF Teacher Service - Static file serving for Vue 3 frontend.
+"""BFF Teacher Service - Static file serving and API composition for Vue 3 frontend.
 
-Minimal skeleton service that serves pre-built frontend assets.
-API composition endpoints will be added in a subsequent implementation phase.
+Serves pre-built frontend assets and provides screen-specific API endpoints
+that aggregate data from backend services.
 """
 
 from __future__ import annotations
@@ -18,6 +18,7 @@ from huleedu_service_libs.error_handling.fastapi import (
 from huleedu_service_libs.logging_utils import create_service_logger
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from services.bff_teacher_service.api.v1 import router as teacher_router_v1
 from services.bff_teacher_service.config import settings
 
 logger = create_service_logger("bff_teacher_service")
@@ -127,8 +128,12 @@ def create_app() -> FastAPI:
             return FileResponse(favicon_path, media_type="image/svg+xml")
         return JSONResponse(status_code=404, content={"detail": "Favicon not found"})
 
+    # Include API routes BEFORE SPA fallback
+    # Routes: /bff/v1/teacher/dashboard, etc.
+    app.include_router(teacher_router_v1, prefix="/bff/v1/teacher", tags=["Teacher API"])
+
     # SPA fallback - serve index.html for all unmatched routes
-    # This must be registered AFTER static mounts
+    # This must be registered AFTER API routes and static mounts
     @app.get("/{full_path:path}", include_in_schema=False)
     async def serve_spa(full_path: str) -> FileResponse | JSONResponse:  # noqa: ARG001
         """Serve SPA index.html for client-side routing."""

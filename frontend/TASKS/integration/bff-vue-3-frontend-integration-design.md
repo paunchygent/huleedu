@@ -19,19 +19,23 @@ Implementing a Backend-for-Frontend (BFF) layer will bridge the event-driven mic
 
 ## 1. BFF Service Topology and Structure
 
-Separate BFF per User Role vs Single Multi-Role: We recommend separate BFF services for each role (e.g. bff-teacher and bff-admin), rather than one combined BFF. This follows microservice principles by keeping clear domain boundaries per role[1]. Each BFF can be owned and scaled independently, which is important since teacher-facing and admin-facing needs differ (teacher BFF will handle more screens and likely more load than the admin BFF). A future student-facing BFF can be added similarly when needed.
+### Separate BFF per User Role vs Single Multi-Role
 
-Service Responsibilities:
+We recommend separate BFF services for each role (e.g. `bff-teacher` and `bff-admin`), rather than one combined BFF. This follows microservice principles by keeping clear domain boundaries per role[1]. Each BFF can be owned and scaled independently, which is important since teacher-facing and admin-facing needs differ (teacher BFF will handle more screens and likely more load than the admin BFF). A future student-facing BFF can be added similarly when needed.
+
+### Service Responsibilities
 
 - **bff-teacher**: Handles teacher UI needs (initially 4 screens: class dashboard, batch detail, essay feedback, student associations). It will compose data from services like Class Management (CMS), Result Aggregator (RAS), File/Content services, Identity, etc., focusing on what a teacher needs to see.
 - **bff-admin**: Handles admin UI needs (initially 2 screens: user approval queue and system settings). It will interface with Identity service for account approvals and a new Config service for settings once that exists.
 
+### Code Structure
+
 By separating these, each BFF stays small and focused. The code structure for each will mirror our existing service pattern:
 
-- A lightweight FastAPI app (app.py) with common middlewares (CORS, auth, tracing)
-- Routes under a clear prefix [e.g. /v1/teacher/* in teacher routes module](5)
+- A lightweight FastAPI app (`app.py`) with common middlewares (CORS, auth, tracing)
+- Routes under a clear prefix [e.g. `/v1/teacher/*` in teacher routes module](5)
 - DTO models for responses (discussed below)
-- HTTP client modules for calling backend microservices (e.g. clients/cms_client.py, ras_client.py)
+- HTTP client modules for calling backend microservices (e.g. `clients/cms_client.py`, `ras_client.py`)
 - Optionally, a streaming component (e.g. Kafka/Redis listener) for pushing events (for real-time updates)
 
 ### API Gateway Integration
@@ -43,64 +47,101 @@ The existing API Gateway will route external requests to the appropriate BFF:
 
 This gateway mapping will be configured so that clients still have one entry point. The gateway also continues to handle cross-cutting concerns (JWT validation, rate limiting, CORS) before requests reach the BFF. In Docker Compose, we'll add the BFF services (each on its own internal port) and update the gateway's routing config to point to them. For example, bff-teacher might run on an internal URL like `http://bff_teacher_service:8000` with gateway forwarding requests accordingly.
 
+### Environment Configuration
+
 Each BFF will have its own environment configuration (set in Compose/Env files):
 
 - URLs for downstream services it needs [e.g. `CMS_BASE_URL`, `RAS_BASE_URL`, etc.](8)
 - Possibly an internal API key or token to authenticate itself to internal services. For instance, RAS's internal endpoints might require an `X-API-Key` header that the BFF provides. This ensures only authorized internal clients (like our BFFs) can call internal APIs.
 
-Why not a single BFF? A combined BFF would mix teacher and admin logic, which complicates ownership and could introduce security risks (we'd need to carefully separate role-based access within one codebase). Separate services keep things cleaner: e.g. the teacher BFF can be deployed or updated independently of the admin BFF, and each can have its own scaling policy [teacher BFF might need more replicas if it's heavily used](1).
+### Why Not a Single BFF?
+
+A combined BFF would mix teacher and admin logic, which complicates ownership and could introduce security risks (we'd need to carefully separate role-based access within one codebase). Separate services keep things cleaner: e.g. the teacher BFF can be deployed or updated independently of the admin BFF, and each can have its own scaling policy [teacher BFF might need more replicas if it's heavily used](1).
 
 ## 2. Screen-Specific DTO Contract Design
 
 Each frontend screen will communicate with the backend via a dedicated BFF endpoint that returns a screen-specific DTO (Data Transfer Object). Designing these DTOs is crucial, as they form the contract between the BFF and the Vue frontend.
 
-Identifying Screen DTOs: For the Teacher role, we have four main screens and thus four read-model DTOs to define:
+### Teacher Role DTOs
 
-- **Class Dashboard DTO** – e.g. TeacherClassDashboardV1: Aggregated overview of all class batches for the teacher. Likely includes a list of batch summaries (batch ID, class, status, progress metrics, etc.) possibly grouped by class. Data sources: needs input from RAS (to get batch statuses for that teacher) and CMS [to list classes or attach class names](10).
-- **Batch Detail DTO** – e.g. TeacherBatchDetailV1: Detailed info for a specific batch. Contains batch metadata and the status of each essay in that batch [e.g. essay IDs, filenames, processing status, scores, etc.](11). Data sources: primarily RAS (which can provide a batch status with embedded essay statuses), plus possibly File Service for any file-specific info. We will compose these into one JSON for the frontend.
-- **Essay Feedback DTO** – e.g. TeacherEssayFeedbackV1: Data needed to render the essay grading/feedback screen. This likely overlaps with batch detail (one essay's details), but could include additional fields like the full essay text or AI feedback details. Data sources: could be retrieved by filtering the batch detail data for one essay, though ideally we add a direct endpoint. [We may extend RAS with GET /essays/{id} so the BFF doesn't have to fetch the whole batch just for one essay](12).
-- **Student Associations DTO** – e.g. StudentAssociationListV1: Data for the "student-class associations" management screen, showing which students are associated with a batch and class, etc. Data source: the Class Management Service (CMS) already provides endpoints for getting and confirming associations. The BFF will basically proxy or slightly transform those into the shape needed by the UI. There may also be a corresponding request DTO [e.g. AssociationConfirmRequestV1 for posting an association confirmation](13).
+For the Teacher role, we have four main screens and thus four read-model DTOs to define:
+
+- **Class Dashboard DTO** – e.g. `TeacherClassDashboardV1`: Aggregated overview of all class batches for the teacher. Likely includes a list of batch summaries (batch ID, class, status, progress metrics, etc.) possibly grouped by class. Data sources: needs input from RAS (to get batch statuses for that teacher) and CMS [to list classes or attach class names](10).
+- **Batch Detail DTO** – e.g. `TeacherBatchDetailV1`: Detailed info for a specific batch. Contains batch metadata and the status of each essay in that batch [e.g. essay IDs, filenames, processing status, scores, etc.](11). Data sources: primarily RAS (which can provide a batch status with embedded essay statuses), plus possibly File Service for any file-specific info. We will compose these into one JSON for the frontend.
+- **Essay Feedback DTO** – e.g. `TeacherEssayFeedbackV1`: Data needed to render the essay grading/feedback screen. This likely overlaps with batch detail (one essay's details), but could include additional fields like the full essay text or AI feedback details. Data sources: could be retrieved by filtering the batch detail data for one essay, though ideally we add a direct endpoint. [We may extend RAS with GET `/essays/{id}` so the BFF doesn't have to fetch the whole batch just for one essay](12).
+- **Student Associations DTO** – e.g. `StudentAssociationListV1`: Data for the "student-class associations" management screen, showing which students are associated with a batch and class, etc. Data source: the Class Management Service (CMS) already provides endpoints for getting and confirming associations. The BFF will basically proxy or slightly transform those into the shape needed by the UI. There may also be a corresponding request DTO [e.g. `AssociationConfirmRequestV1` for posting an association confirmation](13).
+
+### Admin Role DTOs
 
 For the Admin role, initial screens and DTOs include:
 
-- **Pending Users DTO** – list of users awaiting approval (e.g. AdminPendingUsersV1), containing user info and any metadata needed for the admin to decide. Source: Identity Service [we need to implement endpoints like /users/pending and approval actions, as these are missing](14).
-- **System Settings DTO** – e.g. AdminSettingsV1, representing configurable system settings. Source: a new Config Service (to be created) or similar source.
+- **Pending Users DTO** – list of users awaiting approval (e.g. `AdminPendingUsersV1`), containing user info and any metadata needed for the admin to decide. Source: Identity Service [we need to implement endpoints like `/users/pending` and approval actions, as these are missing](14).
+- **System Settings DTO** – e.g. `AdminSettingsV1`, representing configurable system settings. Source: a new Config Service (to be created) or similar source.
 
-DTO Definition and Ownership: We will define these DTOs within their respective BFF service codebases. Each BFF will have a dto/ module, e.g. services/bff_teacher_service/dto/teacher_v1.py, containing Pydantic models for that BFF’s responses. By co-locating DTO models in the BFF, we ensure each BFF is the single source of truth for its API contract (no ambiguous shared models that could be used incorrectly elsewhere). This also makes versioning straightforward: the BFF can evolve its DTOs independently. For example, TeacherBatchDetailV1 is defined in bff-teacher – if we later need to change it in a backward-incompatible way, we could introduce TeacherBatchDetailV2 in the same BFF without affecting the admin BFF.
+### DTO Definition and Ownership
 
-Versioning Strategy: We will use semantic versioning in both the URL and model names:
+We will define these DTOs within their respective BFF service codebases. Each BFF will have a `dto/` module, e.g. `services/bff_teacher_service/dto/teacher_v1.py`, containing Pydantic models for that BFF's responses. By co-locating DTO models in the BFF, we ensure each BFF is the single source of truth for its API contract (no ambiguous shared models that could be used incorrectly elsewhere). This also makes versioning straightforward: the BFF can evolve its DTOs independently. For example, `TeacherBatchDetailV1` is defined in bff-teacher – if we later need to change it in a backward-incompatible way, we could introduce `TeacherBatchDetailV2` in the same BFF without affecting the admin BFF.
 
-- The API routes themselves include a version (e.g. /bff/v1/teacher/...). This v1 in the path signals the version of the contract. Any breaking change to the contract would entail bumping this to v2 and maintaining the old v1 endpoints for backward compatibility if needed.
-- The Pydantic model classes will carry version suffixes [e.g. ...DashboardV1](17). This makes it clear which version of the response is being used in code, and allows parallel support of v1 and v2 if we ever had to (for example, if the frontend and BFF are deployed independently).
-- Non-breaking additions (like adding an optional field) can be done within v1 without changes to the URL, as JSON clients will ignore unknown fields. Breaking changes (removing or renaming fields, changing semantics) trigger a new version.
+### Versioning Strategy
 
-OpenAPI and TypeScript Integration: Once we implement these endpoints and DTOs in FastAPI, they will be automatically documented via OpenAPI. We already have a pipeline to generate TypeScript types from OpenAPI specs – this will include the new BFF DTO models (just as it currently includes our existing domain service models). Therefore, the Vue 3 frontend will get strongly-typed interfaces for each BFF response for free. This is a big win for developer productivity and catching integration issues early.
+We will use semantic versioning in both the URL and model names:
 
-Composition Depth (Calls per Endpoint): Each BFF endpoint will aggregate data from one or more backend services. We should design the DTOs to include exactly the data each screen needs – no more, no less – even if that means the BFF must call multiple services:
+- The API routes themselves include a version (e.g. `/bff/v1/teacher/...`). This `v1` in the path signals the version of the contract. Any breaking change to the contract would entail bumping this to `v2` and maintaining the old `v1` endpoints for backward compatibility if needed.
+- The Pydantic model classes will carry version suffixes [e.g. `...DashboardV1`](17). This makes it clear which version of the response is being used in code, and allows parallel support of `v1` and `v2` if we ever had to (for example, if the frontend and BFF are deployed independently).
+- Non-breaking additions (like adding an optional field) can be done within `v1` without changes to the URL, as JSON clients will ignore unknown fields. Breaking changes (removing or renaming fields, changing semantics) trigger a new version.
 
-- Our goal is to minimize the number of calls per request (both for performance and simplicity). Ideally, some screens can be served with a single call to a specialized backend aggregator. For instance, to build the Teacher Dashboard DTO, we might call a RAS endpoint like GET /internal/v1/batches/user/{user_id} which returns all batch statuses for that teacher. If we also need class names from CMS, that could be a second call to GET /v1/classes (filtered by teacher) and then we join the data.
-- Where possible, leverage the Result Aggregator Service (RAS) as it's meant to provide query-optimized, aggregated data. The BFF should act mostly as a thin composition layer. E.g. for batch detail: RAS already gives a batch status with all essay statuses, so bff-teacher can mostly forward that (perhaps adding a bit of formatting or additional fields) rather than querying each domain service for essays. If RAS lacks an endpoint we need (like fetching a single essay’s details), we have two choices: either call a broader endpoint and filter in the BFF, or extend RAS. In fact, adding an RAS endpoint (e.g. GET /internal/v1/essays/{id}) to avoid over-fetching an entire batch was noted as a desirable enhancement.
-- Parallel calls: In cases where multiple sources are needed, the BFF can perform calls in parallel (since it’s I/O-bound). Using httpx.AsyncClient, for example, we can concurrently fetch data from CMS and RAS, then combine. This keeps latency closer to the slowest single call rather than sum of all.
+### OpenAPI and TypeScript Integration
 
-- Each BFF route will include the composition logic, but we should keep it clean. For clarity, consider offloading some logic to the client wrappers. For example, a method RASClient.get_batches_for_user(user_id) encapsulates calling RAS and returning a structured result, and CMSClient.get_classes_for_user(user_id) calls CMS. The route handler then just orchestrates these and maps into the DTO.
+Once we implement these endpoints and DTOs in FastAPI, they will be automatically documented via OpenAPI. We already have a pipeline to generate TypeScript types from OpenAPI specs – this will include the new BFF DTO models (just as it currently includes our existing domain service models). Therefore, the Vue 3 frontend will get strongly-typed interfaces for each BFF response for free. This is a big win for developer productivity and catching integration issues early.
 
-Example – Teacher Batch Detail Composition: The GET /v1/teacher/batches/{batch_id} endpoint in bff-teacher might: 1. Call RAS: /internal/v1/batches/{batch_id}/status to get overall batch info and essay list [if RAS provides essay details](19). 2. Possibly call File or Content service if we need extra info like file download links or full text for an essay (depending on UI needs). 3. Merge results into a TeacherBatchDetailV1 object and return. That DTO would include fields like batch_id, overall_status, created_at, last_updated, requested_pipeline (from RAS) and an array of essays each with their id, filename, and status details [spellcheck status, score, etc.](20).
+### Composition Depth (Calls per Endpoint)
 
-Frontend State Integration: We design DTOs to be convenient for the Vue frontend. That means structuring data in a way that mirrors the UI components’ needs to minimize transformation on the client. For example, the Teacher Dashboard DTO might return an array of batch summaries already sorted/grouped as the UI needs, rather than making the frontend assemble that. We will document these contracts clearly so frontend can use them directly.
-On the frontend:
+Each BFF endpoint will aggregate data from one or more backend services. We should design the DTOs to include exactly the data each screen needs – no more, no less – even if that means the BFF must call multiple services:
 
-- Use TanStack Query (via Vue Query) to fetch these BFF endpoints. Each screen’s component (or a corresponding composable) will call the appropriate endpoint and get a typed DTO object. Because the DTOs are tailored, the component can directly bind to fields (e.g. iterate over dashboard.batches list, show batch.status etc.).
-- The Pinia store isn’t needed to hold these screen-specific lists long-term (Query will cache them), but Pinia can hold global state and context. For example, Pinia can keep the current user’s info (role, id, etc.) and perhaps some UI state, while Query manages server data state. Pinia could also manage something like a WebSocket connection (more on that in section 4).
-- One integration consideration: if our DTOs have certain computed fields or need client-side augmentation, we might ship minimal raw data and let the front-end compute some things. But since we control both sides, it's often simpler to compute everything server-side. The BFF can use common libraries or logic from common_core to populate fields. For instance, mapping internal status codes to human-readable statuses is already done in API Gateway for consistency[21];   BFF can follow the same patterns so the frontend gets user-friendly values.
+- Our goal is to minimize the number of calls per request (both for performance and simplicity). Ideally, some screens can be served with a single call to a specialized backend aggregator. For instance, to build the Teacher Dashboard DTO, we might call a RAS endpoint like `GET /internal/v1/batches/user/{user_id}` which returns all batch statuses for that teacher. If we also need class names from CMS, that could be a second call to `GET /v1/classes` (filtered by teacher) and then we join the data.
+- Where possible, leverage the Result Aggregator Service (RAS) as it's meant to provide query-optimized, aggregated data. The BFF should act mostly as a thin composition layer. E.g. for batch detail: RAS already gives a batch status with all essay statuses, so bff-teacher can mostly forward that (perhaps adding a bit of formatting or additional fields) rather than querying each domain service for essays. If RAS lacks an endpoint we need (like fetching a single essay's details), we have two choices: either call a broader endpoint and filter in the BFF, or extend RAS. In fact, adding an RAS endpoint (e.g. `GET /internal/v1/essays/{id}`) to avoid over-fetching an entire batch was noted as a desirable enhancement.
+- Parallel calls: In cases where multiple sources are needed, the BFF can perform calls in parallel (since it's I/O-bound). Using `httpx.AsyncClient`, for example, we can concurrently fetch data from CMS and RAS, then combine. This keeps latency closer to the slowest single call rather than sum of all.
 
-DTO Versioning and Evolution: We will treat the BFF-to-frontend DTOs as versioned APIs. As noted, any breaking change (like changing a field name) will result in a new version path (/v2/...) and model class. This provides stability for the frontend. In practice, since our frontend and BFF are developed in tandem for this project, we may upgrade both together; but maintaining the discipline of versioning ensures future clients (or even third-party consumers if any) won’t be surprised by silent changes. We will also create contract tests to validate that the DTOs conform to expectations [for example, using example payloads](23), and possibly write OpenAPI-based tests to ensure the TS types match the Python models.
+### Code Organization
+
+Each BFF route will include the composition logic, but we should keep it clean. For clarity, consider offloading some logic to the client wrappers. For example, a method `RASClient.get_batches_for_user(user_id)` encapsulates calling RAS and returning a structured result, and `CMSClient.get_classes_for_user(user_id)` calls CMS. The route handler then just orchestrates these and maps into the DTO.
+
+### Example: Teacher Batch Detail Composition
+
+The `GET /v1/teacher/batches/{batch_id}` endpoint in bff-teacher might:
+
+1. Call RAS: `/internal/v1/batches/{batch_id}/status` to get overall batch info and essay list [if RAS provides essay details](19).
+2. Possibly call File or Content service if we need extra info like file download links or full text for an essay (depending on UI needs).
+
+That DTO would include fields like `batch_id`, `overall_status`, `created_at`, `last_updated`, `requested_pipeline` (from RAS) and an array of essays each with their `id`, `filename`, and status details [spellcheck status, score, etc.](20).
+
+### Frontend State Integration
+
+We design DTOs to be convenient for the Vue frontend. That means structuring data in a way that mirrors the UI components' needs to minimize transformation on the client. For example, the Teacher Dashboard DTO might return an array of batch summaries already sorted/grouped as the UI needs, rather than making the frontend assemble that. We will document these contracts clearly so frontend can use them directly.
+
+#### On the frontend
+
+- Use TanStack Query (via Vue Query) to fetch these BFF endpoints. Each screen's component (or a corresponding composable) will call the appropriate endpoint and get a typed DTO object. Because the DTOs are tailored, the component can directly bind to fields (e.g. iterate over `dashboard.batches` list, show `batch.status` etc.).
+- The Pinia store isn't needed to hold these screen-specific lists long-term (Query will cache them), but Pinia can hold global state and context. For example, Pinia can keep the current user's info (role, id, etc.) and perhaps some UI state, while Query manages server data state. Pinia could also manage something like a WebSocket connection (more on that in section 4).
+- One integration consideration: if our DTOs have certain computed fields or need client-side augmentation, we might ship minimal raw data and let the front-end compute some things. But since we control both sides, it's often simpler to compute everything server-side. The BFF can use common libraries or logic from common_core to populate fields. For instance, mapping internal status codes to human-readable statuses is already done in API Gateway for consistency[21]; BFF can follow the same patterns so the frontend gets user-friendly values.
+
+### DTO Versioning and Evolution
+
+We will treat the BFF-to-frontend DTOs as versioned APIs. As noted, any breaking change (like changing a field name) will result in a new version path (`/v2/...`) and model class. This provides stability for the frontend. In practice, since our frontend and BFF are developed in tandem for this project, we may upgrade both together; but maintaining the discipline of versioning ensures future clients (or even third-party consumers if any) won't be surprised by silent changes. We will also create contract tests to validate that the DTOs conform to expectations [for example, using example payloads](23), and possibly write OpenAPI-based tests to ensure the TS types match the Python models.
 
 ## 3. Backend-to-BFF Communication Patterns
 
 This section covers how the BFF services will interact with the existing backend services, including how requests flow, how we handle auth, and error mapping.
-Request Flow via API Gateway: In production, the client will call the API Gateway, which then routes to the BFF. The gateway already runs on port 4001 and performs JWT authentication and rate limiting. We’ll extend it to forward /bff/v1/... paths to the BFFs (likely via environment config or a routing table). From the client’s perspective, calling GET /bff/v1/teacher/dashboard (for example) is just like any other API call. The gateway will validate the JWT, attach any necessary headers (like correlation IDs), then proxy the request to the teacher BFF service. The response flows back through the gateway (unchanged) to the client.
-Note: In dev environments, we may allow the Vue app to call BFF directly (bypassing gateway) for simplicity, but then the BFF must handle CORS and JWT verification itself. This is doable (FastAPI + our libs can validate tokens), but using the gateway even in dev might be simpler if CORS is configured (the gateway’s CORS config can include the Vue dev server origins[26]). Either approach works, but the production pattern is always through the gateway.
-Internal Service Calls (BFF -> Microservices): Once a request reaches the BFF, it will typically need to call one or more internal services (CMS, RAS, Identity, etc.) to gather data:
+
+### Request Flow via API Gateway
+
+In production, the client will call the API Gateway, which then routes to the BFF. The gateway already runs on port 4001 and performs JWT authentication and rate limiting. We'll extend it to forward `/bff/v1/...` paths to the BFFs (likely via environment config or a routing table). From the client's perspective, calling `GET /bff/v1/teacher/dashboard` (for example) is just like any other API call. The gateway will validate the JWT, attach any necessary headers (like correlation IDs), then proxy the request to the teacher BFF service. The response flows back through the gateway (unchanged) to the client.
+
+**Dev Environment Note**: In dev environments, we may allow the Vue app to call BFF directly (bypassing gateway) for simplicity, but then the BFF must handle CORS and JWT verification itself. This is doable (FastAPI + our libs can validate tokens), but using the gateway even in dev might be simpler if CORS is configured (the gateway's CORS config can include the Vue dev server origins[26]). Either approach works, but the production pattern is always through the gateway.
+
+### Internal Service Calls (BFF -> Microservices)
+
+Once a request reaches the BFF, it will typically need to call one or more internal services (CMS, RAS, Identity, etc.) to gather data:
 
 - The BFF will use internal HTTP client libraries (we have some in libs/huleedu_service_libs and libs/common_core) or simple httpx calls. We'll configure base URLs for each downstream service (e.g. environment variables like CMS_SERVICE_URL, RAS_SERVICE_URL) so the BFF knows where to send requests.
 - Authentication/Authorization on Internal Calls: Our internal services are generally not exposed publicly and expect requests either from the gateway or other services. There are a few patterns:
@@ -267,16 +308,18 @@ In summary, the caching strategy is to use short-lived caches to absorb transien
 Additional Vue Integration Notes
 While not part of the BFF architecture per se, aligning on frontend patterns will ensure a smooth end-to-end implementation:
 • State Management Choices: We confirm the plan to use Pinia and TanStack Vue Query together:
-• Use Pinia for global application state – e.g. current user info, auth token (if not in cookie), UI preferences, and possibly to manage the WebSocket connection status as discussed. Pinia is great for reactive global stores and is much simpler than Vuex was.
-• Use Vue Query for server-derived state – all data that comes from APIs (our BFF endpoints). This library will handle caching, loading states, and syncing with devtools, etc. This separation means we don't manually manage loading/error for every API call; we leverage Query's hooks.
-• Pinia and Query can work together: e.g., the auth Pinia store could provide the JWT token that Query uses in its fetcher for authenticated calls. And Query's results can be fed into Pinia if we want to store some of it globally (though generally we can keep it in components).
-• Composition API & Code Organization: We will use the Vue 3 Composition API throughout, as it's recommended for TypeScript and code reuse. Instead of large option-api components, we'll factor logic into composables (in src/composables/ or alongside feature components):
-• e.g., a useTeacherDashboardData() composable might internally use useQuery(['teacherDashboard'], fetchDashboard) to get data and return { data, error, isLoading } to the component. This keeps the component code clean.
-• Similarly, useBatchDetail(batchId) uses a query to fetch that batch’s detail.
-• WebSocket integration can be a composable or part of a global Pinia store as described.
-• This approach mirrors the modular backend (each BFF endpoint has a corresponding front-end hook).
-• Project Structure: We favor a feature-based structure for front-end files. For instance:
-    src/
+- Use Pinia for global application state – e.g. current user info, auth token (if not in cookie), UI preferences, and possibly to manage the WebSocket connection status as discussed. Pinia is great for reactive global stores and is much simpler than Vuex was.
+- Use Vue Query for server-derived state – all data that comes from APIs (our BFF endpoints). This library will handle caching, loading states, and syncing with devtools, etc. This separation means we don't manually manage loading/error for every API call; we leverage Query's hooks.
+- Pinia and Query can work together: e.g., the auth Pinia store could provide the JWT token that Query uses in its fetcher for authenticated calls. And Query's results can be fed into Pinia if we want to store some of it globally (though generally we can keep it in components).
+- Composition API & Code Organization: We will use the Vue 3 Composition API throughout, as it's recommended for TypeScript and code reuse. Instead of large option-api components, we'll factor logic into composables (in src/composables/ or alongside feature components):
+  - e.g., a useTeacherDashboardData() composable might internally use useQuery(['teacherDashboard'], fetchDashboard) to get data and return { data, error, isLoading } to the component. This keeps the component code clean.
+  - Similarly, useBatchDetail(batchId) uses a query to fetch that batch's detail.
+  - WebSocket integration can be a composable or part of a global Pinia store as described.
+  - This approach mirrors the modular backend (each BFF endpoint has a corresponding front-end hook).
+- Project Structure: We favor a feature-based structure for front-end files. For instance:
+
+  ``` text  
+  src/
   modules/
     teacher/
       DashboardView.vue
@@ -288,29 +331,42 @@ While not part of the BFF architecture per se, aligning on frontend patterns wil
       PendingUsersView.vue
       usePendingUsers.ts
       ...
-  store/
-    auth.ts
-    websocket.ts (if using Pinia for WS)
-  App.vue, main.ts, etc.
-    Grouping by feature (teacher vs admin, or even specific screens) makes it easier to develop and maintain, as each feature might have its own routes, state, and composables. It also aligns with our backend separation (we can have separate sections in docs or code for teacher vs admin features).
-• Example Frontend Workflow: Once the BFF’s OpenAPI is published, the frontend team will generate TS types. They create a Pinia store for auth, and perhaps a plugin to inject an axios or fetch wrapper that attaches the JWT token. They set up Vue Query's client. For a Teacher Dashboard page, they use our TeacherClassDashboardV1 type from the types file and write:
-    const { data: dashboard, error, isLoading } = useQuery(['teacherDashboard'], () =>
-  fetch('/bff/v1/teacher/dashboard').then(res => res.json())
-);
-    The UI can then bind dashboard.value.batches to render a list. When the WebSocket pushes an update, we handle it by updating this cache as discussed.
-• Pinia for UI State: Pinia might hold things like a loading spinner state or selected items, but those are minor. It can also hold a small number of persistent notifications or modals, etc., which is outside our scope here.
-• Authentication Flow: It’s worth noting the JWT auth flow remains standard – the user logs in (likely via the Identity service through the gateway), gets a token, and the frontend stores it (likely in memory or localStorage for dev, and using secure cookies in production as mentioned in integration guide). The BFF uses that JWT for identifying the user (via gateway). Nothing special needed here beyond what’s done.
+  ```
+
+Grouping by feature (teacher vs admin, or even specific screens) makes it easier to develop and maintain, as each feature might have its own routes, state, and composables. It also aligns with our backend separation (we can have separate sections in docs or code for teacher vs admin features).
+
+- Example Frontend Workflow: Once the BFF's OpenAPI is published, the frontend team will generate TS types. They create a Pinia store for auth, and perhaps a plugin to inject an axios or fetch wrapper that attaches the JWT token. They set up Vue Query's client. For a Teacher Dashboard page, they use our TeacherClassDashboardV1 type from the types file and write:
+
+  ```typescript
+  const { data: dashboard, error, isLoading } = useQuery(['teacherDashboard'], () =>
+    fetch('/bff/v1/teacher/dashboard').then(res => res.json())
+  );
+  ```
+
+  The UI can then bind `dashboard.value.batches` to render a list. When the WebSocket pushes an update, we handle it by updating this cache as discussed.
+
+- **Pinia for UI State**: Pinia might hold things like a loading spinner state or selected items, but those are minor. It can also hold a small number of persistent notifications or modals, etc., which is outside our scope here.
+- **Authentication Flow**: It's worth noting the JWT auth flow remains standard – the user logs in (likely via the Identity service through the gateway), gets a token, and the frontend stores it (likely in memory or localStorage for dev, and using secure cookies in production as mentioned in integration guide). The BFF uses that JWT for identifying the user (via gateway). Nothing special needed here beyond what's done.
+
 By establishing these patterns, both backend and frontend teams have a clear contract and roadmap. To recap the benefits:
+
 - Each role-focused BFF cleanly encapsulates business logic for that UI, simplifying both ends of development[1].
-- Screen-specific DTOs mean the frontend doesn’t have to stitch data from multiple endpoints, and changes to data needs are easy to track [one DTO per screen](23).
+- Screen-specific DTOs mean the frontend doesn't have to stitch data from multiple endpoints, and changes to data needs are easy to track [one DTO per screen](23).
 - The API gateway and auth infrastructure ensure security and consistency across all calls [no bypassing authentication, uniform error handling](31).
 - Real-time via WebSockets provides a responsive UX, and our design of diff-based events plus cache invalidation strikes a balance between immediacy and correctness.
 - Caching strategies at multiple layers will improve performance while minimizing stale data risk.
 - Using modern Vue 3 patterns (Composition API, Pinia, Vue Query) will make the frontend highly maintainable and scalable, which complements the scalable backend architecture.
+
+## Next Steps
+
 This design, once approved, unblocks the next steps:
-- Backend team: Can start implementing the Teacher BFF service (skeleton, endpoints, integration with existing services) as outlined in the plan, followed by Admin BFF once teacher flows are validated.
-- Frontend team: Can proceed setting up the Vue 3 project structure with Pinia and Query, and begin building pages using the agreed DTO contracts (even using mock data until the BFF is live, since we have the OpenAPI and can create sample JSON). They now know how state will be managed and how real-time updates will come in.
-- DevOps: Will add the new BFF services to Docker Compose and adjust API Gateway config to route /bff/v1/teacher and /bff/v1/admin prefixes to the correct containers. Also ensure the WebSocket service CORS and origins include the new frontend origin [already handled in dev config for Vite](26), and that appropriate environment variables (service URLs, API keys, JWT secret references) are set for the BFF containers.
+
+- **Backend team**: Can start implementing the Teacher BFF service (skeleton, endpoints, integration with existing services) as outlined in the plan, followed by Admin BFF once teacher flows are validated.
+- **Frontend team**: Can proceed setting up the Vue 3 project structure with Pinia and Query, and begin building pages using the agreed DTO contracts (even using mock data until the BFF is live, since we have the OpenAPI and can create sample JSON). They now know how state will be managed and how real-time updates will come in.
+- **DevOps**: Will add the new BFF services to Docker Compose and adjust API Gateway config to route `/bff/v1/teacher` and `/bff/v1/admin` prefixes to the correct containers. Also ensure the WebSocket service CORS and origins include the new frontend origin [already handled in dev config for Vite](26), and that appropriate environment variables (service URLs, API keys, JWT secret references) are set for the BFF containers.
+
+## Conclusion
+
 By adhering to this architecture, we create a clear Backend-for-Frontend layer that cleanly separates frontend-specific needs from the core microservices, accelerating development and reducing complexity on both sides. The design is flexible enough to accommodate future features (e.g., adding a Student BFF later, or expanding teacher/admin functionality) without breaking existing contracts.
 
 [1]                              bff-pattern-adoption-and-rollout-plan.md

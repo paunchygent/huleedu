@@ -2,7 +2,7 @@
 id: bff-service-implementation-plan
 title: BFF-Teacher Service Implementation Plan
 type: task
-status: research
+status: active
 priority: high
 domain: integration
 service: bff_teacher_service
@@ -10,9 +10,37 @@ owner_team: frontend
 owner: ""
 program: ""
 created: 2025-11-24
-last_updated: 2025-11-24
+last_updated: 2025-12-08
 related: []
 labels: []
+---
+
+## Progress Update (2025-12-08)
+
+### Completed: API Gateway → BFF Routing + Scaffolding
+
+**Gateway changes:**
+- Added `BFF_TEACHER_URL` to `services/api_gateway_service/config.py`
+- Created `services/api_gateway_service/routers/bff_teacher_routes.py` (proxy pattern)
+- Registered router in `app/main.py` with prefix `/bff/v1/teacher`
+- Added `BFF_TEACHER_SERVICE_URL` env var to `docker-compose.services.yml`
+- Added `bff_teacher_service` to gateway's `depends_on`
+
+**BFF service changes:**
+- Created `services/bff_teacher_service/api/v1/teacher_routes.py` (stub dashboard endpoint)
+- Created `services/bff_teacher_service/dto/teacher_v1.py` (stub DTOs)
+- Created `services/bff_teacher_service/clients/__init__.py` (scaffold)
+- Updated `app.py` to include API router before SPA fallback
+- Updated `config.py` CORS methods for full API support
+
+**Validation:**
+- `pdm run typecheck-all` passes
+- `pdm run lint-fix --unsafe-fixes` passes
+
+### Next Phase: Teacher Dashboard Screen Implementation
+
+See next session instruction in `frontend/.claude/work/session/handoff.md`
+
 ---
  
  BFF-Teacher Service Implementation Plan
@@ -53,24 +81,24 @@ labels: []
  ├── config.py                       # Settings (Pydantic BaseSettings)
  ├── di.py                           # Dishka DI container setup
  ├── dto/
- │   ├── __init__.py
+ │   ├── **init**.py
  │   └── teacher_v1.py              # Screen-specific DTOs
  ├── api/
- │   ├── __init__.py
+ │   ├── **init**.py
  │   ├── v1/
- │   │   ├── __init__.py
+ │   │   ├── **init**.py
  │   │   ├── dashboard.py           # GET /v1/teacher/dashboard
  │   │   ├── batch_detail.py        # GET /v1/teacher/batches/{batch_id}
  │   │   ├── essay_feedback.py      # GET /v1/teacher/batches/{batch_id}/essays/{essay_id}
  │   │   └── associations.py        # GET /v1/teacher/batches/{batch_id}/associations
  ├── clients/
- │   ├── __init__.py
+ │   ├── **init**.py
  │   ├── ras_client.py              # Result Aggregator Service client
  │   ├── cms_client.py              # Class Management Service client
  │   ├── file_client.py             # File Service client
  │   └── content_client.py          # Content Service client
  ├── streaming/
- │   ├── __init__.py
+ │   ├── **init**.py
  │   ├── event_publisher.py         # Redis pub/sub for WebSocket
  │   └── kafka_listener.py          # Optional: listen to domain events
  ├── protocols.py                    # Protocol definitions for DI
@@ -95,7 +123,7 @@ labels: []
  1.1 Create Service Directory Structure
 
  - Create services/bff_teacher_service/ with subdirectories
- - Initialize __init__.py files
+ - Initialize **init**.py files
  - Create README.md with service overview
 
  1.2 Configuration (config.py)
@@ -343,7 +371,7 @@ labels: []
  from typing import Any
 
  class RASClient:
-     def __init__(self, base_url: str, client: httpx.AsyncClient, api_key: str):
+     def **init**(self, base_url: str, client: httpx.AsyncClient, api_key: str):
          self.base_url = base_url
          self.client = client
          self.api_key = api_key
@@ -379,7 +407,7 @@ labels: []
  3.3 CMS Client (clients/cms_client.py)
 
  class CMSClient:
-     def __init__(self, base_url: str, client: httpx.AsyncClient):
+     def **init**(self, base_url: str, client: httpx.AsyncClient):
          self.base_url = base_url
          self.client = client
 
@@ -632,7 +660,7 @@ labels: []
  from huleedu_service_libs.redis_pubsub import RedisPubSub
 
  class EventPublisher:
-     def __init__(self, redis_client: aioredis.Redis, client_id: str = "bff_teacher_service"):
+     def **init**(self, redis_client: aioredis.Redis, client_id: str = "bff_teacher_service"):
          # Use shared RedisPubSub helper to ensure async, standardized channel naming
          self._pubsub = RedisPubSub(client=redis_client, client_id=client_id)
 

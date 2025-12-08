@@ -101,6 +101,11 @@ class Settings(SecureServiceSettings, JWTValidationSettings):
         description="Batch Orchestrator Service internal base URL",
         validation_alias=AliasChoices("API_GATEWAY_BOS_URL", "BATCH_ORCHESTRATOR_SERVICE_URL"),
     )
+    BFF_TEACHER_URL: str = Field(
+        default="http://bff_teacher_service:4101",
+        description="BFF Teacher Service base URL",
+        validation_alias=AliasChoices("API_GATEWAY_BFF_TEACHER_URL", "BFF_TEACHER_SERVICE_URL"),
+    )
 
     # Redis configuration
     REDIS_URL: str = Field(

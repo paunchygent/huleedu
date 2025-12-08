@@ -56,8 +56,8 @@ class BFFTeacherSettings(SecureServiceSettings):
         default=True, description="Allow credentials in CORS requests"
     )
     CORS_ALLOW_METHODS: list[str] = Field(
-        default=["GET", "OPTIONS"],
-        description="Allowed HTTP methods for CORS (static serving only)",
+        default=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        description="Allowed HTTP methods for CORS (static serving and API composition)",
     )
     CORS_ALLOW_HEADERS: list[str] = Field(
         default=["*"], description="Allowed headers for CORS requests"

@@ -469,6 +469,8 @@ services:
         condition: service_healthy
       file_service:
         condition: service_healthy
+      bff_teacher_service:
+        condition: service_healthy
       redis:
         condition: service_healthy
     networks:
@@ -491,6 +493,7 @@ services:
       - CLASS_MANAGEMENT_SERVICE_URL=http://class_management_service:5002
       - FILE_SERVICE_URL=http://file_service:7001
       - LLM_PROVIDER_SERVICE_URL=http://llm_provider_service:8080
+      - BFF_TEACHER_SERVICE_URL=http://bff_teacher_service:4101
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
       - OTEL_SERVICE_NAME=api_gateway_service
       - OTEL_TRACES_EXPORTER=otlp

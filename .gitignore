@@ -77,5 +77,11 @@ dist/
 # Migration backups
 *_backup_*/
 documentation_backup_*/
-.DS_Store
+
+# Frontend (Vue 3 + Vite)
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/*.local
+
 .DS_Store

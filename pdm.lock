@@ -5,7 +5,7 @@
 groups = ["default", "dev", "monorepo-tools"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:37b02cbce9f4c47f7d88dcc42e9697000a7ca4abc217c813e8b7e0b0147c3960"
+content_hash = "sha256:92fbc9ef9975e48fd116e9ce2f406c2896f16c6bb6d63741bd2dc7c498040475"
 
 [[metadata.targets]]
 requires_python = ">=3.11,<3.13"
@@ -3928,6 +3928,17 @@ groups = ["dev"]
 files = [
     {file = "pyspellchecker-0.8.3-py3-none-any.whl", hash = "sha256:e993076e98b0da5a99b7cc31085c3022c77a9dc37c5e95f5cf6304b5dbb8b9d2"},
     {file = "pyspellchecker-0.8.3.tar.gz", hash = "sha256:cb06eeafe124837f321e0d02f8e21deab713e966e28e0360319a28a089c43978"},
+]
+
+[[package]]
+name = "pytailwindcss"
+version = "0.3.0"
+requires_python = "<4.0,>=3.11"
+summary = "Standalone Tailwind CSS CLI, installable via pip. Use Tailwind CSS without Node.js."
+groups = ["monorepo-tools"]
+files = [
+    {file = "pytailwindcss-0.3.0-py3-none-any.whl", hash = "sha256:a9b770ad3c0a0f40073052bcfe81a060b550fed38af614a472f5aa7bb85fa8aa"},
+    {file = "pytailwindcss-0.3.0.tar.gz", hash = "sha256:1f71dd64020aacb40608dfe8725ca441c772016c344f757ccbc74b8b6143027d"},
 ]
 
 [[package]]

@@ -37,6 +37,10 @@ ALLOWED_DOMAINS = {
     "integrations",
     "architecture",
     "programs",
+    # Frontend-specific domains (for frontend/TASKS/)
+    "accessibility",
+    "integration",
+    "design",
 }
 ALLOWED_STATUSES = {"research", "blocked", "in_progress", "completed", "paused", "archived"}
 ALLOWED_PRIORITIES = {"low", "medium", "high", "critical"}
@@ -53,6 +57,10 @@ ALLOWED_TOP_LEVEL_DIRS = {
     "integrations",
     "architecture",
     "archive",
+    # Frontend-specific domains (for frontend/TASKS/)
+    "accessibility",
+    "integration",
+    "design",
 }
 
 # Files excluded from validation
@@ -321,36 +329,50 @@ def should_exclude_file(p: Path, tasks_root: Path, exclude_archive: bool) -> boo
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(description="Validate TASKS frontmatter and structure compliance")
     ap.add_argument("--root", default=str(TASKS_DIR), help="Tasks root directory")
+    ap.add_argument("--all", action="store_true", help="Validate both TASKS/ and frontend/TASKS/")
     ap.add_argument("--exclude-archive", action="store_true", default=True)
     ap.add_argument("--verbose", "-v", action="store_true")
     args = ap.parse_args(argv)
 
-    root = Path(args.root)
+    # Determine which roots to validate
+    roots = []
+    if args.all:
+        roots.append(TASKS_DIR)
+        frontend_tasks = ROOT / "frontend" / "TASKS"
+        if frontend_tasks.exists():
+            roots.append(frontend_tasks)
+    else:
+        roots.append(Path(args.root))
+
     failures = 0
 
-    for p in root.rglob("*.md"):
-        # Check exclusions first
-        if should_exclude_file(p, root, args.exclude_archive):
-            continue
+    for root in roots:
+        if args.verbose and len(roots) > 1:
+            print(f"\n=== Validating {root.relative_to(ROOT)} ===")
 
-        rel = p.relative_to(root)
-        errs: list[str] = []
+        for p in root.rglob("*.md"):
+            # Check exclusions first
+            if should_exclude_file(p, root, args.exclude_archive):
+                continue
 
-        # Validate path structure (before parsing frontmatter)
-        errs.extend(validate_no_spaces(p, root))
-        errs.extend(validate_path_structure(p, root))
-        errs.extend(validate_directory_naming(p, root))
+            rel = p.relative_to(root)
+            errs: list[str] = []
 
-        # Validate file content and frontmatter
-        errs.extend(validate_file(p, root))
+            # Validate path structure (before parsing frontmatter)
+            errs.extend(validate_no_spaces(p, root))
+            errs.extend(validate_path_structure(p, root))
+            errs.extend(validate_directory_naming(p, root))
 
-        if errs:
-            failures += 1
-            print(f"[ERROR] {rel}:")
-            for e in errs:
-                print(f"  - {e}")
-        elif args.verbose:
-            print(f"[OK] {rel}")
+            # Validate file content and frontmatter
+            errs.extend(validate_file(p, root))
+
+            if errs:
+                failures += 1
+                print(f"[ERROR] {rel}:")
+                for e in errs:
+                    print(f"  - {e}")
+            elif args.verbose:
+                print(f"[OK] {rel}")
 
     if failures:
         print(f"\nValidation failed: {failures} file(s) with errors.")

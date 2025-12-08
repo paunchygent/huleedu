@@ -17,6 +17,14 @@ Operational guide for BFF Teacher Service and Vue 3 frontend development workflo
 | BFF static serving | 4101 | `pdm run bff-start` |
 | API Gateway | 8080 | `pdm run dev-start api_gateway_service` |
 
+### API Routes
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /bff/v1/teacher/dashboard` | Teacher dashboard (stub) |
+| `GET /bff/v1/teacher/healthz` | BFF health check (via gateway) |
+| `GET /healthz` | Direct BFF health check |
+
 ## Development Workflows
 
 ### Frontend-Only Development (Recommended for UI work)
@@ -190,18 +198,20 @@ Development:
 │             │     │  └─ /api/* proxy ───┼──▶ API Gateway (8080)
 └─────────────┘     └─────────────────────┘
 
-Production:
-┌─────────────┐     ┌─────────────────────┐
-│  Browser    │────▶│  BFF Teacher        │ (port 4101)
-│             │     │  ├─ /healthz        │
-│             │     │  ├─ /assets/* (static)
-│             │     │  └─ /* (index.html) │
-└─────────────┘     └─────────────────────┘
+Production (via API Gateway):
+┌─────────────┐     ┌─────────────────────┐     ┌─────────────────────┐
+│  Browser    │────▶│  API Gateway        │────▶│  BFF Teacher        │ (port 4101)
+│             │     │  (port 8080)        │     │  ├─ /bff/v1/teacher/*│
+│             │     │  ├─ JWT validation  │     │  ├─ /healthz        │
+│             │     │  ├─ Rate limiting   │     │  ├─ /assets/* (static)
+│             │     │  └─ /bff/v1/teacher │     │  └─ /* (index.html) │
+└─────────────┘     └─────────────────────┘     └─────────────────────┘
 ```
 
 ## Related Documentation
 
 - ADR-0007: BFF vs API Gateway Pattern
 - ADR-0023: BFF Frontend Build Integration and Static Serving
+- `.claude/rules/020.21-bff-teacher-service.md` - BFF service architecture rule
 - `frontend/.claude/work/session/handoff.md` - Frontend session context
 - `.claude/rules/200-frontend-core-rules.md` - Frontend coding standards

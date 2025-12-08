@@ -9,56 +9,139 @@ Backend context lives in: `/.claude/work/session/handoff.md`
 
 ## Current Session (2025-12-08)
 
-### Scope: BFF Static Serving Integration
+### Scope: API Gateway → BFF Routing + API Scaffolding
 
 **Completed:**
 
-1. **BFF Teacher Service skeleton created** (`services/bff_teacher_service/`)
-   - FastAPI app serving Vue 3 frontend static assets
-   - Health endpoint at `/healthz` following Rule 072 format
-   - Static files mount at `/assets/*`
-   - SPA fallback serving `index.html` for client-side routing
-   - Correlation ID middleware
-   - CORS configured for dev origins
+1. **API Gateway BFF routing**
+   - Added `BFF_TEACHER_URL` to gateway config
+   - Created `bff_teacher_routes.py` (proxy following class_routes pattern)
+   - Registered router in `main.py` with prefix `/bff/v1/teacher`
+   - Added env var to `docker-compose.services.yml`
+   - Added `bff_teacher_service` to gateway `depends_on`
 
-2. **Docker integration**
-   - Multi-stage Dockerfile (Node.js frontend builder + Python base)
-   - Added to `docker-compose.services.yml` on port 4101
-   - Volume mount for dev: `frontend/dist:/app/static:ro`
-   - Health check: `curl -f http://localhost:4101/healthz`
+2. **BFF API scaffolding**
+   - Created `api/v1/teacher_routes.py` with stub `/dashboard` endpoint
+   - Created `dto/teacher_v1.py` with `TeacherDashboardResponseV1` DTO
+   - Created `clients/__init__.py` scaffold
+   - Updated `app.py` to include router before SPA fallback
+   - Updated `config.py` CORS methods for full API support
 
-3. **PDM scripts added**
-   - `pdm run bff-build` - Build BFF Docker image
-   - `pdm run bff-start` - Start BFF service
-   - `pdm run bff-logs` - Follow BFF logs
-   - `pdm run bff-restart` - Restart BFF service
+3. **Validation**
+   - `pdm run typecheck-all` passes (1409 files)
+   - `pdm run lint-fix --unsafe-fixes` passes
 
-4. **Mypy strict config**
-   - Added `services.bff_teacher_service.*` to strict mypy overrides
-
-**Validated:**
-- Health check returns healthy with all static file checks passing
-- index.html served at root
-- Assets served at /assets/*
-- SPA fallback works for client-side routes (/app/dashboard → index.html)
+**Previous session completed:**
+- BFF Teacher Service skeleton (static serving)
+- Docker integration (port 4101)
+- PDM scripts for BFF management
+- Mypy strict config
 
 ---
 
-## Next Session – Recommended Focus
+## Next Session Instruction
 
-1. **API Gateway routing to BFF:**
-   - Configure API Gateway to proxy `/bff/v1/teacher/*` to BFF service
-   - Add BFF_TEACHER_URL to gateway config
+```markdown
+## Role
 
-2. **Full BFF implementation (separate task):**
-   - API composition endpoints (DTOs, service clients)
-   - Teacher dashboard, batch detail, essay feedback screens
-   - See: `frontend/TASKS/integration/bff-service-implementation-plan.md`
+You are the lead developer and architect of HuleEdu. The scope of this session is
+Teacher Dashboard screen implementation in the BFF service.
 
-3. **Development workflow:**
-   - Frontend dev: `pdm run fe-dev` (Vite on port 5173)
-   - BFF static serving: `pdm run bff-start` (port 4101)
-   - Full stack: API Gateway (8080) → BFF (4101) or direct services
+---
+
+## Session Scope
+
+Objective: Implement the Teacher Dashboard endpoint that aggregates batch data from
+RAS and class names from CMS into a screen-optimized response.
+
+Out of scope:
+- Batch detail screen (separate task)
+- Essay feedback screen (separate task)
+- WebSocket real-time updates (Phase 2)
+- Admin BFF service
+
+---
+
+## Before Touching Code
+
+From monorepo root:
+
+# 1. Read BFF architecture and patterns
+cat docs/decisions/0007-bff-vs-api-gateway-pattern.md
+cat .claude/rules/041.1-fastapi-integration-patterns.md
+cat .claude/rules/042-async-patterns-and-di.md
+
+# 2. Understand existing BFF structure
+cat services/bff_teacher_service/app.py
+cat services/bff_teacher_service/api/v1/teacher_routes.py
+cat services/bff_teacher_service/dto/teacher_v1.py
+
+# 3. Check backend service APIs to consume
+cat services/result_aggregator_service/api/query_routes.py
+cat services/result_aggregator_service/models_api.py
+cat services/class_management_service/api/v1/class_routes.py
+
+# 4. Implementation plan
+cat frontend/TASKS/integration/bff-service-implementation-plan.md
+
+---
+
+## Implementation Steps
+
+1. **Extend DTOs** (`dto/teacher_v1.py`)
+   - Add `BatchSummaryV1` with fields from RAS `BatchStatusResponse`
+   - Update `TeacherDashboardResponseV1` to use `list[BatchSummaryV1]`
+   - Import `BatchClientStatus` from `common_core.status_enums`
+
+2. **Create service clients** (`clients/`)
+   - Create `ras_client.py` with `RASClientProtocol` and `RASClient` impl
+   - Create `cms_client.py` with `CMSClientProtocol` and `CMSClient` impl
+   - Use `httpx.AsyncClient` with proper timeout and error handling
+
+3. **Setup DI** (`di.py`)
+   - Create `BFFTeacherProvider` with Dishka providers
+   - Provide `httpx.AsyncClient` (APP scope)
+   - Provide RAS and CMS clients (APP scope)
+
+4. **Update app.py**
+   - Import and setup Dishka container
+   - Use `DishkaRoute` for router
+
+5. **Implement dashboard endpoint** (`api/v1/teacher_routes.py`)
+   - Inject RAS and CMS clients via `FromDishka`
+   - Extract `X-User-ID` and `X-Correlation-ID` headers
+   - Parallel fetch batches (RAS) and classes (CMS) with `asyncio.gather`
+   - Enrich batches with class names
+   - Return `TeacherDashboardResponseV1`
+
+6. **Validation**
+   - `pdm run typecheck-all` passes
+   - Add unit test with mocked clients
+   - Test via gateway: `curl http://localhost:8080/bff/v1/teacher/dashboard`
+
+---
+
+## Key Files
+
+| File | Purpose |
+|------|---------|
+| `services/bff_teacher_service/api/v1/teacher_routes.py` | Dashboard endpoint |
+| `services/bff_teacher_service/dto/teacher_v1.py` | DTOs |
+| `services/bff_teacher_service/clients/ras_client.py` | RAS HTTP client |
+| `services/bff_teacher_service/clients/cms_client.py` | CMS HTTP client |
+| `services/bff_teacher_service/di.py` | Dishka DI providers |
+| `services/result_aggregator_service/models_api.py` | RAS response models |
+| `frontend/TASKS/integration/bff-service-implementation-plan.md` | Full plan |
+
+---
+
+## When Done
+
+Update:
+- `frontend/.claude/work/session/handoff.md` - what was completed
+- `frontend/TASKS/integration/bff-service-implementation-plan.md` - mark dashboard complete
+- Create next session instruction for Batch Detail screen
+```
 
 ---
 
@@ -66,14 +149,15 @@ Backend context lives in: `/.claude/work/session/handoff.md`
 
 | File | Purpose | Status |
 |------|---------|--------|
-| `services/bff_teacher_service/app.py` | BFF FastAPI static serving | ✅ Created |
-| `services/bff_teacher_service/config.py` | BFF settings | ✅ Created |
-| `services/bff_teacher_service/Dockerfile` | Multi-stage build | ✅ Created |
-| `docker-compose.services.yml` | BFF service definition | ✅ Updated |
-| `frontend/dist/` | Vue 3 production build | ✅ Verified |
-| `styles/src/huleedu-landing-final.html` | Landing page | ✅ Updated |
-| `styles/src/anmal-intresse.html` | Waitlist signup | ✅ Updated |
-| `docs/design/customer-flows.md` | Personas & journeys | Reference |
+| `services/bff_teacher_service/app.py` | BFF FastAPI app | ✅ Updated |
+| `services/bff_teacher_service/config.py` | BFF settings | ✅ Updated |
+| `services/bff_teacher_service/api/v1/teacher_routes.py` | API routes | ✅ Created |
+| `services/bff_teacher_service/dto/teacher_v1.py` | DTOs | ✅ Created |
+| `services/bff_teacher_service/clients/__init__.py` | Clients scaffold | ✅ Created |
+| `services/api_gateway_service/config.py` | Gateway config | ✅ Updated |
+| `services/api_gateway_service/routers/bff_teacher_routes.py` | Gateway proxy | ✅ Created |
+| `services/api_gateway_service/app/main.py` | Gateway app | ✅ Updated |
+| `docker-compose.services.yml` | Service definitions | ✅ Updated |
 
 ---
 

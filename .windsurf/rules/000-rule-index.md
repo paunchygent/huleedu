@@ -34,6 +34,7 @@ scope: "all"
   - [020.18-language-tool-service-patterns.md](mdc:020.18-language-tool-service-patterns.md): Language Tool Service (Grammar checking via Java subprocess)
   - [020.19-eng5-np-runner-container.md](mdc:020.19-eng5-np-runner-container.md): ENG5 NP Runner containerization patterns and volume mount standards
   - [020.20-cj-llm-prompt-contract.md](mdc:020.20-cj-llm-prompt-contract.md): CJ → LLM prompt composition map (student assignment, rubric, essays, system prompt overrides)
+  - [020.21-bff-teacher-service.md](mdc:020.21-bff-teacher-service.md): BFF Teacher Service (API composition for Vue 3 frontend, static serving)
 - [030-event-driven-architecture-eda-standards.md](mdc:030-event-driven-architecture-eda-standards.md): Event-driven communication standards with header-first optimization
 
 ## Processing Flows

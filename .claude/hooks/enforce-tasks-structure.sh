@@ -37,8 +37,8 @@ COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
 
 # Check Write operations
 if [[ "$TOOL_NAME" == "Write" ]] && [[ -n "$FILE_PATH" ]]; then
-  # Check if writing to TASKS/
-  if [[ "$FILE_PATH" =~ /TASKS/ ]] || [[ "$FILE_PATH" =~ ^TASKS/ ]]; then
+  # Check if writing to root TASKS/ (skip frontend/TASKS/ which has its own structure)
+  if [[ "$FILE_PATH" =~ /TASKS/ ]] && [[ ! "$FILE_PATH" =~ frontend/TASKS/ ]]; then
     # Extract the path relative to TASKS/
     RELATIVE_PATH="${FILE_PATH#*/TASKS/}"
 
@@ -84,8 +84,9 @@ fi
 
 # Check Bash operations that might create directories
 if [[ "$TOOL_NAME" == "Bash" ]] && [[ -n "$COMMAND" ]]; then
-  # Check for mkdir commands in TASKS/
-  if [[ "$COMMAND" =~ mkdir.*TASKS/ ]]; then
+  # Check for mkdir commands in root TASKS/ (not frontend/TASKS/)
+  # Allow: frontend/TASKS/, Block: TASKS/ at repo root
+  if [[ "$COMMAND" =~ mkdir.*TASKS/ ]] && [[ ! "$COMMAND" =~ mkdir.*frontend/TASKS/ ]]; then
     cat >&2 << EOF
 🚫 TASKS STRUCTURE VIOLATION
 

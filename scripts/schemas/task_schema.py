@@ -42,6 +42,10 @@ class TaskDomain(str, Enum):
     integrations = "integrations"
     architecture = "architecture"
     programs = "programs"
+    # Frontend-specific domains (for frontend/TASKS/)
+    accessibility = "accessibility"
+    integration = "integration"
+    design = "design"
 
 
 class TaskType(str, Enum):

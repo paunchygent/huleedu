@@ -30,7 +30,6 @@ Top-level directories under `TASKS/`:
 - `assessment/`
 - `content/`
 - `identity/`
-- `frontend/`
 - `infrastructure/`
 - `security/`
 - `integrations/`
@@ -38,6 +37,8 @@ Top-level directories under `TASKS/`:
 - `archive/`
 
 No other top-level directories are allowed under `TASKS/`.
+
+> **Note:** Frontend tasks live in `frontend/TASKS/` (not `TASKS/frontend/`). This enables frontend-specific hooks, agents, and tooling when working from the `frontend/` directory.
 
 ### 3.1 Belongs-Here Rules
 
@@ -52,9 +53,6 @@ No other top-level directories are allowed under `TASKS/`.
 - `identity/`
   - Identity, auth, JWT, roles, API Gateway auth flows.
   - Example: `identity/TASK-IDENTITY-RS256-JWT-ROLLOUT.md`.
-- `frontend/`
-  - SPA integration, websockets, upload UX, Svelte 5, teacher dashboards.
-  - Example: `frontend/SVELTE5_CORS_AND_DEV_UTILITIES.md`.
 - `infrastructure/`
   - DevOps, CI/CD, Docker/Compose, observability, shared scripts.
 - `security/`
