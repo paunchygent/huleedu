@@ -183,3 +183,5 @@ async def test_finalize_single_essay_publishes_and_updates(
 
     event_publisher.publish_assessment_completed.assert_called_once()
     event_publisher.publish_assessment_result.assert_called_once()
+    # Batch-level completion timestamp should be recorded for single-essay batches
+    assert batch.completed_at is not None

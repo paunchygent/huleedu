@@ -22,8 +22,7 @@ from huleedu_service_libs.protocols import RedisClientProtocol
 from services.cj_assessment_service.cj_core_logic.grade_projector import GradeProjector
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.event_processor import (
-    # TODO: To be implemented by Agent Beta
-    process_llm_result,  # type: ignore
+    process_llm_result,
     process_single_message,
 )
 from services.cj_assessment_service.protocols import (

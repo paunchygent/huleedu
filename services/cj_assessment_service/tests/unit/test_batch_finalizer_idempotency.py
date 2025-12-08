@@ -62,6 +62,7 @@ class TestFinalizeScoringIdempotency:
         batch.created_at = datetime.now(UTC)
         batch.user_id = "user-123"
         batch.org_id = "org-abc"
+        batch.completed_at = datetime.now(UTC)
 
         session = AsyncMock(spec=AsyncSession)
         session.get.return_value = batch

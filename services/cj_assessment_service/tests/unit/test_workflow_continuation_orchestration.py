@@ -233,3 +233,260 @@ async def test_trigger_continuation_requests_more_when_not_finalized(
     assert await_args is not None
     assert await_args.kwargs["mode"] == wc.PairGenerationMode.COVERAGE
     finalize_called.assert_not_awaited()
+
+
+class _DummyContinuationContext:
+    """Minimal continuation context for finalization guard tests."""
+
+    def __init__(self) -> None:
+        self.metadata_updates: dict[str, Any] = {}
+        self.max_possible_pairs = 0
+        self.successful_pairs_count = 0
+        self.unique_coverage_complete = False
+        self.resampling_pass_count = 0
+        self.small_net_resampling_cap = 0
+        self.regular_batch_resampling_cap = 0
+        self.is_small_net = False
+        self.small_net_cap_reached = False
+        self.bt_se_inflated = False
+        self.comparison_coverage_sparse = False
+        self.has_isolated_items = False
+        self.callbacks_received = 4
+        self.denominator = 4
+        self.max_score_change = 0.0
+        self.success_rate = 1.0
+        self.success_rate_threshold = 0.8
+        self.callbacks_reached_cap = True
+        self.budget_exhausted = False
+        self.pairs_remaining = 0
+        self.completed = 4
+        self.failed = 0
+        self.expected_essay_count = 4
+
+
+@pytest.mark.asyncio
+async def test_finalization_skipped_when_fresh_pending_callbacks_detected(
+    monkeypatch: Any,
+) -> None:
+    """Fresh pending callbacks guard should skip FINALIZE_SCORING."""
+
+    settings = Settings()
+    settings.MAX_PAIRWISE_COMPARISONS = 4
+
+    event_publisher = AsyncMock()
+    content_client = AsyncMock()
+    llm_interaction = AsyncMock()
+
+    batch_state = CJBatchState()
+    batch_state.batch_id = 11
+    batch_state.submitted_comparisons = 4
+    batch_state.completed_comparisons = 4
+    batch_state.failed_comparisons = 0
+    batch_state.total_comparisons = 4
+    batch_state.total_budget = 4
+    batch_state.current_iteration = 1
+    batch_state.processing_metadata = {}
+    batch_state.batch_upload = _make_upload(expected_count=4)
+
+    essays = [
+        Mock(
+            els_essay_id=str(i),
+            assessment_input_text=f"essay-{i}",
+            current_bt_score=0.0,
+            comparison_count=1,
+        )
+        for i in range(4)
+    ]
+
+    monkeypatch.setattr(
+        wc.scoring_ranking,
+        "record_comparisons_and_update_scores",
+        AsyncMock(return_value={}),
+    )
+    monkeypatch.setattr(
+        wc.scoring_ranking,
+        "check_score_stability",
+        Mock(return_value=0.0),
+    )
+    monkeypatch.setattr(wc, "merge_batch_processing_metadata", AsyncMock())
+
+    dummy_ctx = _DummyContinuationContext()
+    monkeypatch.setattr(
+        wc,
+        "_build_continuation_context",
+        AsyncMock(return_value=dummy_ctx),
+    )
+    monkeypatch.setattr(wc, "_can_attempt_resampling", Mock(return_value=False))
+    monkeypatch.setattr(wc, "record_workflow_decision", Mock())
+    monkeypatch.setattr(
+        wc,
+        "decide",
+        Mock(return_value=wc.ContinuationDecision.FINALIZE_SCORING),
+    )
+
+    has_fresh_pending = AsyncMock(return_value=True)
+    monkeypatch.setattr(wc, "_has_fresh_pending_callbacks", has_fresh_pending)
+
+    finalize_scoring_called = AsyncMock()
+
+    class _Finalizer:
+        def __init__(self, *_args: Any, **_kwargs: Any) -> None:
+            pass
+
+        async def finalize_scoring(self, *_args: Any, **_kwargs: Any) -> None:
+            await finalize_scoring_called()
+
+        async def finalize_failure(self, *_args: Any, **_kwargs: Any) -> None:
+            raise AssertionError("finalize_failure should not be called in this test")
+
+    monkeypatch.setattr(wc, "BatchFinalizer", _Finalizer)
+
+    @asynccontextmanager
+    async def mock_session_ctx() -> AsyncGenerator[AsyncSession, None]:
+        yield AsyncMock(spec=AsyncSession)
+
+    mock_session_provider = AsyncMock()
+    mock_session_provider.session = mock_session_ctx
+
+    mock_batch_repository = AsyncMock(spec=CJBatchRepositoryProtocol)
+    mock_batch_repository.get_batch_state = AsyncMock(return_value=batch_state)
+    mock_essay_repository = AsyncMock(spec=CJEssayRepositoryProtocol)
+    mock_essay_repository.get_essays_for_cj_batch = AsyncMock(return_value=essays)
+
+    mock_grade_projector = AsyncMock()
+    mock_matching_strategy = make_real_matching_strategy_mock()
+    mock_orientation_strategy = AsyncMock()
+
+    await wc.trigger_existing_workflow_continuation(
+        batch_id=batch_state.batch_id,
+        session_provider=mock_session_provider,
+        batch_repository=mock_batch_repository,
+        comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
+        essay_repository=mock_essay_repository,
+        instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
+        event_publisher=event_publisher,
+        settings=settings,
+        content_client=content_client,
+        correlation_id=uuid4(),
+        llm_interaction=llm_interaction,
+        matching_strategy=mock_matching_strategy,
+        grade_projector=mock_grade_projector,
+        orientation_strategy=mock_orientation_strategy,
+    )
+
+    assert has_fresh_pending.await_count == 1
+    finalize_scoring_called.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_finalization_proceeds_when_no_fresh_pending_callbacks(
+    monkeypatch: Any,
+) -> None:
+    """FINALIZE_SCORING should proceed when guard reports no pending callbacks."""
+
+    settings = Settings()
+    settings.MAX_PAIRWISE_COMPARISONS = 4
+
+    event_publisher = AsyncMock()
+    content_client = AsyncMock()
+    llm_interaction = AsyncMock()
+
+    batch_state = CJBatchState()
+    batch_state.batch_id = 12
+    batch_state.submitted_comparisons = 4
+    batch_state.completed_comparisons = 4
+    batch_state.failed_comparisons = 0
+    batch_state.total_comparisons = 4
+    batch_state.total_budget = 4
+    batch_state.current_iteration = 1
+    batch_state.processing_metadata = {}
+    batch_state.batch_upload = _make_upload(expected_count=4)
+
+    essays = [
+        Mock(
+            els_essay_id=str(i),
+            assessment_input_text=f"essay-{i}",
+            current_bt_score=0.0,
+            comparison_count=1,
+        )
+        for i in range(4)
+    ]
+
+    monkeypatch.setattr(
+        wc.scoring_ranking,
+        "record_comparisons_and_update_scores",
+        AsyncMock(return_value={}),
+    )
+    monkeypatch.setattr(
+        wc.scoring_ranking,
+        "check_score_stability",
+        Mock(return_value=0.0),
+    )
+    monkeypatch.setattr(wc, "merge_batch_processing_metadata", AsyncMock())
+
+    dummy_ctx = _DummyContinuationContext()
+    monkeypatch.setattr(
+        wc,
+        "_build_continuation_context",
+        AsyncMock(return_value=dummy_ctx),
+    )
+    monkeypatch.setattr(wc, "_can_attempt_resampling", Mock(return_value=False))
+    monkeypatch.setattr(wc, "record_workflow_decision", Mock())
+    monkeypatch.setattr(
+        wc,
+        "decide",
+        Mock(return_value=wc.ContinuationDecision.FINALIZE_SCORING),
+    )
+
+    has_fresh_pending = AsyncMock(return_value=False)
+    monkeypatch.setattr(wc, "_has_fresh_pending_callbacks", has_fresh_pending)
+
+    finalize_scoring_called = AsyncMock()
+
+    class _Finalizer:
+        def __init__(self, *_args: Any, **_kwargs: Any) -> None:
+            pass
+
+        async def finalize_scoring(self, *_args: Any, **_kwargs: Any) -> None:
+            await finalize_scoring_called()
+
+        async def finalize_failure(self, *_args: Any, **_kwargs: Any) -> None:
+            raise AssertionError("finalize_failure should not be called in this test")
+
+    monkeypatch.setattr(wc, "BatchFinalizer", _Finalizer)
+
+    @asynccontextmanager
+    async def mock_session_ctx() -> AsyncGenerator[AsyncSession, None]:
+        yield AsyncMock(spec=AsyncSession)
+
+    mock_session_provider = AsyncMock()
+    mock_session_provider.session = mock_session_ctx
+
+    mock_batch_repository = AsyncMock(spec=CJBatchRepositoryProtocol)
+    mock_batch_repository.get_batch_state = AsyncMock(return_value=batch_state)
+    mock_essay_repository = AsyncMock(spec=CJEssayRepositoryProtocol)
+    mock_essay_repository.get_essays_for_cj_batch = AsyncMock(return_value=essays)
+
+    mock_grade_projector = AsyncMock()
+    mock_matching_strategy = make_real_matching_strategy_mock()
+    mock_orientation_strategy = AsyncMock()
+
+    await wc.trigger_existing_workflow_continuation(
+        batch_id=batch_state.batch_id,
+        session_provider=mock_session_provider,
+        batch_repository=mock_batch_repository,
+        comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
+        essay_repository=mock_essay_repository,
+        instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
+        event_publisher=event_publisher,
+        settings=settings,
+        content_client=content_client,
+        correlation_id=uuid4(),
+        llm_interaction=llm_interaction,
+        matching_strategy=mock_matching_strategy,
+        grade_projector=mock_grade_projector,
+        orientation_strategy=mock_orientation_strategy,
+    )
+
+    assert has_fresh_pending.await_count == 1
+    finalize_scoring_called.assert_awaited_once()

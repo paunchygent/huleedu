@@ -177,3 +177,5 @@ async def test_finalize_scoring_transitions_state(monkeypatch: pytest.MonkeyPatc
         state=CoreCJState.COMPLETED,
     )
     assert batch_repo.update_cj_batch_status.await_count == 1
+    # Batch-level completion timestamp should be recorded on successful finalization
+    assert batch.completed_at is not None

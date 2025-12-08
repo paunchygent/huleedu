@@ -108,6 +108,50 @@ async def check_workflow_continuation(
         return iteration_complete
 
 
+async def _has_fresh_pending_callbacks(
+    *,
+    batch_id: int,
+    session_provider: SessionProviderProtocol,
+    batch_repository: CJBatchRepositoryProtocol,
+    correlation_id: UUID,
+) -> bool:
+    """Return True when a fresh snapshot shows pending callbacks for the batch.
+
+    This helper is used as a last-minute guard before finalization to avoid
+    making completion decisions against a stale view of callback counters.
+    """
+
+    async with session_provider.session() as session:
+        batch_state = await batch_repository.get_batch_state(session, batch_id)
+        if not batch_state:
+            logger.error(
+                "Batch state not found during finalization pending check",
+                extra={"correlation_id": str(correlation_id), "batch_id": batch_id},
+            )
+            return True
+
+        completed = batch_state.completed_comparisons or 0
+        failed = batch_state.failed_comparisons or 0
+        callbacks_received = completed + failed
+        pending_callbacks = max(batch_state.submitted_comparisons - callbacks_received, 0)
+
+        if pending_callbacks > 0:
+            logger.info(
+                "Skipping finalization due to fresh pending callbacks",
+                extra={
+                    "correlation_id": str(correlation_id),
+                    "batch_id": batch_id,
+                    "pending_callbacks": pending_callbacks,
+                    "submitted_comparisons": batch_state.submitted_comparisons,
+                    "completed_comparisons": completed,
+                    "failed_comparisons": failed,
+                },
+            )
+            return True
+
+        return False
+
+
 def _resolve_comparison_budget(
     metadata: dict[str, Any] | None,
     settings: "Settings",
@@ -455,6 +499,17 @@ async def trigger_existing_workflow_continuation(
         )
 
     if decision is ContinuationDecision.FINALIZE_FAILURE:
+        # Before finalizing, re-check for any newly-arrived callbacks using a
+        # fresh batch_state snapshot. If callbacks are still pending, skip
+        # finalization and let a subsequent continuation invocation recompute
+        # the decision against up-to-date counters.
+        if await _has_fresh_pending_callbacks(
+            batch_id=batch_id,
+            session_provider=session_provider,
+            batch_repository=batch_repository,
+            correlation_id=correlation_id,
+        ):
+            return
         logger.warning(
             "Finalizing batch as FAILED due to low success rate",
             extra={
@@ -502,6 +557,15 @@ async def trigger_existing_workflow_continuation(
         return
 
     if decision is ContinuationDecision.FINALIZE_SCORING:
+        # Symmetric fresh pending check for successful finalization to avoid
+        # committing completion when callbacks are still in flight.
+        if await _has_fresh_pending_callbacks(
+            batch_id=batch_id,
+            session_provider=session_provider,
+            batch_repository=batch_repository,
+            correlation_id=correlation_id,
+        ):
+            return
         logger.info("Finalizing batch after stability/budget evaluation", extra=log_extra)
         if grade_projector is None:
             raise ValueError(

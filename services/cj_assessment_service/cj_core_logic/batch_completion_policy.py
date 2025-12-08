@@ -86,7 +86,13 @@ class BatchCompletionPolicy:
         correlation_id: UUID,
     ) -> None:
         try:
-            batch_state = await batch_repo.get_batch_state(session=session, batch_id=batch_id)
+            # Use a row-level lock to prevent lost updates when multiple callbacks
+            # for the same batch are processed concurrently.
+            batch_state = await batch_repo.get_batch_state_for_update(
+                session=session,
+                batch_id=batch_id,
+                for_update=True,
+            )
             if not batch_state:
                 logger.error("Batch state not found for batch %s", batch_id)
                 return

@@ -206,6 +206,10 @@ class BatchFinalizer:
                     cj_batch_id=batch_id,
                     status=CJBatchStatusEnum.COMPLETE_STABLE,
                 )
+                # Record batch-level completion timestamp for successful finalization
+                # CJBatchUpload.completed_at is a naive (timezone-unaware) DateTime column.
+                # Use UTC but drop tzinfo to avoid PostgreSQL TIMESTAMP WITHOUT TIME ZONE errors.
+                batch_upload.completed_at = datetime.now(UTC).replace(tzinfo=None)
 
                 # Rankings and grade projections
                 rankings = await scoring_ranking.get_essay_rankings(
@@ -344,6 +348,9 @@ class BatchFinalizer:
 
             batch_state.state = CoreCJState.FAILED
             now = datetime.now(UTC)
+            # Record batch-level completion timestamp for failure finalization
+            # CJBatchUpload.completed_at is naive; drop tzinfo for DB write.
+            batch_upload.completed_at = now.replace(tzinfo=None)
             batch_state.last_activity_at = now
             if batch_state.processing_metadata is None:
                 batch_state.processing_metadata = {}
@@ -448,6 +455,9 @@ class BatchFinalizer:
                     batch_id=batch_id,
                     state=CoreCJState.COMPLETED,
                 )
+                # Record batch-level completion timestamp for single-essay batches
+                # CJBatchUpload.completed_at is naive; drop tzinfo for DB write.
+                batch_upload.completed_at = datetime.now(UTC).replace(tzinfo=None)
                 await session.commit()
 
                 # Minimal scoring for single student to map ELS status to success

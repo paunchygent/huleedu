@@ -122,7 +122,7 @@ class TestUpdateBatchCompletionCounters:
 
         session = AsyncMock(spec=AsyncSession)
         batch_repo = AsyncMock(spec=CJBatchRepositoryProtocol)
-        batch_repo.get_batch_state.return_value = batch_state
+        batch_repo.get_batch_state_for_update.return_value = batch_state
 
         await policy.update_batch_completion_counters(
             batch_repo=batch_repo,
@@ -132,8 +132,10 @@ class TestUpdateBatchCompletionCounters:
             correlation_id=uuid4(),
         )
 
-        batch_repo.get_batch_state.assert_awaited_once_with(
-            session=session, batch_id=batch_state.batch_id
+        batch_repo.get_batch_state_for_update.assert_awaited_once_with(
+            session=session,
+            batch_id=batch_state.batch_id,
+            for_update=True,
         )
         assert batch_state.completed_comparisons == 4
         assert batch_state.failed_comparisons == 1
@@ -153,7 +155,7 @@ class TestUpdateBatchCompletionCounters:
         )
         session = AsyncMock(spec=AsyncSession)
         batch_repo = AsyncMock(spec=CJBatchRepositoryProtocol)
-        batch_repo.get_batch_state.return_value = batch_state
+        batch_repo.get_batch_state_for_update.return_value = batch_state
 
         await policy.update_batch_completion_counters(
             batch_repo=batch_repo,
@@ -161,6 +163,12 @@ class TestUpdateBatchCompletionCounters:
             batch_id=batch_state.batch_id,
             is_error=True,
             correlation_id=uuid4(),
+        )
+
+        batch_repo.get_batch_state_for_update.assert_awaited_once_with(
+            session=session,
+            batch_id=batch_state.batch_id,
+            for_update=True,
         )
 
         assert batch_state.completed_comparisons == 4
@@ -189,7 +197,7 @@ class TestUpdateBatchCompletionCounters:
         )
         session = AsyncMock(spec=AsyncSession)
         batch_repo = AsyncMock(spec=CJBatchRepositoryProtocol)
-        batch_repo.get_batch_state.return_value = batch_state
+        batch_repo.get_batch_state_for_update.return_value = batch_state
 
         await policy.update_batch_completion_counters(
             batch_repo=batch_repo,
@@ -197,6 +205,12 @@ class TestUpdateBatchCompletionCounters:
             batch_id=batch_state.batch_id,
             is_error=False,
             correlation_id=uuid4(),
+        )
+
+        batch_repo.get_batch_state_for_update.assert_awaited_once_with(
+            session=session,
+            batch_id=batch_state.batch_id,
+            for_update=True,
         )
 
         assert batch_state.partial_scoring_triggered is expected_flag
@@ -217,7 +231,7 @@ class TestUpdateBatchCompletionCounters:
 
         session = AsyncMock(spec=AsyncSession)
         batch_repo = AsyncMock(spec=CJBatchRepositoryProtocol)
-        batch_repo.get_batch_state.return_value = batch_state
+        batch_repo.get_batch_state_for_update.return_value = batch_state
 
         await policy.update_batch_completion_counters(
             batch_repo=batch_repo,
@@ -225,6 +239,12 @@ class TestUpdateBatchCompletionCounters:
             batch_id=batch_state.batch_id,
             is_error=False,
             correlation_id=uuid4(),
+        )
+
+        batch_repo.get_batch_state_for_update.assert_awaited_once_with(
+            session=session,
+            batch_id=batch_state.batch_id,
+            for_update=True,
         )
 
         assert batch_state.partial_scoring_triggered is True
@@ -237,7 +257,7 @@ class TestUpdateBatchCompletionCounters:
     ) -> None:
         session = AsyncMock(spec=AsyncSession)
         batch_repo = AsyncMock(spec=CJBatchRepositoryProtocol)
-        batch_repo.get_batch_state.return_value = None
+        batch_repo.get_batch_state_for_update.return_value = None
 
         await policy.update_batch_completion_counters(
             batch_repo=batch_repo,
@@ -247,5 +267,8 @@ class TestUpdateBatchCompletionCounters:
             correlation_id=uuid4(),
         )
 
-        # Nothing to assert besides absence of exceptions
-        assert True
+        batch_repo.get_batch_state_for_update.assert_awaited_once_with(
+            session=session,
+            batch_id=123,
+            for_update=True,
+        )
