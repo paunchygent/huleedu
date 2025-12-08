@@ -10,8 +10,8 @@ owner_team: agents
 owner: ''
 program: ''
 created: '2025-11-27'
-last_updated: '2025-11-27'
-related: ["docs/decisions/0004-llm-provider-batching-mode-selection.md", "docs/decisions/0015-cj-assessment-convergence-tuning-strategy.md", "docs/decisions/0017-cj-assessment-wave-submission-pattern.md", "docs/operations/cj-assessment-runbook.md", "docs/operations/eng5-np-runbook.md", "TASKS/assessment/cj-llm-serial-bundle-validation-fixes.md"]
+last_updated: '2025-12-07'
+related: ["docs/decisions/0004-llm-provider-batching-mode-selection.md", "docs/decisions/0015-cj-assessment-convergence-tuning-strategy.md", "docs/decisions/0017-cj-assessment-wave-submission-pattern.md", "docs/operations/cj-assessment-runbook.md", "docs/operations/eng5-np-runbook.md", "services/llm_provider_service/README.md", "TASKS/assessment/cj-llm-serial-bundle-validation-fixes.md"]
 labels: []
 ---
 
@@ -33,8 +33,11 @@ This task is a follow-on to `TASKS/assessment/cj-llm-serial-bundle-validation-fi
 
 - ADR-0004 (LLM Provider batching mode selection)
 - ADR-0015 (CJ convergence tuning)
-- ADR-0017 (wave-based submission pattern)
+- ADR-0017 (wave-based submission pattern and `preferred_bundle_size` hints)
 - CJ/ENG5 runbooks (`docs/operations/cj-assessment-runbook.md`, `docs/operations/eng5-np-runbook.md`)
+- LLM Provider README (`services/llm_provider_service/README.md`) for the queue processing
+  contract (`QUEUE_PROCESSING_MODE`, `SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL` default 64, and how
+  `preferred_bundle_size` is interpreted during serial bundling).
 
 ## PRs
 
@@ -57,6 +60,10 @@ This task is a follow-on to `TASKS/assessment/cj-llm-serial-bundle-validation-fi
 - New unit test in `services/cj_assessment_service/tests/unit/test_comparison_processing.py` (or a new dedicated test file for the orchestrator) to assert that:
   - In `provider_batch_api` effective mode, `generate_comparison_tasks` is invoked with `existing_pairs_threshold == max_pairs_cap`.
   - `merge_batch_processing_metadata` receives a payload that includes `"llm_batching_mode": "provider_batch_api"`.
+- **Progress 2025-12-07:** Initial CJ → LPS batching metadata hints wired and covered:
+  - Builder-level capping in `services/cj_assessment_service/tests/unit/test_llm_batching_config.py::test_includes_capped_preferred_bundle_size` (`preferred_bundle_size` capped at 64 when hints are enabled).
+  - Initial wave metadata in `services/cj_assessment_service/tests/unit/test_llm_batching_metadata.py::test_submit_initial_batch_sets_preferred_bundle_size_to_wave_size` ensuring `preferred_bundle_size == len(comparison_tasks)` and `<= 64`.
+  - Retry wave metadata in `services/cj_assessment_service/tests/unit/test_retry_logic.py::test_retry_batch_metadata_includes_capped_preferred_bundle_size` ensuring retry hints are capped at 64.
 
 ### PR 2 – Provider-Batch Continuation Semantics (No Iterative Waves)
 

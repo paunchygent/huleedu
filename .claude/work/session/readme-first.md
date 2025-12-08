@@ -74,24 +74,34 @@ pdm run pytest-root tests/integration/
 
 ---
 
-## Mock Profiles (Docker Tests)
+## Mock Profiles & ENG5 Suites
 
-| Profile | Use Case | Test File |
+| Profile | Use Case | Main Tests |
 |---------|----------|-----------|
-| `cj_generic_batch` | Regular batch tests | `test_cj_regular_batch_resampling_docker.py` |
-| `eng5_lower5_gpt51_low` | LOWER5 small-net | `test_cj_small_net_continuation_docker.py` |
-| `eng5_anchor_gpt51_low` | Full anchor tests | `test_eng5_mock_parity_full_anchor.py` |
+| `cj_generic_batch` | Regular CJ batch | `tests/integration/test_cj_regular_batch_resampling_docker.py`, `tests/integration/test_cj_regular_batch_callbacks_docker.py`, `tests/eng5_profiles/test_cj_mock_parity_generic.py` |
+| `eng5_lower5_gpt51_low` | LOWER5 small-net | `tests/integration/test_cj_small_net_continuation_docker.py`, `tests/eng5_profiles/test_eng5_mock_parity_lower5.py` |
+| `eng5_anchor_gpt51_low` | Full anchor nets | `tests/eng5_profiles/test_eng5_mock_parity_full_anchor.py` |
 
-**Switching profiles:**
+**Switching profiles & running ENG5 parity suites:**
 ```bash
-# Set profile in .env, then:
-pdm run dev-recreate llm_provider_service  # Required for env changes
-pdm run llm-mock-profile <profile>         # Validates + runs tests
+# Validate .env + restart LPS + run profile-specific suite
+pdm run llm-mock-profile cj-generic
+pdm run llm-mock-profile eng5-anchor
+pdm run llm-mock-profile eng5-lower5
 ```
 
-**Profile verification:**
+**CJ docker semantics (small + regular nets):**
 ```bash
-curl http://localhost:8011/admin/mock-mode
+# Recreate CJ + LPS, then run small-net + regular-batch CJ docker tests
+pdm run eng5-cj-docker-suite           # all
+pdm run eng5-cj-docker-suite small-net # only LOWER5 small-net
+pdm run eng5-cj-docker-suite regular   # only regular ENG5 batch
+```
+
+All individual tests remain runnable via `pytest-root`, for example:
+```bash
+pdm run pytest-root tests/integration/test_cj_regular_batch_callbacks_docker.py -m "docker and integration" -v
+pdm run pytest-root tests/eng5_profiles/test_eng5_mock_parity_lower5.py -m "docker and integration" -v
 ```
 
 ---

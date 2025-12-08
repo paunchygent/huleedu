@@ -1,5 +1,11 @@
 # HuleEdu Developer Reference
 
+## Golden rules:
+1. No vibe-coding, each implementation or change in production code behavior must be researche and have a decision, epic, and story/fix describing it.
+2. Avoid any legacy support and deprecation paths. HuleEdu is a pure prototype codebase with no production data to protect. Convoluted legacy paths and semantics add clutter and confusion in our high-churn, fast evolving codebase. 
+3. Respect SOLID, YAGNI and DDD/Clean Code SRP principles: always leave code cleaner than you found it. 
+4. Respect and USE .claude/rules and docs/. We have a comprehensive onboarding system built just for you.
+
 ## Core Workflow
 
 ### 1. Initial Setup
@@ -7,7 +13,7 @@
 Before using pdm run, start an env-aware shell:
 
 ```bash
-./scripts/dev-shell.sh   # loads .env, then run `pdm run ...`
+./scripts/dev-shell.sh  Use semantics for running docker tests in shell by always loading .env before `pdm run pytest-root...`
 ```
 
 ```markdown

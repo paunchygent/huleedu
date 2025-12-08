@@ -351,6 +351,25 @@ labels in logs and reports.
     - Leave `LLM_PROVIDER_SERVICE_BATCH_API_MODE=disabled`
     - Redeploy CJ and LLM Provider; HTTP contracts and callbacks are unchanged across modes.
 
+### ENG5/CJ serial-bundle test harness
+
+- **ENG5 profile parity tests**
+  - High-fidelity, trace-based ENG5/LOWER5 mocks live in `tests/eng5_profiles/*` and are treated as **ENG5 profile parity tests** (separate from standard docker integration tests under `tests/integration/`).
+- **Recommended orchestration commands**
+  - `pdm run eng5-cj-docker-suite` – recreates `cj_assessment_service` + `llm_provider_service` and runs CJ docker semantics tests:
+    - `pdm run eng5-cj-docker-suite` – run LOWER5 small-net + regular ENG5 batch tests.
+    - `pdm run eng5-cj-docker-suite small-net` – only `tests/integration/test_cj_small_net_continuation_docker.py`.
+    - `pdm run eng5-cj-docker-suite regular` – only regular ENG5 batch tests (resampling + callbacks).
+  - `pdm run llm-mock-profile <profile>` – switches LLM Provider mock profile, restarts the service, and runs the matching ENG5 profile parity suite:
+    - `cj-generic`, `eng5-anchor`, `eng5-lower5` map to tests in `tests/eng5_profiles/*` (see `tests/eng5_profiles/test_eng5_profile_suite.py` for the orchestrator).
+- **Running individual test files (selective validation)**
+  - All tests remain runnable via `pytest-root` when you need to validate a single file instead of the full suite, for example:
+    ```bash
+    pdm run pytest-root tests/integration/test_cj_regular_batch_callbacks_docker.py -m "docker and integration" -v
+    pdm run pytest-root tests/integration/test_cj_small_net_continuation_docker.py -m "docker and integration" -v
+    pdm run pytest-root tests/eng5_profiles/test_eng5_mock_parity_lower5.py -m "docker and integration" -v
+    ```
+
 ### Stability & budget recipes (ENG5)
 
 - **Default serial-bundle behaviour (recommended)**  

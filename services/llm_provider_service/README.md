@@ -82,9 +82,9 @@ LLM_PROVIDER_SERVICE_REDIS_URL=redis://localhost:6379/0
 LLM_PROVIDER_SERVICE_KAFKA_BOOTSTRAP_SERVERS=localhost:9092
 
 # Queue + batching
-LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE=per_request      # per_request | serial_bundle | batch_api
-LLM_PROVIDER_SERVICE_SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL=8  # 1-64
-LLM_PROVIDER_SERVICE_BATCH_API_MODE=disabled                # disabled | nightly | opportunistic
+LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE=per_request       # per_request | serial_bundle | batch_api
+LLM_PROVIDER_SERVICE_SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL=64  # 1-64, CJ hints further constrain per-bundle size
+LLM_PROVIDER_SERVICE_BATCH_API_MODE=disabled                 # disabled | nightly | opportunistic
 
 # Prompt caching (prompt blocks only, never responses)
 LLM_PROVIDER_SERVICE_ENABLE_PROMPT_CACHING=true
@@ -147,12 +147,23 @@ LLM_PROVIDER_SERVICE_LLM_CIRCUIT_BREAKER_RECOVERY_TIMEOUT=120
 through the comparison processor:
 
 - `per_request` (default): call `process_comparison` exactly once per dequeued item.
-- `serial_bundle`: dequeue the leading request plus up to
-  `LLM_PROVIDER_SERVICE_SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL` compatible follow-ups,
-  then invoke `process_comparison_batch` once for the entire group. Requests are
-  considered compatible when the resolved provider, model override, and optional
-  `cj_llm_batching_mode` hint all match. This keeps provider calls sequential
-  while dramatically reducing queue round-trips.
+- `serial_bundle`: dequeue the leading request plus additional compatible
+  follow-ups, then invoke `process_comparison_batch` once for the entire group:
+  - Requests are compatible when the resolved provider, model override, and
+    optional `cj_llm_batching_mode` hint all match.
+  - When a caller (e.g. CJ Assessment) supplies a soft
+    `preferred_bundle_size` hint in request metadata, LPS computes:
+
+    ```text
+    effective_limit = min(preferred_bundle_size or SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL,
+                          SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL)
+    ```
+
+    and stops bundling once `len(bundle_requests) == effective_limit`.
+  - `SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL` is an LPS-wide safety cap (default
+    `64`, validated to `[1, 64]`); hints can reduce bundle size but can never
+    push it above this cap. This keeps CJ’s wave semantics and LPS’s bundling
+    behaviour aligned without coupling their internal implementations.
 - `batch_api`: reserved for native provider batch endpoints. Until that lands, it
   behaves the same as `serial_bundle` but remains separately configurable via
   `LLM_PROVIDER_SERVICE_BATCH_API_MODE` (disabled/nightly/opportunistic). CJ’s

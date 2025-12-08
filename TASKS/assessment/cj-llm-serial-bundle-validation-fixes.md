@@ -7,7 +7,7 @@ priority: high
 domain: assessment
 owner_team: agents
 created: '2025-11-19'
-last_updated: '2025-11-21'
+last_updated: '2025-12-07'
 service: cj_assessment_service
 owner: ''
 program: ''
@@ -48,6 +48,39 @@ labels: []
 - PR1: stability-first completion shipped (callback-driven scoring, nC₂ denominator cap, monitor recovery-only). Unit tests added; targeted pytest command below.
 - PR3: Anthropic client hardened (429 Retry-After, 529/overloaded retryable, stop_reason=max_tokens, prompt caching hook + metadata). Integration test still to extend for 529/stop_reason cases.
 - Docs updated: CJ README (completion path) and LPS README (Anthropic ops/caching). Tests run: `pdm run pytest-root services/cj_assessment_service/tests/unit/test_workflow_continuation.py services/cj_assessment_service/tests/unit/test_completion_threshold.py services/llm_provider_service/tests/integration/test_anthropic_error_diagnostics.py`.
+
+**Progress 2025-12-07 (this session):**
+- PR1 – Completion safety & callback semantics:
+  - `BatchCompletionPolicy.update_batch_completion_counters` now uses `CJBatchRepositoryProtocol.get_batch_state_for_update(..., for_update=True)` to obtain a row-locked `CJBatchState` snapshot before mutating callback counters, preventing lost updates under concurrent callbacks.
+  - Tests updated in `services/cj_assessment_service/tests/unit/test_batch_completion_policy.py` to assert the `get_batch_state_for_update(..., for_update=True)` call in all counter update scenarios while preserving the existing behavioural assertions for `completed_comparisons`, `failed_comparisons`, `last_activity_at`, and `partial_scoring_triggered`.
+- PR1/Continuation – Fresh pending-callback guard:
+  - Added `services/cj_assessment_service/tests/unit/test_workflow_continuation_orchestration.py::test_finalization_skipped_when_fresh_pending_callbacks_detected` and `::test_finalization_proceeds_when_no_fresh_pending_callbacks` to lock in the new `_has_fresh_pending_callbacks` guard semantics around `ContinuationDecision.FINALIZE_SCORING`.
+  - These tests ensure that both success and failure finalization paths consult a fresh batch-state snapshot and skip finalization when new callbacks are still in flight.
+- CJ ↔ LPS serial-bundle hint semantics (shared with TASK-CJ-LLM-PROVIDER-BATCH-API-MODE):
+  - CJ metadata hints:
+    - Initial batches: `services/cj_assessment_service/tests/unit/test_llm_batching_metadata.py::test_submit_initial_batch_sets_preferred_bundle_size_to_wave_size` verifies that `ComparisonBatchOrchestrator.submit_initial_batch()` emits `preferred_bundle_size == len(comparison_tasks)` (per wave) and `<= 64`.
+    - Retry batches: `services/cj_assessment_service/tests/unit/test_retry_logic.py::test_retry_batch_metadata_includes_capped_preferred_bundle_size` verifies that retry waves emit `preferred_bundle_size == 64` when more than 64 tasks are retried.
+  - LPS hint parsing and bundling:
+    - `services/llm_provider_service/tests/unit/test_llm_override_utils.py` covers `get_preferred_bundle_size_hint` for valid / invalid / out-of-range values.
+    - `services/llm_provider_service/tests/unit/test_serial_bundle_strategy.py` asserts that:
+      - For `preferred_bundle_size` below the cap, `SerialBundleStrategy.execute` limits the bundle size to the hint.
+      - For `preferred_bundle_size` above the cap, bundling is capped at `settings.SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL` (default 64).
+  - Docker-level callback invariants for regular ENG5 batches:
+    - Added `tests/integration/test_cj_regular_batch_callbacks_docker.py::TestCJRegularBatchCallbacksDocker::test_cj_regular_batch_callbacks_and_preferred_bundle_size_invariants` to drive a 24-essay ENG5 batch under the `cj_generic_batch` mock profile with `LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE=serial_bundle`, asserting that:
+      - CJBatchState callback counters (`completed_comparisons + failed_comparisons`) match the number of `LLMComparisonResultV1` callbacks observed on the CJ LLM callback topic.
+      - Any `preferred_bundle_size` values present in callback `request_metadata` are integers in the inclusive range `[1, 64]`.
+      - No additional callbacks are observed for the batch once CJ has finalized scoring (based on `CJBatchUpload.completed_at` and callback `event_timestamp`).
+    - The docker test is gated on `CJ_ASSESSMENT_SERVICE_ENABLE_LLM_BATCHING_METADATA_HINTS=true` to avoid running a full 24-essay ENG5 batch in environments where batching hints are disabled; when the flag is false the test skips quickly with an explicit message.
+  - Cross-service metadata contract:
+    - `tests/integration/test_cj_lps_metadata_roundtrip.py` now:
+      - Allows CJ to send `preferred_bundle_size` in `LLMComparisonRequest.metadata`.
+      - Expects `preferred_bundle_size` to be present (when provided) in `LLMComparisonResultV1.request_metadata` with invariants: `isinstance(value, int)` and `1 <= value <= 64`.
+    - `services/llm_provider_service/tests/integration/test_serial_bundle_integration.py` extends the happy-path bundling test to include a `preferred_bundle_size` hint under the cap, ensuring that the size-2 bundle used in the test is compatible with the hint semantics.
+  - ENG5/CJ harness documentation:
+    - `docs/operations/eng5-np-runbook.md` now includes an **ENG5/CJ serial-bundle test harness** subsection that:
+      - Points at `tests/eng5_profiles/*` as ENG5 profile parity tests (separate from standard docker integration tests).
+      - Documents `pdm run eng5-cj-docker-suite` and `pdm run llm-mock-profile <profile>` as the primary orchestration commands.
+      - Provides `pdm run pytest-root ...` examples so individual docker/ENG5 test files can still be executed without running the full suite.
 
 ---
 

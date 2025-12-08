@@ -86,7 +86,7 @@ All tests in this section:
 
 #### 3.1 CJ trace replay vs mock for generic batches
 
-- [ ] Add an integration test module (e.g. `tests/integration/test_cj_mock_parity_generic.py`) that:
+- [ ] Add an integration test module (e.g. `tests/eng5_profiles/test_cj_mock_parity_generic.py`) that:
   - [ ] Replays recorded `LLMComparisonResultV1` fixtures into CJ for a generic batch (real trace path), completes the batch, and records:
     - Coverage metrics: `max_possible_pairs`, `successful_pairs_count`.
     - BT `se_summary` and `bt_quality_flags`.
@@ -101,7 +101,7 @@ All tests in this section:
 
 #### 3.2 ENG5 anchor-align parity (full anchor nets)
 
-- [ ] Add an integration test module (e.g. `tests/integration/test_eng5_mock_parity_full_anchor.py`) that:
+- [ ] Add an integration test module (e.g. `tests/eng5_profiles/test_eng5_mock_parity_full_anchor.py`) that:
   - [ ] Uses recorded ENG5 anchor-align real traces to compute reference metrics (as in 3.1) for a full-anchor run.
   - [ ] Runs the same ENG5 configuration via `eng5-runner` with `provider=openai`/Anthropic + mock mode enabled (no live external LLM).
   - [ ] Asserts:
@@ -110,7 +110,7 @@ All tests in this section:
 
 #### 3.3 ENG5 LOWER5 parity (small nets)
 
-- [ ] Add an integration test module (e.g. `tests/integration/test_eng5_mock_parity_lower5.py`) that:
+- [ ] Add an integration test module (e.g. `tests/eng5_profiles/test_eng5_mock_parity_lower5.py`) that:
   - [ ] Uses recorded LOWER5 real runs (GPT‑5.1, 007/006 and 006/006) to compute reference metrics:
     - [ ] `max_possible_pairs`, `successful_pairs_count`, `unique_coverage_complete`.
     - [ ] Total comparisons and iteration counts.
@@ -153,9 +153,9 @@ All tests in this section:
 ### 7. Quality gates
 
 - [ ] Run targeted tests:
-  - [ ] `pdm run pytest-root tests/integration/test_cj_mock_parity_generic.py`
-  - [ ] `pdm run pytest-root tests/integration/test_eng5_mock_parity_full_anchor.py`
-  - [ ] `pdm run pytest-root tests/integration/test_eng5_mock_parity_lower5.py`
+  - [ ] `pdm run pytest-root tests/eng5_profiles/test_cj_mock_parity_generic.py`
+  - [ ] `pdm run pytest-root tests/eng5_profiles/test_eng5_mock_parity_full_anchor.py`
+  - [ ] `pdm run pytest-root tests/eng5_profiles/test_eng5_mock_parity_lower5.py`
   - [ ] `pdm run pytest-root tests/integration/test_cj_mock_parity_errors.py`
   - [ ] `pdm run pytest-root tests/integration/test_llm_mock_schema_parity.py`
 - [ ] Run repo-wide quality gates:
@@ -172,7 +172,7 @@ All tests in this section:
     - [x] `default_provider` (string) derived from `Settings.DEFAULT_LLM_PROVIDER`.
   - [x] Add LPS API tests under `services/llm_provider_service/tests/api/` to pin this endpoint for the three mock profiles and the admin-disabled guard.
 - [x] Refactor CJ/ENG5 docker parity/coverage tests to assert against `/admin/mock-mode` instead of `.env` heuristics:
-  - [x] In `tests/integration/test_cj_mock_parity_generic.py`, `tests/integration/test_eng5_mock_parity_full_anchor.py`, and `tests/integration/test_eng5_mock_parity_lower5.py`:
+  - [x] In `tests/eng5_profiles/test_cj_mock_parity_generic.py`, `tests/eng5_profiles/test_eng5_mock_parity_full_anchor.py`, and `tests/eng5_profiles/test_eng5_mock_parity_lower5.py`:
     - [x] Use the validated `llm_provider_service` base URL from `ServiceTestManager` to call `/admin/mock-mode` at the start of each test.
     - [x] `pytest.skip` when `use_mock_llm` is `false` or `mock_mode` does not match the expected profile.
     - [x] Remove direct `.env` parsing and cross-checks between process env and `.env`; treat `/admin/mock-mode` as the single source of truth for the running container’s mock mode. `.env` is still validated by `scripts/llm_mgmt/mock_profile_helper.sh`, but tests rely exclusively on the HTTP admin endpoint.
@@ -520,3 +520,11 @@ All CJ/ENG5 docker-backed mock parity tests now:
     - After selecting a profile via `pdm run llm-mock-profile <profile>` (which validates `.env` and restarts LPS), run:
       - `pdm run pytest-root tests/integration/test_eng5_profile_suite.py -m "docker and integration" -v`
     - This keeps `/admin/mock-mode` as the canonical source of truth for the active mock profile while providing a single orchestrated entry point for CJ/ENG5 docker validation.
+
+## Progress (2025-12-07 – ENG5 runbook & harness docs)
+
+- ENG5 NP runbook integration:
+  - `docs/operations/eng5-np-runbook.md` now has an **ENG5/CJ serial-bundle test harness** subsection that:
+    - Explicitly points at `tests/eng5_profiles/*` as ENG5 profile parity tests (separate from standard docker integration tests in `tests/integration/`).
+    - Documents `pdm run eng5-cj-docker-suite` and `pdm run llm-mock-profile <profile>` as the recommended entrypoints for running the heavy ENG5/LOWER5 docker suites.
+    - Includes `pdm run pytest-root ...` examples for running individual ENG5 parity and CJ docker files when selective validation is needed.

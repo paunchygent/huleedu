@@ -2,7 +2,7 @@
 type: runbook
 service: cj_assessment_service
 severity: high
-last_reviewed: 2025-12-06
+last_reviewed: 2025-12-07
 ---
 
 # CJ Assessment & LLM Provider Foundation (Working Reference)

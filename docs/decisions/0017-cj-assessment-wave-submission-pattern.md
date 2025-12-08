@@ -3,7 +3,7 @@ type: decision
 id: ADR-0017
 status: proposed
 created: 2025-11-27
-last_updated: 2025-11-27
+last_updated: 2025-12-07
 ---
 
 # ADR-0017: CJ Assessment Wave-Based Submission Pattern
@@ -41,6 +41,35 @@ per-wave cap. Stability is governed by:
 2. Callbacks update completed/failed counters + last_activity_at
 3. Continuation triggers when `callbacks_received == submitted_comparisons` via `workflow_continuation.trigger_existing_workflow_continuation`
 4. `trigger_existing_workflow_continuation` recomputes BT scores, checks stability, and decides whether to request additional comparisons via `comparison_processing.request_additional_comparisons_for_batch` or finalize
+
+### Wave-Aligned Bundling Hints (CJ → LLM Provider)
+
+Wave size is an internal CJ concept (how many comparisons are generated per
+iteration), but LLM Provider owns the queue and bundle sizes used for actual
+provider calls. To keep these aligned without coupling implementations:
+
+- CJ emits a **soft hint** `preferred_bundle_size` in the metadata of each
+  `LLMComparisonRequest`:
+  - Initial waves use `preferred_bundle_size = len(comparison_tasks)` for that
+    submission.
+  - Retry waves use `preferred_bundle_size = len(retry_tasks)` for the retry
+    bundle.
+  - Hints are capped at `64` in CJ before being sent.
+- LLM Provider Service reads this hint and computes an effective per-bundle
+  limit as:
+
+  ```text
+  effective_limit = min(preferred_bundle_size or SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL,
+                        SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL)
+  ```
+
+- `SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL` remains the authoritative operational
+  safety cap (default `64`, clamped to `[1, 64]` in settings). CJ hints can
+  reduce the bundle size for a given wave but can never push it above this cap.
+
+This keeps CJ’s wave semantics and LPS’s bundling behaviour loosely coupled:
+wave size can evolve with matching strategies and budgets, while LPS preserves
+global safeguards and multi-tenant resilience.
 
 ## Consequences
 

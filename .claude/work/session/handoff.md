@@ -16,63 +16,53 @@ All completed work, patterns, and decisions live in:
 
 Role: You are the lead developer and architect of HuleEdu.
 
-### Scope: CJ Completion Semantics v2 Enforcement Complete
+### Scope: CJ ↔ LPS serial bundling, ENG5/LOWER5 docker suites, and heavy mock separation
 
-**Just completed (2025-12-07):**
-- Enforced strict `total_budget`-only completion semantics per ADR-0020
-- `completion_denominator()` now raises `RuntimeError` when `total_budget` missing/invalid
-- All callers handle RuntimeError gracefully with structured logging
-- Full details in `TASKS/assessment/cj-completion-semantics-v2-enforce-total-budget-and-remove-nc2-fallback.md`
+**Completed this session (2025-12-07):**
+- Moved ENG5 trace-based mock parity tests into `tests/eng5_profiles/`:
+  - `test_cj_mock_parity_generic.py`
+  - `test_eng5_mock_parity_full_anchor.py`
+  - `test_eng5_mock_parity_lower5.py`
+  - `test_eng5_profile_suite.py` (orchestrator over the above).
+- Kept CJ docker semantics tests in `tests/integration/`:
+  - `test_cj_small_net_continuation_docker.py`
+  - `test_cj_regular_batch_resampling_docker.py`
+  - `test_cj_regular_batch_callbacks_docker.py` (callback counts + preferred_bundle_size invariants).
+- Added `scripts/llm_mgmt/eng5_cj_docker_suite.sh` and a PDM alias:
+  - `pdm run eng5-cj-docker-suite [all|small-net|regular]`:
+    - Recreates `llm_provider_service` + `cj_assessment_service`.
+    - Runs LOWER5 small-net and/or regular-batch CJ docker tests.
+- Updated:
+  - `.claude/work/session/readme-first.md` with the new ENG5/LOWER5 test layout and commands.
+  - `TASKS/assessment/cj-llm-serial-bundle-validation-fixes.md` with the regular-batch callback test.
+  - `TASKS/infrastructure/llm-mock-provider-cj-behavioural-parity-tests.md` paths to `tests/eng5_profiles/...`.
+  - `docs/operations/eng5-np-runbook.md` with an **ENG5/CJ serial-bundle test harness** subsection that documents `tests/eng5_profiles/*`, `pdm run eng5-cj-docker-suite`, `pdm run llm-mock-profile <profile>`, and per-file `pytest-root` examples.
 
-**Key changes:**
-- `models_db.py:315-334`: `completion_denominator()` strict budget-only
-- `batch_completion_checker.py`, `batch_completion_policy.py`, `batch_monitor.py`, `workflow_continuation.py`: RuntimeError handling
-- ADR-0020 status changed from "proposed" to "accepted"
-- All test fixtures updated to explicitly set `total_budget`
-- Fixed outbox test flakiness: added `session.expire()` before `refresh()` to handle cross-session transaction isolation
+**Next session – recommended focus:**
+1. Run the ENG5 CJ docker suite under serial_bundle + hints:
+   - Ensure `.env` (dev stack) has:
+     - `CJ_ASSESSMENT_SERVICE_LLM_BATCHING_MODE=serial_bundle`
+     - `CJ_ASSESSMENT_SERVICE_ENABLE_LLM_BATCHING_METADATA_HINTS=true`
+     - `LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE=serial_bundle`
+   - Run:
+     - `pdm run eng5-cj-docker-suite regular`
+     - `pdm run eng5-cj-docker-suite small-net`
+2. For trace-based ENG5 parity runs, use:
+   - `pdm run llm-mock-profile cj-generic`
+   - `pdm run llm-mock-profile eng5-anchor`
+   - `pdm run llm-mock-profile eng5-lower5`
+   and keep these in a separate CI stage from normal docker integration tests.
+3. **[NEW] BatchMonitor Separation of Concerns (US-005.6):**
+   - Eliminate ~200 lines of duplicated finalization logic in `batch_monitor._trigger_scoring()`
+   - Delegate to `BatchFinalizer.finalize_scoring()` for progress >= 80%
+   - Add `COMPLETE_FORCED_RECOVERY` status to distinguish monitor-forced completions
+   - See: `TASKS/assessment/batchmonitor-separation-of-concerns.md`, `docs/decisions/0022-batchmonitor-separation-of-concerns.md`
 
-**Next tasks:**
-1. Run full typecheck and test suite to verify
-2. Continue with per-mode positional fairness docker tests (previous session scope)
-
-### Key Files
-
-| Purpose | Path |
-|---------|------|
-| ADR (accepted) | `docs/decisions/0020-cj-assessment-completion-semantics-v2.md` |
-| Core change | `services/cj_assessment_service/models_db.py:315-334` |
-| Task doc | `TASKS/assessment/cj-completion-semantics-v2-enforce-total-budget-and-remove-nc2-fallback.md` |
-| Plan file | `.claude/plans/zany-sparking-kurzweil.md` |
-
-### Validation
-
-```bash
-# Type check
-pdm run typecheck-all
-
-# Unit tests (CJ service)
-pdm run pytest-root services/cj_assessment_service/tests/unit/ -v
-
-# Specific completion semantics tests
-pdm run pytest-root services/cj_assessment_service/tests/unit/test_completion_threshold.py -v
-```
-
-### Before Touching Code
-
-1. Read ADR-0020 for budget vs coverage semantics
-2. Read task doc for full implementation history
-
----
-
-## Active Blockers
-
-None.
-
----
-
-## Session End Checklist
-
-After completing work:
-1. Update the relevant TASKS/ document with implementation details
-2. Update this file's NEXT SESSION INSTRUCTION for successor
-3. Keep this file under 100 lines
+**Key files:**
+- CJ docker semantics: `tests/integration/test_cj_small_net_continuation_docker.py`, `test_cj_regular_batch_resampling_docker.py`, `test_cj_regular_batch_callbacks_docker.py`
+- ENG5 mock parity: `tests/eng5_profiles/*`
+- Orchestration scripts: `scripts/llm_mgmt/mock_profile_helper.sh`, `scripts/llm_mgmt/eng5_cj_docker_suite.sh`
+- BatchMonitor refactoring: `services/cj_assessment_service/batch_monitor.py`, `services/cj_assessment_service/cj_core_logic/batch_finalizer.py`
+- Active tasks:
+  - `TASKS/assessment/cj-llm-serial-bundle-validation-fixes.md`
+  - `TASKS/assessment/batchmonitor-separation-of-concerns.md`
