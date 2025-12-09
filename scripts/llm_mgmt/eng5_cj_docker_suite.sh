@@ -37,13 +37,13 @@ pdm run dev-recreate llm_provider_service cj_assessment_service
 
 run_small_net_tests() {
   echo "🧪 Running LOWER5 small-net CJ docker tests..."
-  pdm run pytest-root tests/integration/test_cj_small_net_continuation_docker.py -m 'docker and integration' -v
+  pdm run pytest-root tests/functional/cj_eng5/test_cj_small_net_continuation_docker.py -m 'docker and integration' -v
 }
 
 run_regular_batch_tests() {
   echo "🧪 Running regular-batch CJ docker tests (resampling + callbacks)..."
-  pdm run pytest-root tests/integration/test_cj_regular_batch_resampling_docker.py -m 'docker and integration' -v
-  pdm run pytest-root tests/integration/test_cj_regular_batch_callbacks_docker.py -m 'docker and integration' -v
+  pdm run pytest-root tests/functional/cj_eng5/test_cj_regular_batch_resampling_docker.py -m 'docker and integration' -v
+  pdm run pytest-root tests/functional/cj_eng5/test_cj_regular_batch_callbacks_docker.py -m 'docker and integration' -v
 }
 
 case "$SCENARIO" in
@@ -65,4 +65,3 @@ case "$SCENARIO" in
 esac
 
 echo "✅ ENG5/CJ docker suite ($SCENARIO) completed."
-

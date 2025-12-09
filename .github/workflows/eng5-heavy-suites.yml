@@ -1,0 +1,101 @@
+name: ENG5 Heavy CJ/ENG5 Suites
+
+on:
+  # Heavy suites are opt-in: manual or scheduled only.
+  workflow_dispatch:
+  schedule:
+    # Nightly at 03:00 UTC
+    - cron: '0 3 * * *'
+
+jobs:
+  eng5-cj-docker-regular-and-small-net:
+    name: ENG5 CJ Docker Semantics (regular + small-net)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      # CJ batching + hints (must match ENG5 runbook expectations)
+      CJ_ASSESSMENT_SERVICE_LLM_BATCHING_MODE: serial_bundle
+      CJ_ASSESSMENT_SERVICE_ENABLE_LLM_BATCHING_METADATA_HINTS: "true"
+      # LLM Provider queue processing configuration
+      LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE: serial_bundle
+      LLM_PROVIDER_SERVICE_BATCH_API_MODE: disabled
+      # Mock provider controls – heavy suites must never hit real providers in CI
+      LLM_PROVIDER_SERVICE_ALLOW_MOCK_PROVIDER: "true"
+      LLM_PROVIDER_SERVICE_USE_MOCK_LLM: "true"
+      LLM_PROVIDER_SERVICE_MOCK_PROVIDER_SEED: "42"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install PDM and dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pdm
+          pdm install --dev
+
+      - name: Run ENG5 CJ docker suite (regular + small-net)
+        run: |
+          # Ensure .env exists (eng5_cj_docker_suite.sh relies on it)
+          if [ ! -f ".env" ]; then
+            echo "Missing .env at repo root – ENG5 CJ docker suite cannot run." >&2
+            exit 1
+          fi
+
+          # Run regular-batch then small-net semantics tests under serial_bundle
+          pdm run eng5-cj-docker-suite regular
+          pdm run eng5-cj-docker-suite small-net
+
+  eng5-profile-parity-suite:
+    name: ENG5 Mock Profile Parity Suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      # Queue processing and batching settings for profile parity runs
+      LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE: serial_bundle
+      LLM_PROVIDER_SERVICE_BATCH_API_MODE: disabled
+      LLM_PROVIDER_SERVICE_ALLOW_MOCK_PROVIDER: "true"
+      LLM_PROVIDER_SERVICE_USE_MOCK_LLM: "true"
+      LLM_PROVIDER_SERVICE_MOCK_PROVIDER_SEED: "42"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install PDM and dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pdm
+          pdm install --dev
+
+      - name: Run CJ generic mock profile parity
+        run: |
+          if [ ! -f ".env" ]; then
+            echo "Missing .env at repo root – ENG5 profile parity suite cannot run." >&2
+            exit 1
+          fi
+
+          # Ensure cj_generic_batch is configured and run its docker-backed parity suite
+          sed -i 's/^LLM_PROVIDER_SERVICE_MOCK_MODE=.*/LLM_PROVIDER_SERVICE_MOCK_MODE=cj_generic_batch/' .env
+          pdm run llm-mock-profile cj-generic
+
+      - name: Run ENG5 anchor mock profile parity
+        run: |
+          # Switch .env to ENG5 anchor profile and run its parity suite
+          sed -i 's/^LLM_PROVIDER_SERVICE_MOCK_MODE=.*/LLM_PROVIDER_SERVICE_MOCK_MODE=eng5_anchor_gpt51_low/' .env
+          pdm run llm-mock-profile eng5-anchor
+
+      - name: Run ENG5 LOWER5 mock profile parity
+        run: |
+          # Switch .env to ENG5 LOWER5 small-net profile and run its parity suite
+          sed -i 's/^LLM_PROVIDER_SERVICE_MOCK_MODE=.*/LLM_PROVIDER_SERVICE_MOCK_MODE=eng5_lower5_gpt51_low/' .env
+          pdm run llm-mock-profile eng5-lower5
+
