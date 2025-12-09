@@ -278,3 +278,12 @@ class ClassManagementServiceImpl(ClassManagementServiceProtocol, Generic[T, U]):
         Delegates to repository. No events are published.
         """
         return await self.repo.list_classes_by_owner(user_id=user_id, limit=limit, offset=offset)
+
+    async def get_class_info_for_batches(
+        self, batch_ids: list[uuid.UUID]
+    ) -> dict[str, dict[str, str] | None]:
+        """Get class info for multiple batches via EssayStudentAssociation.
+
+        Delegates to repository. No events are published.
+        """
+        return await self.repo.get_class_info_for_batches(batch_ids)

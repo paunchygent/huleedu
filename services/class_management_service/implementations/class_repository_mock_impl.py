@@ -156,3 +156,12 @@ class MockClassRepositoryImpl(ClassRepositoryProtocol[T, U]):
         # Simulate ordering by created_at descending is not tracked; return slice only
         sliced = owned[offset : offset + limit]
         return cast(list[T], list(sliced))
+
+    async def get_class_info_for_batches(
+        self, batch_ids: list[UUID]
+    ) -> dict[str, dict[str, str] | None]:
+        """Get class info for multiple batches via EssayStudentAssociation.
+
+        Mock implementation returns None for all batch_ids.
+        """
+        return {str(bid): None for bid in batch_ids}

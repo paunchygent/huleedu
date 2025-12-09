@@ -1,19 +1,46 @@
 from __future__ import annotations
 
+from typing import Optional
 from uuid import UUID, uuid4
 
 from dishka import FromDishka
 from huleedu_service_libs.error_handling import HuleEduError
 from huleedu_service_libs.logging_utils import create_service_logger
-from quart import Blueprint, Response, jsonify, request
+from quart import Blueprint, Response, g, jsonify, request
 from quart_dishka import inject
 
+from services.class_management_service.config import settings
 from services.class_management_service.domain_handlers.student_name_handler import (
     StudentNameHandler,
 )
+from services.class_management_service.protocols import ClassManagementServiceProtocol
 
 bp = Blueprint("internal", __name__, url_prefix="/internal/v1")
 logger = create_service_logger("class_management_service.internal_routes")
+
+
+@bp.before_request
+async def authenticate_request() -> Optional[tuple[Response, int]]:
+    """Authenticate internal service requests via API key.
+
+    Validates X-Internal-API-Key and X-Service-ID headers.
+    Sets g.service_id and g.correlation_id for downstream handlers.
+    """
+    api_key = request.headers.get("X-Internal-API-Key")
+    service_id = request.headers.get("X-Service-ID")
+
+    if not api_key or not service_id:
+        logger.warning("Missing authentication headers for internal request")
+        return jsonify({"error": "Missing authentication"}), 401
+
+    if api_key != settings.INTERNAL_API_KEY.get_secret_value():
+        logger.warning("Invalid API key for internal request", service_id=service_id)
+        return jsonify({"error": "Invalid credentials"}), 401
+
+    g.service_id = service_id
+    g.correlation_id = request.headers.get("X-Correlation-ID", str(uuid4()))
+
+    return None
 
 
 def _extract_correlation_id() -> UUID:
@@ -127,3 +154,47 @@ async def get_essay_student_association(
             },
         )
         return jsonify({"error": e.error_detail.model_dump()}), 400
+
+
+@bp.route("/batches/class-info", methods=["GET"])
+@inject
+async def get_batch_class_info(
+    service: FromDishka[ClassManagementServiceProtocol],
+) -> Response | tuple[Response, int]:
+    """Get class info for multiple batches.
+
+    Query params:
+        batch_ids: Comma-separated list of batch UUIDs
+
+    Returns:
+        Dict mapping batch_id to class info or null if no association
+    """
+    correlation_id = _extract_correlation_id()
+
+    batch_ids_param = request.args.get("batch_ids", "")
+    if not batch_ids_param:
+        return jsonify({}), 200
+
+    try:
+        batch_ids = [UUID(bid.strip()) for bid in batch_ids_param.split(",") if bid.strip()]
+    except ValueError as e:
+        logger.warning(
+            "Invalid batch_id format in class-info request",
+            extra={
+                "error": str(e),
+                "correlation_id": str(correlation_id),
+            },
+        )
+        return jsonify({"error": "Invalid UUID format"}), 400
+
+    result = await service.get_class_info_for_batches(batch_ids)
+
+    logger.info(
+        "Batch class info retrieved successfully",
+        extra={
+            "batch_count": len(batch_ids),
+            "correlation_id": str(correlation_id),
+        },
+    )
+
+    return jsonify(result), 200

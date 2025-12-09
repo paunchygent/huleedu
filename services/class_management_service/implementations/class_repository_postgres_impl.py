@@ -559,6 +559,70 @@ class PostgreSQLClassRepositoryImpl(ClassRepositoryProtocol[T, U]):
             duration = time.time() - start_time
             self._record_operation_metrics(operation, table, duration, success)
 
+    async def get_class_info_for_batches(
+        self, batch_ids: list[UUID]
+    ) -> dict[str, dict[str, str] | None]:
+        """Get class info for multiple batches via EssayStudentAssociation.
+
+        Args:
+            batch_ids: List of batch UUIDs to look up
+
+        Returns:
+            Dict mapping batch_id (str) to class info dict or None if no association.
+        """
+        start_time = time.time()
+        operation = "get_class_info_for_batches"
+        table = "essay_student_associations"
+        success = True
+
+        try:
+            async with self.session() as session:
+                # Build result dict with None defaults for all requested batch_ids
+                result: dict[str, dict[str, str] | None] = {str(bid): None for bid in batch_ids}
+
+                if not batch_ids:
+                    return result
+
+                # Query distinct batch_id -> class info via EssayStudentAssociation
+                stmt = (
+                    select(
+                        EssayStudentAssociation.batch_id,
+                        UserClass.id,
+                        UserClass.name,
+                    )
+                    .join(UserClass, EssayStudentAssociation.class_id == UserClass.id)
+                    .where(EssayStudentAssociation.batch_id.in_(batch_ids))
+                    .distinct(EssayStudentAssociation.batch_id)
+                )
+                rows = await session.execute(stmt)
+
+                for batch_id, class_id, class_name in rows.all():
+                    result[str(batch_id)] = {
+                        "class_id": str(class_id),
+                        "class_name": class_name,
+                    }
+
+                logger.info(
+                    f"Retrieved class info for {len(batch_ids)} batches",
+                    extra={
+                        "requested_count": len(batch_ids),
+                        "found_count": sum(1 for v in result.values() if v is not None),
+                    },
+                )
+
+                return result
+
+        except Exception as e:
+            success = False
+            error_type = e.__class__.__name__
+            self._record_error_metrics(error_type, operation)
+            logger.error(f"Failed to get class info for batches: {error_type}: {e}")
+            raise
+
+        finally:
+            duration = time.time() - start_time
+            self._record_operation_metrics(operation, table, duration, success)
+
     async def _validate_and_get_course(
         self, session: AsyncSession, course_codes: list[CourseCode], correlation_id: UUID
     ) -> Course:

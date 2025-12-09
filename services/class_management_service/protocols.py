@@ -83,6 +83,20 @@ class ClassRepositoryProtocol(Protocol, Generic[T, U]):
         """
         ...
 
+    async def get_class_info_for_batches(
+        self, batch_ids: list[UUID]
+    ) -> dict[str, dict[str, str] | None]:
+        """Get class info for multiple batches via EssayStudentAssociation.
+
+        Args:
+            batch_ids: List of batch UUIDs to look up
+
+        Returns:
+            Dict mapping batch_id (str) to class info dict or None if no association.
+            Class info: {"class_id": str, "class_name": str}
+        """
+        ...
+
 
 class ClassEventPublisherProtocol(Protocol):
     """Protocol for publishing class management-related events."""
@@ -164,6 +178,20 @@ class ClassManagementServiceProtocol(Protocol, Generic[T, U]):
 
     async def list_classes_for_user(self, user_id: str, limit: int, offset: int) -> list[T]:
         """List classes for the given user (owner)."""
+        ...
+
+    async def get_class_info_for_batches(
+        self, batch_ids: list[UUID]
+    ) -> dict[str, dict[str, str] | None]:
+        """Get class info for multiple batches via EssayStudentAssociation.
+
+        Args:
+            batch_ids: List of batch UUIDs to look up
+
+        Returns:
+            Dict mapping batch_id (str) to class info dict or None if no association.
+            Class info: {"class_id": str, "class_name": str}
+        """
         ...
 
 
