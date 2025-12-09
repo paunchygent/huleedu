@@ -104,6 +104,21 @@ pdm run pytest-root tests/integration/test_cj_regular_batch_callbacks_docker.py 
 pdm run pytest-root tests/eng5_profiles/test_eng5_mock_parity_lower5.py -m "docker and integration" -v
 ```
 
+**CI staging for ENG5 heavy suites (separate from default CI):**
+- `ENG5 CJ Docker Semantics (regular + small-net)` (`eng5-cj-docker-regular-and-small-net` in `.github/workflows/eng5-heavy-suites.yml`)
+  - Reproduces locally with:
+    ```bash
+    pdm run eng5-cj-docker-suite regular
+    pdm run eng5-cj-docker-suite small-net
+    ```
+- `ENG5 Mock Profile Parity Suite` (`eng5-profile-parity-suite` in `.github/workflows/eng5-heavy-suites.yml`)
+  - Reproduces locally with:
+    ```bash
+    pdm run llm-mock-profile cj-generic
+    pdm run llm-mock-profile eng5-anchor
+    pdm run llm-mock-profile eng5-lower5
+    ```
+
 ---
 
 ## Troubleshooting

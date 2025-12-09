@@ -1,22 +1,18 @@
 ---
 type: decision
 id: ADR-0022
-status: proposed
+status: accepted
 created: '2025-12-07'
-last_updated: '2025-12-07'
+last_updated: '2025-12-08'
 ---
 # ADR-0022: BatchMonitor Separation of Concerns
 
-## Status
-
-Proposed
-
 ## Context
 
-The `BatchMonitor` class in CJ Assessment Service currently violates the Single Responsibility Principle (SRP) by mixing two distinct responsibilities:
+The `BatchMonitor` class in CJ Assessment Service previously violated the Single Responsibility Principle (SRP) by mixing two distinct responsibilities:
 
 1. **Monitoring**: Detecting stuck batches via timeout thresholds and triggering recovery actions
-2. **Finalization**: Implementing a full scoring pipeline via `_trigger_scoring()` method (~200 lines)
+2. **Finalization**: Implementing a full scoring pipeline via an internal `_trigger_scoring()` method (~200 lines, now removed)
 
 This creates several architectural problems:
 
@@ -25,33 +21,23 @@ This creates several architectural problems:
 - **Maintenance burden**: Changes to finalization logic require updates in two locations
 - **Testing complexity**: The monitor-forced completion path is harder to test in isolation
 
-### Current State
-
-| Operation | batch_monitor._trigger_scoring() | BatchFinalizer.finalize_scoring() |
-|-----------|----------------------------------|-----------------------------------|
-| Fetch batch upload | Lines 468-477 | Lines 150-156 |
-| Convert essays | Lines 496-504 | Lines 181-189 |
-| Bradley-Terry scoring | Lines 510-518 | Lines 193-201 |
-| Grade projections | Lines 533-544 | Lines 214-227 |
-| Publish events | Lines 617-625 | Lines 256-264 |
-
 ## Decision
 
-**Delegate all finalization logic from BatchMonitor to BatchFinalizer**.
+**Delegate all finalization logic from BatchMonitor to BatchFinalizer** and remove `_trigger_scoring()` entirely.
 
-BatchMonitor will be refactored to:
+BatchMonitor is refactored to:
 1. Remain responsible only for monitoring (detecting stuck batches)
-2. Delegate to `BatchFinalizer.finalize_scoring()` for progress >= 80%
+2. Delegate to `BatchFinalizer.finalize_scoring()` for progress >= 80% (forced recovery)
 3. Publish failure events directly for progress < 80%
 
-A new batch status `COMPLETE_FORCED_RECOVERY` will distinguish monitor-forced completions from callback-driven completions.
+A new batch status `COMPLETE_FORCED_RECOVERY` distinguishes monitor-forced completions from callback-driven completions. All terminal states (`COMPLETE_*` and `ERROR_*`) are treated as idempotent terminal statuses in `BatchFinalizer.finalize_scoring()`.
 
 ### Post-Refactoring Architecture
 
 ```
 BatchMonitor (Pure Monitoring)
   ├─ Detects stuck batches
-  ├─ progress >= 80% → Delegates to BatchFinalizer
+  ├─ progress >= 80% → Delegates to BatchFinalizer.finalize_scoring() with completion_status=COMPLETE_FORCED_RECOVERY
   └─ progress < 80% → Publishes failure event directly
 
 BatchFinalizer (Canonical Finalization)
@@ -68,7 +54,8 @@ BatchFinalizer (Canonical Finalization)
 - **Reduced maintenance**: Changes to finalization semantics require updates in one location
 - **Improved testability**: BatchMonitor can be tested with mocked BatchFinalizer
 - **Clear boundaries**: Monitoring and finalization responsibilities cleanly separated per DDD principles
-- **~200 lines removed**: Elimination of duplicated code
+- **~200 lines removed**: Elimination of duplicated `_trigger_scoring()` code in BatchMonitor
+- **Explicit observability**: Forced recoveries are explicitly labeled via `COMPLETE_FORCED_RECOVERY` and additional `completion_source` metadata (`batch_monitor_forced_recovery` vs `workflow_continuation` / `batch_monitor_completion_sweep`).
 
 ### Negative
 

@@ -16,56 +16,144 @@ All completed work, patterns, and decisions live in:
 
 Role: You are the lead developer and architect of HuleEdu.
 
-### Scope: CJ ↔ LPS serial bundling, ENG5/LOWER5 docker suites, and heavy mock separation
+### Scope: CJ ↔ LPS serial bundling metrics, ENG5 heavy CI hardening, and next-step parity refinements
 
-**Completed this session (2025-12-07):**
-- Moved ENG5 trace-based mock parity tests into `tests/eng5_profiles/`:
-  - `test_cj_mock_parity_generic.py`
-  - `test_eng5_mock_parity_full_anchor.py`
-  - `test_eng5_mock_parity_lower5.py`
-  - `test_eng5_profile_suite.py` (orchestrator over the above).
-- Kept CJ docker semantics tests in `tests/integration/`:
-  - `test_cj_small_net_continuation_docker.py`
-  - `test_cj_regular_batch_resampling_docker.py`
-  - `test_cj_regular_batch_callbacks_docker.py` (callback counts + preferred_bundle_size invariants).
-- Added `scripts/llm_mgmt/eng5_cj_docker_suite.sh` and a PDM alias:
-  - `pdm run eng5-cj-docker-suite [all|small-net|regular]`:
-    - Recreates `llm_provider_service` + `cj_assessment_service`.
-    - Runs LOWER5 small-net and/or regular-batch CJ docker tests.
-- Updated:
-  - `.claude/work/session/readme-first.md` with the new ENG5/LOWER5 test layout and commands.
-  - `TASKS/assessment/cj-llm-serial-bundle-validation-fixes.md` with the regular-batch callback test.
-  - `TASKS/infrastructure/llm-mock-provider-cj-behavioural-parity-tests.md` paths to `tests/eng5_profiles/...`.
-  - `docs/operations/eng5-np-runbook.md` with an **ENG5/CJ serial-bundle test harness** subsection that documents `tests/eng5_profiles/*`, `pdm run eng5-cj-docker-suite`, `pdm run llm-mock-profile <profile>`, and per-file `pytest-root` examples.
+**Completed this session (2025-12-09):**
+- **US-005.6 – BatchMonitor separation of concerns closed:**
+  - Reviewed `services/cj_assessment_service/batch_monitor.py` and `cj_core_logic/batch_finalizer.py` plus unit tests to confirm:
+    - BatchMonitor only decides + annotates stuck batches (80% threshold, forced-to-SCORING metadata, or FAILED + `CJAssessmentFailedV1`).
+    - BatchFinalizer owns all completion state transitions, `CJBatchUpload.completed_at`, and dual event publishing, including `COMPLETE_FORCED_RECOVERY`.
+  - Re-ran and validated:
+    - `pdm run pytest-root services/cj_assessment_service/tests/unit/test_batch_monitor_unit.py`
+    - `pdm run pytest-root services/cj_assessment_service/tests/unit/test_batch_finalizer_scoring_state.py`
+  - Updated `TASKS/assessment/batchmonitor-separation-of-concerns.md`:
+    - `status: 'completed'`, success criteria aligned with the event parity test and migration test.
+    - Implementation files now reference:
+      - `services/cj_assessment_service/enums_db.py` (`COMPLETE_FORCED_RECOVERY`)
+      - `services/cj_assessment_service/alembic/versions/20251208_1200_cj_forced_recovery_status.py`
+      - `services/cj_assessment_service/tests/unit/test_batch_monitor_unit.py`
+      - `services/cj_assessment_service/tests/unit/test_batch_finalizer_scoring_state.py`
+      - `services/cj_assessment_service/tests/unit/test_batch_finalizer_idempotency.py`
+      - `services/cj_assessment_service/tests/integration/test_cj_batch_status_forced_recovery_migration.py`
+- **ENG5 heavy CI staging added (kept out of default fast CI path):**
+  - Created `.github/workflows/eng5-heavy-suites.yml` with two jobs:
+    - `ENG5 CJ Docker Semantics (regular + small-net)` (`eng5-cj-docker-regular-and-small-net`):
+      - Runs ENG5 CJ docker semantics under serial_bundle + batching hints via:
+        - `pdm run eng5-cj-docker-suite regular`
+        - `pdm run eng5-cj-docker-suite small-net`
+      - Assumes `.env` provides:
+        - `CJ_ASSESSMENT_SERVICE_LLM_BATCHING_MODE=serial_bundle`
+        - `CJ_ASSESSMENT_SERVICE_ENABLE_LLM_BATCHING_METADATA_HINTS=true`
+        - `LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE=serial_bundle`
+        - `LLM_PROVIDER_SERVICE_BATCH_API_MODE=disabled`
+        - `LLM_PROVIDER_SERVICE_USE_MOCK_LLM=true`
+    - `ENG5 Mock Profile Parity Suite` (`eng5-profile-parity-suite`):
+      - Uses `.env` + `pdm run llm-mock-profile <profile>` to run docker-backed ENG5 parity tests for:
+        - `cj-generic` → `tests/eng5_profiles/test_cj_mock_parity_generic.py`
+        - `eng5-anchor` → `tests/eng5_profiles/test_eng5_mock_parity_full_anchor.py`
+        - `eng5-lower5` → `tests/eng5_profiles/test_eng5_mock_parity_lower5.py`
+      - CI steps explicitly rewrite `LLM_PROVIDER_SERVICE_MOCK_MODE` in `.env` per profile:
+        - `cj_generic_batch`, `eng5_anchor_gpt51_low`, `eng5_lower5_gpt51_low`
+      - All runs are isolated to this heavy workflow; no default PR push/pull_request triggers.
+- **Docs and TASKs aligned with ENG5 CI staging:**
+  - `docs/operations/eng5-np-runbook.md`:
+    - Added **“CI / validation for ENG5 heavy suites”** section documenting:
+      - Workflow file name.
+      - Job names.
+      - Commands each job runs.
+      - Local reproduction commands (copy-pasteable `pdm run eng5-cj-docker-suite` / `pdm run llm-mock-profile` / `pytest-root` examples).
+  - `.claude/work/session/readme-first.md`:
+    - Under “Mock Profiles & ENG5 Suites”, added explicit mapping from CI jobs to local reproduction commands and clarified that these suites live in a separate CI stage.
+  - `TASKS/assessment/cj-llm-serial-bundle-validation-fixes.md`:
+    - Added progress entry for 2025-12-09 describing the new ENG5 heavy CI workflow and how it validates serial-bundle semantics under `CJ_ASSESSMENT_SERVICE_LLM_BATCHING_MODE=serial_bundle`.
+  - `TASKS/infrastructure/llm-mock-provider-cj-behavioural-parity-tests.md`:
+    - Noted that the ENG5 mock profile parity suite now runs in `eng5-profile-parity-suite` as an opt-in heavy CI stage.
 
-**Next session – recommended focus:**
-1. Run the ENG5 CJ docker suite under serial_bundle + hints:
-   - Ensure `.env` (dev stack) has:
-     - `CJ_ASSESSMENT_SERVICE_LLM_BATCHING_MODE=serial_bundle`
-     - `CJ_ASSESSMENT_SERVICE_ENABLE_LLM_BATCHING_METADATA_HINTS=true`
-     - `LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE=serial_bundle`
-   - Run:
-     - `pdm run eng5-cj-docker-suite regular`
-     - `pdm run eng5-cj-docker-suite small-net`
-2. For trace-based ENG5 parity runs, use:
-   - `pdm run llm-mock-profile cj-generic`
-   - `pdm run llm-mock-profile eng5-anchor`
-   - `pdm run llm-mock-profile eng5-lower5`
-   and keep these in a separate CI stage from normal docker integration tests.
-3. **[NEW] BatchMonitor Separation of Concerns (US-005.6):**
-   - Eliminate ~200 lines of duplicated finalization logic in `batch_monitor._trigger_scoring()`
-   - Delegate to `BatchFinalizer.finalize_scoring()` for progress >= 80%
-   - Add `COMPLETE_FORCED_RECOVERY` status to distinguish monitor-forced completions
-   - See: `TASKS/assessment/batchmonitor-separation-of-concerns.md`, `docs/decisions/0022-batchmonitor-separation-of-concerns.md`
+**Next session – recommended focus: ENG5 metrics & parity hardening**
+1. **Add metrics-level assertions for CJ ↔ LPS serial bundling in docker tests**
+   - Goal: ensure docker semantics tests validate Prometheus metrics as well as behaviour.
+   - Files/tests to extend:
+     - `tests/integration/test_cj_regular_batch_callbacks_docker.py`
+     - `tests/integration/test_cj_regular_batch_resampling_docker.py`
+     - `tests/integration/test_cj_small_net_continuation_docker.py`
+   - Metrics/fields to assert (non-exhaustive, guided by `.claude/rules/071.2-prometheus-metrics-patterns.md` and CJ/LLM docs):
+     - CJ-side: `cj_llm_requests_total{batching_mode="serial_bundle"}`, `cj_llm_batches_started_total{batching_mode}`, `cj_batch_state`, `cj_batch_progress_percentage`.
+     - LPS-side: `llm_provider_serial_bundle_calls_total{provider,model}`, `llm_provider_serial_bundle_items_per_call{provider,model}`, queue expiry/wait-time metrics for `queue_processing_mode="serial_bundle"`.
+   - Runner:
+     - Locally: `pdm run eng5-cj-docker-suite regular` and `small-net` with serial_bundle settings in `.env`.
+     - CI: rely on `eng5-cj-docker-regular-and-small-net` job in `eng5-heavy-suites.yml`.
+2. **Refine ENG5 mock profile parity suite for queue semantics and batch diagnostics**
+   - Goal: extend profile parity tests beyond callback shape/latency/token parity to include:
+     - Queue wait-time distributions for ENG5 traces.
+     - Serial-bundle vs per-request behaviour toggles (where applicable).
+   - Files/tests to extend:
+     - `tests/eng5_profiles/test_cj_mock_parity_generic.py`
+     - `tests/eng5_profiles/test_eng5_mock_parity_full_anchor.py`
+     - `tests/eng5_profiles/test_eng5_mock_parity_lower5.py`
+     - Optionally orchestrator: `tests/eng5_profiles/test_eng5_profile_suite.py`
+   - Tie back to TASKs:
+     - `TASKS/infrastructure/llm-mock-provider-cj-behavioural-parity-tests.md` (document new parity dimensions and metrics).
+     - `TASKS/assessment/cj-llm-serial-bundle-validation-fixes.md` (record which metrics are now pinned by ENG5 suites).
+3. **(Optional stretch) Prepare follow-up work for provider `batch_api` mode tests**
+   - Scope to hand off:
+     - Identify where `LLM_PROVIDER_SERVICE_BATCH_API_MODE` and `CJ_ASSESSMENT_SERVICE_LLM_BATCHING_MODE=provider_batch_api` should be exercised in docker tests once real batch APIs are available.
+     - Outline candidate tests and metrics in the relevant TASK docs without changing code yet.
 
-**Key files:**
-- CJ docker semantics: `tests/integration/test_cj_small_net_continuation_docker.py`, `test_cj_regular_batch_resampling_docker.py`, `test_cj_regular_batch_callbacks_docker.py`
-- ENG5 mock parity: `tests/eng5_profiles/*`
-- Orchestration scripts: `scripts/llm_mgmt/mock_profile_helper.sh`, `scripts/llm_mgmt/eng5_cj_docker_suite.sh`
-- BatchMonitor refactoring: `services/cj_assessment_service/batch_monitor.py`, `services/cj_assessment_service/cj_core_logic/batch_finalizer.py`
-- Active tasks:
+**Key files for next session:**
+- CJ docker semantics & metrics:
+  - `tests/integration/test_cj_small_net_continuation_docker.py`
+  - `tests/integration/test_cj_regular_batch_resampling_docker.py`
+  - `tests/integration/test_cj_regular_batch_callbacks_docker.py`
+- ENG5 mock parity:
+  - `tests/eng5_profiles/test_cj_mock_parity_generic.py`
+  - `tests/eng5_profiles/test_eng5_mock_parity_full_anchor.py`
+  - `tests/eng5_profiles/test_eng5_mock_parity_lower5.py`
+  - `tests/eng5_profiles/test_eng5_profile_suite.py`
+- Orchestration scripts & CI:
+  - `scripts/llm_mgmt/mock_profile_helper.sh`
+  - `scripts/llm_mgmt/eng5_cj_docker_suite.sh`
+  - `.github/workflows/eng5-heavy-suites.yml`
+- CI and testing rules/epic:
+  - `.claude/rules/070-testing-and-quality-assurance.md`
+  - `.claude/rules/101-ci-lanes-and-heavy-suites.md`
+  - `docs/decisions/0024-eng5-heavy-c-lane-ci-strategy.md` (ADR-0024)
+  - `docs/product/epics/ci-test-lanes-and-eng5-heavy-suites.md` (EPIC-011)
+- BatchMonitor / BatchFinalizer (for reference only; US-005.6 is now closed):
+  - `services/cj_assessment_service/batch_monitor.py`
+  - `services/cj_assessment_service/cj_core_logic/batch_finalizer.py`
+- Active TASKs to update as you progress:
   - `TASKS/assessment/cj-llm-serial-bundle-validation-fixes.md`
-  - `TASKS/assessment/batchmonitor-separation-of-concerns.md`
+  - `TASKS/infrastructure/llm-mock-provider-cj-behavioural-parity-tests.md`
+
+---
+
+## CMS Batch Class Info Internal Endpoint (2025-12-09)
+
+**COMPLETED:** `GET /internal/v1/batches/class-info` endpoint for batch→class lookup.
+
+**Endpoint:** `GET /internal/v1/batches/class-info?batch_ids=<uuid1>,<uuid2>,...`
+
+**Response:**
+```json
+{
+  "<batch_id>": {"class_id": "<uuid>", "class_name": "Class Name"},
+  "<batch_id_without_association>": null
+}
+```
+
+**Files modified:**
+- `services/class_management_service/protocols.py` - Added `get_class_info_for_batches()` to both protocols
+- `services/class_management_service/implementations/class_repository_postgres_impl.py` - Repository method with metrics
+- `services/class_management_service/implementations/class_repository_mock_impl.py` - Mock implementation
+- `services/class_management_service/implementations/class_management_service_impl.py` - Service method
+- `services/class_management_service/api/internal_routes.py` - `before_request` auth hook + route handler
+- `services/class_management_service/tests/unit/test_batch_class_info.py` - 9 unit tests
+
+**Authentication:** Uses RAS-canonical `before_request` hook pattern with `X-Internal-API-Key` + `X-Service-ID` headers.
+
+**Task:** `TASKS/programs/teacher_dashboard_integration/cms-batch-class-info-internal-endpoint.md` (status: completed)
+
+**Unblocks:** BFF Teacher Dashboard can now call CMS for class name enrichment.
 
 ---
 
@@ -76,6 +164,17 @@ Role: You are the lead developer and architect of HuleEdu.
 - Docker compose integrated with volume mount for dev
 - PDM scripts: `bff-build`, `bff-start`, `bff-logs`, `bff-restart`
 - See frontend handoff for details: `frontend/.claude/work/session/handoff.md`
+
+---
+
+## API Gateway: BFF Teacher Proxy Tests (2025-12-08)
+
+**Completed:**
+- Created `services/api_gateway_service/tests/test_bff_teacher_routes.py` with 9 unit tests
+- Tests cover: GET/POST success, identity header injection (X-User-ID, X-Correlation-ID, X-Org-ID), error handling (502), status code preservation, query param forwarding
+- All tests pass, typecheck-all and lint pass
+
+**Test pattern:** Uses `respx_mock` for HTTP mocking, `AuthTestProvider` + `InfrastructureTestProvider` from `test_provider.py`, mirrors `test_class_routes.py` pattern exactly.
 
 ---
 

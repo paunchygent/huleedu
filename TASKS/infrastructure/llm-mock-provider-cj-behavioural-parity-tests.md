@@ -10,8 +10,8 @@ owner_team: 'agents'
 owner: ''
 program: 'eng5'
 created: '2025-12-04'
-last_updated: '2025-12-05'
-related: ['EPIC-005', 'EPIC-008', 'llm-provider-openai-gpt-5x-reasoning-controls', 'llm-provider-anthropic-thinking-controls', 'cj-small-net-coverage-and-continuation-docker-validation']
+last_updated: '2025-12-09'
+related: ['EPIC-005', 'EPIC-008', 'EPIC-011', 'llm-provider-openai-gpt-5x-reasoning-controls', 'llm-provider-anthropic-thinking-controls', 'cj-small-net-coverage-and-continuation-docker-validation']
 labels: ['llm-provider', 'cj', 'eng5', 'mock-provider', 'parity']
 ---
 # LLM mock provider CJ behavioural parity tests
@@ -204,6 +204,37 @@ All CJ/ENG5 docker-backed mock parity tests now:
 - Validating `.env` mock profile settings (`LLM_PROVIDER_SERVICE_USE_MOCK_LLM=true`, `LLM_PROVIDER_SERVICE_MOCK_MODE=<expected>`).
 - Restarting only the `llm_provider_service` dev container.
 - Running the appropriate docker-backed parity tests, which now rely on `/admin/mock-mode` as the single source of truth for the running container’s mock mode.
+
+In CI, these parity tests are wired into the dedicated heavy workflow `.github/workflows/eng5-heavy-suites.yml` via the `ENG5 Mock Profile Parity Suite` job (`eng5-profile-parity-suite`), which:
+
+- Ensures mock mode is enabled and `LLM_PROVIDER_SERVICE_MOCK_MODE` is set per profile (`cj_generic_batch`, `eng5_anchor_gpt51_low`, `eng5_lower5_gpt51_low`) by updating `.env`.
+- Executes `pdm run llm-mock-profile cj-generic`, `pdm run llm-mock-profile eng5-anchor`, and `pdm run llm-mock-profile eng5-lower5` as part of a separate, opt-in CI stage so ENG5/CJ parity checks remain out of the default fast PR pipeline.
+
+**Planned Work – Step 2: Richer ENG5 parity metrics in Heavy C-lane (EPIC-005, EPIC-008, EPIC-011):**
+
+- Scope:
+  - Extend ENG5 mock parity tests with queue/batching and metrics assertions **within Lane C only**:
+    - `tests/eng5_profiles/test_cj_mock_parity_generic.py`
+    - `tests/eng5_profiles/test_eng5_mock_parity_full_anchor.py`
+    - `tests/eng5_profiles/test_eng5_mock_parity_lower5.py`
+    - Orchestrator: `tests/eng5_profiles/test_eng5_profile_suite.py` (optional aggregate checks).
+- Execution:
+  - Local:
+    - `pdm run llm-mock-profile cj-generic`
+    - `pdm run llm-mock-profile eng5-anchor`
+    - `pdm run llm-mock-profile eng5-lower5`
+  - CI:
+    - `eng5-profile-parity-suite` job in `.github/workflows/eng5-heavy-suites.yml` (future: matrix per profile).
+- Metrics and behaviours to assert (examples, to be refined during implementation):
+  - LPS (mock provider):
+    - `llm_provider_serial_bundle_calls_total{provider="mock",model=<expected>}` increases per ENG5 scenario.
+    - `llm_provider_serial_bundle_items_per_call{provider="mock",model=<expected>}` stays within configured bounds and shows non-degenerate distribution.
+    - Queue wait-time metrics (`llm_provider_queue_wait_time_seconds{queue_processing_mode="serial_bundle",result=...}`) remain within tolerances derived from recorded ENG5 traces.
+  - CJ (where applicable for CJ-shaped mock runs):
+    - `cj_llm_requests_total{batching_mode="serial_bundle"}` / `cj_llm_batches_started_total` reflect expected bundling behaviour.
+  - All new assertions MUST rely on:
+    - `/admin/mock-mode` for profile verification.
+    - `/metrics` for Prometheus scraping, without introducing per-request mock switches.
 
 ## Success Criteria
 

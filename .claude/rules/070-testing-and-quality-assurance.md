@@ -137,3 +137,21 @@ os.environ["SERVICE_DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
 
 ---
 **Fix underlying issues, don't simplify tests.**
+
+## 10. CI Lanes and Test Locations (see Rule 101)
+
+- **tests/functional/**:
+  - Houses full docker orchestration and `.env`-driven tests (ENG5 CJ docker semantics, ENG5 mock profiles, end-to-end flows).
+  - These tests are **Heavy C-lane** only:
+    - Run via explicit harnesses (e.g. `pdm run eng5-cj-docker-suite`, `pdm run llm-mock-profile ...`).
+    - Wired into dedicated CI workflows (e.g. `eng5-heavy-suites.yml`), not the default PR pipeline.
+- **tests/integration/**:
+  - Houses lighter cross-service integration tests that:
+    - Assume a running stack but **do not** own docker-compose orchestration.
+    - Do **not** mutate `.env` or depend on ENG5-specific profiles.
+- **Rule 101 alignment**:
+  - Lane A/B/C semantics and `.env`/harness rules are defined in `101-ci-lanes-and-heavy-suites.md`.
+  - When adding new tests, choose location and CI lane explicitly:
+    - Unit/service-local → service `tests/` + Lane A.
+    - Cross-service light integration → `tests/integration/` + Lane A/B.
+    - Full docker/ENG5/ENV-driven → `tests/functional/` + Lane C only.

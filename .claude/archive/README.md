@@ -28,6 +28,12 @@ Historical and completed artifacts.
   - Old task documents
   - Completed implementation plans
 
+- **reports/** - Completed research and investigation reports
+  - Implementation plans extracted into tasks
+  - Domain model investigations
+  - API audit reports
+  - Naming: `<subject>-YYYY-MM-DD.md`
+
 ## Purpose
 
 This directory preserves historical context while keeping active work directories clean. Items here are kept for reference but are not part of current active work.

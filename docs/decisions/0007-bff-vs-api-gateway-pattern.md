@@ -143,6 +143,30 @@ async def get_teacher_dashboard(user_id: str) -> TeacherClassDashboardV1:
     return TeacherClassDashboardV1(batches=batches, total_count=len(batches))
 ```
 
+### 5a. BFF Feature Scope
+
+| Feature Area             | BFF Role                 | Backend Service   |
+|--------------------------|--------------------------|-------------------|
+| Dashboard (batch list)   | Aggregates RAS + CMS     | RAS, CMS          |
+| Batch Detail             | Aggregates RAS + Content | RAS, Content      |
+| Class/Student Management | Proxy to CMS             | CMS               |
+| Batch CRUD               | Proxy to BOS             | BOS               |
+| Essay Management         | Proxy to ELS/File        | ELS, File Service |
+| Statistics               | Aggregates RAS           | RAS               |
+| AI Feedback              | Aggregates RAS + Content | RAS, Content      |
+
+### 5b. Write Path Decision
+
+**Decision**: BFF proxies writes to backend services via Gateway patterns.
+
+- **Reads**: BFF aggregates from multiple services (primary responsibility)
+- **Writes**: BFF forwards to appropriate backend, Gateway handles command publishing
+- **Rationale**: Keeps BFF focused on read optimization; avoids duplicating write logic
+
+**Write Flow**:
+1. Vue → Gateway → BOS/ELS (writes)
+2. Vue → Gateway → BFF → RAS/CMS (reads)
+
 ### 6. Versioning Strategy
 - **URL path versioning**: `/bff/v1/teacher/...`
 - **DTO version suffixes**: `TeacherClassDashboardV1`, `V2`, etc.

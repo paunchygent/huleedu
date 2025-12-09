@@ -7,11 +7,11 @@ priority: high
 domain: assessment
 owner_team: agents
 created: '2025-11-19'
-last_updated: '2025-12-07'
+last_updated: '2025-12-09'
 service: cj_assessment_service
 owner: ''
 program: ''
-related: []
+related: ['EPIC-005', 'EPIC-008', 'EPIC-011']
 labels: []
 ---
 
@@ -113,6 +113,45 @@ counters so completion percentages never exceed 100% and match DB reality.
 - **[±]** Partial scoring trigger still uses legacy 80% heuristic; leave for follow-up if needed (no regression today).
 - **[x]** Tests added/updated: workflow continuation, completion denominator small-batch cap.
 - **[x]** Validation: `pdm run pytest-root services/cj_assessment_service/tests/unit/test_workflow_continuation.py services/cj_assessment_service/tests/unit/test_completion_threshold.py` + lint/format.
+
+**Progress 2025-12-09 (ENG5 heavy CI staging):**
+- Added dedicated heavy CI workflow `.github/workflows/eng5-heavy-suites.yml` with two opt-in jobs (kept out of the default fast CI path):
+  - `ENG5 CJ Docker Semantics (regular + small-net)` (`eng5-cj-docker-regular-and-small-net`):
+    - Runs ENG5 CJ docker semantics under serial-bundle + hints using:
+      - `pdm run eng5-cj-docker-suite regular`
+      - `pdm run eng5-cj-docker-suite small-net`
+    - Assumes `.env` config with:
+      - `CJ_ASSESSMENT_SERVICE_LLM_BATCHING_MODE=serial_bundle`
+      - `CJ_ASSESSMENT_SERVICE_ENABLE_LLM_BATCHING_METADATA_HINTS=true`
+      - `LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE=serial_bundle`
+      - `LLM_PROVIDER_SERVICE_BATCH_API_MODE=disabled`
+  - `ENG5 Mock Profile Parity Suite` (`eng5-profile-parity-suite`):
+    - Validates CJ/LPS trace-based ENG5 profiles via `pdm run llm-mock-profile <profile>`:
+      - `cj-generic`, `eng5-anchor`, `eng5-lower5` mapped to tests in `tests/eng5_profiles/*`.
+    - Assumes `.env` mock profile settings:
+      - `LLM_PROVIDER_SERVICE_USE_MOCK_LLM=true`
+      - `LLM_PROVIDER_SERVICE_MOCK_MODE` in `{cj_generic_batch, eng5_anchor_gpt51_low, eng5_lower5_gpt51_low}` per profile.
+
+**Planned Work – Step 1: Heavy-lane metrics assertions in ENG5 CJ docker tests (EPIC-005, EPIC-011):**
+- Scope:
+  - Extend ENG5 CJ docker semantics tests with Prometheus metrics assertions for serial bundling and completion **in Lane C only**:
+    - `tests/functional/cj_eng5/test_cj_regular_batch_callbacks_docker.py`
+    - `tests/functional/cj_eng5/test_cj_regular_batch_resampling_docker.py`
+    - `tests/functional/cj_eng5/test_cj_small_net_continuation_docker.py`
+- Constraints:
+  - New metrics assertions MUST be exercised only via:
+    - Local: `pdm run eng5-cj-docker-suite regular` / `small-net`.
+    - CI: `eng5-cj-docker-regular-and-small-net` job in `.github/workflows/eng5-heavy-suites.yml`.
+  - No changes to fast PR or walking-skeleton lanes (see EPIC-011 and Rule 101).
+- Metrics to assert (non-exhaustive, guided by ENG5 runbook and metrics rules):
+  - CJ:
+    - `cj_llm_requests_total{batching_mode="serial_bundle"}`
+    - `cj_llm_batches_started_total{batching_mode="serial_bundle"}`
+    - `cj_batch_state` / `cj_batch_progress_percentage` for completion.
+  - LPS:
+    - `llm_provider_serial_bundle_calls_total{provider,model}`
+    - `llm_provider_serial_bundle_items_per_call{provider,model}`
+    - Queue wait-time metrics under `queue_processing_mode="serial_bundle"` where available.
 
 ---
 

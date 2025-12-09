@@ -96,12 +96,12 @@ Connects to:
 
 5. **Docker/E2E validation (follow-up)**
    - [x] LOWER5 small-net positional fairness harness implemented:
-     - [x] `tests/integration/test_cj_small_net_continuation_docker.py::test_lower5_positional_fairness_after_continuation`
+     - [x] `tests/functional/cj_eng5/test_cj_small_net_continuation_docker.py::test_lower5_positional_fairness_after_continuation`
      - [x] Gates on `eng5_lower5_gpt51_low` mock profile.
      - [x] Uses `MAX_ALLOWED_SKEW=0.5` (to be tightened based on empirical data).
      - [x] Per-pair complement assertions (resampled pairs have AB + BA).
    - [x] Regular-batch (24 essays) positional fairness harness implemented:
-     - [x] `tests/integration/test_cj_regular_batch_resampling_docker.py::test_cj_regular_batch_resampling_metadata_completed_successful`
+     - [x] `tests/functional/cj_eng5/test_cj_regular_batch_resampling_docker.py::test_cj_regular_batch_resampling_metadata_completed_successful`
      - [x] Gates on `cj_generic_batch` mock profile.
      - [x] Validates PR-2/PR-7 invariants + resampling cap for regular batches.
      - [x] Includes positional fairness assertions with same `MAX_ALLOWED_SKEW=0.5` threshold.

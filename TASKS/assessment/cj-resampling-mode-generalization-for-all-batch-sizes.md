@@ -98,17 +98,17 @@ Connects to:
    - [x] Add unit tests in `test_pair_generation_context.py` to confirm RESAMPLING remains fair and budget-aware for larger nets.
 
 5. **Docker/E2E validation (follow-up)**
-   - [ ] After unit semantics are stable, add or extend integration tests (potentially a second test in `tests/integration/test_cj_small_net_continuation_docker.py` or a new `test_cj_regular_batch_resampling_docker.py`) to:
+   - [ ] After unit semantics are stable, add or extend functional/docker tests (potentially a second test in `tests/functional/cj_eng5/test_cj_small_net_continuation_docker.py` or the `test_cj_regular_batch_resampling_docker.py` skeleton in `tests/functional/cj_eng5/`) to:
      - [x] Sketch a realistic CJ regular‑batch scenario under ENG5 or generic CJ configuration in a new docker test module that reuses the LOWER5 helpers.
      - [ ] Run the regular‑batch scenario once RESAMPLING orchestration for non-small nets is implemented and stabilised under docker.
      - [ ] Verify that:
        - [ ] RESAMPLING is invoked at least once (e.g. via metadata, counts, or metrics).
        - [ ] The batch still finalizes correctly when caps or stability conditions are met.
-   - Note: a LOWER5-focused small-net continuation harness already exists in `tests/integration/test_cj_small_net_continuation_docker.py`; it is structured to be net-size agnostic so that regular-batch RESAMPLING tests can reuse the same helpers once the generalized settings and orchestration changes are in place. As of 2025‑12‑06, this harness verifies:
+   - Note: a LOWER5-focused small-net continuation harness already exists in `tests/functional/cj_eng5/test_cj_small_net_continuation_docker.py`; it is structured to be net-size agnostic so that regular-batch RESAMPLING tests can reuse the same helpers once the generalized settings and orchestration changes are in place. As of 2025‑12‑06, this harness verifies:
      - Small‑net classification for 5‑essay ENG5 LOWER5 batches (`expected_essay_count <= MIN_RESAMPLING_NET_SIZE`).
      - Coverage metadata (`max_possible_pairs == successful_pairs_count == 10`, `unique_coverage_complete is True`).
      - Phase‑2 small‑net resampling hitting the configured cap (`resampling_pass_count == MAX_RESAMPLING_PASSES_FOR_SMALL_NET`, `total_comparisons ≈ 40`) and finalization via `FINALIZE_SCORING` with `success_rate == 1.0` and `failed_comparisons == 0`.
-   - Design sketch (2025‑12‑06): `tests/integration/test_cj_regular_batch_resampling_docker.py`
+   - Design sketch (2025‑12‑06): `tests/functional/cj_eng5/test_cj_regular_batch_resampling_docker.py`
      outlines a future regular‑batch docker test using:
      - `expected_essay_count ≈ 24` (so `is_small_net is False` under default thresholds).
      - The shared `_wait_for_cj_batch_final_state(...)` helper to assert completion.

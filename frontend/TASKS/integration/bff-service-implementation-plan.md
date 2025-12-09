@@ -2,7 +2,7 @@
 id: bff-service-implementation-plan
 title: BFF-Teacher Service Implementation Plan
 type: task
-status: active
+status: in_progress
 priority: high
 domain: integration
 service: bff_teacher_service
@@ -32,6 +32,13 @@ labels: []
 - Created `services/bff_teacher_service/clients/__init__.py` (scaffold)
 - Updated `app.py` to include API router before SPA fallback
 - Updated `config.py` CORS methods for full API support
+
+### Completed: API Gateway BFF Teacher Proxy Tests
+
+- Created `services/api_gateway_service/tests/test_bff_teacher_routes.py` with 9 unit tests
+- Tests cover: GET/POST success, identity header injection (X-User-ID, X-Correlation-ID, X-Org-ID), error handling (502), status code preservation, query param forwarding
+- All tests pass, typecheck-all and lint pass
+- Test pattern: Uses `respx_mock` for HTTP mocking, mirrors `test_class_routes.py` pattern
 
 **Validation:**
 - `pdm run typecheck-all` passes

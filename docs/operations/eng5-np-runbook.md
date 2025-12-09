@@ -358,17 +358,62 @@ labels in logs and reports.
 - **Recommended orchestration commands**
   - `pdm run eng5-cj-docker-suite` – recreates `cj_assessment_service` + `llm_provider_service` and runs CJ docker semantics tests:
     - `pdm run eng5-cj-docker-suite` – run LOWER5 small-net + regular ENG5 batch tests.
-    - `pdm run eng5-cj-docker-suite small-net` – only `tests/integration/test_cj_small_net_continuation_docker.py`.
-    - `pdm run eng5-cj-docker-suite regular` – only regular ENG5 batch tests (resampling + callbacks).
+    - `pdm run eng5-cj-docker-suite small-net` – only `tests/functional/cj_eng5/test_cj_small_net_continuation_docker.py`.
+    - `pdm run eng5-cj-docker-suite regular` – only regular ENG5 batch tests (resampling + callbacks) in `tests/functional/cj_eng5/`.
   - `pdm run llm-mock-profile <profile>` – switches LLM Provider mock profile, restarts the service, and runs the matching ENG5 profile parity suite:
     - `cj-generic`, `eng5-anchor`, `eng5-lower5` map to tests in `tests/eng5_profiles/*` (see `tests/eng5_profiles/test_eng5_profile_suite.py` for the orchestrator).
 - **Running individual test files (selective validation)**
   - All tests remain runnable via `pytest-root` when you need to validate a single file instead of the full suite, for example:
     ```bash
-    pdm run pytest-root tests/integration/test_cj_regular_batch_callbacks_docker.py -m "docker and integration" -v
-    pdm run pytest-root tests/integration/test_cj_small_net_continuation_docker.py -m "docker and integration" -v
+    pdm run pytest-root tests/functional/cj_eng5/test_cj_regular_batch_callbacks_docker.py -m "docker and integration" -v
+    pdm run pytest-root tests/functional/cj_eng5/test_cj_small_net_continuation_docker.py -m "docker and integration" -v
     pdm run pytest-root tests/eng5_profiles/test_eng5_mock_parity_lower5.py -m "docker and integration" -v
     ```
+
+### CI / validation for ENG5 heavy suites
+
+- **Workflow**: `.github/workflows/eng5-heavy-suites.yml`
+- **Jobs (heavy, non-default CI path)**:
+  - `ENG5 CJ Docker Semantics (regular + small-net)` (`eng5-cj-docker-regular-and-small-net`)
+    - Triggers: `workflow_dispatch`, nightly `schedule` (03:00 UTC).
+    - Environment (expected):
+      - `CJ_ASSESSMENT_SERVICE_LLM_BATCHING_MODE=serial_bundle`
+      - `CJ_ASSESSMENT_SERVICE_ENABLE_LLM_BATCHING_METADATA_HINTS=true`
+      - `LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE=serial_bundle`
+      - `LLM_PROVIDER_SERVICE_BATCH_API_MODE=disabled`
+      - `LLM_PROVIDER_SERVICE_USE_MOCK_LLM=true` / `LLM_PROVIDER_SERVICE_ALLOW_MOCK_PROVIDER=true`
+    - Commands:
+      - `pdm run eng5-cj-docker-suite regular`
+      - `pdm run eng5-cj-docker-suite small-net`
+    - Local reproduction (from repo root, .env matching the above):
+      ```bash
+      pdm run eng5-cj-docker-suite regular
+      pdm run eng5-cj-docker-suite small-net
+      ```
+  - `ENG5 Mock Profile Parity Suite` (`eng5-profile-parity-suite`)
+    - Triggers: `workflow_dispatch`, nightly `schedule` (03:00 UTC).
+    - Environment (expected):
+      - `LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE=serial_bundle`
+      - `LLM_PROVIDER_SERVICE_BATCH_API_MODE=disabled`
+      - `LLM_PROVIDER_SERVICE_USE_MOCK_LLM=true` / `LLM_PROVIDER_SERVICE_ALLOW_MOCK_PROVIDER=true`
+    - For each profile, CI updates `.env` `LLM_PROVIDER_SERVICE_MOCK_MODE` and runs:
+      - Generic CJ mock:
+        ```bash
+        pdm run llm-mock-profile cj-generic
+        ```
+      - ENG5 anchor:
+        ```bash
+        pdm run llm-mock-profile eng5-anchor
+        ```
+      - ENG5 LOWER5:
+        ```bash
+        pdm run llm-mock-profile eng5-lower5
+        ```
+    - Local reproduction:
+      - Use the same `pdm run llm-mock-profile <profile>` commands as above, or run the orchestrator:
+        ```bash
+        pdm run pytest-root tests/eng5_profiles/test_eng5_profile_suite.py -m "docker and integration" -v
+        ```
 
 ### Stability & budget recipes (ENG5)
 

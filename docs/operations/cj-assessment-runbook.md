@@ -71,7 +71,7 @@ Purpose: single reference for defaults, reasoning, metrics, and open work across
 | MAX_RESAMPLING_PASSES_FOR_SMALL_NET | 2 | Caps resampling passes for small nets once unique coverage is complete. | Adjust cautiously; monitor BT SE diagnostics and coverage metrics before increasing. |
 | MAX_RESAMPLING_PASSES_FOR_REGULAR_BATCH | 1 | Caps Phase‑2 RESAMPLING passes for non‑small‑net batches, preventing larger nets from over‑consuming budget via RESAMPLING while still allowing limited stability/fairness improvements. | Start with a conservative value (≤ small‑net cap); increase only after validating coverage, stability, and positional fairness metrics in CJ/ENG5 traces. |
 | PAIR_ORIENTATION_STRATEGY | `fair_complement` | Orientation strategy for A/B positions in COVERAGE and RESAMPLING. `fair_complement` uses persisted `ComparisonPair` history to (a) steer each essay’s A/B skew back toward 50/50 and (b) enforce AB/BA complements for unordered pairs when budget allows. | Treat as a DI‑swappable experiment knob only. For a 24‑essay net, `MAX_PAIRWISE_COMPARISONS=552` (276 coverage + 276 resampling) yields 0.0 positional skew with full complement coverage; the standard budget `MAX_PAIRWISE_COMPARISONS=288` resamples only ~4.3% of pairs and naturally produces ≈0.167 residual skew from incomplete complement coverage, which is expected and not an algorithm defect. |
-| BatchMonitor timeout_hours | prod: 4h; dev: 1h | Recovery-only safety net; generous for prod, tight for dev. | Remove 80% heuristic; keep timeout-only once validated. |
+| BatchMonitor timeout_hours | prod: 4h; dev: 1h | Recovery-only safety net; generous for prod, tight for dev. | Keep timeout-based detection of stuck batches; rely on BatchFinalizer for all completions (including forced recovery). |
 | PROMPT_CACHE_TTL_SECONDS | ad-hoc/dev: 300–600s; assignment_id/batch: 3600s | Short TTL for rapid iteration; longer for stable, repeated prompts in batch runs. | Raise to 4–6h if cache hit rate is high and safety acceptable. |
 | ENABLE_PROMPT_CACHING | true for assignment_id/batch; optional for ad-hoc | Reduce cost on repeated static context; avoid surprises in highly dynamic prompts. | Keep on for curated exams; monitor hits/misses. |
 | stop_reason handling | error on max_tokens | Prevent silent truncation. | Keep; add tests for stop_reason and 529. |
@@ -85,8 +85,11 @@ Purpose: single reference for defaults, reasoning, metrics, and open work across
 ### Stability vs caps
 - `MAX_PAIRWISE_COMPARISONS` (and any runner `max_comparisons` hint) are treated as **caps**, not obligations. Batches may finalize early when BT scores stabilize under `SCORE_STABILITY_THRESHOLD` once `MIN_COMPARISONS_FOR_STABILITY_CHECK` successful comparisons are available.
 - To *intentionally* consume the full cap in a stability‑aware workflow (no early stop), configure `MIN_COMPARISONS_FOR_STABILITY_CHECK` greater than the effective cap (`MAX_PAIRWISE_COMPARISONS` or runner override) so the stability gate never passes; finalization then occurs only when callbacks reach the denominator/cap.
-4) Finalization: SCORING -> COMPLETE_STABLE, rankings + projections (only if assignment_id), events out.
-5) BatchMonitor: intended recovery-only; remove 80% heuristic after timeout-only path is validated.
+4) Finalization (callback-driven path): SCORING -> COMPLETE_STABLE, rankings + projections (only if assignment_id), events out.
+5) BatchMonitor (recovery-only):
+   - Detects stuck batches based on `last_activity_at` and monitored states.
+   - For progress >= 80%, forces the real-time CJ state to SCORING and delegates to `BatchFinalizer.finalize_scoring(...)` with `completion_status=COMPLETE_FORCED_RECOVERY` and `source="batch_monitor_forced_recovery"`.
+   - For progress < 80%, marks the batch as FAILED and publishes a `CJAssessmentFailedV1` event directly.
 
 ## Metrics to instrument/track
 - Completion latency: callback_to_finalization p95.

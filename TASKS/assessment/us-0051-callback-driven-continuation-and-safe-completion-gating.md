@@ -65,7 +65,7 @@ Key files to modify:
 
 Goal: Add a docker-backed, "completed-successful small net" test that validates callback-driven continuation semantics end-to-end (AGW → BOS/BCS/ELS → CJ → LPS mock → CJ/RAS), with a focus on small-net coverage and continuation behaviour under the ENG5 LOWER5 mock profile.
 
-This section defines the concrete implementation checklist for `tests/integration/test_cj_small_net_continuation_docker.py`. The test will be cross-linked with:
+This section defines the concrete implementation checklist for `tests/functional/cj_eng5/test_cj_small_net_continuation_docker.py`. The test will be cross-linked with:
 
 - EPIC-005 (CJ Stability & Reliability)
 - PR-7 (Phase-2 resampling and convergence harness)
@@ -204,7 +204,7 @@ Planned follow-ups (partially implemented as of 2025‑12‑06):
 
 - **Regular-batch RESAMPLING docker harness (non-small nets)**  
   - Design skeleton lives in
-    `tests/integration/test_cj_regular_batch_resampling_docker.py` and reuses
+    `tests/functional/cj_eng5/test_cj_regular_batch_resampling_docker.py` and reuses
     `_wait_for_cj_batch_final_state(...)` plus the ENG5 LOWER5 harness helpers.
   - Target scenario: `expected_essay_count ≈ 20–30` so that
     `ContinuationContext.is_small_net is False` under default thresholds.
