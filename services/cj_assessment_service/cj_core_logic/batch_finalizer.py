@@ -134,6 +134,9 @@ class BatchFinalizer:
         batch_id: int,
         correlation_id: UUID,
         log_extra: dict[str, Any],
+        *,
+        completion_status: CJBatchStatusEnum | None = None,
+        source: str | None = None,
     ) -> None:
         """Finalize standard scoring path and publish events."""
         global scoring_ranking
@@ -151,7 +154,11 @@ class BatchFinalizer:
                 if not batch_upload:
                     logger.error(
                         "Batch upload not found for scoring finalization",
-                        extra={**log_extra, "batch_id": batch_id},
+                        extra={
+                            **log_extra,
+                            "batch_id": batch_id,
+                            "completion_source": source or "workflow_continuation",
+                        },
                     )
                     return
 
@@ -160,9 +167,16 @@ class BatchFinalizer:
                 if status_str.startswith("COMPLETE") or status_str.startswith("ERROR"):
                     logger.info(
                         "Batch already terminal, skipping finalization",
-                        extra={**log_extra, "batch_id": batch_id, "status": status_str},
+                        extra={
+                            **log_extra,
+                            "batch_id": batch_id,
+                            "status": status_str,
+                            "completion_source": source or "workflow_continuation",
+                        },
                     )
                     return
+
+                effective_status = completion_status or CJBatchStatusEnum.COMPLETE_STABLE
 
                 # Transition the CJ state machine into SCORING once finalization starts
                 await self._batch_repo.update_batch_state(
@@ -200,11 +214,11 @@ class BatchFinalizer:
                     correlation_id=correlation_id,
                 )
 
-                # Mark batch as complete (stable)
+                # Mark batch as complete (stable or forced-recovery)
                 await self._batch_repo.update_cj_batch_status(
                     session=session,
                     cj_batch_id=batch_id,
-                    status=CJBatchStatusEnum.COMPLETE_STABLE,
+                    status=effective_status,
                 )
                 # Record batch-level completion timestamp for successful finalization
                 # CJBatchUpload.completed_at is a naive (timezone-unaware) DateTime column.
@@ -277,13 +291,24 @@ class BatchFinalizer:
 
                 logger.info(
                     "Completed scoring finalization for batch",
-                    extra={**log_extra, "batch_id": batch_id, "essay_count": len(essays)},
+                    extra={
+                        **log_extra,
+                        "batch_id": batch_id,
+                        "essay_count": len(essays),
+                        "completion_status": str(effective_status),
+                        "completion_source": source or "workflow_continuation",
+                    },
                 )
 
             except Exception as e:
                 logger.error(
                     f"Failed scoring finalization: {e}",
-                    extra={**log_extra, "batch_id": batch_id, "error_type": type(e).__name__},
+                    extra={
+                        **log_extra,
+                        "batch_id": batch_id,
+                        "error_type": type(e).__name__,
+                        "completion_source": source or "workflow_continuation",
+                    },
                     exc_info=True,
                 )
                 try:

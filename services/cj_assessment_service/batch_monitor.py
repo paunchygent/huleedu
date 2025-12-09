@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from common_core.event_enums import ProcessingEvent
@@ -22,15 +22,9 @@ from common_core.metadata_models import SystemProcessingMetadata
 from common_core.status_enums import BatchStatus, CJBatchStateEnum, ProcessingStage
 from huleedu_service_libs.logging_utils import create_service_logger
 
-from services.cj_assessment_service.cj_core_logic import scoring_ranking
 from services.cj_assessment_service.cj_core_logic.batch_finalizer import BatchFinalizer
-from services.cj_assessment_service.cj_core_logic.dual_event_publisher import (
-    DualEventPublishingData,
-    publish_dual_assessment_events,
-)
 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
 from services.cj_assessment_service.metrics import get_business_metrics
-from services.cj_assessment_service.models_api import EssayForComparison
 from services.cj_assessment_service.models_db import CJBatchState, CJBatchUpload
 
 if TYPE_CHECKING:
@@ -194,6 +188,7 @@ class BatchMonitor:
                                 batch_id=ready_state.batch_id,
                                 correlation_id=correlation_id,
                                 log_extra=log_extra,
+                                source="batch_monitor_completion_sweep",
                             )
                         except Exception as e:  # pragma: no cover
                             logger.error(
@@ -337,10 +332,41 @@ class BatchMonitor:
                     if self._stuck_batches_recovered:
                         self._stuck_batches_recovered.inc()
 
-                    # Trigger scoring process for forced batch
-                    await self._trigger_scoring(
+                    # Delegate scoring and completion to BatchFinalizer with forced-recovery status
+                    batch_upload = await session.get(CJBatchUpload, batch_id)
+                    if not batch_upload:
+                        logger.error(
+                            "Batch upload not found for forced recovery finalization",
+                            extra={"batch_id": batch_id},
+                        )
+                        return
+
+                    correlation_id = UUID(batch_upload.event_correlation_id)
+                    log_extra = {
+                        "batch_id": batch_id,
+                        "progress_pct": progress_pct,
+                        "callbacks_received": callbacks_recorded,
+                        "total": denominator,
+                        "reason": "monitor_forced_recovery",
+                        "stuck_timeout_hours": self.timeout_hours,
+                    }
+
+                    finalizer = BatchFinalizer(
+                        session_provider=self._session_provider,
+                        batch_repository=self._batch_repository,
+                        essay_repository=self._essay_repository,
+                        comparison_repository=self._comparison_repository,
+                        event_publisher=self._event_publisher,
+                        content_client=self._content_client,
+                        settings=self._settings,
+                        grade_projector=self._grade_projector,
+                    )
+                    await finalizer.finalize_scoring(
                         batch_id=batch_id,
-                        correlation_id=UUID(batch_state.batch_upload.event_correlation_id),
+                        correlation_id=correlation_id,
+                        log_extra=log_extra,
+                        completion_status=CJBatchStatusEnum.COMPLETE_FORCED_RECOVERY,
+                        source="batch_monitor_forced_recovery",
                     )
 
                 else:
@@ -442,206 +468,3 @@ class BatchMonitor:
         """Graceful shutdown signal."""
         logger.info("Stopping batch monitor")
         self._running = False
-
-    async def _trigger_scoring(
-        self,
-        batch_id: int,
-        correlation_id: UUID,
-    ) -> None:
-        """Trigger Bradley-Terry scoring for a stuck batch forced to SCORING state.
-
-        Args:
-            batch_id: The CJ batch ID
-            correlation_id: Correlation ID for event tracing
-        """
-        async with self._session_provider.session() as session:
-            try:
-                logger.info(
-                    "Triggering Bradley-Terry scoring for forced batch",
-                    extra={
-                        "batch_id": batch_id,
-                        "correlation_id": correlation_id,
-                    },
-                )
-
-                # Get batch upload for BOS batch ID
-                batch_upload = await session.get(CJBatchUpload, batch_id)
-                if not batch_upload:
-                    logger.error(
-                        "Batch upload not found for batch ID",
-                        extra={
-                            "batch_id": batch_id,
-                            "correlation_id": correlation_id,
-                        },
-                    )
-                    return
-
-                # Get all essays for this batch
-                essays = await self._essay_repository.get_essays_for_cj_batch(
-                    session=session,
-                    cj_batch_id=batch_id,
-                )
-
-                if not essays:
-                    logger.error(
-                        "No essays found for batch, cannot calculate scores",
-                        extra={
-                            "batch_id": batch_id,
-                            "correlation_id": correlation_id,
-                        },
-                    )
-                    return
-
-                # Convert to API model format for scoring function
-                essays_for_api = [
-                    EssayForComparison(
-                        id=essay.els_essay_id,
-                        text_content=essay.assessment_input_text,
-                        current_bt_score=essay.current_bt_score,
-                        is_anchor=essay.is_anchor,
-                    )
-                    for essay in essays
-                ]
-
-                # Get all existing comparisons (empty list if none)
-                comparisons: list[Any] = []
-
-                # Calculate final Bradley-Terry scores
-                await scoring_ranking.record_comparisons_and_update_scores(
-                    all_essays=essays_for_api,
-                    comparison_results=comparisons,
-                    session_provider=self._session_provider,
-                    comparison_repository=self._comparison_repository,
-                    essay_repository=self._essay_repository,
-                    cj_batch_id=batch_id,
-                    correlation_id=correlation_id,
-                )
-
-                # Update batch status to completed
-                await self._batch_repository.update_cj_batch_status(
-                    session=session,
-                    cj_batch_id=batch_id,
-                    status=CJBatchStateEnum.COMPLETED,
-                )
-
-                # Get final rankings
-                rankings = await scoring_ranking.get_essay_rankings(
-                    self._session_provider, self._essay_repository, batch_id, correlation_id
-                )
-
-                # Calculate grade projections using injected GradeProjector
-                grade_projections = await self._grade_projector.calculate_projections(
-                    rankings=rankings,
-                    cj_batch_id=batch_id,
-                    assignment_id=batch_upload.assignment_id
-                    if hasattr(batch_upload, "assignment_id")
-                    else None,
-                    course_code=batch_upload.course_code
-                    if hasattr(batch_upload, "course_code")
-                    else "",
-                    content_client=self._content_client,
-                    correlation_id=correlation_id,
-                )
-
-                # Log if no projections are available (no anchor essays)
-                if not grade_projections.projections_available:
-                    logger.info(
-                        "No grade projections available - no anchor essays present",
-                        extra={
-                            "batch_id": batch_id,
-                            "correlation_id": correlation_id,
-                        },
-                    )
-
-                # Derive LLM provider/model attribution from comparison metadata
-                llm_model_used: str | None = None
-                llm_provider_used: str | None = None
-                try:
-                    comparisons = await self._comparison_repository.get_valid_comparisons_for_batch(
-                        session=session,
-                        batch_id=batch_id,
-                    )
-                    counts: dict[tuple[str, str], int] = {}
-                    for pair in comparisons:
-                        metadata = getattr(pair, "processing_metadata", None) or {}
-                        provider = metadata.get("provider")
-                        model = metadata.get("model")
-                        if not provider or not model:
-                            continue
-                        key = (str(provider), str(model))
-                        counts[key] = counts.get(key, 0) + 1
-                    if counts:
-                        (llm_provider_used, llm_model_used), _ = max(
-                            counts.items(), key=lambda item: item[1]
-                        )
-                        logger.info(
-                            "Derived LLM metadata for forced scoring batch",
-                            extra={
-                                "batch_id": batch_id,
-                                "correlation_id": str(correlation_id),
-                                "llm_provider_used": llm_provider_used,
-                                "llm_model_used": llm_model_used,
-                            },
-                        )
-                except Exception as exc:  # pragma: no cover - defensive guard
-                    logger.warning(
-                        "Failed to derive LLM metadata for forced scoring batch",
-                        extra={
-                            "batch_id": batch_id,
-                            "correlation_id": str(correlation_id),
-                            "reason": str(exc),
-                        },
-                    )
-
-                # Extract data from batch_upload for publishing
-                # user_id MUST be present for resource consumption tracking
-                if not batch_upload.user_id:
-                    raise ValueError(
-                        f"user_id is None for batch {batch_upload.id} - identity threading failed. "
-                        f"This is a critical error that should never happen in production."
-                    )
-
-                publishing_data = DualEventPublishingData(
-                    bos_batch_id=batch_upload.bos_batch_id,
-                    cj_batch_id=str(batch_upload.id),
-                    assignment_id=batch_upload.assignment_id,
-                    course_code=batch_upload.course_code,
-                    user_id=batch_upload.user_id,  # Will raise if None due to check above
-                    org_id=batch_upload.org_id,
-                    created_at=batch_upload.created_at,
-                    llm_model_used=llm_model_used,
-                    llm_provider_used=llm_provider_used,
-                )
-
-                # Use centralized dual event publishing function
-                await publish_dual_assessment_events(
-                    rankings=rankings,
-                    grade_projections=grade_projections,
-                    publishing_data=publishing_data,  # Pass DTO
-                    event_publisher=self._event_publisher,
-                    settings=self._settings,
-                    correlation_id=correlation_id,
-                    processing_started_at=batch_upload.created_at,
-                )
-
-                logger.info(
-                    "Successfully triggered scoring and published completion for forced batch",
-                    extra={
-                        "batch_id": batch_id,
-                        "correlation_id": correlation_id,
-                        "essay_count": len(essays),
-                        "status": "COMPLETED",
-                    },
-                )
-
-            except Exception as e:
-                logger.error(
-                    "Failed to trigger scoring for stuck batch",
-                    extra={
-                        "batch_id": batch_id,
-                        "correlation_id": correlation_id,
-                        "error": str(e),
-                        "error_type": type(e).__name__,
-                    },
-                    exc_info=True,
-                )

@@ -13,6 +13,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from services.cj_assessment_service.cj_core_logic import batch_finalizer as bf
 from services.cj_assessment_service.cj_core_logic.batch_finalizer import BatchFinalizer
 from services.cj_assessment_service.cj_core_logic.grade_projector import GradeProjector
 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
@@ -36,6 +37,7 @@ class TestFinalizeScoringIdempotency:
             CJBatchStatusEnum.COMPLETE_STABLE,
             CJBatchStatusEnum.COMPLETE_MAX_COMPARISONS,
             CJBatchStatusEnum.COMPLETE_INSUFFICIENT_ESSAYS,
+            CJBatchStatusEnum.COMPLETE_FORCED_RECOVERY,
             CJBatchStatusEnum.ERROR_PROCESSING,
             CJBatchStatusEnum.ERROR_ESSAY_PROCESSING,
         ],
@@ -93,7 +95,9 @@ class TestFinalizeScoringIdempotency:
         event_publisher.publish_assessment_completed.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_finalize_scoring_proceeds_when_not_terminal(self) -> None:
+    async def test_finalize_scoring_proceeds_when_not_terminal(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """finalize_scoring should proceed normally when batch is in non-terminal state."""
         # This test verifies that the idempotency guard only blocks terminal states,
         # not valid states like PERFORMING_COMPARISONS
@@ -127,6 +131,20 @@ class TestFinalizeScoringIdempotency:
         # Mock repository to return empty essays to avoid full scoring logic
         essay_repo.get_essays_for_cj_batch.return_value = []
         batch_repo.update_cj_batch_status = AsyncMock()
+
+        # Patch scoring_ranking to avoid hitting real DB/session logic
+        class _FakeScoring:
+            async def record_comparisons_and_update_scores(
+                self, *args: object, **kwargs: object
+            ) -> None:
+                return None
+
+            async def get_essay_rankings(
+                self, *args: object, **kwargs: object
+            ) -> list[dict[str, object]]:
+                return []
+
+        monkeypatch.setattr(bf, "scoring_ranking", _FakeScoring())
 
         finalizer = BatchFinalizer(
             session_provider=session_provider,

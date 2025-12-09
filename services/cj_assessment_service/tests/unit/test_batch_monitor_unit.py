@@ -173,6 +173,7 @@ class TestBatchMonitorRecoveryStrategy:
         mock_session_provider: MagicMock,
         mock_batch_repository: AsyncMock,
         sample_batch_upload: CJBatchUpload,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Test that batches >= 80% complete are forced to SCORING state."""
         # Arrange: 85% complete batch (17/20 comparisons)
@@ -191,8 +192,26 @@ class TestBatchMonitorRecoveryStrategy:
         )
         # Mock the batch repository to return batch_state_db for FOR UPDATE query
         mock_batch_repository.get_batch_state_for_update.return_value = batch_state_db
+        # Ensure session.get returns the real batch upload when forced recovery runs
+        session.get.return_value = sample_batch_upload
 
-        # Act: Handle the stuck batch
+        # Patch BatchFinalizer to avoid running full scoring logic and to
+        # assert delegation from BatchMonitor.
+        from services.cj_assessment_service import batch_monitor as batch_monitor_module
+        from services.cj_assessment_service.enums_db import CJBatchStatusEnum
+
+        finalize_called = AsyncMock()
+
+        class _FakeFinalizer:
+            def __init__(self, *args: object, **kwargs: object) -> None:  # noqa: D401
+                """Lightweight stand-in for BatchFinalizer."""
+
+            async def finalize_scoring(self, *args: object, **kwargs: object) -> None:
+                await finalize_called(*args, **kwargs)
+
+        monkeypatch.setattr(batch_monitor_module, "BatchFinalizer", _FakeFinalizer)
+
+        # Act: Handle the stuck batch (should delegate to BatchFinalizer)
         await batch_monitor._handle_stuck_batch(batch_state)
 
         # Assert: The database batch state should be forced to SCORING state
@@ -208,6 +227,14 @@ class TestBatchMonitorRecoveryStrategy:
         mock_batch_repository.get_batch_state_for_update.assert_called_once_with(
             session=session, batch_id=1, for_update=True
         )
+
+        # Verify that BatchMonitor delegated finalization to BatchFinalizer
+        finalize_called.assert_awaited_once()
+        call = finalize_called.await_args
+        call_kwargs = call.kwargs if call is not None else {}
+        assert call_kwargs["batch_id"] == 1
+        assert call_kwargs["completion_status"] == CJBatchStatusEnum.COMPLETE_FORCED_RECOVERY
+        assert call_kwargs["source"] == "batch_monitor_forced_recovery"
 
     @pytest.mark.asyncio
     async def test_recovery_strategy_low_progress_marks_failed(
@@ -305,6 +332,7 @@ class TestBatchMonitorRecoveryStrategy:
         mock_session_provider: MagicMock,
         mock_batch_repository: AsyncMock,
         sample_batch_upload: CJBatchUpload,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Test boundary condition: exactly 80% progress."""
         # Arrange: Exactly 80% complete batch (8/10 comparisons)
@@ -316,12 +344,26 @@ class TestBatchMonitorRecoveryStrategy:
         )
 
         # Mock database operations
+        session = mock_session_provider.session.return_value.session_mock
+        session.get.return_value = sample_batch_upload
         # Create a separate batch_state_db object that represents what comes from DB
         batch_state_db = self.create_stuck_batch_state(
             batch_id=1, completed=8, total=10, batch_upload=sample_batch_upload
         )
         # Mock the batch repository to return batch_state_db for FOR UPDATE query
         mock_batch_repository.get_batch_state_for_update.return_value = batch_state_db
+
+        # Patch BatchFinalizer to avoid running full scoring logic
+        from services.cj_assessment_service import batch_monitor as batch_monitor_module
+
+        class _FakeFinalizer:
+            def __init__(self, *args: object, **kwargs: object) -> None:  # noqa: D401
+                """Lightweight stand-in for BatchFinalizer."""
+
+            async def finalize_scoring(self, *args: object, **kwargs: object) -> None:
+                return None
+
+        monkeypatch.setattr(batch_monitor_module, "BatchFinalizer", _FakeFinalizer)
 
         # Act: Handle the stuck batch
         await batch_monitor._handle_stuck_batch(batch_state)
@@ -381,6 +423,7 @@ class TestBatchMonitorRecoveryStrategy:
         mock_session_provider: MagicMock,
         mock_batch_repository: AsyncMock,
         sample_batch_upload: CJBatchUpload,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Test that last_activity_at is updated during recovery."""
         # Arrange
@@ -394,6 +437,8 @@ class TestBatchMonitorRecoveryStrategy:
         batch_state.last_activity_at = old_timestamp
 
         # Mock database operations
+        session = mock_session_provider.session.return_value.session_mock
+        session.get.return_value = sample_batch_upload
         # Create a separate batch_state_db object that represents what comes from DB
         batch_state_db = self.create_stuck_batch_state(
             batch_id=1, completed=9, total=10, batch_upload=sample_batch_upload
@@ -401,6 +446,18 @@ class TestBatchMonitorRecoveryStrategy:
         batch_state_db.last_activity_at = old_timestamp  # Set old timestamp on DB object
         # Mock the batch repository to return batch_state_db for FOR UPDATE query
         mock_batch_repository.get_batch_state_for_update.return_value = batch_state_db
+
+        # Patch BatchFinalizer to avoid running full scoring logic
+        from services.cj_assessment_service import batch_monitor as batch_monitor_module
+
+        class _FakeFinalizer:
+            def __init__(self, *args: object, **kwargs: object) -> None:  # noqa: D401
+                """Lightweight stand-in for BatchFinalizer."""
+
+            async def finalize_scoring(self, *args: object, **kwargs: object) -> None:
+                return None
+
+        monkeypatch.setattr(batch_monitor_module, "BatchFinalizer", _FakeFinalizer)
 
         # Act: Handle the stuck batch
         await batch_monitor._handle_stuck_batch(batch_state)
