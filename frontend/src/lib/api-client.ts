@@ -1,5 +1,6 @@
 import { useAuthStore } from '@/stores/auth'
 import { ApiError } from './api-error'
+import { type ZodSchema } from 'zod'
 
 export interface RequestOptions extends Omit<RequestInit, 'body'> {
   body?: unknown
@@ -34,8 +35,25 @@ class ApiClient {
     return response.json() as Promise<T>
   }
 
+  async requestWithValidation<T>(
+    endpoint: string,
+    schema: ZodSchema<T>,
+    options: RequestOptions = {},
+  ): Promise<T> {
+    const data = await this.request<unknown>(endpoint, options)
+    return schema.parse(data)
+  }
+
   async get<T>(endpoint: string, options?: RequestOptions): Promise<T> {
     return this.request<T>(endpoint, { ...options, method: 'GET' })
+  }
+
+  async getWithValidation<T>(
+    endpoint: string,
+    schema: ZodSchema<T>,
+    options?: RequestOptions,
+  ): Promise<T> {
+    return this.requestWithValidation<T>(endpoint, schema, { ...options, method: 'GET' })
   }
 
   async post<T>(endpoint: string, body?: unknown, options?: RequestOptions): Promise<T> {
