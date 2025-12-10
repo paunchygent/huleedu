@@ -173,6 +173,27 @@ counters so completion percentages never exceed 100% and match DB reality.
     - `tests/functional/cj_eng5/test_cj_regular_batch_resampling_docker.py`
   - Extend LPS-side assertions with queue wait-time metrics where stable enough for C-lane (e.g. `llm_provider_queue_wait_time_seconds` by `queue_processing_mode="serial_bundle"`).
 
+**Progress 2025-12-10 (session 4) – ENG5 CI fixes and provider switch COMPLETED:**
+- **Default LLM provider switched from Anthropic to OpenAI:**
+  - `services/llm_provider_service/config.py`: `DEFAULT_LLM_PROVIDER` → `LLMProviderType.OPENAI`
+  - `services/llm_provider_service/config.py`: `OPENAI_DEFAULT_MODEL` → `gpt-5.1`
+  - `services/cj_assessment_service/config.py`: `DEFAULT_LLM_MODEL` → `gpt-5.1`
+  - `docker-compose.services.yml`: CJ defaults from `anthropic/claude-haiku-4-5-20251001` → `openai/gpt-5.1`
+- **USE_MOCK_LLM alias fully deprecated:**
+  - `env.example`: `USE_MOCK_LLM=true` → `LLM_PROVIDER_SERVICE_USE_MOCK_LLM=true`
+  - `docker-compose.services.yml`: Removed `${USE_MOCK_LLM:-true}` alias
+  - Updated 10+ documentation files with canonical env var
+- **Positional fairness test fixed:**
+  - Root cause: `MAX_PAIRWISE_COMPARISONS=120` too low for 24-essay batch (skew ~0.6 vs threshold 0.2)
+  - Fix: Added `CJ_ASSESSMENT_SERVICE_MAX_PAIRWISE_COMPARISONS=288` to CI workflow `.env` generation
+- **All ENG5 docker suites validated:**
+  - `pdm run eng5-cj-docker-suite regular` ✅ (callbacks + resampling tests pass)
+  - `pdm run eng5-cj-docker-suite small-net` ✅ (LOWER5 continuation test passes)
+  - `pdm run llm-mock-profile cj-generic` ✅
+  - `pdm run llm-mock-profile eng5-anchor` ✅
+  - `pdm run llm-mock-profile eng5-lower5` ✅
+- **Code quality validated:** `format-all`, `lint-fix`, `typecheck-all` all pass
+
 ---
 
 ## PR 2 – Pair Generation Fairness & Anchor Position Balancing

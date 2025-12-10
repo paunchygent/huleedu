@@ -91,57 +91,59 @@ Role: You are the lead developer and architect of HuleEdu.
 
 ---
 
-## ENG5 Heavy CI Workflow Fixes (2025-12-10 session 3)
+## ENG5 Heavy CI Workflow Fixes (2025-12-10 session 3) - COMPLETED
 
-**PARTIAL:** Fixed CI trigger and `.env` generation, but discovered additional issues requiring completion.
+**COMPLETED:** All ENG5 docker suites validated, LLM provider defaults switched to OpenAI.
 
 ### Completed
-1. **Trigger changed from nightly cron to release tags only:**
-   - `.github/workflows/eng5-heavy-suites.yml`: `push.tags: ['v*']` + `workflow_dispatch`
-   - Removes wasteful nightly runs for solo dev
+1. **Default LLM provider switched from Anthropic to OpenAI:**
+   - `services/llm_provider_service/config.py`: `DEFAULT_LLM_PROVIDER` → `OPENAI`
+   - `services/llm_provider_service/config.py`: `OPENAI_DEFAULT_MODEL` → `gpt-5.1`
+   - `services/cj_assessment_service/config.py`: `DEFAULT_LLM_MODEL` → `gpt-5.1`
+   - `docker-compose.services.yml`: CJ defaults from `anthropic/claude-haiku-4-5-20251001` → `openai/gpt-5.1`
+   - `env.example`: `DEFAULT_LLM_PROVIDER=openai`
 
-2. **`.env` generation fixed:**
-   - Replaced broken `sed` approach with full `cat > .env << 'EOF'` generation
-   - Added `sed -i 's/^[[:space:]]*//' .env` to strip YAML heredoc whitespace
-   - Added `cat .env` debug output in each step
+2. **USE_MOCK_LLM alias fully deprecated:**
+   - `env.example`: `USE_MOCK_LLM=true` → `LLM_PROVIDER_SERVICE_USE_MOCK_LLM=true`
+   - `docker-compose.services.yml`: Removed `${USE_MOCK_LLM:-true}` alias
+   - `tests/functional/conftest.py`: Removed from `_MOCK_LLM_ENV_VARS`
+   - Updated 10+ documentation files with canonical env var
 
-3. **Health wait added to scripts:**
-   - `scripts/llm_mgmt/mock_profile_helper.sh`: Added `wait_for_healthy()` function + call after `dev-recreate`
-   - `scripts/llm_mgmt/eng5_cj_docker_suite.sh`: Same health wait + now recreates all required services (`api_gateway_service`, `llm_provider_service`, `cj_assessment_service`)
+3. **Positional fairness test fixed:**
+   - Root cause: `MAX_PAIRWISE_COMPARISONS=120` too low for 24-essay batch (skew ~0.6 vs threshold 0.2)
+   - Fix: Added `CJ_ASSESSMENT_SERVICE_MAX_PAIRWISE_COMPARISONS=288` to `.env` and CI workflow
+   - CI: `.github/workflows/eng5-heavy-suites.yml` now generates this in `.env`
 
-4. **`USE_MOCK_LLM` alias deprecated:**
-   - `tests/functional/conftest.py`: Changed `_MOCK_LLM_ENV_VARS` from `("LLM_PROVIDER_SERVICE_USE_MOCK_LLM", "USE_MOCK_LLM")` to only `("LLM_PROVIDER_SERVICE_USE_MOCK_LLM",)`
-   - This fixes the skip issue where old `USE_MOCK_LLM=false` in shell environment conflicted with new `LLM_PROVIDER_SERVICE_USE_MOCK_LLM=true`
-
-5. **Profile parity tests validated (3/3 pass):**
+4. **All ENG5 docker suites validated:**
+   - `pdm run eng5-cj-docker-suite regular` ✅ (callbacks + resampling tests pass)
+   - `pdm run eng5-cj-docker-suite small-net` ✅ (LOWER5 continuation test passes)
    - `pdm run llm-mock-profile cj-generic` ✅
    - `pdm run llm-mock-profile eng5-anchor` ✅
    - `pdm run llm-mock-profile eng5-lower5` ✅
 
-### Remaining Work
-1. **`test_cj_regular_batch_resampling_docker` fails with positional fairness assertion:**
-   ```
-   AssertionError: Positional fairness skew exceeded threshold for essays: [...] (max_observed_skew=0.6, MAX_ALLOWED_SKEW=0.2)
-   ```
-   - This is a pre-existing test logic issue, not a CI workflow issue
-   - Investigate `FairComplementOrientationStrategy` or adjust `MAX_ALLOWED_SKEW` threshold
-
-2. **Run and validate remaining docker suite tests:**
-   - `pdm run eng5-cj-docker-suite regular` (blocked by above test failure)
-   - `pdm run eng5-cj-docker-suite small-net`
-
-3. **Run `pdm run format-all`, `lint-fix`, `typecheck-all`** after all changes
+5. **Code quality validated:**
+   - `pdm run format-all` ✅
+   - `pdm run lint-fix --unsafe-fixes` ✅
+   - `pdm run typecheck-all` ✅
 
 ### Key Files Modified
-- `.github/workflows/eng5-heavy-suites.yml` - Trigger + .env generation
-- `scripts/llm_mgmt/mock_profile_helper.sh` - Health wait
-- `scripts/llm_mgmt/eng5_cj_docker_suite.sh` - Health wait + required services
-- `tests/functional/conftest.py` - Removed `USE_MOCK_LLM` alias
+- `services/llm_provider_service/config.py` - Default provider/model
+- `services/cj_assessment_service/config.py` - Default model
+- `docker-compose.services.yml` - CJ defaults, removed USE_MOCK_LLM alias
+- `env.example` - Canonical env vars
+- `.github/workflows/eng5-heavy-suites.yml` - MAX_PAIRWISE_COMPARISONS in CI
+- Documentation: rules, docs/operations, docs/overview, tests/README.md
+
+### Git Commits (2025-12-10)
+1. `9a4bf7a1` - refactor(llm): switch default provider to OpenAI gpt-5.1 and deprecate USE_MOCK_LLM alias
+2. `9e0a2dda` - fix(ci): add MAX_PAIRWISE_COMPARISONS=288 to ENG5 heavy suites
+3. `77e9c310` - feat(bff): implement BFF Teacher Service with internal clients
+4. `5c019671` - docs: update task documentation and session context
 
 ### Local Testing Tip
-If tests skip with "Mock LLM must be enabled", ensure your shell doesn't have stale `USE_MOCK_LLM=false`:
+If tests fail with provider mismatch, ensure shell doesn't have stale env vars:
 ```bash
-unset USE_MOCK_LLM
+unset DEFAULT_LLM_PROVIDER USE_MOCK_LLM
 # or start fresh shell
 ```
 
