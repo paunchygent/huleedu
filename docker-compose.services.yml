@@ -107,6 +107,8 @@ services:
       - SERVICE_NAME=result_aggregator_service
       - HOST=0.0.0.0
       - PORT=4003
+      # Allowed internal services (api-gateway-service, admin-dashboard-service are defaults)
+      - ALLOWED_SERVICE_IDS=["api-gateway-service","admin-dashboard-service","bff-teacher-service"]
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
       - OTEL_SERVICE_NAME=result_aggregator
       - OTEL_TRACES_EXPORTER=otlp
@@ -437,8 +439,8 @@ services:
       - HULEEDU_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
       # Testing configuration handled by LLM Provider Service
       # Default LLM configuration (passed to LLM Provider Service)
-      - CJ_ASSESSMENT_SERVICE_DEFAULT_LLM_PROVIDER=anthropic
-      - CJ_ASSESSMENT_SERVICE_DEFAULT_LLM_MODEL=claude-haiku-4-5-20251001
+      - CJ_ASSESSMENT_SERVICE_DEFAULT_LLM_PROVIDER=openai
+      - CJ_ASSESSMENT_SERVICE_DEFAULT_LLM_MODEL=gpt-5.1
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
       - OTEL_SERVICE_NAME=cj_assessment_service
       - OTEL_TRACES_EXPORTER=otlp
@@ -579,7 +581,7 @@ services:
       - LLM_PROVIDER_SERVICE_HOST=0.0.0.0
       - LLM_PROVIDER_SERVICE_REDIS_URL=redis://redis:6379
       # Testing configuration
-      - LLM_PROVIDER_SERVICE_USE_MOCK_LLM=${USE_MOCK_LLM:-true}
+      - LLM_PROVIDER_SERVICE_USE_MOCK_LLM=${LLM_PROVIDER_SERVICE_USE_MOCK_LLM:-true}
       - LLM_PROVIDER_SERVICE_MOCK_MODE=${LLM_PROVIDER_SERVICE_MOCK_MODE:-default}
       # LLM Provider API Keys (from env)
       - LLM_PROVIDER_SERVICE_ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
@@ -588,7 +590,7 @@ services:
       - LLM_PROVIDER_SERVICE_GOOGLE_PROJECT_ID=${GOOGLE_PROJECT_ID:-}
       - LLM_PROVIDER_SERVICE_OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       # Provider Selection
-      - LLM_PROVIDER_SERVICE_DEFAULT_LLM_PROVIDER=${DEFAULT_LLM_PROVIDER:-anthropic}
+      - LLM_PROVIDER_SERVICE_DEFAULT_LLM_PROVIDER=${DEFAULT_LLM_PROVIDER:-openai}
       - LLM_PROVIDER_SERVICE_PROVIDER_SELECTION_STRATEGY=${PROVIDER_SELECTION_STRATEGY:-priority}
       # Circuit Breaker Settings
       - LLM_PROVIDER_SERVICE_CIRCUIT_BREAKER_ENABLED=true
@@ -932,6 +934,8 @@ services:
       - BFF_TEACHER_SERVICE_PORT=4101
       - BFF_TEACHER_SERVICE_HOST=0.0.0.0
       - BFF_TEACHER_SERVICE_LOG_LEVEL=INFO
+      # Internal service auth
+      - HULEEDU_INTERNAL_API_KEY=${HULEEDU_INTERNAL_API_KEY}
       # Observability
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
       - OTEL_SERVICE_NAME=bff_teacher_service

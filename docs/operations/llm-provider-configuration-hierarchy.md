@@ -15,7 +15,7 @@ Document the 3-tier configuration override hierarchy for LLM Provider Service to
 
 ```mermaid
 graph TD
-    A[Incoming Request] --> B{Global USE_MOCK_LLM?}
+    A[Incoming Request] --> B{Global LLM_PROVIDER_SERVICE_USE_MOCK_LLM?}
     B -- Yes --> C[Use MockProviderImpl]
     B -- No --> D{Request has Override?}
     D -- Yes --> E[Use Request Config]
@@ -46,7 +46,7 @@ if settings.USE_MOCK_LLM and mock_provider is not None:
 
 ## Tier 2: Request-Level Overrides (Runtime)
 
-**Condition**: Active only when `USE_MOCK_LLM=False`
+**Condition**: Active only when `LLM_PROVIDER_SERVICE_USE_MOCK_LLM=False`
 
 **Contract**: `LLMConfigOverrides` in `libs/common_core/src/common_core/events/cj_assessment_events.py:78-108`
 
@@ -82,7 +82,7 @@ def resolve_provider_from_request(request: QueuedRequest, settings: Settings) ->
 
 ## Configuration Scenarios
 
-| Scenario | `USE_MOCK_LLM` | `ALLOW_MOCK_PROVIDER` | Behavior |
+| Scenario | `LLM_PROVIDER_SERVICE_USE_MOCK_LLM` | `ALLOW_MOCK_PROVIDER` | Behavior |
 |----------|----------------|----------------------|----------|
 | Pure Development | `true` | any | All requests use mock |
 | Mixed Development | `false` | `true` | Request can choose mock OR real |
@@ -126,7 +126,7 @@ true
 
 ## Architectural Notes
 
-**Why request overrides cannot bypass `USE_MOCK_LLM`**:
+**Why request overrides cannot bypass `LLM_PROVIDER_SERVICE_USE_MOCK_LLM`**:
 
 1. **DI Scope**: Provider map is `Scope.APP` (Dishka) - built once at startup
 2. **Immutability**: No runtime provider swapping; map is frozen after boot

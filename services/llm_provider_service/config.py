@@ -148,7 +148,7 @@ class Settings(SecureServiceSettings):
     PROVIDER_ERROR_THRESHOLD_FOR_DISABLE: int = 5
 
     # Global LLM Configuration (can be overridden per provider)
-    DEFAULT_LLM_PROVIDER: LLMProviderType = LLMProviderType.ANTHROPIC
+    DEFAULT_LLM_PROVIDER: LLMProviderType = LLMProviderType.OPENAI
     LLM_REQUEST_TIMEOUT: int = 300
     LLM_MAX_CONCURRENT_REQUESTS: int = 3
     LLM_DEFAULT_TEMPERATURE: float = 0.7
@@ -198,7 +198,7 @@ class Settings(SecureServiceSettings):
     OPENAI_BASE_URL: Optional[str] = None
     # DEPRECATED: Prefer using model manifest via llm_config_overrides
     # Fallback when no override specified. To be removed in future versions.
-    OPENAI_DEFAULT_MODEL: str = "gpt-5-mini-2025-08-07"
+    OPENAI_DEFAULT_MODEL: str = "gpt-5.1"
     OPENAI_ORG_ID: Optional[str] = None
     OPENAI_ENABLED: bool = True
 

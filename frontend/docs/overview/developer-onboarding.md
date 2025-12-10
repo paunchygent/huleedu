@@ -83,7 +83,7 @@ HULEEDU_REDIS_PORT=6379
 HULEEDU_JWT_SECRET=your-development-jwt-secret-key-change-in-production
 
 # LLM provider configuration (for CJ assessment)
-USE_MOCK_LLM=true  # Set to false for real LLM calls
+LLM_PROVIDER_SERVICE_USE_MOCK_LLM=true  # Set to false for real LLM calls
 ANTHROPIC_API_KEY=your-api-key-here
 OPENAI_API_KEY=your-api-key-here
 

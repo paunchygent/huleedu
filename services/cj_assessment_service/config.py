@@ -112,7 +112,7 @@ class Settings(SecureServiceSettings, JWTValidationSettings):
     # Default LLM provider for centralized service requests
     DEFAULT_LLM_PROVIDER: LLMProviderType = LLMProviderType.OPENAI
     DEFAULT_LLM_MODEL: str = Field(
-        default="gpt-5-mini-2025-08-07",
+        default="gpt-5.1",
         description="Default LLM model to use for comparison requests",
     )
     LLM_BATCHING_MODE: LLMBatchingMode = Field(

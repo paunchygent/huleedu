@@ -41,7 +41,8 @@ logger = create_service_logger("test.functional.conftest")
 READINESS_TIMEOUT_SECONDS = int(os.getenv("FUNCTIONAL_READINESS_TIMEOUT", "60"))
 READINESS_RETRY_SECONDS = int(os.getenv("FUNCTIONAL_READINESS_RETRY", "3"))
 REDIS_URL = os.getenv("FUNCTIONAL_REDIS_URL", "redis://localhost:6379")
-_MOCK_LLM_ENV_VARS = ("LLM_PROVIDER_SERVICE_USE_MOCK_LLM", "USE_MOCK_LLM")
+# Canonical env var for mock LLM mode - USE_MOCK_LLM is deprecated
+_MOCK_LLM_ENV_VARS = ("LLM_PROVIDER_SERVICE_USE_MOCK_LLM",)
 
 # Aggregate topics that functional tests commonly touch (pipeline + entitlements + student matching)
 _DEFAULT_KAFKA_TOPICS: set[str] = set(create_kafka_test_config().topics.values()) | set(
@@ -89,7 +90,7 @@ def enforce_mock_llm_mode() -> None:
     if not _mock_llm_enabled():
         pytest.skip(
             "Mock LLM must be enabled for functional suite. "
-            "Set USE_MOCK_LLM=true (or LLM_PROVIDER_SERVICE_USE_MOCK_LLM=true) "
+            "Set LLM_PROVIDER_SERVICE_USE_MOCK_LLM=true in .env "
             "or export ALLOW_REAL_LLM_FUNCTIONAL=1 to bypass."
         )
 
