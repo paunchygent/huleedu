@@ -38,13 +38,15 @@ pdm run pytest-root tests/integration/
 
 | Service | Port | Purpose |
 |---------|------|---------|
-| API Gateway | 8000 | External API, JWT auth |
-| BOS | 8001 | Pipeline coordination |
-| BCS | 8002 | Dependency resolution |
-| ELS | 8003 | Phase outcome tracking |
-| CJ Assessment | 8010 | Comparative judgment |
-| LLM Provider | 8011 | LLM abstraction layer |
-| Result Aggregator | 8020 | Results compilation |
+| API Gateway | 8080 | External API, JWT auth |
+| BFF Teacher | 4101 | Teacher dashboard BFF |
+| BOS | 5000 | Pipeline coordination |
+| BCS | 4002 | Dependency resolution |
+| CJ Assessment | 5010 | Comparative judgment |
+| LLM Provider | 8080 | LLM abstraction layer |
+| Result Aggregator | 4003 | Results compilation |
+| CMS | 5002 | Class management |
+| File Service | 7001 | File storage |
 
 ---
 
@@ -148,9 +150,31 @@ docker exec huleedu_<service>_db psql -U "$HULEEDU_DB_USER" -d <db_name>
 
 ---
 
+## LLM Configuration
+
+**Default provider:** OpenAI (gpt-5.1)
+
+**Env vars:**
+- `LLM_PROVIDER_SERVICE_USE_MOCK_LLM=true` – Enable mock LLM (canonical name)
+- `LLM_PROVIDER_SERVICE_MOCK_MODE=cj_generic_batch` – Mock profile (default)
+
+**Batching modes:**
+
+| Mode | CJ Env | LPS Env | Status |
+|------|--------|---------|--------|
+| serial_bundle | `CJ_ASSESSMENT_SERVICE_LLM_BATCHING_MODE=serial_bundle` | `LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE=serial_bundle` | Production |
+| provider_batch_api | `=provider_batch_api` | `=batch_api` | Phase-2 (LPS job manager + BATCH_API path implemented; CJ semantics + ENG5 harness in progress) |
+
+**ENG5 metrics guardrails:**
+- Queue wait-time: `0 <= avg <= 120s` (broad guardrail for heavy C-lane)
+- Serial bundle calls: `>= 1` per profile
+- Use `tests/utils/metrics_helpers.py` for Prometheus assertions
+
+---
+
 ## Architecture Decisions
 
-1. **Hot-reload**: All Quart services use Hypercorn with `--reload`
+1. **Hot-reload**: Quart services use Hypercorn `--reload`, FastAPI services use uvicorn `--reload`
 2. **Contracts in common_core**: Services never import from each other
 3. **Test organization**: Service tests in `services/<name>/tests/`, cross-service in `tests/integration/`
 

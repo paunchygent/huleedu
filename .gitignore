@@ -85,3 +85,6 @@ frontend/.vite/
 frontend/*.local
 
 .DS_Store
+
+.gemini/
+gha-creds-*.json

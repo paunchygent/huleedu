@@ -338,6 +338,29 @@ labels in logs and reports.
     - `llm_provider_queue_expiry_total{provider,queue_processing_mode,expiry_reason}` and
       `llm_provider_queue_wait_time_seconds{queue_processing_mode,result}` for queue health.
 - **ENG5-first rollout guardrails (summary)**
+  - Today (Phase 1): ENG5 trials use `serial_bundle` only:
+    - `CJ_ASSESSMENT_SERVICE_LLM_BATCHING_MODE=serial_bundle`
+    - `LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE=serial_bundle`
+    - `LLM_PROVIDER_SERVICE_BATCH_API_MODE=disabled`
+    - Metrics to pin:
+      - CJ: `cj_llm_requests_total{batching_mode="serial_bundle"}`,
+        `cj_llm_batches_started_total{batching_mode="serial_bundle"}`.
+      - LPS: `llm_provider_serial_bundle_calls_total{provider,model}`,
+        `llm_provider_serial_bundle_items_per_call{provider,model}`,
+        `llm_provider_queue_wait_time_seconds{queue_processing_mode="serial_bundle",result}`.
+  - Future (Phase 2 – provider batch APIs):
+    - ENG5 provider‑batch trials will instead run with:
+      - `CJ_ASSESSMENT_SERVICE_LLM_BATCHING_MODE=provider_batch_api`
+      - `LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE=batch_api`
+      - Provider‑specific `*_BATCH_API_MODE` set to `nightly`/`opportunistic` for the ENG5 pair.
+    - Additional metrics to monitor:
+      - CJ: `cj_llm_requests_total{batching_mode="provider_batch_api"}`,
+        `cj_llm_batches_started_total{batching_mode="provider_batch_api"}`.
+      - LPS queue: `llm_provider_queue_wait_time_seconds{queue_processing_mode="batch_api",result}`,
+        `llm_provider_comparison_callbacks_total{queue_processing_mode="batch_api",result}`.
+      - LPS jobs: `llm_provider_batch_api_jobs_total{provider,model,status}`,
+        `llm_provider_batch_api_items_per_job{provider,model}`,
+        `llm_provider_batch_api_job_duration_seconds{provider,model}`.
   - Enable trial runs by setting:
     - `CJ_ASSESSMENT_SERVICE_LLM_BATCHING_MODE=serial_bundle`
     - `LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE=serial_bundle`
