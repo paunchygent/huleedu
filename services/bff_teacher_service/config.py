@@ -63,6 +63,26 @@ class BFFTeacherSettings(SecureServiceSettings):
         default=["*"], description="Allowed headers for CORS requests"
     )
 
+    # Backend service URLs for API composition
+    RAS_URL: str = Field(
+        default="http://result_aggregator_service:4003",
+        description="Result Aggregator Service base URL",
+    )
+    CMS_URL: str = Field(
+        default="http://class_management_service:5002",
+        description="Class Management Service base URL",
+    )
+
+    # HTTP client configuration
+    HTTP_CLIENT_TIMEOUT_SECONDS: float = Field(
+        default=30.0,
+        description="HTTP client request timeout in seconds",
+    )
+    HTTP_CLIENT_CONNECT_TIMEOUT_SECONDS: float = Field(
+        default=10.0,
+        description="HTTP client connection timeout in seconds",
+    )
+
 
 # Global settings instance
 settings = BFFTeacherSettings()

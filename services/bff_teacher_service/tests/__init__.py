@@ -1,0 +1,1 @@
+"""BFF Teacher Service tests."""

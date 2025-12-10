@@ -36,8 +36,46 @@ class TeacherBatchItemV1(BaseModel):
 class TeacherDashboardResponseV1(BaseModel):
     """Dashboard view: list of batches for teacher.
 
-    Full implementation will aggregate data from RAS and CMS services.
+    Aggregates data from RAS and CMS services.
     """
 
     batches: list[TeacherBatchItemV1] = Field(default_factory=list)
     total_count: int = 0
+
+
+# --- Internal response models for backend service deserialization ---
+
+
+class BatchSummaryV1(BaseModel):
+    """RAS batch summary from internal API response.
+
+    Used for deserialization from RAS GET /internal/v1/batches/user/{user_id}.
+    Maps to internal status values (not client-facing statuses).
+    """
+
+    batch_id: str
+    user_id: str
+    overall_status: str
+    essay_count: int = 0
+    completed_essay_count: int = 0
+    failed_essay_count: int = 0
+    created_at: datetime
+    assignment_id: str | None = None
+
+
+class ClassInfoV1(BaseModel):
+    """CMS class info from internal API response.
+
+    Used for deserialization from CMS GET /internal/v1/batches/class-info.
+    """
+
+    class_id: str
+    class_name: str
+
+
+class PaginationV1(BaseModel):
+    """Pagination metadata from backend responses."""
+
+    limit: int
+    offset: int
+    total: int
