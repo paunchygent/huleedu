@@ -75,7 +75,7 @@ Concretely:
     - [ ] Latency distribution and token-usage ranges that approximate real traces.
     - [ ] Proper handling of `reasoning_effort` / `output_verbosity` (fields present/absent as in real calls).
 - [ ] Wire these modes into:
-  - [ ] CJ settings (e.g. `USE_MOCK_LLM`, `MOCK_LLM_MODE`).
+  - [ ] CJ settings (e.g. `LLM_PROVIDER_SERVICE_USE_MOCK_LLM`, `LLM_PROVIDER_SERVICE_MOCK_MODE`).
   - [ ] ENG5 runner configs used by the docker tests (so the runner can select the appropriate mock mode).
 
 ### 3. Add docker trace-replay parity tests
@@ -189,7 +189,7 @@ All tests in this section:
 {
   "use_mock_llm": true,
   "mock_mode": "cj_generic_batch",
-  "default_provider": "anthropic"
+  "default_provider": "openai"
 }
 ```
 
@@ -225,16 +225,43 @@ In CI, these parity tests are wired into the dedicated heavy workflow `.github/w
     - `pdm run llm-mock-profile eng5-lower5`
   - CI:
     - `eng5-profile-parity-suite` job in `.github/workflows/eng5-heavy-suites.yml` (future: matrix per profile).
-- Metrics and behaviours to assert (examples, to be refined during implementation):
-  - LPS (mock provider):
-    - `llm_provider_serial_bundle_calls_total{provider="mock",model=<expected>}` increases per ENG5 scenario.
-    - `llm_provider_serial_bundle_items_per_call{provider="mock",model=<expected>}` stays within configured bounds and shows non-degenerate distribution.
-    - Queue wait-time metrics (`llm_provider_queue_wait_time_seconds{queue_processing_mode="serial_bundle",result=...}`) remain within tolerances derived from recorded ENG5 traces.
-  - CJ (where applicable for CJ-shaped mock runs):
-    - `cj_llm_requests_total{batching_mode="serial_bundle"}` / `cj_llm_batches_started_total` reflect expected bundling behaviour.
+- Metrics and behaviours to assert (metrics plan for ENG5 parity tests):
+  - LPS (mock provider, per ENG5 profile):
+    - `llm_provider_serial_bundle_calls_total{provider="mock",model=<profile_model>}`:
+      - After each successful ENG5 profile run, assert that the metric is present for the active mock profile model and that `max(values) >= 1` (at least one serial-bundle call per run).
+    - `llm_provider_serial_bundle_items_per_call{provider="mock",model=<profile_model>}`:
+      - Use the `_count` and `_bucket` series to confirm at least one observation (`_count >= 1`) and infer an upper bound on `max(items_per_call)`.
+      - Assert `1 <= max_items_per_call <= Settings.SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL`, mirroring the ENG5 CJ docker semantics but scoped to mock-provider traffic.
+    - Queue latency / throughput metrics:
+      - `llm_provider_queue_wait_time_seconds{queue_processing_mode="serial_bundle",result=...}`:
+        - Assert that at least one sample is recorded for `queue_processing_mode="serial_bundle"` and result in `{success,failure,expired}` as appropriate for each profile.
+        - For healthy ENG5 runs, treat this as a **guardrail** rather than a strict SLO: check that the average wait derived from `_sum/_count` stays non-negative and within a broad upper bound (currently `average_wait_seconds <= 120.0` for heavy ENG5 suites), without pinning exact percentiles.
+      - Coarse sanity checks for:
+        - `llm_provider_comparison_callbacks_total{queue_processing_mode="serial_bundle",result=...}` to ensure callbacks are being published for serial-bundle paths.
+        - `llm_provider_queue_depth{queue_type=...}` remaining below hard failure thresholds during ENG5 mock-only suites (no runaway queue growth; current guardrail `max(depth) <= 1000.0`).
+  - CJ (where applicable for CJ-shaped mock runs, especially `cj_generic_batch`):
+    - `cj_llm_requests_total{batching_mode="serial_bundle"}` and `cj_llm_batches_started_total{batching_mode="serial_bundle"}` should follow the same ≥1 semantics as the ENG5 CJ docker tests, but with expectations framed in terms of “at least one CJ serial-bundle request/batch per parity run” rather than exact counts.
+  - Test-side harness pattern (shared across all ENG5 profile tests):
+    - Reuse `ServiceTestManager` fixtures and `get_validated_endpoints()` to obtain `base_url` / `metrics_url` for `llm_provider_service` (and `cj_assessment_service` where relevant) after each successful ENG5 profile run.
+    - Use `tests/utils/metrics_helpers.py::fetch_and_parse_metrics` to fetch `/metrics` and parse Prometheus text into a `metric_name -> [(labels, value), ...]` mapping.
+    - Filter metrics by `provider="mock"` and `model=<profile_model>` (e.g.:
+      - `cj_generic_batch` profile model.
+      - `eng5_anchor_gpt51_low` profile model.
+      - `eng5_lower5_gpt51_low` profile model.
+    - Apply inequality-based assertions:
+      - At least one serial-bundle call per profile (`llm_provider_serial_bundle_calls_total >= 1`).
+      - Reasonable bundle-size distribution via `llm_provider_serial_bundle_items_per_call` histogram (within configured bounds; no degenerate single-bucket distributions for sustained runs).
+      - Queue wait-time distributions that show “healthy” behaviour (no extreme tails under normal ENG5 parity suites, while still allowing rare outliers in heavy experimentation lanes).
+  - Relationship to Step 1 CJ docker metrics:
+    - Parity metrics MUST reuse the same helper (`tests/utils/metrics_helpers.py`) and general assertion style (≥1 semantics, histogram-derived upper bounds) as the ENG5 CJ docker tests, but scoped to:
+      - `provider="mock"` and per-profile `model` labels.
+      - ENG5 profile orchestration via `pdm run llm-mock-profile ...` instead of the CJ docker ENG5 runners.
+    - All parity metrics remain read-only checks:
+      - No changes to `.env` semantics beyond existing `LLM_PROVIDER_SERVICE_MOCK_MODE` profiles.
+      - No modifications to ENG5 CI workflows or docker-compose; tests consume whatever metrics the running services expose.
   - All new assertions MUST rely on:
     - `/admin/mock-mode` for profile verification.
-    - `/metrics` for Prometheus scraping, without introducing per-request mock switches.
+    - `/metrics` for Prometheus scraping, without introducing per-request mock switches or test-only provider flags.
 
 ## Success Criteria
 
@@ -559,3 +586,42 @@ In CI, these parity tests are wired into the dedicated heavy workflow `.github/w
     - Explicitly points at `tests/eng5_profiles/*` as ENG5 profile parity tests (separate from standard docker integration tests in `tests/integration/`).
     - Documents `pdm run eng5-cj-docker-suite` and `pdm run llm-mock-profile <profile>` as the recommended entrypoints for running the heavy ENG5/LOWER5 docker suites.
     - Includes `pdm run pytest-root ...` examples for running individual ENG5 parity and CJ docker files when selective validation is needed.
+
+## Progress (2025-12-10 – Step 2 ENG5 mock profile metrics implemented and validated)
+
+- The Step 2 parity metrics plan above is now implemented using a shared helper:
+  - File: `tests/eng5_profiles/eng5_lps_metrics_assertions.py`
+  - Behaviour:
+    - Fetches `/metrics` from `llm_provider_service` via `ServiceTestManager.get_validated_endpoints()["llm_provider_service"]["metrics_url"]`.
+    - Parses metrics into a `metric_name -> [(labels, value), ...]` map using `tests/utils/metrics_helpers.py`.
+    - Derives the active mock “profile model” from `llm_provider_serial_bundle_calls_total{provider="mock",model=*}` by selecting the model with the highest call count.
+    - Applies the planned inequality-based assertions for:
+      - `llm_provider_serial_bundle_calls_total{provider="mock",model=<profile_model>}` (≥1 call).
+      - `llm_provider_serial_bundle_items_per_call_{count,bucket}{provider="mock",model=<profile_model>}` (1 ≤ max items per call ≤ `Settings.SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL`).
+      - `llm_provider_queue_wait_time_seconds_{count,sum}{queue_processing_mode="serial_bundle"}` (average wait in [0, 120] seconds, with result labels limited to `{success,failure,expired}`).
+      - `llm_provider_comparison_callbacks_total{queue_processing_mode="serial_bundle"}` (≥1 callback).
+      - `llm_provider_queue_depth{queue_type="total"}` (if present, ≤ 1000).
+- Profile suites now consume these metrics as part of their parity checks:
+  - CJ generic:
+    - `TestCJMockParityGenericParity` and `TestCJMockParityGenericCoverage` both call the shared helper after verifying winner distributions (100% Essay A), token usage, and latency parity vs `cj_lps_roundtrip_mock_20251205`.
+  - ENG5 full-anchor:
+    - `TestEng5MockParityFullAnchorParity` (implemented in `eng5_mock_parity_full_anchor_parity_impl.py`) drives the 12-anchor/66-comparison batch, asserts winner distribution parity (±20 percentage point drift per label allowed), token and latency parity vs `eng5_anchor_align_gpt51_low_20251201`, and then runs the LPS metrics helper.
+    - `tests/eng5_profiles/test_eng5_mock_parity_full_anchor.py` is now a thin wrapper exposing `TestEng5MockParityFullAnchor` for CI and scripts without changing nodeids.
+  - ENG5 LOWER5:
+    - `TestEng5MockParityLower5Parity` remains the canonical single-batch parity test vs `eng5_lower5_gpt51_low_20251202` and calls the helper after parity assertions.
+    - `TestEng5MockParityLower5Diagnostics.test_eng5_mock_lower5_small_net_diagnostics_across_batches` now:
+      - Drives three LOWER5-shaped small-net batches (5 anchors → 10 pairs per batch) with `cj_llm_batching_mode="serial_bundle"`.
+      - Asserts complete per-batch and cross-batch pair coverage and stable winners per pair.
+      - Uses a **shape + drift** parity model vs the recorded LOWER5 summary:
+        - Essay B remains the majority winner.
+        - Per-label winner proportions may drift by up to ±0.20 from the recorded proportions (canary, not bitwise equality).
+      - Verifies token/latency parity (same inequality bands as the main LOWER5 parity test).
+      - Invokes the shared LPS metrics helper at the end to pin serial-bundle and queue metrics under the LOWER5 profile.
+- Heavy C-lane validation:
+  - With `.env` configured appropriately and services restarted via the helper:
+    - `pdm run llm-mock-profile cj-generic` ✅ (CJ generic parity + coverage + LPS metrics).
+    - `pdm run llm-mock-profile eng5-anchor` ✅ (ENG5 full-anchor parity + LPS metrics, queue wait-time guardrail at 120 seconds).
+    - `pdm run llm-mock-profile eng5-lower5` ✅ (ENG5 LOWER5 parity + small-net diagnostics + LPS metrics).
+- Remaining work for this task:
+  - Optional: refine Prometheus/Grafana query snippets in the ENG5 runbook and LPS README to surface these serial-bundle and queue metrics explicitly for ENG5 heavy suites.
+  - Optional: move the small-net winner-proportion canary thresholds into configuration or constants if we see further ENG5-specific tuning requirements.

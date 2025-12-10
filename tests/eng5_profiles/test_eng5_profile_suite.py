@@ -9,11 +9,9 @@ per-profile test modules.
 
 from __future__ import annotations
 
-from typing import Any, cast
-
-import aiohttp
 import pytest
 
+from tests.eng5_profiles._lps_helpers import get_lps_mock_mode
 from tests.eng5_profiles.test_cj_mock_parity_generic import TestCJMockParityGeneric
 from tests.eng5_profiles.test_eng5_mock_parity_full_anchor import (
     TestEng5MockParityFullAnchor,
@@ -46,24 +44,6 @@ class TestEng5ProfileSuite:
 
         return endpoints
 
-    async def _get_lps_mock_mode(self, validated_services: dict) -> dict[str, Any]:
-        """Query LPS /admin/mock-mode to determine active mock configuration."""
-        base_url = validated_services["llm_provider_service"]["base_url"]
-        admin_url = f"{base_url}/admin/mock-mode"
-
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                admin_url,
-                timeout=aiohttp.ClientTimeout(total=5.0),
-            ) as resp:
-                if resp.status != 200:
-                    pytest.skip(
-                        "/admin/mock-mode not available on LPS; "
-                        "ensure dev config exposes this endpoint"
-                    )
-                data = await resp.json()
-                return cast(dict[str, Any], data)
-
     @pytest.mark.docker
     @pytest.mark.integration
     @pytest.mark.asyncio
@@ -79,7 +59,8 @@ class TestEng5ProfileSuite:
         - `/admin/mock-mode` reports `use_mock_llm=true` and `mock_mode=cj_generic_batch`.
         - The existing CJ generic parity and coverage tests pass under this profile.
         """
-        mode_info = await self._get_lps_mock_mode(validated_services)
+        base_url = validated_services["llm_provider_service"]["base_url"]
+        mode_info = await get_lps_mock_mode(base_url)
 
         if not mode_info.get("use_mock_llm", False):
             pytest.skip(
@@ -119,7 +100,8 @@ class TestEng5ProfileSuite:
           `mock_mode=eng5_anchor_gpt51_low`.
         - The existing ENG5 anchor parity test passes under this profile.
         """
-        mode_info = await self._get_lps_mock_mode(validated_services)
+        base_url = validated_services["llm_provider_service"]["base_url"]
+        mode_info = await get_lps_mock_mode(base_url)
 
         if not mode_info.get("use_mock_llm", False):
             pytest.skip(
@@ -156,7 +138,8 @@ class TestEng5ProfileSuite:
         - The existing ENG5 LOWER5 parity and small-net diagnostics tests pass
           under this profile.
         """
-        mode_info = await self._get_lps_mock_mode(validated_services)
+        base_url = validated_services["llm_provider_service"]["base_url"]
+        mode_info = await get_lps_mock_mode(base_url)
 
         if not mode_info.get("use_mock_llm", False):
             pytest.skip(

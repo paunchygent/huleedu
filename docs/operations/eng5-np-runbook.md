@@ -362,6 +362,10 @@ labels in logs and reports.
     - `pdm run eng5-cj-docker-suite regular` – only regular ENG5 batch tests (resampling + callbacks) in `tests/functional/cj_eng5/`.
   - `pdm run llm-mock-profile <profile>` – switches LLM Provider mock profile, restarts the service, and runs the matching ENG5 profile parity suite:
     - `cj-generic`, `eng5-anchor`, `eng5-lower5` map to tests in `tests/eng5_profiles/*` (see `tests/eng5_profiles/test_eng5_profile_suite.py` for the orchestrator).
+    - These parity suites now also pin LPS serial-bundle and queue metrics for the mock provider:
+      - `llm_provider_serial_bundle_calls_total{provider="mock",model=<profile_model>}` (≥1 per run).
+      - `llm_provider_serial_bundle_items_per_call_{count,bucket}{provider="mock",model=<profile_model>}` with `1 <= max(items_per_call) <= Settings.SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL`.
+      - `llm_provider_queue_wait_time_seconds_{count,sum}{queue_processing_mode="serial_bundle"}` with average wait in `[0, 120]` seconds and `result ⊆ {success,failure,expired}`, plus guardrails on `llm_provider_comparison_callbacks_total{queue_processing_mode="serial_bundle"}` and `llm_provider_queue_depth{queue_type="total"}` (no runaway queue growth).
 - **Running individual test files (selective validation)**
   - All tests remain runnable via `pytest-root` when you need to validate a single file instead of the full suite, for example:
     ```bash

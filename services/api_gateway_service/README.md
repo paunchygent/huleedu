@@ -1,19 +1,19 @@
 # API Gateway Service
 
-## Overview **Client-facing API for Svelte 5 + Vite frontend integration**
+## Overview **Client-facing API for Vue 3 + Vite frontend integration**
 
-The API Gateway Service is a FastAPI-based microservice that provides client-facing HTTP endpoints for Svelte 5 + Vite frontend applications. It serves as the secure entry point for external clients, implementing authentication, rate limiting, and proper request validation while proxying to internal microservices.
+The API Gateway Service is a FastAPI-based microservice that provides client-facing HTTP endpoints for Vue 3 + Vite frontend applications. It serves as the secure entry point for external clients, implementing authentication, rate limiting, and proper request validation while proxying to internal microservices.
 
 ## Architecture
 
 - **Framework**: FastAPI + uvicorn (client-facing optimization)
-- **Communication**: HTTP API for Svelte 5 + Vite frontend, Kafka for batch commands, HTTP proxy for file uploads
+- **Communication**: HTTP API for Vue 3 + Vite frontend, Kafka for batch commands, HTTP proxy for file uploads
 - **Port**: 4001 (client-facing)
 - **Features**: CORS, OpenAPI docs, rate limiting, JWT authentication
 
 ## Key Responsibilities
 
-1. **Client API**: Secure HTTP endpoints for Svelte 5 + Vite frontend
+1. **Client API**: Secure HTTP endpoints for Vue 3 + Vite frontend
 2. **Batch Commands**: Kafka event publishing using proper `ClientBatchPipelineRequestV1` contracts
 3. **File Upload Proxy**: Secure file upload proxy to File Service with authentication headers
 4. **Class Management Proxy**: Complete proxy to Class Management Service API
@@ -24,7 +24,9 @@ The API Gateway Service is a FastAPI-based microservice that provides client-fac
 ### Batch Management
 
 - `POST /v1/batches/register` - Register a new batch (proxy to BOS; injects user_id/org_id from JWT)
+- `GET /v1/batches` - List user's batches with pagination and status filtering
 - `POST /v1/batches/{batch_id}/pipelines` - Request pipeline execution (uses `ClientBatchPipelineRequestV1`)
+- `PATCH /v1/batches/{batch_id}/prompt` - Update batch prompt reference
 - `GET /v1/batches/{batch_id}/status` - Get batch status with semantic status mapping and ownership validation
 - `GET /v1/batches/{batch_id}/validation-status` - Get validation status for student associations
 
@@ -38,6 +40,13 @@ The API Gateway Service is a FastAPI-based microservice that provides client-fac
   - Supports all HTTP methods (GET, POST, PUT, DELETE)
   - Headers and query parameters are forwarded
   - Authentication headers are passed through
+
+### BFF Teacher Dashboard (Proxy)
+
+- `ANY /bff/v1/teacher/{path:path}` - Transparent proxy to BFF Teacher Service
+  - Injects identity headers (`X-User-ID`, `X-Correlation-ID`, `X-Org-ID`)
+  - Preserves all HTTP methods and request bodies
+  - Used by teacher dashboard frontend components
 
 ### Service Management
 
@@ -98,7 +107,7 @@ The API Gateway maps internal processing states to semantic client statuses for 
 
 Status values returned by `/v1/batches/{batch_id}/status` are **identical** to WebSocket notification values, ensuring frontend applications receive consistent status information regardless of communication channel.
 
-## Svelte Frontend Integration
+## Vue Frontend Integration
 
 ### CORS Configuration
 
@@ -203,6 +212,31 @@ FastAPI response format:
 
 Reference: `libs/common_core/docs/error-patterns.md`
 
+## Router Organization
+
+Batch routes are organized by operation type (SRP):
+
+```
+routers/
+├── _batch_utils.py           # Shared models, status mapping, auth headers
+├── batch_commands.py         # POST /batches/register, PATCH /batches/{id}/prompt
+├── batch_pipelines.py        # POST /batches/{id}/pipelines (Kafka publishing)
+├── batch_queries.py          # GET /batches (listing with pagination/filtering)
+├── bff_teacher_routes.py     # BFF Teacher Service proxy
+├── class_routes.py           # Class Management Service proxy
+├── file_routes.py            # File upload proxy
+└── status_routes.py          # GET /batches/{id}/status, /validation-status
+```
+
+### Shared Utilities (`_batch_utils.py`)
+
+- `ClientBatchRegistrationRequest` - Registration request model
+- `BatchPipelineRequest` - Pipeline execution request model
+- `BatchListResponse` - Batch listing response with pagination
+- `CLIENT_TO_INTERNAL_STATUS` - Status mapping dictionary
+- `build_internal_auth_headers()` - Internal service auth headers
+- `map_internal_to_client_status()` - Status translation helper
+
 ## Testing
 
 ### Test Structure
@@ -212,8 +246,11 @@ tests/
 ├── test_auth.py                      # JWT authentication tests
 ├── test_auth_org.py                  # Org-level authentication tests
 ├── test_batch_routes.py              # Batch pipeline command tests
+├── test_batch_queries.py             # Batch listing endpoint tests
 ├── test_batch_registration_proxy.py  # BOS proxy tests
+├── test_batch_prompt_amendment_proxy.py  # Prompt update tests
 ├── test_batch_preflight.py           # Validation status tests
+├── test_bff_teacher_routes.py        # BFF Teacher proxy tests
 ├── test_status_routes.py             # Status mapping tests
 ├── test_file_routes.py               # File upload proxy tests
 ├── test_class_routes.py              # Class Management proxy tests
@@ -278,8 +315,10 @@ Environment variables (prefix: `API_GATEWAY_`):
 - File Service: `/v1/files/batch` (file uploads)
 - Class Management Service: `/v1/classes/*` (all class operations)
 - Batch Orchestrator Service: `/v1/batches/register` (registration proxy)
+- Result Aggregator Service: `/v1/batches` listing (internal)
+- BFF Teacher Service: `/bff/v1/teacher/*` (teacher dashboard)
 
-**Consumed by**: Svelte 5 + Vite Frontend Applications
+**Consumed by**: Vue 3 + Vite Frontend Applications
 
 ## Monitoring
 

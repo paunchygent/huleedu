@@ -41,7 +41,7 @@ Design and specify an improved mock LLM provider that better mirrors production 
    - Optional “streaming metadata” flag to exercise client handling without actual chunking.
 
 3) **Design configuration surface**
-   - Propose env var schema (sane defaults, per-feature enable/disable, seed control) and document interactions with `USE_MOCK_LLM` and `ALLOW_MOCK_PROVIDER`.
+   - Propose env var schema (sane defaults, per-feature enable/disable, seed control) and document interactions with `LLM_PROVIDER_SERVICE_USE_MOCK_LLM` and `LLM_PROVIDER_SERVICE_ALLOW_MOCK_PROVIDER`.
    - Ensure deterministic mode for tests and stochastic mode for manual testing.
 
 4) **Implementation outline**
@@ -85,7 +85,7 @@ Design and specify an improved mock LLM provider that better mirrors production 
 - `MOCK_TOKENIZER=tiktoken|simple`; `MOCK_TOKENS_PER_WORD=0.75` (fallback multiplier)
 - `MOCK_OUTCOME_MODE=heuristic|fixed`; `MOCK_CONFIDENCE_BASE=4.5`; `MOCK_CONFIDENCE_JITTER=0.3`
 - `MOCK_STREAMING_METADATA=false`
-- Existing: `ALLOW_MOCK_PROVIDER`, `USE_MOCK_LLM`, `MOCK_PROVIDER_SEED`
+- Existing: `LLM_PROVIDER_SERVICE_ALLOW_MOCK_PROVIDER`, `LLM_PROVIDER_SERVICE_USE_MOCK_LLM`, `LLM_PROVIDER_SERVICE_MOCK_PROVIDER_SEED`
 
 Defaults: all noisy behaviours off in CI (latency/error/cache-hit=0), modest realism in dev via `.env.local` example.
 
