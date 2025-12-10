@@ -374,3 +374,87 @@ class TestCJRegularBatchResamplingDocker:
 
         assert max_items_upper_bound >= 1
         assert max_items_upper_bound <= max_configured
+
+        # LPS queue wait-time and callbacks guardrails for serial_bundle.
+        wait_count_values = find_metric_values_in_map(
+            lps_metrics,
+            "llm_provider_queue_wait_time_seconds_count",
+            {"queue_processing_mode": "serial_bundle"},
+        )
+        wait_sum_values = find_metric_values_in_map(
+            lps_metrics,
+            "llm_provider_queue_wait_time_seconds_sum",
+            {"queue_processing_mode": "serial_bundle"},
+        )
+        assert wait_count_values and wait_sum_values, (
+            "Expected llm_provider_queue_wait_time_seconds_* metrics for "
+            "queue_processing_mode='serial_bundle'"
+        )
+
+        total_wait_count = sum(wait_count_values)
+        total_wait_sum = sum(wait_sum_values)
+        assert total_wait_count > 0.0, (
+            "Expected at least one serial_bundle queue wait sample; "
+            f"total_wait_count={total_wait_count}, "
+            f"wait_count_values={wait_count_values}"
+        )
+        average_wait = total_wait_sum / total_wait_count
+        assert average_wait >= 0.0, (
+            "Expected non-negative average queue wait; "
+            f"average_wait={average_wait}, "
+            f"total_wait_sum={total_wait_sum}, "
+            f"total_wait_count={total_wait_count}"
+        )
+        assert average_wait <= 120.0, (
+            "Expected average serial_bundle queue wait <= 120s; "
+            f"average_wait={average_wait}, "
+            f"total_wait_sum={total_wait_sum}, "
+            f"total_wait_count={total_wait_count}"
+        )
+
+        wait_count_samples = [
+            labels
+            for labels, _value in lps_metrics.get("llm_provider_queue_wait_time_seconds_count", [])
+            if labels.get("queue_processing_mode") == "serial_bundle"
+        ]
+        results_seen = {
+            labels.get("result")
+            for labels in wait_count_samples
+            if labels.get("result") is not None
+        }
+        assert results_seen, (
+            "Expected queue wait-time samples for at least one result under serial_bundle mode; "
+            f"observed_results={results_seen}"
+        )
+        assert results_seen <= {"success", "failure", "expired"}, (
+            "Unexpected result labels in serial_bundle queue wait metrics; "
+            f"observed_results={results_seen}"
+        )
+
+        callback_values = find_metric_values_in_map(
+            lps_metrics,
+            "llm_provider_comparison_callbacks_total",
+            {"queue_processing_mode": "serial_bundle"},
+        )
+        assert callback_values, (
+            "Expected llm_provider_comparison_callbacks_total for "
+            "queue_processing_mode='serial_bundle'; "
+            f"callback_values={callback_values}"
+        )
+        assert max(callback_values) >= 1.0, (
+            "Expected at least one comparison callback recorded for serial_bundle; "
+            f"max_callback_value={max(callback_values)}, "
+            f"callback_values={callback_values}"
+        )
+
+        depth_values_total = find_metric_values_in_map(
+            lps_metrics,
+            "llm_provider_queue_depth",
+            {"queue_type": "total"},
+        )
+        if depth_values_total:
+            assert max(depth_values_total) <= 1000.0, (
+                "Queue depth guardrail breached for serial_bundle; "
+                f"max_depth_total={max(depth_values_total)}, "
+                f"depth_values_total={depth_values_total}"
+            )
