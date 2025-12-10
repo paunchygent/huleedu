@@ -53,6 +53,10 @@ class BatchRepositoryProtocol(Protocol):
         """Get batches for a user."""
         ...
 
+    async def count_user_batches(self, user_id: str, status: Optional[str] = None) -> int:
+        """Count total batches for a user (for pagination)."""
+        ...
+
     async def update_essay_spellcheck_result(
         self,
         essay_id: str,
@@ -222,6 +226,10 @@ class BatchQueryServiceProtocol(Protocol):
         self, user_id: str, status: Optional[str] = None, limit: int = 20, offset: int = 0
     ) -> List[BatchResult]:
         """Get all batches for a user."""
+        ...
+
+    async def count_user_batches(self, user_id: str, status: Optional[str] = None) -> int:
+        """Count total batches for a user (for pagination)."""
         ...
 
 

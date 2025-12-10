@@ -121,3 +121,19 @@ class AggregatorServiceImpl(BatchQueryServiceProtocol):
                 exc_info=True,
             )
             raise
+
+    async def count_user_batches(self, user_id: str, status: Optional[str] = None) -> int:
+        """Count total batches for a user (for pagination)."""
+        try:
+            return await self.batch_repository.count_user_batches(
+                user_id=user_id,
+                status=status,
+            )
+        except Exception as e:
+            logger.error(
+                "Failed to count user batches",
+                user_id=user_id,
+                error=str(e),
+                exc_info=True,
+            )
+            raise

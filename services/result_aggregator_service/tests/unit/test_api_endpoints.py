@@ -195,6 +195,7 @@ def create_mock_batch_result(
     mock_batch.processing_started_at = None
     mock_batch.processing_completed_at = None
     mock_batch.batch_metadata = batch_metadata or {}
+    mock_batch.assignment_id = None  # Set to None or a string value
     return mock_batch
 
 
@@ -430,8 +431,9 @@ class TestQueryEndpoints:
             ),
         ]
 
-        # Configure the mock to return batches
+        # Configure the mock to return batches and count
         test_provider._batch_query_service.get_user_batches.return_value = mock_batches
+        test_provider._batch_query_service.count_user_batches.return_value = 2
 
         # Act
         headers: Dict[str, str] = {
@@ -471,8 +473,9 @@ class TestQueryEndpoints:
             for i in range(5)
         ]
 
-        # Configure the mock to return batches
+        # Configure the mock to return batches and count
         test_provider._batch_query_service.get_user_batches.return_value = mock_batches
+        test_provider._batch_query_service.count_user_batches.return_value = 100  # total count
 
         # Act
         headers: Dict[str, str] = {
@@ -489,6 +492,7 @@ class TestQueryEndpoints:
         assert len(data["batches"]) == 5
         assert data["pagination"]["limit"] == 5
         assert data["pagination"]["offset"] == 10
+        assert data["pagination"]["total"] == 100
 
         # Verify query service was called with correct parameters
         test_provider._batch_query_service.get_user_batches.assert_called_once_with(
@@ -517,8 +521,9 @@ class TestQueryEndpoints:
             ),
         ]
 
-        # Configure the mock to return batches
+        # Configure the mock to return batches and count
         test_provider._batch_query_service.get_user_batches.return_value = mock_batches
+        test_provider._batch_query_service.count_user_batches.return_value = 1
 
         # Act
         headers: Dict[str, str] = {
@@ -553,8 +558,9 @@ class TestQueryEndpoints:
         # Arrange
         user_id: str = "user-no-batches"
 
-        # Configure the mock to return empty list
+        # Configure the mock to return empty list and count of 0
         test_provider._batch_query_service.get_user_batches.return_value = []
+        test_provider._batch_query_service.count_user_batches.return_value = 0
 
         # Act
         headers: Dict[str, str] = {

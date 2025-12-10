@@ -170,10 +170,11 @@ async def get_user_batches(
                 # Cache miss
                 metrics.cache_misses_total.labels(cache_type="user_batches").inc()
 
-            # Query batches
+            # Query batches and total count
             batches = await query_service.get_user_batches(
                 user_id=user_id, status=status, limit=limit, offset=offset
             )
+            total_count = await query_service.count_user_batches(user_id=user_id, status=status)
 
             # Create response
             response_data = {
@@ -183,7 +184,7 @@ async def get_user_batches(
                 "pagination": {
                     "limit": limit,
                     "offset": offset,
-                    "total": len(batches),  # Would include total count in production
+                    "total": total_count,
                 },
             }
 

@@ -110,6 +110,10 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
         """Get all batches for a user."""
         return await self.queries.get_user_batches(user_id, status, limit, offset)
 
+    async def count_user_batches(self, user_id: str, status: Optional[str] = None) -> int:
+        """Count total batches for a user (for pagination)."""
+        return await self.queries.count_user_batches(user_id, status)
+
     async def create_batch(
         self,
         batch_id: str,

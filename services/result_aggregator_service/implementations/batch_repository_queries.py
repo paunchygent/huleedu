@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from huleedu_service_libs.logging_utils import create_service_logger
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
 from services.result_aggregator_service.models_db import BatchResult, EssayResult
@@ -114,6 +114,29 @@ class BatchRepositoryQueries:
 
             result = await session.execute(query)
             return list(result.scalars().all())
+
+    async def count_user_batches(
+        self,
+        user_id: str,
+        status: Optional[str] = None,
+    ) -> int:
+        """Count total batches for a user.
+
+        Args:
+            user_id: User ID to filter batches
+            status: Optional status filter
+
+        Returns:
+            Total count of matching batches
+        """
+        async with self.session_factory() as session:
+            query = select(func.count(BatchResult.batch_id)).where(BatchResult.user_id == user_id)
+
+            if status:
+                query = query.where(BatchResult.overall_status == status)
+
+            result = await session.execute(query)
+            return result.scalar() or 0
 
     async def get_batch_essays(self, batch_id: str) -> List[EssayResult]:
         """Get all essays for a batch.
