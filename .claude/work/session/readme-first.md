@@ -163,7 +163,7 @@ docker exec huleedu_<service>_db psql -U "$HULEEDU_DB_USER" -d <db_name>
 | Mode | CJ Env | LPS Env | Status |
 |------|--------|---------|--------|
 | serial_bundle | `CJ_ASSESSMENT_SERVICE_LLM_BATCHING_MODE=serial_bundle` | `LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE=serial_bundle` | Production |
-| provider_batch_api | `=provider_batch_api` | `=batch_api` | Phase-2 (LPS job manager + BATCH_API path implemented; CJ semantics + ENG5 harness in progress) |
+| provider_batch_api | `=provider_batch_api` | `=batch_api` | Phase-2 (LPS job manager + BATCH_API path implemented; CJ now persists `llm_batching_mode` and disables additional waves in this mode; single-wave generation + ENG5 harness still in progress) |
 
 **ENG5 metrics guardrails:**
 - Queue wait-time: `0 <= avg <= 120s` (broad guardrail for heavy C-lane)

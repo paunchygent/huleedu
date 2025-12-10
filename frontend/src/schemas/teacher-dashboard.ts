@@ -33,6 +33,8 @@ export type TeacherBatchItem = z.infer<typeof TeacherBatchItemSchema>;
 export const TeacherDashboardResponseSchema = z.object({
   batches: z.array(TeacherBatchItemSchema),
   total_count: z.number().int().nonnegative(),
+  limit: z.number().int().positive(),
+  offset: z.number().int().nonnegative(),
 });
 
 export type TeacherDashboardResponse = z.infer<typeof TeacherDashboardResponseSchema>;

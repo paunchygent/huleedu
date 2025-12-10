@@ -261,15 +261,18 @@ Once Phase‑2 BATCH_API execution is implemented:
     - Job formation (grouping compatible `QueuedRequest`s based on provider, model, and `cj_llm_batching_mode`).
     - Job submission via `BatchJobManagerProtocol.schedule_job(...)`.
     - Mapping `BatchJobResult` entries back to per‑request callbacks and queue status transitions.
+    - Extended unit coverage for error paths:
+      - `test_batch_api_strategy_handles_collect_results_exception` exercises the job‑manager failure guard.
+      - `test_execute_batch_api_handles_job_manager_error` ensures executor‑level outcomes remain per‑request failures.
   - [ ] Wire job‑level metrics (initially using the mock manager, then real providers):
     - `llm_provider_batch_api_jobs_total{provider,model,status}`.
     - `llm_provider_batch_api_items_per_job{provider,model}`.
     - `llm_provider_batch_api_job_duration_seconds{provider,model}`.
 
 - **Phase 2.4 – CJ provider_batch_api semantics**
-  - [ ] Persist `llm_batching_mode` into `CJBatchState.processing_metadata` on initial submission.
+  - [x] Persist `llm_batching_mode` into `CJBatchState.processing_metadata` on initial submission.
   - [ ] Ensure single‑wave generation up to `max_pairs_cap` for `provider_batch_api`.
-  - [ ] Adjust continuation logic to:
+  - [~] Adjust continuation logic to:
     - Finalize when callbacks hit the denominator/cap.
     - Never schedule additional comparison waves in `provider_batch_api` mode.
 

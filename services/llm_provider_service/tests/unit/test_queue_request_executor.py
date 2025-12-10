@@ -314,3 +314,81 @@ class TestQueuedRequestExecutor:
         assert kwargs["temperature_override"] == 0.3
         assert kwargs["system_prompt_override"] == "System override"
         assert kwargs["max_tokens_override"] == 4096
+
+    @pytest.mark.asyncio
+    async def test_execute_batch_api_handles_job_manager_error(
+        self,
+        mock_comparison_processor: AsyncMock,
+        mock_queue_manager: AsyncMock,
+        mock_event_publisher: AsyncMock,
+        mock_trace_context_manager: Mock,
+        settings: Settings,
+        mock_metrics: Mock,
+        mock_tracing_enricher: Mock,
+    ) -> None:
+        """BATCH_API execution should surface failure outcomes on job errors."""
+        settings.QUEUE_PROCESSING_MODE = QueueProcessingMode.BATCH_API
+
+        batch_job_manager = AsyncMock()
+        batch_job_manager.schedule_job = AsyncMock()
+        batch_job_manager.collect_results = AsyncMock(side_effect=RuntimeError("job failed"))
+
+        executor = QueuedRequestExecutor(
+            comparison_processor=mock_comparison_processor,
+            queue_manager=mock_queue_manager,
+            event_publisher=mock_event_publisher,
+            trace_context_manager=mock_trace_context_manager,
+            settings=settings,
+            queue_processing_mode=QueueProcessingMode.BATCH_API,
+            metrics=mock_metrics,
+            tracing_enricher=mock_tracing_enricher,
+            batch_job_manager=batch_job_manager,
+        )
+
+        request1 = QueuedRequest(
+            queue_id=uuid.uuid4(),
+            request_data=LLMComparisonRequest(
+                user_prompt="prompt-1",
+                callback_topic="topic",
+                correlation_id=uuid.uuid4(),
+                llm_config_overrides=LLMConfigOverridesHTTP(
+                    provider_override=LLMProviderType.MOCK,
+                    model_override="mock-model",
+                ),
+            ),
+            status=QueueStatus.QUEUED,
+            queued_at=datetime.now(timezone.utc),
+            size_bytes=100,
+            callback_topic="topic",
+        )
+        request2 = QueuedRequest(
+            queue_id=uuid.uuid4(),
+            request_data=LLMComparisonRequest(
+                user_prompt="prompt-2",
+                callback_topic="topic",
+                correlation_id=uuid.uuid4(),
+                llm_config_overrides=LLMConfigOverridesHTTP(
+                    provider_override=LLMProviderType.MOCK,
+                    model_override="mock-model",
+                ),
+            ),
+            status=QueueStatus.QUEUED,
+            queued_at=datetime.now(timezone.utc),
+            size_bytes=100,
+            callback_topic="topic",
+        )
+
+        mock_queue_manager.update_status = AsyncMock()
+        mock_queue_manager.dequeue = AsyncMock(side_effect=[request2, None])
+
+        result = await executor.execute_batch_api(request1)
+
+        batch_job_manager.schedule_job.assert_awaited_once()
+        batch_job_manager.collect_results.assert_awaited_once()
+
+        assert len(result.outcomes) == 2
+        assert {outcome.result for outcome in result.outcomes} == {"failure"}
+        assert {outcome.request.queue_id for outcome in result.outcomes} == {
+            request1.queue_id,
+            request2.queue_id,
+        }

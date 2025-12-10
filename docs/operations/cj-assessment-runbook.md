@@ -271,6 +271,20 @@ Operational usage:
 - With assignment_id: hydrate prompt/rubric/anchors; grade projections enabled; cached prompts encouraged.
 - Without assignment_id: rankings only; projections off; shorter cache TTL recommended.
 
+## CJ LLM batching modes (current semantics)
+
+- `LLMBatchingMode.PER_REQUEST`:
+  - Each comparison request is sent to LLM Provider individually.
+  - Continuation uses completion denominator and stability caps but never groups comparisons into provider-side batches.
+- `LLMBatchingMode.SERIAL_BUNDLE`:
+  - CJ submits comparisons in waves where compatible requests are bundled into single provider calls (`QueueProcessingMode.SERIAL_BUNDLE` in LPS).
+  - Continuation logic may request additional waves when stability and budget heuristics indicate more comparisons are needed, including Phase‑2 RESAMPLING for small nets.
+- `LLMBatchingMode.PROVIDER_BATCH_API` (Phase 2 – in progress):
+  - Initial submission persists `"llm_batching_mode": "provider_batch_api"` into `CJBatchState.processing_metadata` and threads `cj_llm_batching_mode="provider_batch_api"` through LLM metadata hints.
+  - `workflow_continuation.trigger_existing_workflow_continuation` resolves the effective batching mode from this metadata and, when it is `provider_batch_api`, **never calls** `comparison_processing.request_additional_comparisons_for_batch(...)`. No further comparison waves are scheduled once the initial provider‑batch wave has been submitted.
+  - Finalization remains driven by the completion denominator / comparison budget, with success‑rate guards deciding between `FINALIZE_SCORING` and `FINALIZE_FAILURE`. Stability checks are diagnostic for this mode rather than a trigger for new waves.
+  - **Note:** Pair generation currently reuses the existing comparison‑budget normalization; a follow‑up slice (tracked in `TASKS/assessment/cj-llm-provider-batch-api-mode.md`) will tighten the “all‑at‑once up to cap” guarantee for large nets.
+
 ## Planned PR: staged submission for serial bundles (non-batch-API)
 - Purpose/story: prevent flooding the full comparison budget at once. Submit comparisons in waves (N bundles per wave), wait for callbacks, run stability check (`SCORE_STABILITY_THRESHOLD`, `MIN_COMPARISONS_FOR_STABILITY_CHECK`), then decide whether to enqueue the next wave. Goal: earlier convergence, lower cost/latency, clearer observability.
 - Entry points: initial submission via `submit_comparisons_for_async_processing`, continuation via `workflow_continuation.trigger_existing_workflow_continuation` which calls `comparison_processing.request_additional_comparisons_for_batch`.

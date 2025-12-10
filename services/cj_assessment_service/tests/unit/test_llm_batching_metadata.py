@@ -5,7 +5,7 @@ Focus: preferred_bundle_size hints from CJ into LPS request metadata.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
@@ -96,6 +96,7 @@ async def test_submit_initial_batch_sets_preferred_bundle_size_to_wave_size(
         AsyncMock(return_value=comparison_tasks),
     )
     monkeypatch.setattr(cbo, "merge_batch_processing_metadata", AsyncMock())
+    merge_mock = cast(AsyncMock, cbo.merge_batch_processing_metadata)
 
     captured_metadata: dict[str, Any] = {}
 
@@ -141,3 +142,106 @@ async def test_submit_initial_batch_sets_preferred_bundle_size_to_wave_size(
     # tasks in this initial wave and respect the global cap of 64.
     assert captured_metadata["preferred_bundle_size"] == len(comparison_tasks)
     assert 1 <= captured_metadata["preferred_bundle_size"] <= 64
+
+    # Effective batching mode should be persisted into batch processing metadata.
+    merge_mock.assert_awaited_once()
+    await_args = merge_mock.await_args
+    assert await_args is not None
+    metadata_updates = await_args.kwargs["metadata_updates"]
+    assert metadata_updates["llm_batching_mode"] == LLMBatchingMode.SERIAL_BUNDLE.value
+
+
+@pytest.mark.asyncio
+async def test_submit_initial_batch_persists_provider_batch_mode_in_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Effective provider_batch_api mode should be recorded in processing metadata."""
+
+    settings = Settings()
+    settings.LLM_BATCHING_MODE = LLMBatchingMode.PROVIDER_BATCH_API
+    settings.ENABLE_LLM_BATCHING_METADATA_HINTS = True
+
+    session_provider = MockSessionProvider()
+    batch_repository = AsyncMock(spec=CJBatchRepositoryProtocol)
+    comparison_repository = AsyncMock(spec=CJComparisonRepositoryProtocol)
+    instruction_repository = AsyncMock(spec=AssessmentInstructionRepositoryProtocol)
+    llm_interaction = AsyncMock(spec=LLMInteractionProtocol)
+    matching_strategy = AsyncMock(spec=PairMatchingStrategyProtocol)
+    orientation_strategy = AsyncMock(spec=PairOrientationStrategyProtocol)
+
+    batching_service = BatchingModeService(settings)
+    orchestrator = cbo.ComparisonBatchOrchestrator(
+        batch_repository=batch_repository,
+        session_provider=session_provider,
+        comparison_repository=comparison_repository,
+        instruction_repository=instruction_repository,
+        llm_interaction=llm_interaction,
+        matching_strategy=matching_strategy,
+        orientation_strategy=orientation_strategy,
+        settings=settings,
+        batching_service=batching_service,
+        request_normalizer=ComparisonRequestNormalizer(settings),
+    )
+
+    essays_for_api_model = [
+        EssayForComparison(id="essay-a", text_content="Essay A"),
+        EssayForComparison(id="essay-b", text_content="Essay B"),
+    ]
+
+    comparison_tasks = [
+        ComparisonTask(
+            essay_a=EssayForComparison(id="a-1", text_content="A"),
+            essay_b=EssayForComparison(id="b-1", text_content="B"),
+            prompt="Compare A and B",
+        )
+    ]
+
+    monkeypatch.setattr(
+        cbo.pair_generation,
+        "generate_comparison_tasks",
+        AsyncMock(return_value=comparison_tasks),
+    )
+    monkeypatch.setattr(cbo, "merge_batch_processing_metadata", AsyncMock())
+    merge_mock_provider = cast(AsyncMock, cbo.merge_batch_processing_metadata)
+
+    class _DummyBatchProcessor:
+        def __init__(self, *_args: Any, **_kwargs: Any) -> None:  # pragma: no cover - wiring
+            pass
+
+        async def submit_comparison_batch(self, *args: Any, **kwargs: Any) -> Any:
+            class _Result:
+                def __init__(self, total: int) -> None:
+                    self.total_submitted = total
+                    self.all_submitted = True
+
+            tasks = kwargs.get("comparison_tasks") or []
+            return _Result(total=len(tasks))
+
+    monkeypatch.setattr(cbo, "BatchProcessor", _DummyBatchProcessor)
+
+    request_data = CJAssessmentRequestData(
+        bos_batch_id="bos-test-456",
+        assignment_id="assignment-2",
+        essays_to_process=[
+            EssayToProcess(els_essay_id="essay-a", text_storage_id="s1"),
+            EssayToProcess(els_essay_id="essay-b", text_storage_id="s2"),
+        ],
+        language="en",
+        course_code="eng5",
+    )
+
+    await orchestrator.submit_initial_batch(
+        essays_for_api_model=essays_for_api_model,
+        cj_batch_id=99,
+        request_data=request_data,
+        correlation_id=uuid4(),
+        log_extra={},
+    )
+
+    merge_mock_provider.assert_awaited_once()
+    await_args_provider = merge_mock_provider.await_args
+    assert await_args_provider is not None
+    provider_metadata_updates = await_args_provider.kwargs["metadata_updates"]
+    assert (
+        provider_metadata_updates["llm_batching_mode"] == LLMBatchingMode.PROVIDER_BATCH_API.value
+    )

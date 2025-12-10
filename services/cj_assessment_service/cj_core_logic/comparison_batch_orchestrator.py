@@ -4,6 +4,7 @@ from random import Random
 from typing import Any
 from uuid import UUID
 
+from common_core.config_enums import LLMBatchingMode
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -102,6 +103,7 @@ class ComparisonBatchOrchestrator:
                 cj_batch_id=cj_batch_id,
                 normalized=normalized,
                 correlation_id=correlation_id,
+                effective_batching_mode=effective_batching_mode,
             )
 
             # Shuffle essays for initial batch to avoid deterministic bias
@@ -216,6 +218,7 @@ class ComparisonBatchOrchestrator:
         cj_batch_id: int,
         normalized: NormalizedComparisonRequest,
         correlation_id: UUID,
+        effective_batching_mode: LLMBatchingMode,
     ) -> None:
         await self.batch_repository.update_cj_batch_status(
             session=session,
@@ -223,6 +226,7 @@ class ComparisonBatchOrchestrator:
             status=CJBatchStatusEnum.PERFORMING_COMPARISONS,
         )
         metadata_updates = normalized.budget_metadata()
+        metadata_updates["llm_batching_mode"] = effective_batching_mode.value
         await merge_batch_processing_metadata(
             session_provider=self.session_provider,
             cj_batch_id=cj_batch_id,

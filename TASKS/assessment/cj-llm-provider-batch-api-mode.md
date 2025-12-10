@@ -67,6 +67,11 @@ This task is a follow-on to `TASKS/assessment/cj-llm-serial-bundle-validation-fi
   - Builder-level capping in `services/cj_assessment_service/tests/unit/test_llm_batching_config.py::test_includes_capped_preferred_bundle_size` (`preferred_bundle_size` capped at 64 when hints are enabled).
   - Initial wave metadata in `services/cj_assessment_service/tests/unit/test_llm_batching_metadata.py::test_submit_initial_batch_sets_preferred_bundle_size_to_wave_size` ensuring `preferred_bundle_size == len(comparison_tasks)` and `<= 64`.
   - Retry wave metadata in `services/cj_assessment_service/tests/unit/test_retry_logic.py::test_retry_batch_metadata_includes_capped_preferred_bundle_size` ensuring retry hints are capped at 64.
+- **Progress 2025-12-10:** Effective batching mode is now persisted into batch processing metadata:
+   - `comparison_batch_orchestrator._prepare_batch_state` writes `"llm_batching_mode": <effective_mode.value>` via `merge_batch_processing_metadata(...)`.
+   - `services/cj_assessment_service/tests/unit/test_llm_batching_metadata.py` asserts:
+     - Serial-bundle runs persist `"llm_batching_mode": "serial_bundle"`.
+     - Provider-batch runs persist `"llm_batching_mode": "provider_batch_api"`.
 
 ### PR 2 – Provider-Batch Continuation Semantics (No Iterative Waves)
 
@@ -93,12 +98,18 @@ This task is a follow-on to `TASKS/assessment/cj-llm-serial-bundle-validation-fi
       - `pairs_remaining > 0`.
 
 **Tests:**
-- Extend `services/cj_assessment_service/tests/unit/test_workflow_continuation.py` with:
+- Extend `services/cj_assessment_service/tests/unit/test_workflow_continuation_orchestration.py` with:
   - `test_trigger_continuation_provider_batch_api_finalizes_without_requesting_more`:
     - Batch state has `"llm_batching_mode": "provider_batch_api"`, callbacks at denominator/cap, and remaining budget > 0.
     - Assert `BatchFinalizer.finalize_scoring` is called and `request_additional_comparisons_for_batch` is not.
   - `test_trigger_continuation_provider_batch_api_ignores_stability_flag`:
     - Force `check_score_stability` to return a large delta above threshold; ensure `should_finalize` still triggers based only on cap/denominator for `provider_batch_api`, and no new wave is requested.
+- **Progress 2025-12-10:** Continuation logic now:
+  - Resolves `effective_batching_mode` from `processing_metadata["llm_batching_mode"]` (with settings fallback).
+  - Guards both RESAMPLING and regular continuation so `comparison_processing.request_additional_comparisons_for_batch(...)` is never invoked when `effective_mode == LLMBatchingMode.PROVIDER_BATCH_API`.
+  - Adds orchestration tests in `test_workflow_continuation_orchestration.py` covering:
+    - Finalization under `provider_batch_api` caps without requesting more comparisons.
+    - Skipping additional waves when `llm_batching_mode="provider_batch_api"` even if stability checks suggest more work.
 
 ### PR 3 – ENG5 Runner Integration Hook
 

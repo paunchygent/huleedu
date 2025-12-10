@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
+from common_core.config_enums import LLMBatchingMode
 from huleedu_service_libs.error_handling import HuleEduError
 from huleedu_service_libs.logging_utils import create_service_logger
 
@@ -166,6 +167,42 @@ def _resolve_comparison_budget(
     return max_pairs
 
 
+def _resolve_batching_mode(
+    metadata: dict[str, Any] | None,
+    settings: "Settings",
+) -> LLMBatchingMode:
+    """Resolve effective LLM batching mode from metadata or settings.
+
+    Metadata takes precedence and is expected to store the string value
+    of LLMBatchingMode. Falls back to Settings.LLM_BATCHING_MODE when
+    missing or invalid, and finally to SERIAL_BUNDLE as a defensive default.
+    """
+    raw_mode: Any | None = None
+    if isinstance(metadata, dict):
+        raw_mode = metadata.get("llm_batching_mode")
+
+    if isinstance(raw_mode, LLMBatchingMode):
+        return raw_mode
+    if isinstance(raw_mode, str):
+        try:
+            return LLMBatchingMode(raw_mode)
+        except ValueError:
+            try:
+                return LLMBatchingMode(raw_mode.lower())
+            except ValueError:
+                logger.warning(
+                    "Invalid llm_batching_mode in processing metadata; "
+                    "falling back to settings value",
+                    extra={"llm_batching_mode": raw_mode},
+                )
+
+    settings_mode: Any | None = getattr(settings, "LLM_BATCHING_MODE", None)
+    if isinstance(settings_mode, LLMBatchingMode):
+        return settings_mode
+
+    return LLMBatchingMode.SERIAL_BUNDLE
+
+
 def _extract_previous_scores(metadata: dict[str, Any] | None) -> dict[str, float]:
     """Safely extract previously persisted BT scores from metadata."""
 
@@ -242,6 +279,7 @@ async def trigger_existing_workflow_continuation(
             if isinstance(batch_state.processing_metadata, dict)
             else {}
         )
+        effective_batching_mode = _resolve_batching_mode(metadata, settings)
         config_overrides_payload = (
             metadata.get("config_overrides") if isinstance(metadata, dict) else None
         )
@@ -385,7 +423,12 @@ async def trigger_existing_workflow_continuation(
     resampling_cap = (
         ctx.small_net_resampling_cap if ctx.is_small_net else ctx.regular_batch_resampling_cap
     )
-    if can_attempt_resampling and resampling_cap > 0 and ctx.resampling_pass_count < resampling_cap:
+    if (
+        effective_batching_mode is not LLMBatchingMode.PROVIDER_BATCH_API
+        and can_attempt_resampling
+        and resampling_cap > 0
+        and ctx.resampling_pass_count < resampling_cap
+    ):
         metadata_updates = dict(ctx.metadata_updates)
         metadata_updates.update(
             {
@@ -591,6 +634,20 @@ async def trigger_existing_workflow_continuation(
         return
 
     if decision is ContinuationDecision.REQUEST_MORE_COMPARISONS:
+        if (
+            effective_batching_mode is LLMBatchingMode.PROVIDER_BATCH_API
+            or ctx.pairs_remaining <= 0
+        ):
+            logger.info(
+                "Skipping additional comparisons in provider_batch_api mode",
+                extra={
+                    **log_extra,
+                    "callbacks_received": ctx.callbacks_received,
+                    "pairs_remaining": ctx.pairs_remaining,
+                    "llm_batching_mode": effective_batching_mode.value,
+                },
+            )
+            return
         submitted = await comparison_processing.request_additional_comparisons_for_batch(
             cj_batch_id=batch_id,
             session_provider=session_provider,

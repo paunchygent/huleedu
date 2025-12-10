@@ -348,11 +348,18 @@ labels in logs and reports.
       - LPS: `llm_provider_serial_bundle_calls_total{provider,model}`,
         `llm_provider_serial_bundle_items_per_call{provider,model}`,
         `llm_provider_queue_wait_time_seconds{queue_processing_mode="serial_bundle",result}`.
-  - Future (Phase 2 – provider batch APIs):
-    - ENG5 provider‑batch trials will instead run with:
+  - Phase 2 (provider batch APIs – in progress):
+    - ENG5 provider‑batch trials will run with:
       - `CJ_ASSESSMENT_SERVICE_LLM_BATCHING_MODE=provider_batch_api`
       - `LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE=batch_api`
       - Provider‑specific `*_BATCH_API_MODE` set to `nightly`/`opportunistic` for the ENG5 pair.
+    - LPS semantics:
+      - `QueueProcessingMode.BATCH_API` now routes through a dedicated `BatchApiStrategy` backed by an internal `BatchJobManager`.
+      - Batch jobs are formed from compatible `QueuedRequest`s but still emit one `LLMComparisonResultV1` callback per comparison, preserving ENG5 artefact contracts.
+    - CJ semantics:
+      - Batches submitted with `LLM_BATCHING_MODE=provider_batch_api` persist `"llm_batching_mode": "provider_batch_api"` in `CJBatchState.processing_metadata`.
+      - Continuation logic reads this mode and **never schedules additional comparison waves** once callbacks for a batch have been submitted; `provider_batch_api` is intended as a single‑wave submission up to the comparison cap, with finalization driven by the completion denominator rather than stability.
+      - Generation still uses the existing comparison‑budget normalization; a follow‑up slice will tighten “all‑at‑once to cap” guarantees for large nets.
     - Additional metrics to monitor:
       - CJ: `cj_llm_requests_total{batching_mode="provider_batch_api"}`,
         `cj_llm_batches_started_total{batching_mode="provider_batch_api"}`.

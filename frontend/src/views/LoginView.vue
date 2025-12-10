@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 
+const router = useRouter()
 const { login, devLogin, isLoading, error } = useAuth()
 
 const email = ref('')
@@ -14,8 +15,7 @@ async function handleSubmit() {
 
 function handleDevLogin() {
   devLogin()
-  // Navigate manually since devLogin doesn't use router
-  window.location.href = '/app/dashboard'
+  router.push('/app/dashboard')
 }
 </script>
 

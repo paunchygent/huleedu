@@ -352,3 +352,62 @@ async def test_batch_api_strategy_handles_failed_item_via_error_handler(
     outcome = result.outcomes[0]
     assert outcome.request.queue_id == failing_request.queue_id
     assert outcome.result == "failure"
+
+
+@pytest.mark.asyncio
+async def test_batch_api_strategy_handles_collect_results_exception(
+    settings: Settings,
+    queue_manager: AsyncMock,
+    metrics: QueueProcessorMetrics,
+    tracing_enricher: QueueTracingEnricher,
+    comparison_processor: AsyncMock,
+    batch_job_manager: AsyncMock,
+) -> None:
+    """Exceptions from collect_results should fail all bundled requests."""
+    first_request = _make_request(
+        provider=LLMProviderType.MOCK,
+        model="mock-model",
+        batching_mode="provider_batch_api",
+    )
+    second_request = _make_request(
+        provider=LLMProviderType.MOCK,
+        model="mock-model",
+        batching_mode="provider_batch_api",
+    )
+
+    # Second compatible request is dequeued once, then queue is empty.
+    queue_manager.dequeue = AsyncMock(side_effect=[second_request, None])
+
+    result_handler = _MinimalResultHandler(queue_manager)
+
+    job_ref = Mock()
+    batch_job_manager.schedule_job.return_value = job_ref
+    batch_job_manager.collect_results.side_effect = RuntimeError("collect failed")
+
+    strategy = BatchApiStrategy(
+        comparison_processor=cast(AsyncMock, comparison_processor),
+        result_handler=result_handler,  # type: ignore[arg-type]
+        trace_context_manager=Mock(),
+        settings=settings,
+        metrics=metrics,
+        tracing_enricher=tracing_enricher,
+        batch_job_manager=batch_job_manager,
+    )
+
+    result = await strategy.execute(first_request)
+
+    batch_job_manager.schedule_job.assert_awaited_once()
+    batch_job_manager.collect_results.assert_awaited_once_with(job_ref)
+
+    # All bundled requests should be routed through the error handler.
+    assert result_handler.handle_request_success.await_count == 0
+    assert result_handler.handle_request_hule_error.await_count == 2
+
+    assert len(result.outcomes) == 2
+    assert {outcome.result for outcome in result.outcomes} == {"failure"}
+    assert {outcome.request.queue_id for outcome in result.outcomes} == {
+        first_request.queue_id,
+        second_request.queue_id,
+    }
+    # Batch API bundling should not leave a pending request when all items are compatible.
+    assert result.pending_request is None

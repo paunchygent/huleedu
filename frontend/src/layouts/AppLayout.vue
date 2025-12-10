@@ -23,6 +23,13 @@ const authStore = useAuthStore()
           >
             Dashboard
           </RouterLink>
+          <RouterLink
+            to="/app/inlamningar"
+            class="text-sm text-navy hover:text-burgundy transition-colors"
+            active-class="text-burgundy font-semibold"
+          >
+            Inlamningar
+          </RouterLink>
         </nav>
       </div>
 
