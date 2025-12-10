@@ -18,7 +18,27 @@ Role: You are the lead developer and architect of HuleEdu.
 
 ### Scope: CJ ↔ LPS serial bundling metrics, ENG5 heavy CI hardening, and next-step parity refinements
 
-**Completed this session (2025-12-09):**
+**Completed this session (2025-12-10):**
+- ENG5 CJ ↔ LPS metrics helper and initial Heavy C-lane assertions:
+  - Added `tests/utils/metrics_helpers.py` to fetch `/metrics` via `httpx.AsyncClient` and parse Prometheus text into a simple `metric_name -> list[(labels, value)]` structure (reusing `tests/utils/metrics_validation.py` parsing helpers) for docker-backed ENG5 tests.
+  - Extended `tests/functional/cj_eng5/test_cj_regular_batch_callbacks_docker.py::TestCJRegularBatchCallbacksDocker::test_cj_regular_batch_callbacks_and_preferred_bundle_size_invariants` to:
+    - Use `ServiceTestManager.get_validated_endpoints()` to discover `cj_assessment_service` and `llm_provider_service` metrics endpoints.
+    - Assert CJ metrics after a successful regular ENG5 batch:
+      - `cj_llm_requests_total{batching_mode="serial_bundle"} >= 1`
+      - `cj_llm_batches_started_total{batching_mode="serial_bundle"} >= 1`.
+    - Assert LPS serial-bundle metrics based on active config:
+      - `llm_provider_serial_bundle_calls_total{provider=<default_provider>,model=<CJSettings.DEFAULT_LLM_MODEL>} >= 1`.
+      - `llm_provider_serial_bundle_items_per_call{provider=<default_provider>,model=<CJSettings.DEFAULT_LLM_MODEL>}` using `_count` and `_bucket` series to ensure at least one observation and bound `max(items_per_call)` within `Settings.SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL`.
+  - Updated `TASKS/assessment/cj-llm-serial-bundle-validation-fixes.md` (Step 1) with a “Progress 2025-12-10” entry describing:
+    - The new helper module.
+    - The exact CJ metrics asserted.
+    - The exact LPS metrics asserted and how histogram bounds are interpreted.
+    - That small-net and resampling docker tests remain planned work.
+  - Validation attempts:
+    - `pdm run format-all`, `pdm run lint-fix --unsafe-fixes`.
+    - `pdm run mypy tests/functional/cj_eng5/test_cj_regular_batch_callbacks_docker.py` (passes).
+    - `pdm run typecheck-all` currently fails due to pre-existing issues in `services/bff_teacher_service/tests/unit/test_ras_client.py` and `test_cms_client.py` (missing return annotations and one `ClassInfoV1 | None` union-attr); not addressed in this slice.
+    - `pdm run eng5-cj-docker-suite regular` invoked, but the run failed locally because `huleedu_zookeeper` is unhealthy; once the docker stack is healthy, rerun this harness to validate metrics end-to-end.
 - **US-005.6 – BatchMonitor separation of concerns closed:**
   - Reviewed `services/cj_assessment_service/batch_monitor.py` and `cj_core_logic/batch_finalizer.py` plus unit tests to confirm:
     - BatchMonitor only decides + annotates stuck batches (80% threshold, forced-to-SCORING metadata, or FAILED + `CJAssessmentFailedV1`).
@@ -69,18 +89,75 @@ Role: You are the lead developer and architect of HuleEdu.
   - `TASKS/infrastructure/llm-mock-provider-cj-behavioural-parity-tests.md`:
     - Noted that the ENG5 mock profile parity suite now runs in `eng5-profile-parity-suite` as an opt-in heavy CI stage.
 
+---
+
+## ENG5 Heavy CI Workflow Fixes (2025-12-10 session 3)
+
+**PARTIAL:** Fixed CI trigger and `.env` generation, but discovered additional issues requiring completion.
+
+### Completed
+1. **Trigger changed from nightly cron to release tags only:**
+   - `.github/workflows/eng5-heavy-suites.yml`: `push.tags: ['v*']` + `workflow_dispatch`
+   - Removes wasteful nightly runs for solo dev
+
+2. **`.env` generation fixed:**
+   - Replaced broken `sed` approach with full `cat > .env << 'EOF'` generation
+   - Added `sed -i 's/^[[:space:]]*//' .env` to strip YAML heredoc whitespace
+   - Added `cat .env` debug output in each step
+
+3. **Health wait added to scripts:**
+   - `scripts/llm_mgmt/mock_profile_helper.sh`: Added `wait_for_healthy()` function + call after `dev-recreate`
+   - `scripts/llm_mgmt/eng5_cj_docker_suite.sh`: Same health wait + now recreates all required services (`api_gateway_service`, `llm_provider_service`, `cj_assessment_service`)
+
+4. **`USE_MOCK_LLM` alias deprecated:**
+   - `tests/functional/conftest.py`: Changed `_MOCK_LLM_ENV_VARS` from `("LLM_PROVIDER_SERVICE_USE_MOCK_LLM", "USE_MOCK_LLM")` to only `("LLM_PROVIDER_SERVICE_USE_MOCK_LLM",)`
+   - This fixes the skip issue where old `USE_MOCK_LLM=false` in shell environment conflicted with new `LLM_PROVIDER_SERVICE_USE_MOCK_LLM=true`
+
+5. **Profile parity tests validated (3/3 pass):**
+   - `pdm run llm-mock-profile cj-generic` ✅
+   - `pdm run llm-mock-profile eng5-anchor` ✅
+   - `pdm run llm-mock-profile eng5-lower5` ✅
+
+### Remaining Work
+1. **`test_cj_regular_batch_resampling_docker` fails with positional fairness assertion:**
+   ```
+   AssertionError: Positional fairness skew exceeded threshold for essays: [...] (max_observed_skew=0.6, MAX_ALLOWED_SKEW=0.2)
+   ```
+   - This is a pre-existing test logic issue, not a CI workflow issue
+   - Investigate `FairComplementOrientationStrategy` or adjust `MAX_ALLOWED_SKEW` threshold
+
+2. **Run and validate remaining docker suite tests:**
+   - `pdm run eng5-cj-docker-suite regular` (blocked by above test failure)
+   - `pdm run eng5-cj-docker-suite small-net`
+
+3. **Run `pdm run format-all`, `lint-fix`, `typecheck-all`** after all changes
+
+### Key Files Modified
+- `.github/workflows/eng5-heavy-suites.yml` - Trigger + .env generation
+- `scripts/llm_mgmt/mock_profile_helper.sh` - Health wait
+- `scripts/llm_mgmt/eng5_cj_docker_suite.sh` - Health wait + required services
+- `tests/functional/conftest.py` - Removed `USE_MOCK_LLM` alias
+
+### Local Testing Tip
+If tests skip with "Mock LLM must be enabled", ensure your shell doesn't have stale `USE_MOCK_LLM=false`:
+```bash
+unset USE_MOCK_LLM
+# or start fresh shell
+```
+
+---
+
 **Next session – recommended focus: ENG5 metrics & parity hardening**
-1. **Add metrics-level assertions for CJ ↔ LPS serial bundling in docker tests**
-   - Goal: ensure docker semantics tests validate Prometheus metrics as well as behaviour.
-   - Files/tests to extend:
-     - `tests/integration/test_cj_regular_batch_callbacks_docker.py`
-     - `tests/integration/test_cj_regular_batch_resampling_docker.py`
-     - `tests/integration/test_cj_small_net_continuation_docker.py`
+1. **Extend CJ ↔ LPS serial bundling metrics to remaining ENG5 CJ docker tests**
+   - Goal: ensure all ENG5 CJ docker semantics tests validate Prometheus metrics as well as behaviour, reusing `tests/utils/metrics_helpers.py`.
+   - Files/tests to extend (callbacks already wired in; small-net and resampling still TODO):
+     - `tests/functional/cj_eng5/test_cj_regular_batch_resampling_docker.py`
+     - `tests/functional/cj_eng5/test_cj_small_net_continuation_docker.py`
    - Metrics/fields to assert (non-exhaustive, guided by `.claude/rules/071.2-prometheus-metrics-patterns.md` and CJ/LLM docs):
-     - CJ-side: `cj_llm_requests_total{batching_mode="serial_bundle"}`, `cj_llm_batches_started_total{batching_mode}`, `cj_batch_state`, `cj_batch_progress_percentage`.
-     - LPS-side: `llm_provider_serial_bundle_calls_total{provider,model}`, `llm_provider_serial_bundle_items_per_call{provider,model}`, queue expiry/wait-time metrics for `queue_processing_mode="serial_bundle"`.
+     - CJ-side: `cj_llm_requests_total{batching_mode="serial_bundle"}`, `cj_llm_batches_started_total{batching_mode="serial_bundle"}`, and (where stable) `cj_batch_state` / `cj_batch_progress_percentage`.
+     - LPS-side: `llm_provider_serial_bundle_calls_total{provider,model}`, `llm_provider_serial_bundle_items_per_call{provider,model}`, queue expiry/wait-time metrics for `queue_processing_mode="serial_bundle"` where not flaky.
    - Runner:
-     - Locally: `pdm run eng5-cj-docker-suite regular` and `small-net` with serial_bundle settings in `.env`.
+     - Locally: `pdm run eng5-cj-docker-suite regular` and `pdm run eng5-cj-docker-suite small-net` with serial_bundle settings in `.env`.
      - CI: rely on `eng5-cj-docker-regular-and-small-net` job in `eng5-heavy-suites.yml`.
 2. **Refine ENG5 mock profile parity suite for queue semantics and batch diagnostics**
    - Goal: extend profile parity tests beyond callback shape/latency/token parity to include:
@@ -101,9 +178,9 @@ Role: You are the lead developer and architect of HuleEdu.
 
 **Key files for next session:**
 - CJ docker semantics & metrics:
-  - `tests/integration/test_cj_small_net_continuation_docker.py`
-  - `tests/integration/test_cj_regular_batch_resampling_docker.py`
-  - `tests/integration/test_cj_regular_batch_callbacks_docker.py`
+  - `tests/functional/cj_eng5/test_cj_small_net_continuation_docker.py`
+  - `tests/functional/cj_eng5/test_cj_regular_batch_resampling_docker.py`
+  - `tests/functional/cj_eng5/test_cj_regular_batch_callbacks_docker.py`
 - ENG5 mock parity:
   - `tests/eng5_profiles/test_cj_mock_parity_generic.py`
   - `tests/eng5_profiles/test_eng5_mock_parity_full_anchor.py`
@@ -157,6 +234,42 @@ Role: You are the lead developer and architect of HuleEdu.
 
 ---
 
+## BFF Teacher Service Internal Clients (2025-12-10)
+
+**COMPLETED:** Phase 1 of Teacher Dashboard Integration - RAS/CMS HTTP clients with Dishka DI.
+
+**Task:** `TASKS/programs/teacher_dashboard_integration/bff-teacher-service-internal-clients.md`
+
+**Files created:**
+- `services/bff_teacher_service/protocols.py` – RASClientProtocol, CMSClientProtocol
+- `services/bff_teacher_service/clients/ras_client.py` – RASClientImpl
+- `services/bff_teacher_service/clients/cms_client.py` – CMSClientImpl
+- `services/bff_teacher_service/clients/_utils.py` – Internal auth header builder
+- `services/bff_teacher_service/di.py` – BFFTeacherProvider, RequestContextProvider
+- `services/bff_teacher_service/middleware.py` – Extracted CorrelationIDMiddleware
+- `services/bff_teacher_service/api/health_routes.py` – Health check routes
+- `services/bff_teacher_service/api/spa_routes.py` – SPA fallback route
+
+**Tests:**
+- Unit tests: 19/19 passing (`services/bff_teacher_service/tests/`)
+- Functional tests: ✅ **4/4 PASSED** (validated 2025-12-10 session 2)
+
+**Functional tests validation:**
+```bash
+ALLOW_REAL_LLM_FUNCTIONAL=1 pdm run pytest-root tests/functional/test_bff_teacher_dashboard_functional.py -v
+```
+
+**Key behaviors:**
+- Missing `X-User-ID` header → 401 `AUTHENTICATION_ERROR`
+- External service errors → 502 Bad Gateway
+- Correlation ID propagated through all calls
+
+**Bugs fixed (2025-12-10 session 2):**
+1. `response_model=None` added to `health_routes.py` and `spa_routes.py` (FastAPI union return type fix)
+2. `docker-compose.services.yml`: Fixed `ALLOWED_SERVICE_IDS` env var (was using wrong prefix `RESULT_AGGREGATOR_SERVICE_`)
+
+---
+
 ## BFF Teacher Service (2025-12-08)
 
 **New service added:** `services/bff_teacher_service/`
@@ -196,23 +309,23 @@ Role: You are the lead developer and architect of HuleEdu.
 - Status filtering (client-facing values: `pending_content`, `ready`, `processing`, etc.)
 - Proxies to RAS `/internal/v1/batches/user/{user_id}` with auth headers
 
+**Completed (2025-12-10):**
+1. **Tests for `GET /v1/batches`** – See task: `TASKS/identity/api-gateway-batch-listing-endpoint-tests.md`
+   - Created `services/api_gateway_service/tests/test_batch_queries.py` (393 LoC, 28 tests)
+   - Pattern: Dishka DI, respx mock, AsyncClient (follows `test_status_routes.py`)
+   - Coverage: success path, pagination, status filtering, status mapping, auth headers, error handling
+   - Validation: typecheck-all pass, 28/28 tests pass, no @patch (DI compliant)
+
 **Next session – remaining work:**
-1. **Add tests for `GET /v1/batches`** – Create `tests/test_batch_queries.py`:
-   - `test_list_batches_success`
-   - `test_list_batches_pagination`
-   - `test_list_batches_status_filter_valid/invalid`
-   - `test_list_batches_status_mapping`
-   - `test_list_batches_ras_error`
-   - `test_list_batches_auth_headers`
-2. **Update API Gateway README** – Add endpoint docs, update file structure
-3. **Update Frontend Integration Guide** – Add batch listing example (optional)
+1. **Update API Gateway README** – Add endpoint docs, update file structure
+2. **Update Frontend Integration Guide** – Add batch listing example (optional)
 
 **Key files:**
-- `services/api_gateway_service/routers/_batch_utils.py`
-- `services/api_gateway_service/routers/batch_commands.py`
-- `services/api_gateway_service/routers/batch_pipelines.py`
-- `services/api_gateway_service/routers/batch_queries.py`
-- `services/api_gateway_service/routers/status_routes.py` (fixed auth headers)
+- `services/api_gateway_service/routers/_batch_utils.py` – status mapping, models
+- `services/api_gateway_service/routers/batch_commands.py` – POST endpoints
+- `services/api_gateway_service/routers/batch_pipelines.py` – pipeline execution
+- `services/api_gateway_service/routers/batch_queries.py` – GET /batches (168 LoC)
+- `services/api_gateway_service/tests/test_batch_queries.py` – tests (393 LoC, 28 tests)
 
 **Known limitation:** Status filter uses first internal status when client status maps to multiple (e.g., `processing` → 4 internal values). Full multi-status filtering would require RAS enhancement.
 

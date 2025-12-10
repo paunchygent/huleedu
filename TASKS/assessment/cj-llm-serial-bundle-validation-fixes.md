@@ -7,7 +7,7 @@ priority: high
 domain: assessment
 owner_team: agents
 created: '2025-11-19'
-last_updated: '2025-12-09'
+last_updated: '2025-12-10'
 service: cj_assessment_service
 owner: ''
 program: ''
@@ -152,6 +152,26 @@ counters so completion percentages never exceed 100% and match DB reality.
     - `llm_provider_serial_bundle_calls_total{provider,model}`
     - `llm_provider_serial_bundle_items_per_call{provider,model}`
     - Queue wait-time metrics under `queue_processing_mode="serial_bundle"` where available.
+
+**Progress 2025-12-10 – Initial metrics slice wired for regular ENG5 callbacks (Lane C only):**
+- Shared metrics helper introduced for docker-backed tests:
+  - File: `tests/utils/metrics_helpers.py`
+  - Responsibilities: fetch `/metrics` via HTTP with a short timeout and parse Prometheus text into a mapping of `metric_name -> [(labels, value), ...]` for test assertions.
+- `tests/functional/cj_eng5/test_cj_regular_batch_callbacks_docker.py` extended with CJ ↔ LPS metrics assertions in
+  `test_cj_regular_batch_callbacks_and_preferred_bundle_size_invariants`:
+  - CJ metrics asserted (serial-bundle semantics):
+    - `cj_llm_requests_total{batching_mode="serial_bundle"}` – at least one request recorded (`max(values) >= 1`).
+    - `cj_llm_batches_started_total{batching_mode="serial_bundle"}` – at least one batch started (`max(values) >= 1`).
+  - LPS metrics asserted (bundling behaviour, derived from `/metrics` and service settings):
+    - `llm_provider_serial_bundle_calls_total{provider=<default_provider>,model=<CJSettings.DEFAULT_LLM_MODEL>}` – at least one serial-bundle call (`max(values) >= 1`).
+    - `llm_provider_serial_bundle_items_per_call{provider=<default_provider>,model=<CJSettings.DEFAULT_LLM_MODEL>}` – use `_count` and `_bucket` series to:
+      - Confirm at least one observation (`_count >= 1`).
+      - Infer an upper bound on `max(items_per_call)` from bucket counts and assert `1 <= max_items_per_call <= Settings.SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL`.
+- Remaining work under Step 1 (still planned, not yet implemented):
+  - Port the same CJ/LPS serial-bundle metrics assertions to:
+    - `tests/functional/cj_eng5/test_cj_small_net_continuation_docker.py`
+    - `tests/functional/cj_eng5/test_cj_regular_batch_resampling_docker.py`
+  - Extend LPS-side assertions with queue wait-time metrics where stable enough for C-lane (e.g. `llm_provider_queue_wait_time_seconds` by `queue_processing_mode="serial_bundle"`).
 
 ---
 

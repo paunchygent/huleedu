@@ -78,8 +78,8 @@ pdm run pytest-root tests/integration/
 
 | Profile | Use Case | Main Tests |
 |---------|----------|-----------|
-| `cj_generic_batch` | Regular CJ batch | `tests/integration/test_cj_regular_batch_resampling_docker.py`, `tests/integration/test_cj_regular_batch_callbacks_docker.py`, `tests/eng5_profiles/test_cj_mock_parity_generic.py` |
-| `eng5_lower5_gpt51_low` | LOWER5 small-net | `tests/integration/test_cj_small_net_continuation_docker.py`, `tests/eng5_profiles/test_eng5_mock_parity_lower5.py` |
+| `cj_generic_batch` | Regular CJ batch | `tests/functional/cj_eng5/test_cj_regular_batch_resampling_docker.py`, `tests/functional/cj_eng5/test_cj_regular_batch_callbacks_docker.py`, `tests/eng5_profiles/test_cj_mock_parity_generic.py` |
+| `eng5_lower5_gpt51_low` | LOWER5 small-net | `tests/functional/cj_eng5/test_cj_small_net_continuation_docker.py`, `tests/eng5_profiles/test_eng5_mock_parity_lower5.py` |
 | `eng5_anchor_gpt51_low` | Full anchor nets | `tests/eng5_profiles/test_eng5_mock_parity_full_anchor.py` |
 
 **Switching profiles & running ENG5 parity suites:**
@@ -100,9 +100,14 @@ pdm run eng5-cj-docker-suite regular   # only regular ENG5 batch
 
 All individual tests remain runnable via `pytest-root`, for example:
 ```bash
-pdm run pytest-root tests/integration/test_cj_regular_batch_callbacks_docker.py -m "docker and integration" -v
+pdm run pytest-root tests/functional/cj_eng5/test_cj_regular_batch_callbacks_docker.py -m "docker and integration" -v
 pdm run pytest-root tests/eng5_profiles/test_eng5_mock_parity_lower5.py -m "docker and integration" -v
 ```
+
+**Metrics helper for ENG5 CJ & parity suites:**
+- Use `tests/utils/metrics_helpers.py` to fetch `/metrics` and parse Prometheus text into a simple `metric_name -> list[(labels, value)]` structure when adding or extending Prometheus assertions in:
+  - `tests/functional/cj_eng5/test_cj_*_docker.py`
+  - `tests/eng5_profiles/test_*eng5_mock_parity*.py`
 
 **CI staging for ENG5 heavy suites (separate from default CI):**
 - `ENG5 CJ Docker Semantics (regular + small-net)` (`eng5-cj-docker-regular-and-small-net` in `.github/workflows/eng5-heavy-suites.yml`)
