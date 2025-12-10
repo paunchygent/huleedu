@@ -108,6 +108,8 @@ async def test_get_dashboard_success(client: AsyncClient, respx_mock: MockRouter
     assert response.status_code == 200
     data = response.json()
     assert data["total_count"] == 1
+    assert data["limit"] == 20  # default
+    assert data["offset"] == 0  # default
     assert len(data["batches"]) == 1
     assert data["batches"][0]["batch_id"] == batch_id
     assert data["batches"][0]["class_name"] == "Class 9A"
@@ -133,6 +135,8 @@ async def test_get_dashboard_empty(client: AsyncClient, respx_mock: MockRouter) 
     assert response.status_code == 200
     data = response.json()
     assert data["total_count"] == 0
+    assert data["limit"] == 20  # default
+    assert data["offset"] == 0  # default
     assert data["batches"] == []
 
 

@@ -25,10 +25,10 @@ labels: ["bff", "frontend-integration", "teacher-dashboard"]
 | --- | --- | --- | --- |
 | CMS Internal Endpoint | `cms-batch-class-info-internal-endpoint.md` | ✅ Completed | - |
 | BFF Service Clients | `bff-teacher-service-internal-clients.md` | ✅ Completed (func tests validated) | - |
-| BFF Dashboard Endpoint | `bff-teacher-dashboard-endpoint.md` | 🔄 In Progress | Edge cases, pagination |
-| API Contract Validation | `bff-teacher-api-contract-validation.md` | 🔄 In Progress | - |
+| BFF Dashboard Endpoint | `bff-teacher-dashboard-endpoint.md` | ✅ Completed (pagination, status filter) | - |
+| API Contract Validation | `bff-teacher-api-contract-validation.md` | ✅ Completed (23 contract tests) | - |
 
-_Last refresh: 2025-12-10 (session 2)_
+_Last refresh: 2025-12-10 (session 8)_
 
 ## 2. Active Workstreams
 
@@ -64,21 +64,24 @@ ALLOW_REAL_LLM_FUNCTIONAL=1 pdm run pytest-root tests/functional/test_bff_teache
 # 4/4 passed
 ```
 
-### Phase 2: BFF Dashboard Endpoint 🔄
-**Task**: `bff-teacher-dashboard-endpoint.md` (IN PROGRESS)
+### Phase 2: BFF Dashboard Endpoint ✅
+**Task**: `bff-teacher-dashboard-endpoint.md` (COMPLETED 2025-12-10)
 
-Basic implementation complete via `teacher_routes.py`. Remaining work:
-- Edge case unit tests (partial CMS failures, empty lists)
-- Pagination query params
-- Status filtering
+Full implementation with pagination and status filtering:
+- `limit` (1-100, default 20), `offset` (default 0) query params
+- `status` filter with client-friendly values (7 valid statuses)
+- Invalid status returns 400 validation error
+- Response includes `total_count`, `limit`, `offset` metadata
+- 35 unit tests (17 edge cases + 8 core + 10 client tests)
 
-### Phase 3: API Contract Validation
-**Task**: `bff-teacher-api-contract-validation.md`
+### Phase 3: API Contract Validation ✅
+**Task**: `bff-teacher-api-contract-validation.md` (COMPLETED 2025-12-10)
 
-Validate and export API contracts:
-- OpenAPI schema generation
-- TypeScript types for frontend
-- Contract tests for DTOs
+Validated and exported API contracts:
+- OpenAPI schema: `docs/reference/apis/bff-teacher-openapi.json`
+- TypeScript types: `docs/reference/apis/bff-teacher-types.ts`
+- Contract tests: 23 tests in `services/bff_teacher_service/tests/contract/`
+- PDM script: `bff-openapi` for schema regeneration
 
 ## 3. Key Artifacts & Commands
 
@@ -120,8 +123,8 @@ pdm run typecheck-all
 | --- | --- | --- |
 | ~~2025-12-10~~ | ✅ CMS endpoint implemented + tested | - |
 | ~~2025-12-12~~ | ✅ BFF clients + DI setup complete | - |
-| 2025-12-13 | Dashboard endpoint polished | - |
-| 2025-12-16 | API contracts validated + exported | Dashboard endpoint |
+| ~~2025-12-13~~ | ✅ Dashboard endpoint polished (pagination, status filter) | - |
+| ~~2025-12-16~~ | ✅ API contracts validated + exported | - |
 
 ## 6. Future Service Integration Template
 
@@ -140,6 +143,7 @@ This programme establishes patterns for future BFF integrations:
 
 ## 7. Change Log
 
+- **2025-12-10 (session 8)** – Phase 3 completed: API contract validation. OpenAPI schema exported, TypeScript types created, 23 contract tests added. Programme COMPLETE.
 - **2025-12-10 (session 2)** – Functional tests validated (4/4 pass). Fixed BFF startup issue (`response_model=None` for union return types). Fixed RAS `ALLOWED_SERVICE_IDS` env var (prefix mismatch).
 - **2025-12-10** – Phase 1 completed: RAS/CMS clients with Dishka DI, 19 unit tests, middleware extraction.
 - **2025-12-09** – CMS internal endpoint completed: `GET /internal/v1/batches/class-info` with auth hook, 9 unit tests.

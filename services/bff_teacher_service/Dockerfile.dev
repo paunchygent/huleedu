@@ -1,0 +1,19 @@
+# Auto-generated development Dockerfile for bff_teacher_service
+ARG DEPS_IMAGE=huledu-deps:dev
+FROM ${DEPS_IMAGE} AS base
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PDM_USE_VENV=false \
+    PDM_IGNORE_ACTIVE_VENV=1 \
+    PROJECT_ROOT=/app \
+    PYTHONPATH=/app \
+    ENV_TYPE=docker
+
+WORKDIR /app
+
+FROM base AS development
+COPY --chown=appuser:appuser services/bff_teacher_service/ /app/services/bff_teacher_service/
+USER appuser
+WORKDIR /app
+CMD ["pdm", "run", "-p", "/app", "python", "-m", "uvicorn", "services.bff_teacher_service.app:app", "--host", "0.0.0.0", "--port", "4101"]

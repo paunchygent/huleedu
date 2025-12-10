@@ -1,0 +1,269 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "bff-teacher-service",
+        "description": "BFF Teacher Service - Serves Vue 3 frontend static assets",
+        "version": "0.1.0"
+    },
+    "paths": {
+        "/healthz": {
+            "get": {
+                "tags": [
+                    "Health"
+                ],
+                "summary": "Health Check",
+                "description": "Health check endpoint following Rule 072 format.",
+                "operationId": "health_check_healthz_get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "additionalProperties": {
+                                        "anyOf": [
+                                            {
+                                                "type": "string"
+                                            },
+                                            {
+                                                "additionalProperties": true,
+                                                "type": "object"
+                                            }
+                                        ]
+                                    },
+                                    "type": "object",
+                                    "title": "Response Health Check Healthz Get"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/bff/v1/teacher/dashboard": {
+            "get": {
+                "tags": [
+                    "Teacher API"
+                ],
+                "summary": "Get Teacher Dashboard",
+                "description": "Get teacher dashboard with batch list and class info.\n\nAggregates data from RAS (batches) and CMS (class names).\n\nArgs:\n    limit: Maximum number of batches to return (1-100, default 20)\n    offset: Number of batches to skip (default 0)\n    status: Filter by client status (pending_content, ready, processing,\n            completed_successfully, completed_with_failures, failed, cancelled)",
+                "operationId": "get_teacher_dashboard_bff_v1_teacher_dashboard_get",
+                "parameters": [
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 100,
+                            "minimum": 1,
+                            "description": "Maximum number of batches to return",
+                            "default": 20,
+                            "title": "Limit"
+                        },
+                        "description": "Maximum number of batches to return"
+                    },
+                    {
+                        "name": "offset",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "Number of batches to skip",
+                            "default": 0,
+                            "title": "Offset"
+                        },
+                        "description": "Number of batches to skip"
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "description": "Filter by client status",
+                            "title": "Status"
+                        },
+                        "description": "Filter by client status"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TeacherDashboardResponseV1"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "BatchClientStatus": {
+                "type": "string",
+                "enum": [
+                    "pending_content",
+                    "ready",
+                    "processing",
+                    "completed_successfully",
+                    "completed_with_failures",
+                    "failed",
+                    "cancelled"
+                ],
+                "title": "BatchClientStatus",
+                "description": "Client-facing batch status for API responses and WebSocket events.\n\nSimplified view of batch processing state for frontends. Synchronized between\nREST API and WebSocket notifications.\n\nFlow: PENDING_CONTENT \u2192 READY \u2192 PROCESSING \u2192\n(COMPLETED_SUCCESSFULLY | COMPLETED_WITH_FAILURES | FAILED)\n\nTerminal: COMPLETED_SUCCESSFULLY, COMPLETED_WITH_FAILURES, FAILED, CANCELLED."
+            },
+            "HTTPValidationError": {
+                "properties": {
+                    "detail": {
+                        "items": {
+                            "$ref": "#/components/schemas/ValidationError"
+                        },
+                        "type": "array",
+                        "title": "Detail"
+                    }
+                },
+                "type": "object",
+                "title": "HTTPValidationError"
+            },
+            "TeacherBatchItemV1": {
+                "properties": {
+                    "batch_id": {
+                        "type": "string",
+                        "title": "Batch Id"
+                    },
+                    "title": {
+                        "type": "string",
+                        "title": "Title",
+                        "default": "Untitled Batch"
+                    },
+                    "class_name": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Class Name"
+                    },
+                    "status": {
+                        "$ref": "#/components/schemas/BatchClientStatus"
+                    },
+                    "total_essays": {
+                        "type": "integer",
+                        "title": "Total Essays",
+                        "default": 0
+                    },
+                    "completed_essays": {
+                        "type": "integer",
+                        "title": "Completed Essays",
+                        "default": 0
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "title": "Created At"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "batch_id",
+                    "status",
+                    "created_at"
+                ],
+                "title": "TeacherBatchItemV1",
+                "description": "Single batch item for the teacher dashboard list.\n\nAggregates data from:\n- RAS: status, counts, timestamps\n- CMS: class_name\n- Content/RAS: title (from assignment or prompt)"
+            },
+            "TeacherDashboardResponseV1": {
+                "properties": {
+                    "batches": {
+                        "items": {
+                            "$ref": "#/components/schemas/TeacherBatchItemV1"
+                        },
+                        "type": "array",
+                        "title": "Batches"
+                    },
+                    "total_count": {
+                        "type": "integer",
+                        "title": "Total Count",
+                        "description": "Total batches matching query",
+                        "default": 0
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "title": "Limit",
+                        "description": "Page size requested",
+                        "default": 20
+                    },
+                    "offset": {
+                        "type": "integer",
+                        "title": "Offset",
+                        "description": "Number of batches skipped",
+                        "default": 0
+                    }
+                },
+                "type": "object",
+                "title": "TeacherDashboardResponseV1",
+                "description": "Dashboard view: list of batches for teacher.\n\nAggregates data from RAS and CMS services."
+            },
+            "ValidationError": {
+                "properties": {
+                    "loc": {
+                        "items": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        },
+                        "type": "array",
+                        "title": "Location"
+                    },
+                    "msg": {
+                        "type": "string",
+                        "title": "Message"
+                    },
+                    "type": {
+                        "type": "string",
+                        "title": "Error Type"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "loc",
+                    "msg",
+                    "type"
+                ],
+                "title": "ValidationError"
+            }
+        }
+    }
+}

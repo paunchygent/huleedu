@@ -178,6 +178,26 @@ services:
       - LOG_LEVEL=DEBUG
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
 
+  # BFF Teacher Service
+  bff_teacher_service:
+    build:
+      context: .
+      dockerfile: services/bff_teacher_service/Dockerfile.dev
+      target: development
+      <<: *deps-build-args
+    command: ["pdm", "run", "-p", "/app", "uvicorn", "services.bff_teacher_service.app:app", "--host", "0.0.0.0", "--port", "4101", "--reload"]
+    volumes:
+      - ./services/bff_teacher_service:/app/services/bff_teacher_service:cached
+      - ./libs/common_core/src:/app/libs/common_core/src:cached
+      - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
+      - ./frontend/dist:/app/static:ro
+      - /app/services/bff_teacher_service/__pycache__
+    environment:
+      - ENV_TYPE=docker
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+      - HULEEDU_INTERNAL_API_KEY=${HULEEDU_INTERNAL_API_KEY}
+
   # Result Aggregator Service
   result_aggregator_service:
     container_name: huleedu_result_aggregator_service

@@ -496,6 +496,7 @@ bff-build = "docker compose build bff_teacher_service"
 bff-start = "docker compose up -d bff_teacher_service"
 bff-logs = "docker compose logs -f bff_teacher_service"
 bff-restart = "docker compose restart bff_teacher_service"
+bff-openapi = "bash -c 'curl -s http://localhost:4101/openapi.json | python3 -m json.tool > docs/reference/apis/bff-teacher-openapi.json'"
 
 [build-system]
 requires = ["pdm-backend"]

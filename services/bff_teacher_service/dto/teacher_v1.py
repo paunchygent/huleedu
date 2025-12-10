@@ -40,7 +40,9 @@ class TeacherDashboardResponseV1(BaseModel):
     """
 
     batches: list[TeacherBatchItemV1] = Field(default_factory=list)
-    total_count: int = 0
+    total_count: int = Field(default=0, description="Total batches matching query")
+    limit: int = Field(default=20, description="Page size requested")
+    offset: int = Field(default=0, description="Number of batches skipped")
 
 
 # --- Internal response models for backend service deserialization ---

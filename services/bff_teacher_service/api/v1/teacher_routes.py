@@ -10,12 +10,13 @@ from uuid import UUID
 
 from common_core.status_enums import BatchClientStatus
 from dishka.integrations.fastapi import FromDishka, inject
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from httpx import ConnectError, ConnectTimeout, HTTPStatusError, ReadTimeout
 from huleedu_service_libs.error_handling import (
     raise_connection_error,
     raise_external_service_error,
     raise_timeout_error,
+    raise_validation_error,
 )
 from huleedu_service_libs.logging_utils import create_service_logger
 
@@ -44,6 +45,24 @@ INTERNAL_TO_CLIENT_STATUS: dict[str, BatchClientStatus] = {
     "cancelled": BatchClientStatus.CANCELLED,
 }
 
+# Reverse mapping: client status -> internal RAS statuses (first is used for filtering)
+CLIENT_TO_INTERNAL_STATUS: dict[str, list[str]] = {
+    "pending_content": ["awaiting_content_validation", "awaiting_pipeline_configuration"],
+    "ready": ["ready_for_pipeline_execution"],
+    "processing": [
+        "processing_pipelines",
+        "awaiting_student_validation",
+        "student_validation_completed",
+        "validation_timeout_processed",
+    ],
+    "completed_successfully": ["completed_successfully"],
+    "completed_with_failures": ["completed_with_failures"],
+    "failed": ["content_ingestion_failed", "failed_critically"],
+    "cancelled": ["cancelled"],
+}
+
+VALID_CLIENT_STATUSES = frozenset(CLIENT_TO_INTERNAL_STATUS.keys())
+
 
 def map_to_client_status(internal_status: str) -> BatchClientStatus:
     """Map internal RAS status to client-facing status."""
@@ -57,21 +76,52 @@ async def get_teacher_dashboard(
     cms_client: FromDishka[CMSClientProtocol],
     user_id: FromDishka[str],
     correlation_id: FromDishka[UUID],
+    limit: int = Query(20, ge=1, le=100, description="Maximum number of batches to return"),
+    offset: int = Query(0, ge=0, description="Number of batches to skip"),
+    status: str | None = Query(None, description="Filter by client status"),
 ) -> TeacherDashboardResponseV1:
     """Get teacher dashboard with batch list and class info.
 
     Aggregates data from RAS (batches) and CMS (class names).
+
+    Args:
+        limit: Maximum number of batches to return (1-100, default 20)
+        offset: Number of batches to skip (default 0)
+        status: Filter by client status (pending_content, ready, processing,
+                completed_successfully, completed_with_failures, failed, cancelled)
     """
+    # Validate status filter if provided
+    if status is not None and status not in VALID_CLIENT_STATUSES:
+        valid_options = ", ".join(sorted(VALID_CLIENT_STATUSES))
+        raise_validation_error(
+            service="bff_teacher_service",
+            field="status",
+            operation="get_teacher_dashboard",
+            message=f"Invalid status filter. Must be one of: {valid_options}",
+            correlation_id=correlation_id,
+            value=status,
+        )
+
+    # Map client status to internal RAS status (use first internal status for filtering)
+    internal_status = CLIENT_TO_INTERNAL_STATUS.get(status, [None])[0] if status else None
+
     try:
         # Get batches from RAS
         batches, pagination = await ras_client.get_batches_for_user(
             user_id=user_id,
             correlation_id=correlation_id,
-            limit=100,
+            limit=limit,
+            offset=offset,
+            status=internal_status,
         )
 
         if not batches:
-            return TeacherDashboardResponseV1(batches=[], total_count=0)
+            return TeacherDashboardResponseV1(
+                batches=[],
+                total_count=0,
+                limit=limit,
+                offset=offset,
+            )
 
         # Get class info from CMS for all batches
         batch_ids = [UUID(b.batch_id) for b in batches]
@@ -99,6 +149,8 @@ async def get_teacher_dashboard(
         return TeacherDashboardResponseV1(
             batches=items,
             total_count=pagination.get("total", len(items)),
+            limit=limit,
+            offset=offset,
         )
 
     except (ConnectTimeout, ReadTimeout) as e:

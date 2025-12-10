@@ -2,7 +2,7 @@
 id: 'bff-teacher-dashboard-endpoint'
 title: 'BFF Teacher Dashboard Endpoint'
 type: 'task'
-status: 'in_progress'
+status: 'completed'
 priority: 'high'
 domain: 'programs'
 service: 'bff_teacher_service'
@@ -29,32 +29,44 @@ The Teacher Dashboard displays a list of batches with status and class names. Th
 2. Looking up class info from CMS via batch_id
 3. Merging into screen-optimized DTO
 
-## Current State (2025-12-10)
+## Completion Summary (2025-12-10)
 
-**Basic implementation complete** in Phase 1:
-- `services/bff_teacher_service/api/v1/teacher_routes.py` - Dashboard endpoint
-- `services/bff_teacher_service/dto/teacher_v1.py` - DTOs
-- Functional tests passing (4/4)
+### Phase 1 (Completed)
+- Basic dashboard endpoint with RAS/CMS integration
+- Dishka DI for internal HTTP clients
+- Error handling with 502 for backend failures
+- 4/4 functional tests passing
 
-**This phase focuses on**: Edge case handling, pagination, additional unit tests.
+### Phase 2 (Completed)
+**Pagination Support**:
+- Added `limit` (1-100, default 20), `offset` (default 0) query params
+- Response includes `total_count`, `limit`, `offset` metadata
+- Fixed RAS `count_user_batches()` method for accurate pagination totals
 
-## Remaining Work
+**Status Filtering**:
+- Added `status` query param with client-friendly values
+- Validation returns 400 for invalid status values
+- Client→internal status mapping for RAS filtering:
+  - `pending_content` → `awaiting_content_validation`, `awaiting_pipeline_configuration`
+  - `ready` → `ready_for_pipeline_execution`
+  - `processing` → `processing_pipelines`, `awaiting_student_validation`, etc.
+  - `completed_successfully` → `completed_successfully`
+  - `completed_with_failures` → `completed_with_failures`
+  - `failed` → `content_ingestion_failed`, `failed_critically`
+  - `cancelled` → `cancelled`
 
-### 1. Edge Case Unit Tests
-**File**: `services/bff_teacher_service/tests/unit/test_dashboard_edge_cases.py` (CREATE)
+**Test Coverage**:
+- `test_dashboard_edge_cases.py` (17 tests) - pagination boundaries, status filtering, edge cases
+- `test_teacher_routes.py` (8 tests) - core functionality, error handling
+- `test_cms_client.py`, `test_ras_client.py` - client tests
+- Total: 35 unit tests passing
 
-Test cases:
-- Large batch lists (pagination boundary)
-- Batches without class associations (CMS returns null)
-- Partial CMS failures (some batches have class info, others don't)
-- RAS returns empty list for new user
-
-### 2. Pagination Support
-- Review if current implementation handles pagination correctly
-- Add offset/limit query params to dashboard endpoint if needed
-
-### 3. Status Filtering
-- Add optional `status` query param for filtering batches
+### Files Modified
+- `services/bff_teacher_service/api/v1/teacher_routes.py` - Query params, status mapping, validation
+- `services/bff_teacher_service/dto/teacher_v1.py` - Pagination metadata in response
+- `services/result_aggregator_service/protocols.py` - Added `count_user_batches()`
+- `services/result_aggregator_service/implementations/*` - Count implementation
+- `services/result_aggregator_service/api/query_routes.py` - Use count for total
 
 ## Success Criteria
 
@@ -63,8 +75,9 @@ Test cases:
 - [x] Proper error responses for service failures
 - [x] Functional tests pass (4/4)
 - [x] `pdm run typecheck-all` passes
-- [ ] Edge case unit tests added
-- [ ] Pagination documented/tested
+- [x] Edge case unit tests added (17 tests)
+- [x] Pagination with limit/offset query params
+- [x] Status filtering with validation
 
 ## Related
 
