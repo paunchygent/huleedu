@@ -37,9 +37,7 @@ from services.llm_provider_service.internal_models import (
     LLMOrchestratorResponse,
     LLMQueuedResult,
 )
-from services.llm_provider_service.protocols import (
-    ComparisonProcessorProtocol,
-)
+from services.llm_provider_service.protocols import ComparisonProcessorProtocol
 from services.llm_provider_service.queue_models import QueuedRequest
 
 logger = create_service_logger("llm_provider_service.queue_strategies")
@@ -305,16 +303,30 @@ class SerialBundleStrategy(RequestExecutionStrategy):
                 )
             )
 
+        queue_mode_label = self.settings.QUEUE_PROCESSING_MODE.value
+
         logger.info(
             "serial_bundle_dispatch",
             extra={
                 "bundle_size": len(bundle_requests),
-                "queue_processing_mode": "serial_bundle",
+                "queue_processing_mode": queue_mode_label,
                 "provider": primary_provider.value,
                 "model_override": primary_overrides.get("model_override"),
                 "cj_llm_batching_mode": primary_hint,
             },
         )
+
+        if self.settings.QUEUE_PROCESSING_MODE is QueueProcessingMode.BATCH_API:
+            logger.info(
+                "BATCH_API (serial bundle compatibility mode)",
+                extra={
+                    "bundle_size": len(bundle_requests),
+                    "queue_processing_mode": queue_mode_label,
+                    "provider": primary_provider.value,
+                    "model_override": primary_overrides.get("model_override"),
+                    "cj_llm_batching_mode": primary_hint,
+                },
+            )
 
         try:
             start_time = time.monotonic()

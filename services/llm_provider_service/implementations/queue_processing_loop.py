@@ -121,10 +121,21 @@ class QueueProcessingLoop:
                         request=outcome.request,
                         processing_started=outcome.processing_started,
                     )
-                else:
+                elif self.queue_processing_mode is QueueProcessingMode.SERIAL_BUNDLE:
                     bundle_result: SerialBundleResult = await self.executor.execute_serial_bundle(
                         request
                     )
+                    self._pending_request = bundle_result.pending_request
+                    for outcome in bundle_result.outcomes:
+                        self.metrics.record_completion_metrics(
+                            provider=outcome.provider,
+                            result=outcome.result,
+                            request=outcome.request,
+                            processing_started=outcome.processing_started,
+                        )
+                    await asyncio.sleep(0)
+                elif self.queue_processing_mode is QueueProcessingMode.BATCH_API:
+                    bundle_result = await self.executor.execute_batch_api(request)
                     self._pending_request = bundle_result.pending_request
                     for outcome in bundle_result.outcomes:
                         self.metrics.record_completion_metrics(

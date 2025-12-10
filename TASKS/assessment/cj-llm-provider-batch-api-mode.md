@@ -10,8 +10,8 @@ owner_team: agents
 owner: ''
 program: ''
 created: '2025-11-27'
-last_updated: '2025-12-07'
-related: ["docs/decisions/0004-llm-provider-batching-mode-selection.md", "docs/decisions/0015-cj-assessment-convergence-tuning-strategy.md", "docs/decisions/0017-cj-assessment-wave-submission-pattern.md", "docs/operations/cj-assessment-runbook.md", "docs/operations/eng5-np-runbook.md", "services/llm_provider_service/README.md", "TASKS/assessment/cj-llm-serial-bundle-validation-fixes.md"]
+last_updated: '2025-12-10'
+related: ["docs/decisions/0004-llm-provider-batching-mode-selection.md", "docs/decisions/0015-cj-assessment-convergence-tuning-strategy.md", "docs/decisions/0017-cj-assessment-wave-submission-pattern.md", "docs/operations/cj-assessment-runbook.md", "docs/operations/eng5-np-runbook.md", "services/llm_provider_service/README.md", "TASKS/assessment/cj-llm-serial-bundle-validation-fixes.md", "TASKS/integrations/llm-provider-batch-api-phase-2.md"]
 labels: []
 ---
 
@@ -30,6 +30,8 @@ Design and implement a clean, minimal `provider_batch_api` mode in CJ Assessment
 - Retains the existing serial-bundle semantics as the default path for most workloads, using budgets as caps and stability-based early stop.
 
 This task is a follow-on to `TASKS/assessment/cj-llm-serial-bundle-validation-fixes.md` and must align with:
+
+- `TASKS/integrations/llm-provider-batch-api-phase-2.md` (Phase‑2 cross-service batch API design and rollout plan; LPS work must complete first for true provider-native jobs).
 
 - ADR-0004 (LLM Provider batching mode selection)
 - ADR-0015 (CJ convergence tuning)
@@ -55,6 +57,7 @@ This task is a follow-on to `TASKS/assessment/cj-llm-serial-bundle-validation-fi
   - When calling `pair_generation.generate_comparison_tasks(...)`, dynamically choose `existing_pairs_threshold`:
     - If `effective_batching_mode is LLMBatchingMode.PROVIDER_BATCH_API`: use `normalized.max_pairs_cap` so all required pairs up to the cap are generated in a single wave.
     - Otherwise: continue to use `settings.COMPARISONS_PER_STABILITY_CHECK_ITERATION` (current behaviour).
+  - Guardrail: reuse the existing budget resolution logic (normalization + `MAX_PAIRWISE_COMPARISONS`) as the **single source of truth** for `max_pairs_cap`, and add tests that prove no more than `max_pairs_cap` comparisons are generated even for very large nets when `provider_batch_api` is active.
 
 **Tests:**
 - New unit test in `services/cj_assessment_service/tests/unit/test_comparison_processing.py` (or a new dedicated test file for the orchestrator) to assert that:
@@ -119,7 +122,7 @@ This task is a follow-on to `TASKS/assessment/cj-llm-serial-bundle-validation-fi
 
 ## Out of Scope
 
-- LLM Provider Service internal batch API implementation (queue processor and HTTP client changes are governed by ADR-0004 and tracked under `TASKS/integrations/llm-batch-strategy-lps-implementation.md`).
+- LLM Provider Service internal batch API implementation (queue processor and HTTP client changes are governed by ADR-0004 and now tracked under `TASKS/integrations/llm-provider-batch-api-phase-2.md`).
 - Changes to ENG5 artefact schemas beyond any metadata needed to report batching mode and effective caps.
 
 ## Validation

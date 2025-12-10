@@ -22,6 +22,9 @@ from services.llm_provider_service.config import Settings, settings
 from services.llm_provider_service.implementations.anthropic_provider_impl import (
     AnthropicProviderImpl,
 )
+from services.llm_provider_service.implementations.batch_job_manager_mock import (
+    BatchJobManagerMock,
+)
 from services.llm_provider_service.implementations.circuit_breaker_llm_provider import (
     CircuitBreakerLLMProvider,
 )
@@ -66,6 +69,7 @@ from services.llm_provider_service.implementations.trace_context_manager_impl im
 )
 from services.llm_provider_service.metrics import get_circuit_breaker_metrics
 from services.llm_provider_service.protocols import (
+    BatchJobManagerProtocol,
     ComparisonProcessorProtocol,
     LLMEventPublisherProtocol,
     LLMOrchestratorProtocol,
@@ -416,6 +420,14 @@ class LLMProviderServiceProvider(Provider):
         )
 
     @provide(scope=Scope.APP)
+    def provide_batch_job_manager(
+        self,
+        comparison_processor: ComparisonProcessorProtocol,
+    ) -> BatchJobManagerProtocol:
+        """Provide in-memory batch job manager for BATCH_API queue mode."""
+        return BatchJobManagerMock(comparison_processor=comparison_processor)
+
+    @provide(scope=Scope.APP)
     def provide_llm_orchestrator(
         self,
         settings: Settings,
@@ -441,6 +453,7 @@ class LLMProviderServiceProvider(Provider):
         event_publisher: LLMEventPublisherProtocol,
         trace_context_manager: TraceContextManagerImpl,
         settings: Settings,
+        batch_job_manager: BatchJobManagerProtocol,
     ) -> QueueProcessorImpl:
         """Provide queue processor for background request processing."""
         return QueueProcessorImpl(
@@ -450,4 +463,5 @@ class LLMProviderServiceProvider(Provider):
             trace_context_manager=trace_context_manager,
             settings=settings,
             queue_processing_mode=settings.QUEUE_PROCESSING_MODE,
+            batch_job_manager=batch_job_manager,
         )

@@ -8,6 +8,9 @@ from common_core.events.envelope import EventEnvelope
 
 from services.llm_provider_service.internal_models import (
     BatchComparisonItem,
+    BatchJobItem,
+    BatchJobRef,
+    BatchJobResult,
     LLMOrchestratorResponse,
     LLMProviderResponse,
     LLMQueuedResult,
@@ -410,4 +413,29 @@ class ComparisonProcessorProtocol(Protocol):
         items: list[BatchComparisonItem],
     ) -> list[LLMOrchestratorResponse]:
         """Process a batch of LLM comparisons (default: sequential per-request)."""
+        ...
+
+
+class BatchJobManagerProtocol(Protocol):
+    """Protocol for provider-native batch job orchestration."""
+
+    async def schedule_job(
+        self,
+        provider: LLMProviderType,
+        model: str,
+        items: list[BatchJobItem],
+    ) -> BatchJobRef:
+        """Schedule a new provider batch job for the given items."""
+        ...
+
+    async def get_job_status(self, job: BatchJobRef) -> BatchJobRef:
+        """Return the latest known status for the given job reference."""
+        ...
+
+    async def collect_results(self, job: BatchJobRef) -> list[BatchJobResult]:
+        """Collect completed item-level results for a finished batch job."""
+        ...
+
+    async def cancel_job(self, job: BatchJobRef) -> None:
+        """Attempt to cancel a pending or running job."""
         ...

@@ -8,6 +8,12 @@ from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.llm_provider_service.config import QueueProcessingMode, Settings
 from services.llm_provider_service.exceptions import HuleEduError
+from services.llm_provider_service.implementations.batch_api_strategy import (
+    BatchApiStrategy,
+)
+from services.llm_provider_service.implementations.batch_api_strategy import (
+    SerialBundleResult as BatchApiSerialBundleResult,
+)
 from services.llm_provider_service.implementations.callback_event_publisher import (
     CallbackEventPublisher,
 )
@@ -28,6 +34,7 @@ from services.llm_provider_service.implementations.request_strategies import (
 )
 from services.llm_provider_service.internal_models import LLMOrchestratorResponse
 from services.llm_provider_service.protocols import (
+    BatchJobManagerProtocol,
     ComparisonProcessorProtocol,
     LLMEventPublisherProtocol,
     QueueManagerProtocol,
@@ -51,6 +58,7 @@ class QueuedRequestExecutor:
         queue_processing_mode: QueueProcessingMode,
         metrics: QueueProcessorMetrics,
         tracing_enricher: QueueTracingEnricher,
+        batch_job_manager: BatchJobManagerProtocol | None = None,
     ) -> None:
         self.settings = settings
         self.queue_processing_mode = queue_processing_mode
@@ -85,6 +93,18 @@ class QueuedRequestExecutor:
             metrics=metrics,
             tracing_enricher=tracing_enricher,
         )
+        self.batch_job_manager = batch_job_manager
+        self.batch_api_strategy: BatchApiStrategy | None = None
+        if batch_job_manager is not None:
+            self.batch_api_strategy = BatchApiStrategy(
+                comparison_processor=comparison_processor,
+                result_handler=self.result_handler,
+                trace_context_manager=trace_context_manager,
+                settings=settings,
+                metrics=metrics,
+                tracing_enricher=tracing_enricher,
+                batch_job_manager=batch_job_manager,
+            )
 
     async def execute_request(self, request: QueuedRequest) -> ExecutionOutcome:
         """Process a single queued request."""
@@ -93,6 +113,26 @@ class QueuedRequestExecutor:
     async def execute_serial_bundle(self, first_request: QueuedRequest) -> SerialBundleResult:
         """Process multiple queued requests under serial bundle mode."""
         return await self.serial_strategy.execute(first_request)
+
+    async def execute_batch_api(self, first_request: QueuedRequest) -> SerialBundleResult:
+        """Process multiple queued requests using the batch job manager."""
+        if self.batch_api_strategy is None:
+            raise RuntimeError("BatchApiStrategy is not configured for this executor instance")
+        result: BatchApiSerialBundleResult = await self.batch_api_strategy.execute(first_request)
+        # Cast to the SerialBundleResult type exposed by request_strategies; the
+        # structures are intentionally mirrored to keep the executor interface stable.
+        return SerialBundleResult(
+            outcomes=[
+                ExecutionOutcome(
+                    request=outcome.request,
+                    provider=outcome.provider,
+                    result=outcome.result,
+                    processing_started=outcome.processing_started,
+                )
+                for outcome in result.outcomes
+            ],
+            pending_request=result.pending_request,
+        )
 
     async def handle_expired_request(self, request: QueuedRequest) -> None:
         """Handle an expired queued request."""

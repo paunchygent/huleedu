@@ -1,5 +1,7 @@
 """Internal Pydantic models for LLM Provider Service."""
 
+from datetime import datetime, timezone
+from enum import StrEnum
 from typing import Any, Dict, Optional
 from uuid import UUID
 
@@ -100,4 +102,97 @@ class BatchComparisonItem(BaseModel):
     overrides: Optional[Dict[str, Any]] = Field(
         default=None,
         description="Optional override kwargs forwarded to process_comparison",
+    )
+
+
+class BatchJobStatus(StrEnum):
+    """Lifecycle status for provider batch jobs."""
+
+    PENDING = "pending"
+    SCHEDULED = "scheduled"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class BatchJobItemStatus(StrEnum):
+    """Outcome status for individual batch job items."""
+
+    SUCCESS = "success"
+    FAILED = "failed"
+
+
+class BatchJobItem(BaseModel):
+    """Link a queued request to a provider-native batch job item."""
+
+    queue_id: UUID = Field(description="Queue identifier for the originating request")
+    provider: LLMProviderType = Field(description="Provider responsible for this item")
+    model: str = Field(description="Model identifier used for this item")
+    custom_id: str = Field(
+        description=(
+            "Provider-facing custom identifier used to correlate job results back to queue items"
+        )
+    )
+    user_prompt: str = Field(description="Rendered comparison prompt for this item")
+    prompt_blocks: list[dict[str, Any]] | None = Field(
+        default=None,
+        description="Structured prompt blocks used when constructing provider payloads",
+    )
+    correlation_id: UUID = Field(
+        description="Correlation identifier propagated from the original comparison request"
+    )
+    overrides: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Resolved override kwargs (model, temperature, tokens, etc.)",
+    )
+    metadata: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Caller-supplied metadata to preserve through provider batch APIs",
+    )
+
+
+class BatchJobResult(BaseModel):
+    """Per-item outcome for a provider batch job."""
+
+    queue_id: UUID = Field(description="Queue identifier for the originating request")
+    provider: LLMProviderType = Field(description="Provider that executed the item")
+    model: str = Field(description="Model used for the item")
+    status: BatchJobItemStatus = Field(description="Item-level outcome status")
+    response: Optional["LLMOrchestratorResponse"] = Field(
+        default=None,
+        description="Normalized LLM response when the item succeeds",
+    )
+    error_code: Optional[ErrorCode] = Field(
+        default=None,
+        description="Optional error code when the item fails",
+    )
+    error_message: Optional[str] = Field(
+        default=None,
+        description="Human-readable error message when the item fails",
+    )
+    raw_error: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Provider- or implementation-specific error payload for diagnostics",
+    )
+
+
+class BatchJobRef(BaseModel):
+    """Handle for tracking provider batch job lifecycle."""
+
+    job_id: UUID = Field(description="Internal identifier for the batch job")
+    provider: LLMProviderType = Field(description="Provider responsible for the job")
+    model: str = Field(description="Model used for the job")
+    status: BatchJobStatus = Field(description="Current lifecycle status for the job")
+    provider_job_id: Optional[str] = Field(
+        default=None,
+        description="Identifier returned by the provider for this job, if applicable",
+    )
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="Timestamp when the job was created",
+    )
+    completed_at: Optional[datetime] = Field(
+        default=None,
+        description="Timestamp when the job reached a terminal state",
     )

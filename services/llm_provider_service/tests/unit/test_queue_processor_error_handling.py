@@ -769,6 +769,67 @@ class TestQueueProcessorMetrics:
         )
         callbacks_counter.labels.return_value.inc.assert_called_once_with()
 
+    def test_success_request_records_wait_time_with_batch_api_label(
+        self,
+    ) -> None:
+        """Ensure BATCH_API mode uses queue_processing_mode='batch_api' in wait-time metrics."""
+        settings = Settings()
+        settings.QUEUE_POLL_INTERVAL_SECONDS = 0.1
+        settings.QUEUE_PROCESSING_MODE = QueueProcessingMode.BATCH_API
+
+        queue_processor = QueueProcessorImpl(
+            comparison_processor=AsyncMock(spec=ComparisonProcessorProtocol),
+            queue_manager=AsyncMock(),
+            event_publisher=AsyncMock(),
+            trace_context_manager=Mock(spec=TraceContextManagerImpl),
+            settings=settings,
+            queue_processing_mode=settings.QUEUE_PROCESSING_MODE,
+        )
+
+        queue_processor.queue_metrics = {
+            "llm_queue_expiry_total": Mock(),
+            "llm_queue_expiry_age_seconds": Mock(),
+            "llm_queue_wait_time_seconds": Mock(),
+            "llm_queue_processing_time_seconds": Mock(),
+            "llm_comparison_callbacks_total": Mock(),
+        }
+
+        wait_hist = queue_processor.queue_metrics["llm_queue_wait_time_seconds"]
+        proc_hist = queue_processor.queue_metrics["llm_queue_processing_time_seconds"]
+        callbacks_counter = queue_processor.queue_metrics["llm_comparison_callbacks_total"]
+
+        wait_hist.labels.return_value = Mock()
+        proc_hist.labels.return_value = Mock()
+        callbacks_counter.labels.return_value = Mock()
+
+        request_data = LLMComparisonRequest(
+            user_prompt="prompt",
+            callback_topic="topic",
+            correlation_id=uuid.uuid4(),
+        )
+        queued_request = QueuedRequest(
+            queue_id=uuid.uuid4(),
+            request_data=request_data,
+            status=QueueStatus.QUEUED,
+            queued_at=datetime.now(timezone.utc) - timedelta(seconds=5),
+            size_bytes=len(request_data.model_dump_json()),
+            callback_topic="topic",
+        )
+
+        processing_started = datetime.now(timezone.utc).timestamp()
+
+        queue_processor._record_completion_metrics(
+            provider=LLMProviderType.MOCK,
+            result="success",
+            request=queued_request,
+            processing_started=processing_started,
+        )
+
+        wait_hist.labels.assert_called_once_with(
+            queue_processing_mode=QueueProcessingMode.BATCH_API.value,
+            result="success",
+        )
+
     @pytest.mark.asyncio
     async def test_serial_bundle_metrics_emitted_for_serial_mode(
         self,

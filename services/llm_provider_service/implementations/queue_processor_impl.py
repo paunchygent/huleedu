@@ -34,6 +34,7 @@ from services.llm_provider_service.implementations.queue_ttl_utils import (
 from services.llm_provider_service.internal_models import LLMOrchestratorResponse
 from services.llm_provider_service.metrics import get_llm_metrics, get_queue_metrics
 from services.llm_provider_service.protocols import (
+    BatchJobManagerProtocol,
     ComparisonProcessorProtocol,
     LLMEventPublisherProtocol,
     QueueManagerProtocol,
@@ -52,6 +53,7 @@ class QueueProcessorImpl:
         trace_context_manager: Any,
         settings: Settings,
         queue_processing_mode: QueueProcessingMode | None = None,
+        batch_job_manager: BatchJobManagerProtocol | None = None,
     ):
         self.comparison_processor = comparison_processor
         self.queue_manager = queue_manager
@@ -59,6 +61,7 @@ class QueueProcessorImpl:
         self.trace_context_manager = trace_context_manager
         self.settings = settings
         self.queue_processing_mode = queue_processing_mode or settings.QUEUE_PROCESSING_MODE
+        self.batch_job_manager = batch_job_manager
 
         self.metrics = QueueProcessorMetrics(
             queue_metrics=get_queue_metrics(),
@@ -78,6 +81,7 @@ class QueueProcessorImpl:
             queue_processing_mode=self.queue_processing_mode,
             metrics=self.metrics,
             tracing_enricher=self.tracing_enricher,
+            batch_job_manager=self.batch_job_manager,
         )
         self.processing_loop = QueueProcessingLoop(
             queue_manager=queue_manager,
