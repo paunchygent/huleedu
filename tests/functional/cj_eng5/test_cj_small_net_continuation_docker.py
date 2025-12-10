@@ -23,6 +23,7 @@ from services.cj_assessment_service.config import Settings as CJSettings
 from services.cj_assessment_service.models_db import CJBatchState, CJBatchUpload
 from tests.utils.auth_manager import AuthTestUser
 from tests.utils.kafka_test_manager import KafkaTestManager
+from tests.utils.metrics_helpers import fetch_and_parse_metrics, find_metric_values_in_map
 from tests.utils.service_test_manager import ServiceTestManager
 
 
@@ -375,3 +376,106 @@ class TestCJSmallNetContinuation:
         completed + failed
 
         assert failed == 0
+
+        # --- CJ ↔ LPS serial-bundle metrics for LOWER5 small net ---
+
+        cj_endpoints = validated_services.get("cj_assessment_service", {})
+        lps_endpoints = validated_services.get("llm_provider_service", {})
+
+        cj_metrics_url = cj_endpoints.get("metrics_url")
+        lps_metrics_url = lps_endpoints.get("metrics_url")
+
+        assert cj_metrics_url, "CJ Assessment metrics URL missing from validated services"
+        assert lps_metrics_url, "LLM Provider Service metrics URL missing from validated services"
+
+        cj_metrics = await fetch_and_parse_metrics(metrics_url=cj_metrics_url)
+        lps_metrics = await fetch_and_parse_metrics(metrics_url=lps_metrics_url)
+
+        serial_bundle_labels = {"batching_mode": "serial_bundle"}
+
+        cj_requests_values = find_metric_values_in_map(
+            cj_metrics,
+            "cj_llm_requests_total",
+            serial_bundle_labels,
+        )
+        cj_batches_values = find_metric_values_in_map(
+            cj_metrics,
+            "cj_llm_batches_started_total",
+            serial_bundle_labels,
+        )
+
+        assert cj_requests_values, (
+            "Expected cj_llm_requests_total{batching_mode='serial_bundle'} "
+            "to be present after LOWER5 small-net run"
+        )
+        assert max(cj_requests_values) >= 1
+
+        assert cj_batches_values, (
+            "Expected cj_llm_batches_started_total{batching_mode='serial_bundle'} "
+            "to be present after LOWER5 small-net run"
+        )
+        assert max(cj_batches_values) >= 1
+
+        expected_model = CJSettings().DEFAULT_LLM_MODEL
+        expected_provider = str(mode_info.get("default_provider") or "mock")
+
+        lps_calls_values = find_metric_values_in_map(
+            lps_metrics,
+            "llm_provider_serial_bundle_calls_total",
+            {"provider": expected_provider, "model": expected_model},
+        )
+        assert lps_calls_values, (
+            "Expected llm_provider_serial_bundle_calls_total with provider/model labels "
+            f"provider='{expected_provider}', model='{expected_model}'"
+        )
+        assert max(lps_calls_values) >= 1
+
+        items_count_values = find_metric_values_in_map(
+            lps_metrics,
+            "llm_provider_serial_bundle_items_per_call_count",
+            {"provider": expected_provider, "model": expected_model},
+        )
+        assert items_count_values, (
+            "Expected llm_provider_serial_bundle_items_per_call_count with "
+            f"provider='{expected_provider}', model='{expected_model}'"
+        )
+        total_calls = max(items_count_values)
+        assert total_calls >= 1
+
+        bucket_samples = [
+            (labels, bucket_value)
+            for labels, bucket_value in lps_metrics.get(
+                "llm_provider_serial_bundle_items_per_call_bucket", []
+            )
+            if labels.get("provider") == expected_provider and labels.get("model") == expected_model
+        ]
+
+        bucket_bounds: list[tuple[int, float]] = []
+        for labels, bucket_value in bucket_samples:
+            le = labels.get("le")
+            if le is None or le == "+Inf":
+                continue
+            try:
+                upper = int(le)
+            except ValueError:
+                continue
+            bucket_bounds.append((upper, bucket_value))
+
+        bucket_bounds.sort(key=lambda t: t[0])
+
+        max_items_upper_bound: float | None = None
+        for upper, count in bucket_bounds:
+            if count >= total_calls:
+                max_items_upper_bound = float(upper)
+                break
+
+        from services.llm_provider_service.config import Settings as LLMProviderSettings
+
+        lps_settings = LLMProviderSettings()
+        max_configured = float(lps_settings.SERIAL_BUNDLE_MAX_REQUESTS_PER_CALL)
+
+        if max_items_upper_bound is None:
+            max_items_upper_bound = max_configured
+
+        assert max_items_upper_bound >= 1
+        assert max_items_upper_bound <= max_configured

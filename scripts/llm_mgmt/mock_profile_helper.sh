@@ -21,6 +21,24 @@
 set -euo pipefail
 IFS=$'\n\t'
 
+# Wait for a Docker container to report healthy status.
+wait_for_healthy() {
+  local service=$1
+  local max_wait=${2:-60}
+  local waited=0
+  echo "⏳ Waiting for $service to become healthy..."
+  while [[ $waited -lt $max_wait ]]; do
+    if docker ps --filter "name=huleedu_${service}" --format '{{.Status}}' | grep -q "(healthy)"; then
+      echo "✅ $service is healthy"
+      return 0
+    fi
+    sleep 2
+    waited=$((waited + 2))
+  done
+  echo "❌ $service did not become healthy within ${max_wait}s" >&2
+  return 1
+}
+
 # Resolve repository root robustly whether invoked directly or via PDM.
 SCRIPT_PATH="${BASH_SOURCE[0]:-$0}"
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
@@ -80,6 +98,7 @@ echo "   LLM_PROVIDER_SERVICE_MOCK_MODE=$LLM_PROVIDER_SERVICE_MOCK_MODE"
 
 echo "🔄 Restarting llm_provider_service to pick up profile..."
 pdm run dev-recreate llm_provider_service
+wait_for_healthy llm_provider_service
 
 echo "🧪 Running parity test for profile '$PROFILE'..."
 pdm run pytest-root "$TEST_PATH" -m 'docker and integration' -v

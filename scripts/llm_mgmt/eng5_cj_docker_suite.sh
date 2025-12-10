@@ -17,6 +17,24 @@
 set -euo pipefail
 IFS=$'\n\t'
 
+# Wait for a Docker container to report healthy status.
+wait_for_healthy() {
+  local service=$1
+  local max_wait=${2:-60}
+  local waited=0
+  echo "⏳ Waiting for $service to become healthy..."
+  while [[ $waited -lt $max_wait ]]; do
+    if docker ps --filter "name=huleedu_${service}" --format '{{.Status}}' | grep -q "(healthy)"; then
+      echo "✅ $service is healthy"
+      return 0
+    fi
+    sleep 2
+    waited=$((waited + 2))
+  done
+  echo "❌ $service did not become healthy within ${max_wait}s" >&2
+  return 1
+}
+
 SCRIPT_PATH="${BASH_SOURCE[0]:-$0}"
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../" && pwd)"
@@ -32,8 +50,16 @@ fi
 
 echo "✅ Using .env at $REPO_ROOT/.env for ENG5/CJ docker suite"
 
-echo "🔄 Recreating llm_provider_service and cj_assessment_service containers..."
-pdm run dev-recreate llm_provider_service cj_assessment_service
+# Tests require: api_gateway_service, cj_assessment_service, llm_provider_service
+# Ensure all required services are running and pick up current .env
+REQUIRED_SERVICES="api_gateway_service llm_provider_service cj_assessment_service"
+
+echo "🔄 Recreating required services: $REQUIRED_SERVICES"
+# shellcheck disable=SC2086
+pdm run dev-recreate $REQUIRED_SERVICES
+wait_for_healthy api_gateway_service
+wait_for_healthy llm_provider_service
+wait_for_healthy cj_assessment_service
 
 run_small_net_tests() {
   echo "🧪 Running LOWER5 small-net CJ docker tests..."
