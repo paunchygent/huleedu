@@ -1,9 +1,9 @@
 # Design Specification: Teacher Dashboard
 
-**Version:** 1.0  
-**Status:** Draft  
-**Created:** 2025-12-07  
-**Last Updated:** 2025-12-07  
+**Version:** 1.2
+**Status:** Draft
+**Created:** 2025-12-07
+**Last Updated:** 2025-12-11
 **Related Epic:** EPIC-002 (Teacher Dashboard)
 
 ---
@@ -21,7 +21,7 @@ Web interface for teachers to submit essays for assessment, monitor processing s
 
 ### 1.3 Target User
 - **Role:** Teacher (Swedish gymnasium/högstadium)
-- **Platform:** Desktop browser (Windows primary)
+- **Platform:** Desktop browser primary, mobile responsive
 - **Frequency:** Few times per week
 - **Session Pattern:** Check status, confirm matches, review results
 
@@ -706,16 +706,44 @@ Förbättringsområden (Improvement areas):
 
 ## 7. Component Patterns
 
-### 7.1 Status Indicators
+### 7.1 Design System Colors
+
+The HuleEdu design system uses a brutalist aesthetic. Current implementation uses primitive colors with inline opacity modifiers.
+
+**Current Primitives:**
+
+| Token | Hex | Usage |
+|-------|-----|-------|
+| `canvas` | `#FDFBF7` | Background, page |
+| `navy` | `#1a1f2c` | Primary text, borders, buttons |
+| `burgundy` | `#7a2e2e` | Accent, alerts, high priority |
+| `paper` | `#ffffff` | Cards, elevated surfaces |
+
+**Planned: Semantic Token Architecture (ADR-0023)**
+
+The current opacity-based approach (`text-navy/60`, `text-navy/40`) will be replaced with semantic tokens per ADR-0023:
+
+| Current | Planned Semantic Token | Contrast |
+|---------|------------------------|----------|
+| `text-navy` | `--color-text-primary` | 4.9:1 ✓ |
+| `text-navy/70` | `--color-text-secondary` | 4.5:1 ✓ |
+| `text-navy/60` | `--color-text-muted` | 4.5:1 (large text) |
+| `text-navy/40` | `--color-text-disabled` | N/A |
+
+See EPIC-010 for implementation plan.
+
+**Typography:** IBM Plex family (Sans, Serif, Mono)
+
+### 7.2 Status Indicators
 
 | State | Icon | Color | Label |
 |-------|------|-------|-------|
-| Awaiting action | ⚠️ | `burgundy` | Kräver åtgärd |
-| Processing | ⏳ | `amber-500` | Bearbetar |
-| Completed | ✅ | `green-600` | Klar |
-| Error | ❌ | `red-600` | Fel |
+| Awaiting action | ● | `burgundy` | Kräver åtgärd |
+| Processing | ● (pulsing) | `navy` | Bearbetar |
+| Completed | — | `navy/40` | Klar |
+| Archived | — | `navy/30` | Arkiverad |
 
-### 7.2 Progress Bar Phases
+### 7.3 Progress Bar Phases
 
 ```
 [Uppladdning] → [Stavning] → [CJ-bedömning] → [Textanalys]
@@ -726,14 +754,14 @@ Förbättringsområden (Improvement areas):
 - **In progress:** Partially filled, percentage
 - **Pending:** Empty circle
 
-### 7.3 Batch Type Indicators
+### 7.4 Batch Type Indicators
 
 | Type | Icon | Label Style |
 |------|------|-------------|
 | REGULAR (class-linked) | 📚 | Class name + course |
 | GUEST | 📄 | "Gästbatch #N" |
 
-### 7.4 Confidence Indicators (Student Matching)
+### 7.5 Confidence Indicators (Student Matching)
 
 | Confidence | Display | Action |
 |------------|---------|--------|
@@ -870,21 +898,106 @@ interface AggregatedFactor {
 
 ---
 
-## 9. Responsive Considerations
+## 9. Responsive Design
 
-### 9.1 Desktop First
-- Primary target: 1280px+ width
-- Full sidebar navigation
-- Multi-column layouts for statistics
+### 9.1 Breakpoint Strategy
 
-### 9.2 Tablet (768px-1279px)
-- Collapsible sidebar
-- Stacked cards
-- Tables remain horizontal with scroll
+Mobile-first approach using Tailwind CSS v4 breakpoints:
 
-### 9.3 Mobile (deferred)
-- Not in initial scope per EPIC-002
-- Basic functionality only if accessed
+| Breakpoint | Width | Layout |
+|------------|-------|--------|
+| Base (mobile) | < 768px | Single column, stacked rows |
+| `md:` | ≥ 768px | Sidebar visible, grid layouts |
+| `lg:` | ≥ 1024px | Full dashboard experience |
+
+### 9.2 Desktop (md+)
+- Sidebar navigation visible (240px fixed)
+- LedgerTable: 12-column grid header visible
+- LedgerRow: 4-column layout (5+2+4+1)
+- Padding: 40px (`p-10`)
+
+### 9.3 Mobile (< 768px)
+- Sidebar hidden, hamburger menu in header
+- LedgerTable: Header hidden
+- LedgerRow: Stacked card layout
+  - Title: full width
+  - Status + Time: side by side (50/50)
+  - Progress: full width at bottom (hidden for archived/complete)
+- Padding: 16px (`p-4`)
+- Touch targets: minimum 48px height
+
+### 9.4 Mobile Navigation
+
+Hamburger menu with slide-out drawer:
+
+```
+┌─────────────────────────────────────┐
+│ ☰ HuleEdu          LÄRARPANEL       │  ← Header with hamburger
+├─────────────────────────────────────┤
+│                                     │
+│  [Dashboard content]                │
+│                                     │
+└─────────────────────────────────────┘
+
+       ↓ Tap hamburger
+
+┌──────────────┬──────────────────────┐
+│              │                      │
+│  Översikt    │  [Dimmed content]    │
+│  Klasser     │                      │
+│  Arkiv       │                      │
+│              │                      │
+│  ──────────  │                      │
+│  + Ny Bunt   │                      │
+│              │                      │
+└──────────────┴──────────────────────┘
+```
+
+**Drawer behavior:**
+- Opens from left, overlays content
+- Content area dimmed (tap to close)
+- Same nav items as desktop sidebar
+- "Ny Bunt" CTA at bottom
+- Close on navigation or outside tap
+
+**Implementation:** Not yet implemented. Sidebar currently hidden on mobile.
+
+### 9.5 Mobile LedgerRow Layout
+
+```
+┌─────────────────────────────────────┐
+│ Title (full width)                  │
+│ Subtitle                            │
+├──────────────────┬──────────────────┤
+│ STATUS           │ TIME/INDICATOR   │
+├──────────────────┴──────────────────┤
+│ Progress bar (if processing)        │
+│ Action text (if attention)          │
+└─────────────────────────────────────┘
+```
+
+### 9.6 Touch Interactions
+
+Following Tailwind v4 philosophy for hover states:
+
+| State | Behavior |
+|-------|----------|
+| `:active` | Touch feedback on all devices (outline, background) |
+| `:hover` | Pointer devices only via `@media (hover: hover)` |
+
+Implementation in `main.css`:
+```css
+/* Touch feedback - all devices */
+.ledger-row:active {
+  background-color: var(--color-canvas);
+  outline: 2px solid var(--color-navy);
+}
+
+/* Hover - pointer devices only */
+@media (hover: hover) {
+  .ledger-row:hover { /* ... */ }
+}
+```
 
 ---
 
@@ -1075,3 +1188,4 @@ interface CreditEstimate {
 |---------|------|--------|---------|
 | 1.0 | 2025-12-07 | Cascade | Initial draft based on user research |
 | 1.1 | 2025-12-07 | Cascade | Added assessment modes (grading/ranking), grade approval UI, AI Feedback integration, Entitlements |
+| 1.2 | 2025-12-11 | Claude | Updated responsive design section with implemented mobile layout; added design system colors; aligned status indicators with actual implementation |

@@ -181,6 +181,21 @@ If frontend design is not the focus, the backend sprint continues below:
   - Implement true **single-wave generation up to cap** for `provider_batch_api` in CJ (`ComparisonBatchOrchestrator.submit_initial_batch(...)` + pair generation thresholds).
   - Extend ENG5 Heavy‑C harness with `provider_batch_api` variants and metrics assertions once LPS job-level metrics are wired.
 
+#### Session 2025-12-11 – provider_batch_api status validation (analysis only)
+
+- Verified that LPS `QueueProcessingMode.BATCH_API` is backed by `BatchApiStrategy` + `BatchJobManager` with unit + integration coverage (`test_batch_api_strategy`, `test_queue_metrics_batch_api`).
+- Confirmed CJ `provider_batch_api` semantics are largely implemented and unit-tested:
+  - Initial submission persists `llm_batching_mode` and uses `max_pairs_per_call == max_pairs_cap` to attempt a single-wave generation via `pair_generation.generate_comparison_tasks(...)`.
+  - Continuation resolves `llm_batching_mode` from metadata and skips additional COVERAGE/RESAMPLING waves when in `provider_batch_api` mode, finalizing once caps/denominator are reached.
+- ENG5 runner exposes `--llm-batching-mode` and threads `llm_batching_mode_hint` into CJ request metadata, but Heavy‑C harness tests still run only `serial_bundle` variants (no `provider_batch_api` docker/parity coverage yet).
+- TASK status snapshot:
+  - `TASKS/integrations/llm-provider-batch-api-phase-2.md`: Phase 2.3 (LPS job manager + BATCH_API) is effectively ✅; Phase 2.4 CJ semantics are partially complete (metadata + continuation guards ✅, single-wave semantics implemented but not yet validated in ENG5 harness); Phase 2.5 ENG5 coverage + runbook alignment remains ☐.
+  - `TASKS/assessment/cj-llm-provider-batch-api-mode.md`: PR1/PR2 code paths and unit tests are in place; PR3 ENG5 runner override is CLI/metadata-only so far, with no end-to-end ENG5 provider_batch_api docker tests.
+- Recommended next steps (backend):
+  - Tighten and document “all-at-once up to cap” behaviour for large nets (additional CJ unit tests +, eventually, ENG5 docker runs with `LLM_BATCHING_MODE=provider_batch_api` / `QUEUE_PROCESSING_MODE=batch_api`).
+  - Extend ENG5 Heavy‑C harness with at least one `provider_batch_api` variant in CJ docker semantics + one ENG5 mock‑profile parity run, asserting key CJ/LPS metrics.
+  - Once harness coverage is in place, update the `status` + checkboxes in both TASK docs and align the `eng5-np-runbook` / `cj-assessment-runbook` wording with the implemented semantics.
+
 You are picking up from sessions that:
 - Completed Phase‑1 `serial_bundle` and Phase‑2 LPS scaffolding (BatchJob* models, `BatchJobManagerProtocol`, in‑memory manager, and a real `QueueProcessingMode.BATCH_API` path wired through `BatchApiStrategy` and `QueuedRequestExecutor.execute_batch_api`).
 - Added negative‑path unit coverage for LPS batch jobs:
@@ -377,7 +392,46 @@ pdm run fe-lint       # Check
 pdm run fe-lint-fix   # Auto-fix
 ```
 
+### Mobile Responsiveness - ✅ COMPLETE (2025-12-11)
+
+**Implementation:**
+- LedgerTable: Header hidden on mobile (`hidden md:grid`)
+- LedgerRow: Responsive grid stacking with `col-span-12 md:col-span-X`
+- TeacherDashboardView: Responsive padding (`p-4 md:p-10`)
+- AppSidebar: Hidden on mobile (`hidden md:flex`)
+- Touch feedback: `.ledger-row:active` state in main.css
+
+**Mobile LedgerRow layout:**
+```
+┌─────────────────────────────────────┐
+│ Title (full width)                  │
+│ Subtitle                            │
+├──────────────────┬──────────────────┤
+│ STATUS           │ TIME/INDICATOR   │
+├──────────────────┴──────────────────┤
+│ Progress bar (if processing)        │
+└─────────────────────────────────────┘
+```
+
+**Progress column visibility:** Hidden on mobile for archived/complete states.
+
+**Documentation updated:**
+- `frontend/docs/product/epics/design-spec-teacher-dashboard.md` - Section 9 rewritten for responsive design
+
+### Design System Token Architecture - PLANNED
+
+**Current state:** Uses inline opacity (`text-navy/60`) which fails WCAG AA.
+
+**Documents aligned:**
+- ADR-0023: Fixed EPIC reference (EPIC-003 → EPIC-010)
+- EPIC-010: Updated file paths for Vue app structure
+- Design spec Section 7.1: References ADR-0023 semantic token plan
+
+**Task created:** `TASKS/frontend/implement-semantic-token-architecture-per-adr-0023.md`
+
 ### Next Session Focus
 
-1. **BFF Integration** - Wire real API endpoints via Teacher BFF
-2. **WebSocket updates** - Real-time batch status changes
+1. **Mobile hamburger menu** - Slide-out drawer navigation (spec'd in design-spec Section 9.4)
+2. **Semantic token implementation** - Replace opacity values with WCAG-compliant tokens (TASK created)
+3. **BFF Integration** - Wire real API endpoints via Teacher BFF
+4. **WebSocket updates** - Real-time batch status changes

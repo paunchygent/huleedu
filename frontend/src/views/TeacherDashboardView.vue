@@ -32,7 +32,7 @@ function handleBatchClick(batch: DashboardBatch) {
 <template>
   <div>
     <!-- Loading state -->
-    <div v-if="dashboardStore.isLoading" class="p-10">
+    <div v-if="dashboardStore.isLoading" class="p-4 md:p-10">
       <div class="flex items-center gap-3">
         <div class="h-2 w-2 rounded-full bg-navy animate-pulse"></div>
         <span class="text-xs font-bold uppercase tracking-widest text-navy/60">
@@ -42,7 +42,7 @@ function handleBatchClick(batch: DashboardBatch) {
     </div>
 
     <!-- Error state -->
-    <div v-else-if="dashboardStore.error" class="p-10">
+    <div v-else-if="dashboardStore.error" class="p-4 md:p-10">
       <div class="bg-white border-2 border-burgundy p-6">
         <h2 class="font-bold text-burgundy mb-2">Fel vid inläsning</h2>
         <p class="text-navy/80 mb-4">{{ dashboardStore.error }}</p>
@@ -58,7 +58,7 @@ function handleBatchClick(batch: DashboardBatch) {
     <!-- Dashboard content -->
     <template v-else>
       <!-- Section: Kräver åtgärd -->
-      <div v-if="dashboardStore.hasActionItems" class="p-10 pb-6 max-w-6xl">
+      <div v-if="dashboardStore.hasActionItems" class="p-4 md:p-10 pb-6 max-w-6xl">
         <SectionHeader
           :title="'Kräver åtgärd'"
           :count="dashboardStore.attentionCount"
@@ -73,7 +73,7 @@ function handleBatchClick(batch: DashboardBatch) {
       </div>
 
       <!-- Section: Pågående och Arkiverat -->
-      <div class="p-10 pt-4 max-w-6xl">
+      <div class="p-4 md:p-10 pt-4 max-w-6xl">
         <SectionHeader
           title="Pågående och Arkiverat"
           variant="navy"
@@ -94,7 +94,7 @@ function handleBatchClick(batch: DashboardBatch) {
       <!-- Empty state -->
       <div
         v-if="!dashboardStore.hasActionItems && dashboardStore.ledgerBatches.length === 0"
-        class="p-10 max-w-6xl"
+        class="p-4 md:p-10 max-w-6xl"
       >
         <div class="bg-white border-2 border-navy p-8 text-center">
           <h2 class="font-bold text-navy mb-2">Inga inlämningar</h2>

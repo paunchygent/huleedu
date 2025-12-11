@@ -120,7 +120,7 @@ Duration and easing curves:
 
 ## Implementation
 
-See EPIC-003 (Frontend Design System Foundational Improvements) for phased
+See EPIC-010 (Frontend Design System Foundational Improvements) for phased
 implementation plan covering:
 
 1. Color primitive scales

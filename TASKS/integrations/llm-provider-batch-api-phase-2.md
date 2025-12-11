@@ -2,7 +2,7 @@
 id: 'llm-provider-batch-api-phase-2'
 title: 'LLM Provider Batch API Phase 2'
 type: 'task'
-status: 'research'
+status: 'in_progress'
 priority: 'medium'
 domain: 'integrations'
 service: ''
@@ -10,8 +10,8 @@ owner_team: 'agents'
 owner: ''
 program: ''
 created: '2025-12-10'
-last_updated: '2025-12-10'
-related: ["docs/decisions/0004-llm-provider-batching-mode-selection.md", "TASKS/assessment/cj-llm-provider-batch-api-mode.md"]
+last_updated: '2025-12-11'
+related: ['docs/decisions/0004-llm-provider-batching-mode-selection.md', 'TASKS/assessment/cj-llm-provider-batch-api-mode.md', 'TASKS/integrations/eng5-provider-batch-api-harness-coverage.md']
 labels: []
 ---
 # LLM Provider Batch API Phase 2
@@ -271,8 +271,8 @@ Once Phase‑2 BATCH_API execution is implemented:
 
 - **Phase 2.4 – CJ provider_batch_api semantics**
   - [x] Persist `llm_batching_mode` into `CJBatchState.processing_metadata` on initial submission.
-  - [ ] Ensure single‑wave generation up to `max_pairs_cap` for `provider_batch_api`.
-  - [~] Adjust continuation logic to:
+  - [x] Ensure single‑wave generation up to `max_pairs_cap` for `provider_batch_api`.
+  - [x] Adjust continuation logic to:
     - Finalize when callbacks hit the denominator/cap.
     - Never schedule additional comparison waves in `provider_batch_api` mode.
 

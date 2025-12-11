@@ -115,14 +115,16 @@ enables consistent UI development velocity.
 ### Token File Structure
 
 ```
-frontend/styles/src/
-├── input.css              # Main entry, imports tokens
+frontend/src/styles/
+├── main.css               # Main entry with @theme block
 ├── tokens/
 │   ├── primitives.css     # Color scales, spacing base
 │   ├── semantic.css       # Text, background, border tokens
 │   ├── components.css     # Button, input, card tokens
 │   └── animation.css      # Duration, easing tokens
 ```
+
+Note: Tokens will be defined in `main.css` @theme block initially, then extracted to separate files as the system grows.
 
 ### Migration Strategy
 
@@ -134,11 +136,20 @@ frontend/styles/src/
 
 ### Files to Modify
 
-- `frontend/styles/src/input.css` - Token definitions
-- `frontend/styles/src/login.html` - Replace inline opacity classes
-- `frontend/styles/src/upload.html` - Replace inline opacity classes
-- `frontend/styles/src/dashboard.html` - Replace inline opacity classes
-- `frontend/styles/src/huleedu-landing-final.html` - Replace inline opacity classes
+**Token definitions:**
+- `frontend/src/styles/main.css` - @theme block with primitives and semantic tokens
+
+**Vue components (replace inline opacity classes):**
+- `frontend/src/components/dashboard/LedgerRow.vue`
+- `frontend/src/components/dashboard/ActionCard.vue`
+- `frontend/src/components/dashboard/SectionHeader.vue`
+- `frontend/src/views/TeacherDashboardView.vue`
+- `frontend/src/views/LoginView.vue`
+- `frontend/src/components/layout/AppHeader.vue`
+- `frontend/src/components/layout/AppSidebar.vue`
+
+**Static prototypes (if still maintained):**
+- `frontend/styles/src/*.html` - Legacy prototype files
 
 ## Dependencies
 

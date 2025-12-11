@@ -245,6 +245,13 @@ input:focus-visible {
   transition: background-color 0.1s ease;
 }
 
+/* Ledger row active - touch feedback for all devices */
+.ledger-row:active {
+  background-color: var(--color-canvas);
+  outline: 2px solid var(--color-navy);
+  outline-offset: -2px;
+}
+
 /* Ledger row hover - pointer devices only */
 @media (hover: hover) {
   .ledger-row:hover {

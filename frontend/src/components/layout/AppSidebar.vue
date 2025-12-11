@@ -14,7 +14,7 @@ const navigationStore = useNavigationStore();
 </script>
 
 <template>
-  <nav class="w-64 flex-none border-r border-navy bg-canvas flex flex-col">
+  <nav class="hidden md:flex w-64 flex-none border-r border-navy bg-canvas flex-col">
     <!-- Navigation links -->
     <div class="flex flex-col py-8">
       <RouterLink

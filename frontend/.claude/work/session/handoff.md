@@ -9,59 +9,6 @@ Backend context lives in: `/.claude/work/session/handoff.md`
 
 ## Current Session (2025-12-08)
 
-### Scope: API Gateway → BFF Routing + API Scaffolding
-
-**Completed:**
-
-1. **API Gateway BFF routing**
-   - Added `BFF_TEACHER_URL` to gateway config
-   - Created `bff_teacher_routes.py` (proxy following class_routes pattern)
-   - Registered router in `main.py` with prefix `/bff/v1/teacher`
-   - Added env var to `docker-compose.services.yml`
-   - Added `bff_teacher_service` to gateway `depends_on`
-
-2. **BFF API scaffolding**
-   - Created `api/v1/teacher_routes.py` with stub `/dashboard` endpoint
-   - Created `dto/teacher_v1.py` with `TeacherDashboardResponseV1` DTO
-   - Created `clients/__init__.py` scaffold
-   - Updated `app.py` to include router before SPA fallback
-   - Updated `config.py` CORS methods for full API support
-
-3. **Validation**
-   - `pdm run typecheck-all` passes (1409 files)
-   - `pdm run lint-fix --unsafe-fixes` passes
-
-**Previous session completed:**
-- BFF Teacher Service skeleton (static serving)
-- Docker integration (port 4101)
-- PDM scripts for BFF management
-- Mypy strict config
-
----
-
-## Next Session Instruction
-
-```markdown
-## Role
-
-You are the lead developer and architect of HuleEdu. The scope of this session is
-Teacher Dashboard screen implementation in the BFF service.
-
----
-
-## Session Scope
-
-Objective: Implement the Teacher Dashboard endpoint that aggregates batch data from
-RAS and class names from CMS into a screen-optimized response.
-
-Out of scope:
-- Batch detail screen (separate task)
-- Essay feedback screen (separate task)
-- WebSocket real-time updates (Phase 2)
-- Admin BFF service
-
----
-
 ## Before Touching Code
 
 From monorepo root:

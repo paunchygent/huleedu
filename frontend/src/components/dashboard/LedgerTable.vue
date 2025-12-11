@@ -9,8 +9,8 @@
 
 <template>
   <div class="bg-white border-2 border-navy">
-    <!-- Table Header -->
-    <div class="grid grid-cols-12 border-b-2 border-navy bg-canvas">
+    <!-- Table Header - hidden on mobile -->
+    <div class="hidden md:grid grid-cols-12 border-b-2 border-navy bg-canvas">
       <div class="col-span-5 p-4 border-r border-navy">
         <span class="text-xs font-bold uppercase tracking-widest text-navy">Uppgift</span>
       </div>

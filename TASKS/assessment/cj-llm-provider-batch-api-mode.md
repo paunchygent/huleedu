@@ -2,7 +2,7 @@
 id: cj-llm-provider-batch-api-mode
 title: CJ LLM Provider Batch API Mode
 type: task
-status: research
+status: in_progress
 priority: medium
 domain: assessment
 service: cj_assessment_service
@@ -10,7 +10,7 @@ owner_team: agents
 owner: ''
 program: ''
 created: '2025-11-27'
-last_updated: '2025-12-10'
+last_updated: '2025-12-11'
 related: ["docs/decisions/0004-llm-provider-batching-mode-selection.md", "docs/decisions/0015-cj-assessment-convergence-tuning-strategy.md", "docs/decisions/0017-cj-assessment-wave-submission-pattern.md", "docs/operations/cj-assessment-runbook.md", "docs/operations/eng5-np-runbook.md", "services/llm_provider_service/README.md", "TASKS/assessment/cj-llm-serial-bundle-validation-fixes.md", "TASKS/integrations/llm-provider-batch-api-phase-2.md"]
 labels: []
 ---

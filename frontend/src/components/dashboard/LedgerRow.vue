@@ -55,10 +55,15 @@ const rowClasses = computed(() => {
   }
 });
 
-// Processing state left border color
+// Processing state left border color - applied to title cell
 const processingBorderClass = computed(() => {
   if (props.batch.state !== "processing") return "";
   return props.batch.isHighPriority ? "border-l-4 border-l-burgundy" : "border-l-4 border-l-navy";
+});
+
+// Show progress column on mobile only for processing/attention states
+const showProgressOnMobile = computed(() => {
+  return props.batch.state === "processing" || props.batch.state === "attention";
 });
 
 // Get status label color
@@ -131,8 +136,11 @@ const dotVariant = computed(() => {
     :data-state-changed="isAnimating ? '' : undefined"
     @click="emit('click', batch)"
   >
-    <!-- Column 1: Title (5 cols) -->
-    <div class="col-span-5 p-4 border-r border-navy flex flex-col justify-center" :class="processingBorderClass">
+    <!-- Column 1: Title - full width mobile, 5 cols desktop -->
+    <div
+      class="col-span-12 md:col-span-5 p-4 md:border-r border-navy flex flex-col justify-center"
+      :class="processingBorderClass"
+    >
       <span class="ledger-title font-bold text-sm" :class="titleOpacity">
         {{ displayTitle }}
       </span>
@@ -141,15 +149,36 @@ const dotVariant = computed(() => {
       </span>
     </div>
 
-    <!-- Column 2: Status (2 cols) -->
-    <div class="col-span-2 p-4 border-r border-navy flex items-center">
+    <!-- Column 2: Status - half width mobile, 2 cols desktop -->
+    <div class="col-span-6 md:col-span-2 p-4 border-t md:border-t-0 md:border-r border-navy flex items-center">
       <span class="font-mono text-xs uppercase tracking-wide" :class="statusColor">
         {{ batch.statusLabel }}
       </span>
     </div>
 
-    <!-- Column 3: Progress/Message (4 cols) -->
-    <div class="col-span-4 p-4 border-r border-navy flex flex-col justify-center gap-2">
+    <!-- Column 4: Time/Indicator - half width mobile paired with status, 1 col desktop -->
+    <div class="col-span-6 md:col-span-1 p-4 border-t md:border-t-0 flex items-center justify-end md:order-last">
+      <template v-if="batch.state === 'processing'">
+        <PulsingDot :variant="dotVariant" />
+      </template>
+      <template v-else-if="batch.state === 'attention'">
+        <span class="font-mono text-sm font-bold text-burgundy">{{ batch.timeDisplay }}</span>
+      </template>
+      <template v-else>
+        <span
+          class="font-mono text-xs"
+          :class="batch.state === 'archived' ? 'text-navy/30' : 'text-navy/40'"
+        >
+          {{ batch.timeDisplay }}
+        </span>
+      </template>
+    </div>
+
+    <!-- Column 3: Progress/Message - full width mobile at bottom, 4 cols desktop -->
+    <div
+      class="col-span-12 md:col-span-4 p-4 border-t md:border-t-0 md:border-r border-navy flex flex-col justify-center gap-2"
+      :class="{ 'hidden md:flex': !showProgressOnMobile }"
+    >
       <template v-if="batch.state === 'processing'">
         <ProgressBar :percent="batch.progressPercent" :variant="progressVariant" />
         <span class="text-[10px] font-mono text-navy/40 uppercase">
@@ -164,24 +193,6 @@ const dotVariant = computed(() => {
       </template>
       <template v-else>
         <span class="text-xs text-navy/30">&#8212;</span>
-      </template>
-    </div>
-
-    <!-- Column 4: Time/Indicator (1 col) -->
-    <div class="col-span-1 p-4 flex items-center justify-end">
-      <template v-if="batch.state === 'processing'">
-        <PulsingDot :variant="dotVariant" />
-      </template>
-      <template v-else-if="batch.state === 'attention'">
-        <span class="font-mono text-sm font-bold text-burgundy">{{ batch.timeDisplay }}</span>
-      </template>
-      <template v-else>
-        <span
-          class="font-mono text-xs"
-          :class="batch.state === 'archived' ? 'text-navy/30' : 'text-navy/40'"
-        >
-          {{ batch.timeDisplay }}
-        </span>
       </template>
     </div>
   </div>
