@@ -113,11 +113,11 @@ export function createMockActionItems(): ActionItem[] {
       className: 'SA22B',
       title: 'Argumenterande text',
       description:
-        'Systemet har matchat 22 texter med hög säkerhet. 2 uppsatser kräver manuell matchning innan uppsatsbunten är redo.',
+        'Systemet har kopplat 22 texter med hög säkerhet. 2 uppsatser kräver manuell koppling innan bunten är redo.',
       deviationCount: 2,
       autoConfirmCountdown: '22:00',
       primaryAction: {
-        label: 'Matcha elever',
+        label: 'Koppla elever',
         route: '/app/batch/batch-882/deviations',
       },
       secondaryAction: {

@@ -31,7 +31,7 @@ function handleSecondaryAction() {
     <div class="p-8 flex-1">
       <div class="flex items-center justify-between mb-4">
         <span class="text-xs font-mono text-navy/40 uppercase tracking-wide">
-          Elevmatchning #{{ item.batchCode }}
+          Elevkoppling #{{ item.batchCode }}
         </span>
         <PulsingDot variant="burgundy" />
       </div>
