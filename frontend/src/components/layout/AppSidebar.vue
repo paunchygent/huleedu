@@ -5,7 +5,7 @@
  * Structure:
  * [Navigation links]
  * [Spacer]
- * [New Batch button]
+ * [Ny Bunt button]
  */
 import { RouterLink } from 'vue-router'
 import { useNavigationStore } from '@/stores/navigation'

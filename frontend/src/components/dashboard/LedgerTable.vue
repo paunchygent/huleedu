@@ -2,7 +2,7 @@
 /**
  * LedgerTable - Container with 12-column grid header
  *
- * Provides the table structure for batch rows.
+ * Provides the table structure for bunt rows.
  * Header matches prototype columns: Uppgift | Status | Process | Tid
  */
 </script>
