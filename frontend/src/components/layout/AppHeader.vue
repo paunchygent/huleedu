@@ -42,7 +42,7 @@ function formatCredits(credits: number | null): string {
     <div class="flex-1 flex h-full">
       <!-- Page title -->
       <div class="h-full border-r border-navy px-6 flex items-center">
-        <h1 class="text-xs font-bold uppercase tracking-widest text-navy">Lärardashboard</h1>
+        <h1 class="text-xs font-bold uppercase tracking-widest text-navy">Lärarpanel</h1>
       </div>
 
       <!-- Spacer -->

@@ -18,7 +18,7 @@ export const useNavigationStore = defineStore('navigation', () => {
   const navItems = computed<NavItem[]>(() => [
     {
       id: 'oversikt',
-      label: 'Oversikt',
+      label: 'Översikt',
       route: '/app/dashboard',
       isActive: currentSection.value === 'oversikt',
     },

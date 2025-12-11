@@ -36,7 +36,7 @@ function handleBatchClick(batch: DashboardBatch) {
       <div class="flex items-center gap-3">
         <div class="h-2 w-2 rounded-full bg-navy animate-pulse"></div>
         <span class="text-xs font-bold uppercase tracking-widest text-navy/60">
-          Laddar dashboard...
+          Laddar översikt...
         </span>
       </div>
     </div>
@@ -99,7 +99,7 @@ function handleBatchClick(batch: DashboardBatch) {
         <div class="bg-white border-2 border-navy p-8 text-center">
           <h2 class="font-bold text-navy mb-2">Inga inlämningar</h2>
           <p class="text-navy/60 mb-6">
-            Du har inga batchar ännu. Skapa en ny bunt för att komma igång.
+            Du har inga buntar ännu. Skapa en ny bunt för att komma igång.
           </p>
           <button
             class="btn-brutal bg-navy text-white px-6 py-3 text-xs font-bold uppercase tracking-widest hover:bg-burgundy shadow-brutal transition-all duration-75"
