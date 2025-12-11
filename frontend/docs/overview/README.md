@@ -100,7 +100,7 @@ graph TB
 
 ## Key Concepts and Terminology
 
-HuleEdu uses specific terminology aligned with its educational assessment domain. For comprehensive definitions, see [Terminology and Definitions](./.././.claude/rules/100-terminology-and-definitions.md).
+HuleEdu uses specific terminology aligned with its educational assessment domain. For comprehensive definitions, see [Terminology and Definitions](./.././.agent/rules/100-terminology-and-definitions.md).
 
 ### Essential Terms
 
@@ -222,19 +222,19 @@ The Product Requirements Document provides:
 
 ### Essential Documentation
 
-- **Architecture Rules**: `.claude/rules/000-rule-index.md` - Complete rule index
-- **Processing Flows**: `.claude/rules/035-complete-processing-flow-overview.md`
-- **Service Patterns**: `.claude/rules/040-service-implementation-guidelines.md`
-- **Testing Standards**: `.claude/rules/075-test-creation-methodology.md`
+- **Architecture Rules**: `.agent/rules/000-rule-index.md` - Complete rule index
+- **Processing Flows**: `.agent/rules/035-complete-processing-flow-overview.md`
+- **Service Patterns**: `.agent/rules/040-service-implementation-guidelines.md`
+- **Testing Standards**: `.agent/rules/075-test-creation-methodology.md`
 - **Development Workflow**: `CLAUDE.md` - Comprehensive technical reference
 
 ### Architecture Diagrams
 
 - **System Architecture**: [Architecture Diagram](./architecture-diagram.md)
-- **Phase 1 Flow**: `.claude/rules/036-phase1-processing-flow.md`
-- **Phase 2 Flow**: `.claude/rules/037-phase2-processing-flow.md`
-- **File Upload Flow**: `.claude/rules/038-file-upload-processing-flow.md`
-- **Results Retrieval**: `.claude/rules/039-results-retrieval-flow.md`
+- **Phase 1 Flow**: `.agent/rules/036-phase1-processing-flow.md`
+- **Phase 2 Flow**: `.agent/rules/037-phase2-processing-flow.md`
+- **File Upload Flow**: `.agent/rules/038-file-upload-processing-flow.md`
+- **Results Retrieval**: `.agent/rules/039-results-retrieval-flow.md`
 
 ### Development Commands
 
@@ -259,7 +259,7 @@ docker ps | grep huleedu
 
 ### Service-Specific Rules
 
-Each major service has dedicated architecture documentation in `.claude/rules/`:
+Each major service has dedicated architecture documentation in `.agent/rules/`:
 
 - `020.3-batch-orchestrator-service-architecture.md`
 - `020.5-essay-lifecycle-service-architecture.md`
@@ -295,7 +295,7 @@ See `.claude/work/session/handoff.md` for the latest development status, includi
 
 HuleEdu follows strict architectural patterns and coding standards:
 
-1. **Read the rules first**: `.claude/rules/000-rule-index.md`
+1. **Read the rules first**: `.agent/rules/000-rule-index.md`
 2. **Follow DDD boundaries**: No cross-service direct calls
 3. **Use Kafka for communication**: All inter-service events
 4. **Type everything**: Full PEP 484 type hints required
@@ -313,10 +313,10 @@ Before contributing:
 
 ## Support and Resources
 
-- **Development Issues**: Check `.claude/rules/044-service-debugging-and-troubleshooting.md`
-- **Docker Problems**: See `.claude/rules/046-docker-container-debugging.md`
-- **Test Failures**: Review `.claude/rules/075-test-creation-methodology.md`
+- **Development Issues**: Check `.agent/rules/044-service-debugging-and-troubleshooting.md`
+- **Docker Problems**: See `.agent/rules/046-docker-container-debugging.md`
+- **Test Failures**: Review `.agent/rules/075-test-creation-methodology.md`
 - **Database Access**: Reference `CLAUDE.md` Database Access section
 - **Task Tracking**: Use `pdm run new-task` for all new work
 
-For detailed technical guidance, always consult `CLAUDE.md` and the `.claude/rules/` directory.
+For detailed technical guidance, always consult `CLAUDE.md` and the `.agent/rules/` directory.

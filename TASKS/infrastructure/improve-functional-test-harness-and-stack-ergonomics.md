@@ -59,5 +59,5 @@ Provide a repeatable, developer-friendly functional test harness that runs again
 
 ## Related
 
-- Rules: `.claude/rules/070-testing-and-quality-assurance.md`, `084-docker-containerization-standards.md`, `084.1-docker-compose-v2-command-reference.md`
+- Rules: `.agent/rules/070-testing-and-quality-assurance.md`, `084-docker-containerization-standards.md`, `084.1-docker-compose-v2-command-reference.md`
 - Docs: `tests/README.md`

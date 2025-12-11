@@ -206,6 +206,13 @@ class BatchApiStrategy:
         )
 
         model_label = primary_overrides.get("model_override") or "default"
+        job_started = time.perf_counter()
+        self.metrics.record_batch_api_job_scheduled(
+            provider=primary_provider,
+            model_override=model_label,
+            bundle_size=len(bundle_requests),
+        )
+
         job_items: list[BatchJobItem] = []
         for request in bundle_requests:
             overrides = build_override_kwargs(request)
@@ -241,6 +248,12 @@ class BatchApiStrategy:
                     "error": str(exc),
                 },
             )
+            self.metrics.record_batch_api_job_completed(
+                provider=primary_provider,
+                model_override=model_label,
+                job_started=job_started,
+                status="failed",
+            )
             try:
                 raise_processing_error(
                     service="llm_provider_service",
@@ -267,6 +280,13 @@ class BatchApiStrategy:
                         )
                     )
             return SerialBundleResult(outcomes=outcomes, pending_request=pending_request)
+
+        self.metrics.record_batch_api_job_completed(
+            provider=primary_provider,
+            model_override=model_label,
+            job_started=job_started,
+            status="completed",
+        )
 
         results_by_queue_id = {result.queue_id: result for result in results}
         for queued_request in bundle_requests:

@@ -21,7 +21,7 @@ Related reference: docs/operations/cj-assessment-runbook.md
 
 > **Autonomous Claude Execution Prompt**
 >
-> 1. **Cloud VM Context** — You are operating inside the HuleEdu Claude cloud VM. Before taking any action, review and comply with `.claude/rules/111-cloud-vm-execution-standards.md`, including PATH setup for `pdm` and the prohibition on Docker/service startups.
+> 1. **Cloud VM Context** — You are operating inside the HuleEdu Claude cloud VM. Before taking any action, review and comply with `.agent/rules/111-cloud-vm-execution-standards.md`, including PATH setup for `pdm` and the prohibition on Docker/service startups.
 >
 > 2. **Plan, Then Execute Sequentially** — Produce an explicit plan first. Execute exactly one planned task at a time to 100% completion before moving to the next. Re-plan if new information appears.
 >
@@ -642,9 +642,9 @@ File: `.claude/tasks/results/CJ-ASSESSMENT-HARDENING-SUMMARY.md`
 ## Key References
 
 **Rules** (read before starting):
-- `.claude/rules/020-architectural-mandates.md` - Error handling, service boundaries, architectural principles
-- `.claude/rules/042-async-patterns-and-di.md` - DI patterns, async session management
-- `.claude/rules/090-documentation-standards.md` - Docstring standards (succinct, intent-focused)
+- `.agent/rules/020-architectural-mandates.md` - Error handling, service boundaries, architectural principles
+- `.agent/rules/042-async-patterns-and-di.md` - DI patterns, async session management
+- `.agent/rules/090-documentation-standards.md` - Docstring standards (succinct, intent-focused)
 
 **Pattern Examples** (reference throughout):
 - `services/cj_assessment_service/api/admin_routes.py` - Admin endpoint patterns

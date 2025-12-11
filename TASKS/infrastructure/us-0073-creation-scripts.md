@@ -36,8 +36,8 @@ pdm run new-doc --type epic --title "My Epic"
 ```bash
 pdm run new-rule --title "My Rule" --type service --scope backend
 ```
-- Auto-generate rule ID (scan `.claude/rules/` for next NNN prefix)
-- Output to `.claude/rules/NNN-kebab-title.md`
+- Auto-generate rule ID (scan `.agent/rules/` for next NNN prefix)
+- Output to `.agent/rules/NNN-kebab-title.md`
 - Print allowed values for `--type` and `--scope`
 
 ## Success Criteria

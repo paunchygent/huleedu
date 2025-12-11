@@ -24,7 +24,7 @@ This epic owns ADR-0024 (ENG5 Heavy C-lane CI Strategy) and Rule 101 (CI Lanes a
 
 - **D1 – CI lane taxonomy and rules**
   - `docs/decisions/0024-eng5-heavy-c-lane-ci-strategy.md` (ADR-0024) accepted and referenced.
-  - `.claude/rules/101-ci-lanes-and-heavy-suites.md` describing:
+  - `.agent/rules/101-ci-lanes-and-heavy-suites.md` describing:
     - Lane A (Fast PR).
     - Lane B (Walking Skeleton / Infra Smoke).
     - Lane C (ENG5 Heavy Suites).
@@ -60,7 +60,7 @@ This epic owns ADR-0024 (ENG5 Heavy C-lane CI Strategy) and Rule 101 (CI Lanes a
 ## References
 
 - ADR-0024: `docs/decisions/0024-eng5-heavy-c-lane-ci-strategy.md`
-- Rule 101: `.claude/rules/101-ci-lanes-and-heavy-suites.md`
-- Testing rules: `.claude/rules/070-testing-and-quality-assurance.md`
+- Rule 101: `.agent/rules/101-ci-lanes-and-heavy-suites.md`
+- Testing rules: `.agent/rules/070-testing-and-quality-assurance.md`
 - ENG5 runbook: `docs/operations/eng5-np-runbook.md`
 - ENG5 epic: `docs/product/epics/eng5-runner-refactor-and-prompt-tuning-epic.md`

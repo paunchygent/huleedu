@@ -137,7 +137,7 @@ Infrastructure tasks often affect:
 - `pyproject.toml` - Build scripts and tooling
 - `scripts/` - Automation scripts
 - `.github/workflows/` - CI/CD pipelines
-- `.claude/rules/` - Development standards
+- `.agent/rules/` - Development standards
 
 Always consider cross-service impact and update documentation when implementing infrastructure changes.
 

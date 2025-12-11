@@ -264,7 +264,7 @@ Once Phase‑2 BATCH_API execution is implemented:
     - Extended unit coverage for error paths:
       - `test_batch_api_strategy_handles_collect_results_exception` exercises the job‑manager failure guard.
       - `test_execute_batch_api_handles_job_manager_error` ensures executor‑level outcomes remain per‑request failures.
-  - [ ] Wire job‑level metrics (initially using the mock manager, then real providers):
+  - [x] Wire job‑level metrics (initially using the mock manager, then real providers):
     - `llm_provider_batch_api_jobs_total{provider,model,status}`.
     - `llm_provider_batch_api_items_per_job{provider,model}`.
     - `llm_provider_batch_api_job_duration_seconds{provider,model}`.
@@ -282,7 +282,7 @@ Once Phase‑2 BATCH_API execution is implemented:
   - [ ] Update:
     - `docs/operations/eng5-np-runbook.md` (batch_api section).
     - `docs/operations/cj-assessment-runbook.md` (CJ modes table).
-    - Any relevant CI lane docs (`.claude/rules/101-ci-lanes-and-heavy-suites.md`, ADR‑0004).
+    - Any relevant CI lane docs (`.agent/rules/101-ci-lanes-and-heavy-suites.md`, ADR‑0004).
 
 ## Recommended Implementation Sequence (Developer Checklist)
 

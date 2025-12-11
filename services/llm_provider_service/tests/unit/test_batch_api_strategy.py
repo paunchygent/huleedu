@@ -71,7 +71,6 @@ def queue_manager() -> AsyncMock:
 
 @pytest.fixture
 def metrics(settings: Settings) -> QueueProcessorMetrics:
-    # Use no-op metrics collectors for unit tests.
     return QueueProcessorMetrics(
         queue_metrics=None,
         llm_metrics=None,
@@ -252,6 +251,133 @@ async def test_batch_api_strategy_groups_compatible_requests_and_invokes_job_man
 
 
 @pytest.mark.asyncio
+async def test_batch_api_strategy_records_job_metrics_on_success(
+    settings: Settings,
+    queue_manager: AsyncMock,
+    tracing_enricher: QueueTracingEnricher,
+    comparison_processor: AsyncMock,
+    batch_job_manager: AsyncMock,
+) -> None:
+    """Batch API job metrics should record scheduled/completed states and bundle sizing."""
+    first_request = _make_request(
+        provider=LLMProviderType.MOCK,
+        model="mock-model",
+        batching_mode="provider_batch_api",
+    )
+    second_request = _make_request(
+        provider=LLMProviderType.MOCK,
+        model="mock-model",
+        batching_mode="provider_batch_api",
+    )
+    queue_manager.dequeue = AsyncMock(side_effect=[second_request, None])
+
+    jobs_counter = Mock()
+    items_hist = Mock()
+    duration_hist = Mock()
+    jobs_counter.labels.return_value = Mock(inc=Mock())
+    items_hist.labels.return_value = Mock(observe=Mock())
+    duration_hist.labels.return_value = Mock(observe=Mock())
+
+    queue_metrics = {
+        "llm_batch_api_jobs_total": jobs_counter,
+        "llm_batch_api_items_per_job": items_hist,
+        "llm_batch_api_job_duration_seconds": duration_hist,
+    }
+    metrics = QueueProcessorMetrics(
+        queue_metrics=queue_metrics,
+        llm_metrics=None,
+        queue_processing_mode=settings.QUEUE_PROCESSING_MODE,
+    )
+
+    result_handler = _MinimalResultHandler(queue_manager)
+
+    job_ref = Mock()
+    batch_job_manager.schedule_job.return_value = job_ref
+    batch_job_manager.collect_results.return_value = [
+        type(
+            "JobResult",
+            (),
+            {
+                "queue_id": first_request.queue_id,
+                "provider": LLMProviderType.MOCK,
+                "model": "mock-model",
+                "status": BatchJobItemStatus.SUCCESS,
+                "response": LLMOrchestratorResponse(
+                    winner=EssayComparisonWinner.ESSAY_A,
+                    justification="A",
+                    confidence=0.5,
+                    provider=LLMProviderType.MOCK,
+                    model="mock-model",
+                    correlation_id=first_request.request_data.correlation_id
+                    or first_request.queue_id,
+                    response_time_ms=10,
+                    token_usage={"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+                    cost_estimate=0.0,
+                    metadata={"prompt_sha256": "abc"},
+                ),
+                "error_message": None,
+            },
+        )(),
+        type(
+            "JobResult",
+            (),
+            {
+                "queue_id": second_request.queue_id,
+                "provider": LLMProviderType.MOCK,
+                "model": "mock-model",
+                "status": BatchJobItemStatus.SUCCESS,
+                "response": LLMOrchestratorResponse(
+                    winner=EssayComparisonWinner.ESSAY_B,
+                    justification="B",
+                    confidence=0.6,
+                    provider=LLMProviderType.MOCK,
+                    model="mock-model",
+                    correlation_id=second_request.request_data.correlation_id
+                    or second_request.queue_id,
+                    response_time_ms=12,
+                    token_usage={"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+                    cost_estimate=0.0,
+                    metadata={"prompt_sha256": "def"},
+                ),
+                "error_message": None,
+            },
+        )(),
+    ]
+
+    strategy = BatchApiStrategy(
+        comparison_processor=cast(AsyncMock, comparison_processor),
+        result_handler=result_handler,  # type: ignore[arg-type]
+        trace_context_manager=Mock(),
+        settings=settings,
+        metrics=metrics,
+        tracing_enricher=tracing_enricher,
+        batch_job_manager=batch_job_manager,
+    )
+
+    await strategy.execute(first_request)
+
+    jobs_counter.labels.assert_any_call(
+        provider="mock",
+        model="mock-model",
+        status="scheduled",
+    )
+    jobs_counter.labels.assert_any_call(
+        provider="mock",
+        model="mock-model",
+        status="completed",
+    )
+    assert jobs_counter.labels.return_value.inc.call_count == 2
+
+    items_hist.labels.assert_called_once_with(provider="mock", model="mock-model")
+    items_hist.labels.return_value.observe.assert_called_once_with(2)
+
+    duration_hist.labels.assert_called_once_with(provider="mock", model="mock-model")
+    duration_call = duration_hist.labels.return_value.observe.call_args
+    assert duration_call is not None
+    assert duration_call.args[0] >= 0.0
+
+
+@pytest.mark.asyncio
 async def test_batch_api_strategy_defers_incompatible_request_as_pending(
     settings: Settings,
     queue_manager: AsyncMock,
@@ -358,7 +484,6 @@ async def test_batch_api_strategy_handles_failed_item_via_error_handler(
 async def test_batch_api_strategy_handles_collect_results_exception(
     settings: Settings,
     queue_manager: AsyncMock,
-    metrics: QueueProcessorMetrics,
     tracing_enricher: QueueTracingEnricher,
     comparison_processor: AsyncMock,
     batch_job_manager: AsyncMock,
@@ -379,6 +504,24 @@ async def test_batch_api_strategy_handles_collect_results_exception(
     queue_manager.dequeue = AsyncMock(side_effect=[second_request, None])
 
     result_handler = _MinimalResultHandler(queue_manager)
+
+    jobs_counter = Mock()
+    items_hist = Mock()
+    duration_hist = Mock()
+    jobs_counter.labels.return_value = Mock(inc=Mock())
+    items_hist.labels.return_value = Mock(observe=Mock())
+    duration_hist.labels.return_value = Mock(observe=Mock())
+
+    queue_metrics = {
+        "llm_batch_api_jobs_total": jobs_counter,
+        "llm_batch_api_items_per_job": items_hist,
+        "llm_batch_api_job_duration_seconds": duration_hist,
+    }
+    metrics = QueueProcessorMetrics(
+        queue_metrics=queue_metrics,
+        llm_metrics=None,
+        queue_processing_mode=settings.QUEUE_PROCESSING_MODE,
+    )
 
     job_ref = Mock()
     batch_job_manager.schedule_job.return_value = job_ref
@@ -411,3 +554,14 @@ async def test_batch_api_strategy_handles_collect_results_exception(
     }
     # Batch API bundling should not leave a pending request when all items are compatible.
     assert result.pending_request is None
+
+    jobs_counter.labels.assert_any_call(
+        provider="mock",
+        model="mock-model",
+        status="scheduled",
+    )
+    jobs_counter.labels.assert_any_call(
+        provider="mock",
+        model="mock-model",
+        status="failed",
+    )

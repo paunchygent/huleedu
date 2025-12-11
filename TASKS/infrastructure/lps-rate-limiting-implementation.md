@@ -698,7 +698,7 @@ Test scenarios:
    - Document `MAX_CONCURRENT_LLM_REQUESTS` setting
    - Explain interaction with LPS rate limits
 
-4. **`.claude/rules/`** (if applicable)
+4. **`.agent/rules/`** (if applicable)
    - Update architectural documentation
    - Document rate limiting patterns
 

@@ -154,6 +154,6 @@ When modifying event schemas:
 
 ## References
 - TASKS/assessment/event-schema-governance-and-ci-plan.md
-- .claude/rules/051-event-contract-standards.md
+- .agent/rules/051-event-contract-standards.md
 - libs/common_core/src/common_core/events/ (current event definitions)
 - libs/common_core/src/common_core/event_enums.py (topic registry)

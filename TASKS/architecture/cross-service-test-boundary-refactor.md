@@ -635,8 +635,8 @@ rm services/cj_assessment_service/tests/integration/test_llm_provider_manifest_i
 
 ## References
 
-- `.claude/rules/020-architectural-mandates.md` - Service boundary principles
-- `.claude/rules/075-test-creation-methodology.md` - Testing standards
+- `.agent/rules/020-architectural-mandates.md` - Service boundary principles
+- `.agent/rules/075-test-creation-methodology.md` - Testing standards
 - `.claude/HANDOFF.md` - Architectural refactor context (2025-11-17)
 - `services/cj_assessment_service/README.md` - CJ↔LPS contract documentation
 - `services/llm_provider_service/README.md` - LPS API documentation

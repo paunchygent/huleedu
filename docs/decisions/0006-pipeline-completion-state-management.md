@@ -222,5 +222,5 @@ Next pipeline request → BCS prunes completed steps
 - docs/architecture/processing-flow-map-and-pipeline-state-management-implementation-plan.md
 - services/batch_orchestrator_service/implementations/pipeline_phase_coordinator_impl.py:193-199
 - services/batch_conductor_service/implementations/pipeline_rules_impl.py:128
-- .claude/rules/020-architectural-mandates.md (event-driven patterns)
-- .claude/rules/042-async-patterns-and-di.md (async coordination)
+- .agent/rules/020-architectural-mandates.md (event-driven patterns)
+- .agent/rules/042-async-patterns-and-di.md (async coordination)

@@ -443,7 +443,7 @@ class TestUpdateBatchCompletionCounters:
         )
         session = AsyncMock(spec=AsyncSession)
         batch_repository = AsyncMock(spec=CJBatchRepositoryProtocol)
-        batch_repository.get_batch_state.return_value = batch_state
+        batch_repository.get_batch_state_for_update.return_value = batch_state
 
         # Act - Update for successful comparison
         await _update_batch_completion_counters(
@@ -457,7 +457,11 @@ class TestUpdateBatchCompletionCounters:
         # Assert - Completed counter incremented
         assert batch_state.completed_comparisons == 5
         assert batch_state.failed_comparisons == 1
-        batch_repository.get_batch_state.assert_awaited_once_with(session=session, batch_id=1)
+        batch_repository.get_batch_state_for_update.assert_awaited_once_with(
+            session=session,
+            batch_id=1,
+            for_update=True,
+        )
 
     @pytest.mark.asyncio
     async def test_update_counters_increments_failed_on_error(self) -> None:
@@ -469,7 +473,7 @@ class TestUpdateBatchCompletionCounters:
         )
         session = AsyncMock(spec=AsyncSession)
         batch_repository = AsyncMock(spec=CJBatchRepositoryProtocol)
-        batch_repository.get_batch_state.return_value = batch_state
+        batch_repository.get_batch_state_for_update.return_value = batch_state
 
         # Act - Update for failed comparison
         await _update_batch_completion_counters(
@@ -483,7 +487,11 @@ class TestUpdateBatchCompletionCounters:
         # Assert - Failed counter incremented
         assert batch_state.completed_comparisons == 4
         assert batch_state.failed_comparisons == 2
-        batch_repository.get_batch_state.assert_awaited_once_with(session=session, batch_id=1)
+        batch_repository.get_batch_state_for_update.assert_awaited_once_with(
+            session=session,
+            batch_id=1,
+            for_update=True,
+        )
 
     @pytest.mark.asyncio
     async def test_update_counters_triggers_partial_scoring_at_threshold(self) -> None:
@@ -496,7 +504,7 @@ class TestUpdateBatchCompletionCounters:
         )
         session = AsyncMock(spec=AsyncSession)
         batch_repository = AsyncMock(spec=CJBatchRepositoryProtocol)
-        batch_repository.get_batch_state.return_value = batch_state
+        batch_repository.get_batch_state_for_update.return_value = batch_state
 
         # Act - Complete one more to hit 80%
         await _update_batch_completion_counters(
@@ -510,7 +518,11 @@ class TestUpdateBatchCompletionCounters:
         # Assert - Partial scoring triggered
         assert batch_state.completed_comparisons == 8
         assert batch_state.partial_scoring_triggered is True
-        batch_repository.get_batch_state.assert_awaited_once_with(session=session, batch_id=1)
+        batch_repository.get_batch_state_for_update.assert_awaited_once_with(
+            session=session,
+            batch_id=1,
+            for_update=True,
+        )
 
     @pytest.mark.asyncio
     async def test_update_counters_handles_missing_batch_gracefully(self) -> None:
@@ -518,7 +530,7 @@ class TestUpdateBatchCompletionCounters:
         # Arrange - No batch state
         session = AsyncMock(spec=AsyncSession)
         batch_repository = AsyncMock(spec=CJBatchRepositoryProtocol)
-        batch_repository.get_batch_state.return_value = None
+        batch_repository.get_batch_state_for_update.return_value = None
 
         # Act - Should not raise
         await _update_batch_completion_counters(
@@ -529,7 +541,11 @@ class TestUpdateBatchCompletionCounters:
             correlation_id=uuid4(),
         )
 
-        batch_repository.get_batch_state.assert_awaited_once_with(session=session, batch_id=999)
+        batch_repository.get_batch_state_for_update.assert_awaited_once_with(
+            session=session,
+            batch_id=999,
+            for_update=True,
+        )
 
     @pytest.mark.asyncio
     async def test_update_counters_handles_database_error_gracefully(self) -> None:
@@ -537,7 +553,7 @@ class TestUpdateBatchCompletionCounters:
         # Arrange
         session = AsyncMock(spec=AsyncSession)
         batch_repository = AsyncMock(spec=CJBatchRepositoryProtocol)
-        batch_repository.get_batch_state.side_effect = Exception("Connection lost")
+        batch_repository.get_batch_state_for_update.side_effect = Exception("Connection lost")
 
         # Act - Should not raise
         await _update_batch_completion_counters(
@@ -548,7 +564,11 @@ class TestUpdateBatchCompletionCounters:
             correlation_id=uuid4(),
         )
 
-        batch_repository.get_batch_state.assert_awaited_once_with(session=session, batch_id=1)
+        batch_repository.get_batch_state_for_update.assert_awaited_once_with(
+            session=session,
+            batch_id=1,
+            for_update=True,
+        )
 
 
 class TestFailedComparisonPoolManagement:

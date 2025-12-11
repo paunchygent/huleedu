@@ -190,7 +190,7 @@ def _make_api_request():
 ### Phase 5: Configuration & Documentation (0.5 days)
 - [ ] Add configuration defaults (CJ and LPS)
 - [ ] Update `docs/operations/cj-assessment-runbook.md`
-- [ ] Update `.claude/rules/020.20-cj-llm-prompt-contract.md`
+- [ ] Update `.agent/rules/020.20-cj-llm-prompt-contract.md`
 - [ ] Run format, lint, typecheck
 
 ---

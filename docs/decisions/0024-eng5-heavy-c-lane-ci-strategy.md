@@ -55,7 +55,7 @@ We adopt **Strategy 2 – Environment-driven configuration with container restar
 
 This decision is codified in:
 
-- `.claude/rules/101-ci-lanes-and-heavy-suites.md`
+- `.agent/rules/101-ci-lanes-and-heavy-suites.md`
 - `.github/workflows/eng5-heavy-suites.yml`
 - `docs/product/epics/ci-test-lanes-and-eng5-heavy-suites.md` (EPIC-011)
 

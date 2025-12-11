@@ -117,7 +117,7 @@ os.environ.setdefault("ENVIRONMENT", environment)
 
 - `observability/promtail/promtail-config.yml` (lines 65-69)
 - `docs/operations/01-grafana-playbook.md` (lines 113-169)
-- `.claude/rules/071.4-grafana-loki-patterns.md` (documentation update)
+- `.agent/rules/071.4-grafana-loki-patterns.md` (documentation update)
 
 ### Checklist
 
@@ -277,7 +277,7 @@ os.environ.setdefault("ENVIRONMENT", environment)
 
 - `libs/huleedu_service_libs/src/huleedu_service_libs/logging_utils.py` (lines 31-145)
 - `libs/huleedu_service_libs/tests/test_logging_utils.py` (new test)
-- `.claude/rules/043-service-configuration-and-logging.md` (documentation update)
+- `.agent/rules/043-service-configuration-and-logging.md` (documentation update)
 
 ### Checklist
 
@@ -613,7 +613,7 @@ os.environ.setdefault("ENVIRONMENT", environment)
 ### Files
 
 - `docs/operations/01-grafana-playbook.md` (lines 113-253)
-- `.claude/rules/071.4-grafana-loki-patterns.md` (reference update)
+- `.agent/rules/071.4-grafana-loki-patterns.md` (reference update)
 
 ### Checklist
 
@@ -928,8 +928,8 @@ os.environ.setdefault("ENVIRONMENT", environment)
 ## Related Documents
 
 - **Validation Research**: Created during this task (embedded in Evidence Summary section)
-- **Logging Standards**: `.claude/rules/043-service-configuration-and-logging.md`
-- **Loki Patterns**: `.claude/rules/071.4-grafana-loki-patterns.md`
+- **Logging Standards**: `.agent/rules/043-service-configuration-and-logging.md`
+- **Loki Patterns**: `.agent/rules/071.4-grafana-loki-patterns.md`
 - **Grafana Playbook**: `docs/operations/01-grafana-playbook.md`
 - **Previous Logging Work**: `.claude/work/tasks/TASK-LOGGING-FILE-PERSISTENCE-AND-DOCKER-CONFIG.md`
-- **Observability Index**: `.claude/rules/071-observability-index.md`
+- **Observability Index**: `.agent/rules/071-observability-index.md`

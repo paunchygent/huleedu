@@ -65,6 +65,7 @@ async def generate_comparison_tasks(
     correlation_id: UUID | None = None,
     randomization_seed: int | None = None,
     mode: PairGenerationMode = PairGenerationMode.COVERAGE,
+    max_pairs_per_call: int | None = None,
 ) -> list[ComparisonTask]:
     """Generate comparison tasks using injected matching strategy.
 
@@ -81,6 +82,13 @@ async def generate_comparison_tasks(
         max_pairwise_comparisons: Optional global cap on total comparison pairs
         correlation_id: Correlation ID for observability
         randomization_seed: Seed for randomizing essay positions in pairs
+        mode: PairGenerationMode for COVERAGE vs RESAMPLING semantics
+        max_pairs_per_call: Optional cap on how many NEW pairs to generate
+            in this invocation. When provided, this value is interpreted
+            as a target for total unique pairs (existing + new) and is
+            combined with max_pairwise_comparisons to derive the remaining
+            budget for this call. When None, behaviour matches the original
+            single-wave semantics.
 
     Returns:
         List of comparison tasks ready for LLM processing
@@ -142,47 +150,148 @@ async def generate_comparison_tasks(
                 )
                 return []
 
+        # Optional per-call budget for new pairs. When provided, this is
+        # interpreted as a target for total unique pairs (existing + new)
+        # and combined with any global cap to derive the remaining budget
+        # for this invocation.
+        per_call_budget: int | None = None
+        if max_pairs_per_call is not None:
+            per_call_budget = max_pairs_per_call - budget_consumed
+            if per_call_budget <= 0:
+                logger.info(
+                    "Per-call pair budget exhausted; no new pairs will be generated",
+                    extra={
+                        "cj_batch_id": cj_batch_id,
+                        "mode": mode.name,
+                        "existing_pairs": existing_pairs_count,
+                        "total_comparisons_performed": total_comparisons_performed,
+                        "max_pairs_per_call": max_pairs_per_call,
+                        "correlation_id": str(correlation_id) if correlation_id else None,
+                    },
+                )
+                return []
+            if remaining_budget is not None:
+                per_call_budget = min(per_call_budget, remaining_budget)
+
         matched_pairs: list[tuple[EssayForComparison, EssayForComparison]]
 
         if mode is PairGenerationMode.COVERAGE:
             # Phase-1 semantics: generate new pairs to improve coverage.
+            #
+            # When no per-call budget is provided, preserve the original
+            # single-wave behaviour (one matching pass, truncated by the
+            # remaining global budget if necessary). When a per-call
+            # budget is present, iterate matching waves within this
+            # invocation until the per-call budget or global cap is
+            # reached, avoiding duplicate pairs via an in-memory
+            # existing_pairs set.
 
-            # Handle odd essay count via strategy (excludes essay with most comparisons)
-            essays_for_matching, excluded_essay = matching_strategy.handle_odd_count(
-                essays_for_comparison, comparison_counts
-            )
-
-            if excluded_essay:
-                logger.info(
-                    "Excluded essay from wave due to odd count",
-                    extra={
-                        "cj_batch_id": cj_batch_id,
-                        "mode": mode.name,
-                        "excluded_essay_id": excluded_essay.id,
-                        "correlation_id": str(correlation_id) if correlation_id else None,
-                    },
+            if per_call_budget is None:
+                # Original single-wave path.
+                essays_for_matching, excluded_essay = matching_strategy.handle_odd_count(
+                    essays_for_comparison, comparison_counts
                 )
 
-            # Compute optimal pairs via strategy (each essay appears exactly once)
-            matched_pairs = matching_strategy.compute_wave_pairs(
-                essays=essays_for_matching,
-                existing_pairs=existing_pairs,
-                comparison_counts=comparison_counts,
-                randomization_seed=randomization_seed,
-            )
+                if excluded_essay:
+                    logger.info(
+                        "Excluded essay from wave due to odd count",
+                        extra={
+                            "cj_batch_id": cj_batch_id,
+                            "mode": mode.name,
+                            "excluded_essay_id": excluded_essay.id,
+                            "correlation_id": str(correlation_id) if correlation_id else None,
+                        },
+                    )
 
-            # Respect global cap using remaining_budget derived above.
-            if remaining_budget is not None and len(matched_pairs) > remaining_budget:
-                matched_pairs = matched_pairs[:remaining_budget]
-                logger.info(
-                    "Truncated pairs to respect global cap",
-                    extra={
-                        "cj_batch_id": cj_batch_id,
-                        "mode": mode.name,
-                        "remaining_budget": remaining_budget,
-                        "pairs_truncated_to": len(matched_pairs),
-                    },
+                # Compute optimal pairs via strategy (each essay appears exactly once)
+                matched_pairs = matching_strategy.compute_wave_pairs(
+                    essays=essays_for_matching,
+                    existing_pairs=existing_pairs,
+                    comparison_counts=comparison_counts,
+                    randomization_seed=randomization_seed,
                 )
+
+                # Respect global cap using remaining_budget derived above.
+                if remaining_budget is not None and len(matched_pairs) > remaining_budget:
+                    matched_pairs = matched_pairs[:remaining_budget]
+                    logger.info(
+                        "Truncated pairs to respect global cap",
+                        extra={
+                            "cj_batch_id": cj_batch_id,
+                            "mode": mode.name,
+                            "remaining_budget": remaining_budget,
+                            "pairs_truncated_to": len(matched_pairs),
+                        },
+                    )
+            else:
+                # Multi-wave generation within a single call, used for
+                # provider_batch_api semantics where we want to realise
+                # as many unique pairs as possible (up to the smaller
+                # of per-call and global caps) without relying on
+                # multiple callback-driven iterations.
+                matched_pairs = []
+                local_existing_pairs = set(existing_pairs)
+                local_counts = dict(comparison_counts)
+
+                while True:
+                    # Stop once the per-call budget has been reached.
+                    if per_call_budget is not None and len(matched_pairs) >= per_call_budget:
+                        break
+
+                    essays_for_matching, excluded_essay = matching_strategy.handle_odd_count(
+                        essays_for_comparison, local_counts
+                    )
+
+                    if excluded_essay:
+                        logger.info(
+                            "Excluded essay from wave due to odd count",
+                            extra={
+                                "cj_batch_id": cj_batch_id,
+                                "mode": mode.name,
+                                "excluded_essay_id": excluded_essay.id,
+                                "correlation_id": str(correlation_id) if correlation_id else None,
+                            },
+                        )
+
+                    if len(essays_for_matching) < 2:
+                        break
+
+                    wave_pairs = matching_strategy.compute_wave_pairs(
+                        essays=essays_for_matching,
+                        existing_pairs=local_existing_pairs,
+                        comparison_counts=local_counts,
+                        randomization_seed=randomization_seed,
+                    )
+
+                    if not wave_pairs:
+                        break
+
+                    added_in_wave = 0
+                    for essay_a, essay_b in wave_pairs:
+                        if per_call_budget is not None and len(matched_pairs) >= per_call_budget:
+                            break
+
+                        pair_key = (
+                            (essay_a.id, essay_b.id)
+                            if essay_a.id < essay_b.id
+                            else (essay_b.id, essay_a.id)
+                        )
+                        if pair_key in local_existing_pairs:
+                            continue
+
+                        matched_pairs.append((essay_a, essay_b))
+                        local_existing_pairs.add(pair_key)
+                        added_in_wave += 1
+
+                        # Update local comparison counts so subsequent
+                        # waves account for planned assignments.
+                        local_counts[essay_a.id] = local_counts.get(essay_a.id, 0) + 1
+                        local_counts[essay_b.id] = local_counts.get(essay_b.id, 0) + 1
+
+                    if added_in_wave == 0:
+                        # No progress in this wave ⇒ further waves
+                        # would be duplicates; stop early.
+                        break
 
         elif mode is PairGenerationMode.RESAMPLING:
             # Phase-2 semantics: resample existing pairs, prioritising essays with
@@ -208,11 +317,13 @@ async def generate_comparison_tasks(
                 tuple[int, str, str, EssayForComparison, EssayForComparison]
             ] = []
             for id_a, id_b in existing_pairs:
-                essay_a = essays_by_id.get(id_a)
-                essay_b = essays_by_id.get(id_b)
-                if not essay_a or not essay_b:
+                essay_a_opt = essays_by_id.get(id_a)
+                essay_b_opt = essays_by_id.get(id_b)
+                if essay_a_opt is None or essay_b_opt is None:
                     # Skip pairs that refer to essays not present in the current wave.
                     continue
+                essay_a = essay_a_opt
+                essay_b = essay_b_opt
                 total_count = comparison_counts.get(id_a, 0) + comparison_counts.get(id_b, 0)
                 # Sort by (total_count, id_a, id_b) for deterministic ordering.
                 scored_candidates.append((total_count, id_a, id_b, essay_a, essay_b))

@@ -12,14 +12,6 @@ repos:
         pass_filenames: false
         stages: [pre-commit]
 
-    -   id: sync-rules
-        name: Sync Rules from .md to .md
-        entry: bash -c 'cd "$(git rev-parse --show-toplevel)" && pdm run python scripts/utils/sync_rules.py --source .claude/rules --target .windsurf/rules'
-        language: system
-        always_run: true
-        pass_filenames: false
-        stages: [pre-commit]
-
     -   id: validate-tasks-frontmatter
         name: Validate TASKS frontmatter and structure
         entry: bash -c 'cd "$(git rev-parse --show-toplevel)" && pdm run python -m scripts.task_mgmt.validate_front_matter'

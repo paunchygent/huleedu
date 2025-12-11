@@ -213,7 +213,7 @@ ENG5 runner logging) in service READMEs and update logging standards.
 
 ### Files
 
-- `.claude/rules/043-service-configuration-and-logging.md` (added section 3.2)
+- `.agent/rules/043-service-configuration-and-logging.md` (added section 3.2)
 - `docs/operations/01-grafana-playbook.md` (added Loki access section)
 
 ### Checklist

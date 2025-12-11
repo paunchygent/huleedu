@@ -115,6 +115,6 @@ class CJAssessmentSettings:
 
 ## References
 - TASKS/integrations/llm-batch-strategy-serial-bundle.md
-- .claude/rules/042-async-patterns-and-di.md (async processing patterns)
+- .agent/rules/042-async-patterns-and-di.md (async processing patterns)
 - Services: services/llm_provider_service/, services/cj_assessment_service/
 - Anthropic Message Batches API: <https://docs.anthropic.com/en/docs/build-with-claude/message-batches>

@@ -112,6 +112,15 @@ class ComparisonBatchOrchestrator:
             essays_for_task_generation = list(essays_for_api_model)
             rng.shuffle(essays_for_task_generation)
 
+            max_pairs_per_call: int | None = None
+            if effective_batching_mode is LLMBatchingMode.PROVIDER_BATCH_API:
+                # In provider_batch_api mode, attempt to realise as many
+                # unique pairs as possible up to the configured budget
+                # cap in a single submission, so that CJ issues one
+                # provider-batch wave instead of relying on iterative
+                # continuation.
+                max_pairs_per_call = normalized.max_pairs_cap
+
             comparison_tasks = await pair_generation.generate_comparison_tasks(
                 essays_for_comparison=essays_for_task_generation,
                 session_provider=self.session_provider,
@@ -124,6 +133,7 @@ class ComparisonBatchOrchestrator:
                 correlation_id=correlation_id,
                 randomization_seed=self.settings.PAIR_GENERATION_SEED,
                 mode=pair_generation_mode,
+                max_pairs_per_call=max_pairs_per_call,
             )
             if not comparison_tasks:
                 logger.warning(

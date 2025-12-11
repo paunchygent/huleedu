@@ -239,6 +239,7 @@ async def test_generate_comparison_tasks_respects_thresholds_and_global_cap(
     matching_strategy = make_real_matching_strategy_mock()
     orientation_strategy = FairComplementOrientationStrategy()
 
+    # Baseline: multiple calls respecting only the global cap.
     tasks_first_call = await pair_generation.generate_comparison_tasks(
         essays_for_comparison=essays,
         session_provider=AsyncMock(spec=SessionProviderProtocol),
@@ -282,6 +283,91 @@ async def test_generate_comparison_tasks_respects_thresholds_and_global_cap(
     )
     assert tasks_third_call == []
     assert len(existing_pairs_store) == global_cap
+
+
+@pytest.mark.asyncio
+async def test_generate_comparison_tasks_can_fill_cap_in_single_call(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When max_pairs_per_call is set, COVERAGE mode should generate
+    as many unique pairs as possible up to the cap in a single call.
+
+    This underpins provider_batch_api semantics where CJ attempts to
+    submit one provider-batch wave instead of relying on iterative
+    continuation waves.
+    """
+
+    global_cap = 4
+    essays = [
+        EssayForComparison(id="essay-a", text_content="Essay content A"),
+        EssayForComparison(id="essay-b", text_content="Essay content B"),
+        EssayForComparison(id="essay-c", text_content="Essay content C"),
+        EssayForComparison(id="essay-d", text_content="Essay content D"),
+    ]
+
+    async def fake_fetch_context(*_: object, **__: object) -> dict[str, str | None]:
+        return {
+            "assessment_instructions": "Assess clarity and structure.",
+            "student_prompt_text": "Explain your argument.",
+            "judge_rubric_text": None,
+        }
+
+    async def fake_fetch_existing_pairs(
+        *_: object,
+        **__: object,
+    ) -> set[tuple[str, str]]:
+        # Start with no existing pairs; this is an initial submission.
+        return set()
+
+    async def fake_fetch_counts(*_: object, **__: object) -> dict[str, int]:
+        return {}
+
+    async def fake_per_essay_counts(*_: object, **__: object) -> dict[str, tuple[int, int]]:
+        return {}
+
+    async def fake_per_pair_counts(
+        *_: object, **__: object
+    ) -> dict[tuple[str, str], tuple[int, int]]:
+        return {}
+
+    monkeypatch.setattr(pair_generation, "_fetch_assessment_context", fake_fetch_context)
+    monkeypatch.setattr(
+        pair_generation, "_fetch_existing_comparison_ids", fake_fetch_existing_pairs
+    )
+    monkeypatch.setattr(pair_generation, "_fetch_comparison_counts", fake_fetch_counts)
+    monkeypatch.setattr(
+        pair_generation,
+        "_fetch_per_essay_position_counts",
+        fake_per_essay_counts,
+    )
+    monkeypatch.setattr(
+        pair_generation,
+        "_fetch_per_pair_orientation_counts",
+        fake_per_pair_counts,
+    )
+
+    AsyncMock(spec=AsyncSession)
+    matching_strategy = make_real_matching_strategy_mock()
+    orientation_strategy = FairComplementOrientationStrategy()
+
+    tasks_single_call = await pair_generation.generate_comparison_tasks(
+        essays_for_comparison=essays,
+        session_provider=AsyncMock(spec=SessionProviderProtocol),
+        comparison_repository=AsyncMock(spec=CJComparisonRepositoryProtocol),
+        instruction_repository=AsyncMock(spec=AssessmentInstructionRepositoryProtocol),
+        matching_strategy=matching_strategy,
+        orientation_strategy=orientation_strategy,
+        cj_batch_id=321,
+        max_pairwise_comparisons=global_cap,
+        correlation_id=uuid4(),
+        randomization_seed=123,
+        max_pairs_per_call=global_cap,
+    )
+
+    # We should realise as many unique pairs as allowed by the cap in
+    # a single call; for 4 essays the coverage graph has 6 possible
+    # pairs, so the global cap of 4 should be the limiting factor.
+    assert len(tasks_single_call) == global_cap
 
 
 @pytest.mark.asyncio

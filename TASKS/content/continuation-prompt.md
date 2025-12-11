@@ -16,7 +16,7 @@ labels: []
 ---
 ## CRITICAL: Read These Files First (In Order)
 
-1. `.claude/rules/095-textual-tui-patterns.md` - Textual API patterns and gotchas
+1. `.agent/rules/095-textual-tui-patterns.md` - Textual API patterns and gotchas
 2. `TASKS/pyinstaller_standalone_executables_plan.md` - Implementation context
 3. `scripts/bayesian_consensus_model/tui/help_screen.py` - CURRENT INCOMPLETE HELP
 4. `scripts/bayesian_consensus_model/tui/form_layout.py` - All form fields and their IDs
@@ -207,7 +207,7 @@ Session completed these fixes:
 
 ## Project Standards Compliance
 
-- **From `.claude/rules/095-textual-tui-patterns.md`**: Verify Textual imports before use
+- **From `.agent/rules/095-textual-tui-patterns.md`**: Verify Textual imports before use
 - **From `CLAUDE.md`**: Run `pdm run python -m ...` for testing, never use relative imports
 - **From `CLAUDE.local.md`**: No makeshift solutions - complete the help properly
 

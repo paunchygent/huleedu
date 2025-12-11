@@ -60,7 +60,7 @@ Design and implement CI orchestration improvements for the ENG5 Heavy C-lane so 
    - Update:
      - `docs/product/epics/ci-test-lanes-and-eng5-heavy-suites.md` (EPIC-011).
      - `docs/operations/eng5-np-runbook.md` CI/validation section.
-     - `.claude/rules/101-ci-lanes-and-heavy-suites.md` (if needed) with a short note on matrix usage.
+     - `.agent/rules/101-ci-lanes-and-heavy-suites.md` (if needed) with a short note on matrix usage.
    - Ensure TASKS for ENG5 serial-bundle and parity work (`cj-llm-serial-bundle-validation-fixes`, `llm-mock-provider-cj-behavioural-parity-tests`) reference this task where appropriate.
 
 ## Success Criteria
@@ -77,7 +77,7 @@ Design and implement CI orchestration improvements for the ENG5 Heavy C-lane so 
 ## Related
 
 - ADR-0024: `docs/decisions/0024-eng5-heavy-c-lane-ci-strategy.md`
-- Rule 101: `.claude/rules/101-ci-lanes-and-heavy-suites.md`
+- Rule 101: `.agent/rules/101-ci-lanes-and-heavy-suites.md`
 - EPIC-011: `docs/product/epics/ci-test-lanes-and-eng5-heavy-suites.md`
 - ENG5 runbook: `docs/operations/eng5-np-runbook.md`
 - Related TASKS:

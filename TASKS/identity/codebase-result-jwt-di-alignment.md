@@ -44,9 +44,9 @@ Realign shared patterns by consolidating the Result monad, centralizing JWT test
 
 3. **Documentation** ✅
    - No changes required - all documentation already referenced target path:
-     - `.claude/rules/048-structured-error-handling-standards.md` already shows `from huleedu_service_libs import Result`
-     - `.claude/rules/060-data-and-metadata-management.md` already documents typed metadata overlay pattern
-     - `.claude/rules/000-rule-index.md` already indexes Result monad correctly
+     - `.agent/rules/048-structured-error-handling-standards.md` already shows `from huleedu_service_libs import Result`
+     - `.agent/rules/060-data-and-metadata-management.md` already documents typed metadata overlay pattern
+     - `.agent/rules/000-rule-index.md` already indexes Result monad correctly
 
 4. **Validation** ✅
 
@@ -106,7 +106,7 @@ Realign shared patterns by consolidating the Result monad, centralizing JWT test
      - Replaced hardcoded secrets with settings object
 
 3. **Documentation** ✅
-   - Added section 6.3 "JWT Authentication Testing" to `.claude/rules/075-test-creation-methodology.md`
+   - Added section 6.3 "JWT Authentication Testing" to `.agent/rules/075-test-creation-methodology.md`
    - Documented `build_jwt_headers()` patterns for HTTP integration tests
    - Documented `create_jwt()` patterns for raw token validation
    - Provided examples for: admin tokens, expired tokens, missing claims, custom claims
@@ -137,7 +137,7 @@ Realign shared patterns by consolidating the Result monad, centralizing JWT test
 - `services/api_gateway_service/tests/test_auth.py` (migrated 15 tests, removed 4 local helpers)
 - `services/api_gateway_service/tests/test_auth_org.py` (migrated 8 tests, removed cross-file import)
 - `services/websocket_service/tests/test_implementations.py` (migrated 8 tests, added settings fixture)
-- `.claude/rules/075-test-creation-methodology.md` (added JWT authentication testing patterns)
+- `.agent/rules/075-test-creation-methodology.md` (added JWT authentication testing patterns)
 
 ---
 
@@ -157,7 +157,7 @@ Realign shared patterns by consolidating the Result monad, centralizing JWT test
    - Integration tests that rely on Dishka continue to call `create_cj_batch` (override the provider if they need a mock client).
 
 4. **Documentation**
-   - Update `.claude/rules/042-async-patterns-and-di.md` with a short “pure implementation + wrapper” testing pattern.
+   - Update `.agent/rules/042-async-patterns-and-di.md` with a short “pure implementation + wrapper” testing pattern.
 
 5. **Validation**
 

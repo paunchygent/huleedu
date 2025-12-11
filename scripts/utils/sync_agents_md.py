@@ -69,9 +69,9 @@ def main():
     source_file = repo_root / "AGENTS.md"
 
     target_files = [
-        repo_root / "CLAUDE.md",
         repo_root / "CODEX.md",
         repo_root / "GEMINI.md",
+        # CLAUDE.md excluded - now uses .claude/rules/ for Claude Code native memory
     ]
 
     print("🔄 Syncing AGENTS.md to AI assistant files...")

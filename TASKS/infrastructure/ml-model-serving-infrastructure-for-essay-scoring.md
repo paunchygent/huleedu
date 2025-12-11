@@ -1140,6 +1140,6 @@ async def test_model_scores_real_essays():
 ## Related
 
 - `/Users/olofs_mba/Documents/Repos/huledu-reboot/TASKS/assessment/task-054-suggested-improvements-to-bayesian-model.md`
-- `.claude/rules/020.7-cj-assessment-service.md`
+- `.agent/rules/020.7-cj-assessment-service.md`
 - `docker-compose.services.yml`
 - `observability/grafana/dashboards/cj-assessment/`

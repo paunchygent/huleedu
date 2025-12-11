@@ -59,7 +59,7 @@ Each README should include:
 - Alembic migration commands
 - Migration file naming conventions
 - When to create migrations
-- Reference: .claude/rules/085-database-migration-standards.md
+- Reference: .agent/rules/085-database-migration-standards.md
 
 ### 4. CLI Tools (where applicable)
 - Available commands
@@ -95,7 +95,7 @@ Each README should include:
 
 ## Documentation Standards
 
-Following `.claude/rules/090-documentation-standards.md`:
+Following `.agent/rules/090-documentation-standards.md`:
 - Machine-intelligence focused (no marketing language)
 - Technical decision rules prominent
 - Canonical examples from real implementations
@@ -104,11 +104,11 @@ Following `.claude/rules/090-documentation-standards.md`:
 
 ## References
 
-- `.claude/rules/090-documentation-standards.md` - Documentation requirements
+- `.agent/rules/090-documentation-standards.md` - Documentation requirements
 - `libs/common_core/README.md` - Template pattern
 - `libs/common_core/docs/error-patterns.md` - Error handling patterns
-- `.claude/rules/085-database-migration-standards.md` - Migration standards
-- `.claude/rules/075-test-creation-methodology.md` - Testing patterns
+- `.agent/rules/085-database-migration-standards.md` - Migration standards
+- `.agent/rules/075-test-creation-methodology.md` - Testing patterns
 - `.claude/results/common-core-documentation-session-1-results.md` - Session 1 lessons
 
 ## Session Timeline

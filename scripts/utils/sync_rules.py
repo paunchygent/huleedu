@@ -51,8 +51,9 @@ def sync_files(source_path: str, target_path: str) -> None:
 
 def sync_directory(source_dir: str, target_dir: str) -> None:
     """
-    Synchronizes .md files in target_dir with .md files from source_dir.
+    Recursively synchronizes .md files in target_dir with .md files from source_dir.
     Creates new .md files, updates existing ones, and prunes orphaned .md files.
+    Handles subdirectories (e.g., core/, backend/, frontend/).
     """
     print(f"🔄 Starting sync from '{source_dir}' to '{target_dir}'...")
 
@@ -67,35 +68,73 @@ def sync_directory(source_dir: str, target_dir: str) -> None:
         print(f"❌ Error: Target path '{target_dir}' exists but is not a directory. Aborting sync.")
         return
 
-    print(f"\nProcessing files from '{source_dir}':")
-    expected_md_files = set()
     if not os.path.isdir(source_dir):
         print(f"⚠️ Source directory '{source_dir}' not found. Cannot sync files.")
-    else:
-        for source_filename in sorted(os.listdir(source_dir)):
-            if source_filename.endswith(".md"):
-                target_filename = source_filename
-                expected_md_files.add(target_filename)
-                source_path = os.path.join(source_dir, source_filename)
-                target_path = os.path.join(target_dir, target_filename)
+        return
+
+    # Track all expected paths (relative to target_dir) for pruning
+    expected_paths: set[str] = set()
+
+    print(f"\nProcessing files from '{source_dir}':")
+
+    for root, dirs, files in os.walk(source_dir):
+        # Calculate relative path from source_dir
+        rel_path = os.path.relpath(root, source_dir)
+        if rel_path == ".":
+            rel_path = ""
+
+        # Create corresponding target subdirectory
+        if rel_path:
+            target_subdir = os.path.join(target_dir, rel_path)
+            expected_paths.add(rel_path)
+        else:
+            target_subdir = target_dir
+
+        if not os.path.exists(target_subdir):
+            os.makedirs(target_subdir, exist_ok=True)
+            print(f"📁 Created subdirectory '{target_subdir}'")
+
+        # Sync .md files
+        for filename in sorted(files):
+            if filename.endswith(".md"):
+                source_path = os.path.join(root, filename)
+                target_path = os.path.join(target_subdir, filename)
+                rel_file_path = os.path.join(rel_path, filename) if rel_path else filename
+                expected_paths.add(rel_file_path)
                 sync_files(source_path, target_path)
 
+    # Prune orphaned files and directories
     print(f"\n🔎 Checking for orphaned files in '{target_dir}' to prune...")
-    try:
-        existing_md_files = {f for f in os.listdir(target_dir) if f.endswith(".md")}
-        orphaned_files = existing_md_files - expected_md_files
+    pruned_any = False
 
-        if orphaned_files:
-            for orphan in sorted(list(orphaned_files)):
-                try:
-                    os.remove(os.path.join(target_dir, orphan))
-                    print(f"🗑️  Pruned orphaned file: {orphan}")
-                except OSError as e:
-                    print(f"❌ Error pruning file {orphan}: {e}")
-        else:
-            print("👍 No orphaned .md files to prune.")
-    except FileNotFoundError:
-        print(f"👍 Target directory '{target_dir}' does not exist. No orphans to prune.")
+    for root, dirs, files in os.walk(target_dir, topdown=False):
+        rel_path = os.path.relpath(root, target_dir)
+        if rel_path == ".":
+            rel_path = ""
+
+        # Prune orphaned .md files
+        for filename in files:
+            if filename.endswith(".md"):
+                rel_file_path = os.path.join(rel_path, filename) if rel_path else filename
+                if rel_file_path not in expected_paths:
+                    try:
+                        os.remove(os.path.join(root, filename))
+                        print(f"🗑️  Pruned orphaned file: {rel_file_path}")
+                        pruned_any = True
+                    except OSError as e:
+                        print(f"❌ Error pruning file {rel_file_path}: {e}")
+
+        # Prune empty directories (except target_dir itself)
+        if rel_path and not os.listdir(root):
+            try:
+                os.rmdir(root)
+                print(f"�️  Pruned empty directory: {rel_path}")
+                pruned_any = True
+            except OSError as e:
+                print(f"❌ Error pruning directory {rel_path}: {e}")
+
+    if not pruned_any:
+        print("👍 No orphaned files or directories to prune.")
 
     print("\n🏁 Sync process complete.")
 

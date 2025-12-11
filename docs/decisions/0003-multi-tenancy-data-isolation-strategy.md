@@ -89,6 +89,6 @@ Implement **row-level tenant isolation** using a `tenant_id` column with composi
 
 ## References
 - TASKS/assessment/multi-tenancy-implementation-plan.md
-- .claude/rules/020-architectural-mandates.md (service boundaries)
-- .claude/rules/042-async-patterns-and-di.md (Dishka DI for request-scoped tenant context)
-- .claude/rules/070-testing-and-quality-assurance.md (isolation testing)
+- .agent/rules/020-architectural-mandates.md (service boundaries)
+- .agent/rules/042-async-patterns-and-di.md (Dishka DI for request-scoped tenant context)
+- .agent/rules/070-testing-and-quality-assurance.md (isolation testing)

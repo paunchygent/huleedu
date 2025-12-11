@@ -155,6 +155,27 @@ def _create_metrics() -> dict[str, Any]:
                 buckets=(1, 2, 4, 8, 16, 32, 64),
                 registry=REGISTRY,
             ),
+            # Batch API job-level metrics (Phase 2)
+            "llm_batch_api_jobs_total": Counter(
+                "llm_provider_batch_api_jobs_total",
+                "Total batch API jobs by provider, model, and status",
+                ["provider", "model", "status"],
+                registry=REGISTRY,
+            ),
+            "llm_batch_api_items_per_job": Histogram(
+                "llm_provider_batch_api_items_per_job",
+                "Number of items per batch API job",
+                ["provider", "model"],
+                buckets=(1, 2, 4, 8, 16, 32, 64, 128),
+                registry=REGISTRY,
+            ),
+            "llm_batch_api_job_duration_seconds": Histogram(
+                "llm_provider_batch_api_job_duration_seconds",
+                "Duration of batch API jobs in seconds",
+                ["provider", "model"],
+                buckets=(0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0, 120.0, 300.0),
+                registry=REGISTRY,
+            ),
             "circuit_breaker_state_changes": Counter(
                 "llm_provider_circuit_breaker_state_changes_total",
                 "Total circuit breaker state changes",
@@ -315,6 +336,9 @@ def get_queue_metrics() -> dict[str, Any]:
         "llm_queue_expiry_age_seconds": all_metrics.get("llm_queue_expiry_age_seconds"),
         "llm_serial_bundle_calls_total": all_metrics.get("llm_serial_bundle_calls_total"),
         "llm_serial_bundle_items_per_call": all_metrics.get("llm_serial_bundle_items_per_call"),
+        "llm_batch_api_jobs_total": all_metrics.get("llm_batch_api_jobs_total"),
+        "llm_batch_api_items_per_job": all_metrics.get("llm_batch_api_items_per_job"),
+        "llm_batch_api_job_duration_seconds": all_metrics.get("llm_batch_api_job_duration_seconds"),
     }
 
 
@@ -356,6 +380,9 @@ def _get_existing_metrics() -> dict[str, Any]:
         "llm_queue_expiry_age_seconds": "llm_provider_queue_expiry_age_seconds",
         "llm_serial_bundle_calls_total": "llm_provider_serial_bundle_calls_total",
         "llm_serial_bundle_items_per_call": "llm_provider_serial_bundle_items_per_call",
+        "llm_batch_api_jobs_total": "llm_provider_batch_api_jobs_total",
+        "llm_batch_api_items_per_job": "llm_provider_batch_api_items_per_job",
+        "llm_batch_api_job_duration_seconds": "llm_provider_batch_api_job_duration_seconds",
         "llm_provider_prompt_cache_events_total": "llm_provider_prompt_cache_events_total",
         "llm_provider_prompt_cache_tokens_total": "llm_provider_prompt_cache_tokens_total",
         "llm_provider_prompt_blocks_total": "llm_provider_prompt_blocks_total",

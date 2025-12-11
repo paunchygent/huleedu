@@ -83,7 +83,7 @@ Extend the D-optimal pair optimizer so that multi-session runs truly continue fr
 
 - Update `scripts/bayesian_consensus_model/tui/README.md` and CLI help text to describe continuation behavior.
 - Note optimizer changes in `TASKS/d_optimal_pair_optimizer_plan.md` and `.claude/work/session/handoff.md`.
-- If Textual patterns change (e.g., instructions referencing continuation), update `.claude/rules/095-textual-tui-patterns.md`.
+- If Textual patterns change (e.g., instructions referencing continuation), update `.agent/rules/095-textual-tui-patterns.md`.
 
 ### 8. Verification
 

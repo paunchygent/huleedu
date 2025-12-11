@@ -300,7 +300,7 @@ pdm run train-essay-grader registry rollback \
 ## Related
 
 - Feature Pipeline: `/Users/olofs_mba/Documents/Repos/huledu-reboot/libs/huleedu_nlp_shared/src/huleedu_nlp_shared/feature_pipeline/`
-- DI Patterns: `.claude/rules/042-async-patterns-and-di.md`
-- Database Standards: `.claude/rules/053-sqlalchemy-standards.md`
-- Testing Methodology: `.claude/rules/075-test-creation-methodology.md`
-- Python Standards: `.claude/rules/050-python-coding-standards.md`
+- DI Patterns: `.agent/rules/042-async-patterns-and-di.md`
+- Database Standards: `.agent/rules/053-sqlalchemy-standards.md`
+- Testing Methodology: `.agent/rules/075-test-creation-methodology.md`
+- Python Standards: `.agent/rules/050-python-coding-standards.md`

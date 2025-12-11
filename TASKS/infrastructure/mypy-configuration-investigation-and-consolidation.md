@@ -55,7 +55,7 @@ MyPy operates in two phases:
 ## Actions Taken
 
 ### Phase 1: Documentation (Completed)
-- Added section 6 to `.claude/rules/086-mypy-configuration-standards.md`
+- Added section 6 to `.agent/rules/086-mypy-configuration-standards.md`
 - Documented how `exclude` and `overrides` interact
 - Explained HuleEdu monorepo pattern and silencing behavior
 - Validation: Documentation renders correctly ✅
@@ -102,7 +102,7 @@ MyPy operates in two phases:
 1. **pyproject.toml Line 184-186**: Removed `"common_core.*"` and `"libs.*"` from overrides
 2. **pyproject.toml Line 448**: Fixed `new-task` script to use cmd array
 3. **pyproject.toml Line 450**: Fixed `tasks` script to use cmd array
-4. **.claude/rules/086-mypy-configuration-standards.md**: Added section 6
+4. **.agent/rules/086-mypy-configuration-standards.md**: Added section 6
 5. **libs/mypy.ini Line 2**: Added `mypy_path` configuration
 6. **libs/mypy.ini Line 42-43**: Added `[mypy-jwt.*]` ignore
 
@@ -117,7 +117,7 @@ MyPy operates in two phases:
 ## Related
 
 - Investigation Report: `.claude/work/reports/2025-11-22-mypy-configuration-investigation.md`
-- Rule: `.claude/rules/086-mypy-configuration-standards.md`
+- Rule: `.agent/rules/086-mypy-configuration-standards.md`
 - Config: `pyproject.toml` (MyPy configuration)
 
 ## Future Work

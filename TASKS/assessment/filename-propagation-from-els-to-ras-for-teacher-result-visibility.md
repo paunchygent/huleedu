@@ -223,8 +223,8 @@ WHERE er.file_upload_id = fu.file_upload_id
 
 - **Investigation Report**: `.claude/work/reports/2025-11-27-filename-propagation-flow-mapping.md`
 - **CJ Runbook**: `docs/operations/cj-assessment-runbook.md`
-- **Event Contracts Rule**: `.claude/rules/052-event-contract-standards.md`
-- **RAS Architecture**: `.claude/rules/020.12-result-aggregator-service-architecture.md`
+- **Event Contracts Rule**: `.agent/rules/052-event-contract-standards.md`
+- **RAS Architecture**: `.agent/rules/020.12-result-aggregator-service-architecture.md`
 
 ## Estimation
 

@@ -242,5 +242,5 @@ await self.redis_pubsub.publish_user_notification(
 - docs/architecture/bff-frontend-integration.md (normative BFF architecture)
 - docs/research/bff-vue-3-frontend-integration-design.md (design research)
 - TASKS/frontend/bff-service-implementation-plan.md (implementation plan)
-- .claude/rules/020.10-api-gateway-service.md (Gateway patterns)
-- .claude/rules/020.12-result-aggregator-service-architecture.md (RAS integration)
+- .agent/rules/020.10-api-gateway-service.md (Gateway patterns)
+- .agent/rules/020.12-result-aggregator-service-architecture.md (RAS integration)

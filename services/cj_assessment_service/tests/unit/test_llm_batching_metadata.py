@@ -149,6 +149,12 @@ async def test_submit_initial_batch_sets_preferred_bundle_size_to_wave_size(
     assert await_args is not None
     metadata_updates = await_args.kwargs["metadata_updates"]
     assert metadata_updates["llm_batching_mode"] == LLMBatchingMode.SERIAL_BUNDLE.value
+    # Serial-bundle initial submission should not opt into multi-wave
+    # provider-batch semantics; generate_comparison_tasks should be
+    # invoked without a per-call pair budget.
+    gen_await_args = cbo.pair_generation.generate_comparison_tasks.await_args  # type: ignore[attr-defined]
+    assert gen_await_args is not None
+    assert gen_await_args.kwargs.get("max_pairs_per_call") is None
 
 
 @pytest.mark.asyncio
@@ -245,3 +251,13 @@ async def test_submit_initial_batch_persists_provider_batch_mode_in_metadata(
     assert (
         provider_metadata_updates["llm_batching_mode"] == LLMBatchingMode.PROVIDER_BATCH_API.value
     )
+
+    # Provider-batch mode should request a single submission that
+    # attempts to realise as many pairs as possible up to the cap.
+    gen_await_args_provider = cbo.pair_generation.generate_comparison_tasks.await_args  # type: ignore[attr-defined]
+    assert gen_await_args_provider is not None
+    gen_kwargs = gen_await_args_provider.kwargs
+    # max_pairwise_comparisons and max_pairs_per_call should both
+    # reflect the normalized max_pairs_cap.
+    assert gen_kwargs["max_pairwise_comparisons"] == settings.MAX_PAIRWISE_COMPARISONS
+    assert gen_kwargs["max_pairs_per_call"] == settings.MAX_PAIRWISE_COMPARISONS

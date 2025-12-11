@@ -9,7 +9,7 @@ Master navigation across all project documentation.
 | Purpose | Location | Description |
 |---------|----------|-------------|
 | **Getting Started** | [docs/overview/](overview/) | Platform overview, onboarding, architecture diagrams |
-| **Architecture** | [docs/architecture/](architecture/) + [.claude/rules/](./../.claude/rules/) | System design, processing flows, service boundaries |
+| **Architecture** | [docs/architecture/](architecture/) + [.agent/rules/](./../.agent/rules/) | System design, processing flows, service boundaries |
 | **Operations** | [docs/operations/](operations/) | Runbooks, deployment, troubleshooting |
 | **Product** | [docs/product/](product/) | PRD, epics, sprint schedule |
 | **Decisions** | [docs/decisions/](decisions/) | Architecture Decision Records (ADRs) |
@@ -37,17 +37,17 @@ Master navigation across all project documentation.
 | [architecture/bff-frontend-integration.md](architecture/bff-frontend-integration.md) | Backend-for-frontend integration design |
 | [architecture/cj-assessment-service-map.md](architecture/cj-assessment-service-map.md) | CJ assessment domain map |
 
-### Processing Flow Rules (.claude/rules/)
+### Processing Flow Rules (.agent/rules/)
 
 | Rule | Name | Scope |
 |------|------|-------|
-| [034](../.claude/rules/034-processing-flow-inventory.md) | Processing Flow Inventory | All flows |
-| [035](../.claude/rules/035-complete-processing-flow-overview.md) | Complete Processing Overview | End-to-end |
-| [036](../.claude/rules/036-phase1-processing-flow.md) | Phase 1: Student Matching | REGULAR batches |
-| [037](../.claude/rules/037-phase2-processing-flow.md) | Phase 2: Pipeline Processing | All batches |
-| [037.1](../.claude/rules/037.1-cj-assessment-phase-processing-flow.md) | CJ Assessment Phase | Assessment |
-| [038](../.claude/rules/038-file-upload-processing-flow.md) | File Upload Flow | Content provisioning |
-| [039](../.claude/rules/039-results-retrieval-flow.md) | Results Retrieval | Result aggregation |
+| [034](../.agent/rules/034-processing-flow-inventory.md) | Processing Flow Inventory | All flows |
+| [035](../.agent/rules/035-complete-processing-flow-overview.md) | Complete Processing Overview | End-to-end |
+| [036](../.agent/rules/036-phase1-processing-flow.md) | Phase 1: Student Matching | REGULAR batches |
+| [037](../.agent/rules/037-phase2-processing-flow.md) | Phase 2: Pipeline Processing | All batches |
+| [037.1](../.agent/rules/037.1-cj-assessment-phase-processing-flow.md) | CJ Assessment Phase | Assessment |
+| [038](../.agent/rules/038-file-upload-processing-flow.md) | File Upload Flow | Content provisioning |
+| [039](../.agent/rules/039-results-retrieval-flow.md) | Results Retrieval | Result aggregation |
 
 ---
 
@@ -160,7 +160,7 @@ All services have comprehensive README documentation:
 
 | Resource | Purpose |
 |----------|---------|
-| [.claude/rules/000-rule-index.md](../.claude/rules/000-rule-index.md) | Master rule index |
+| [.agent/rules/000-rule-index.md](../.agent/rules/000-rule-index.md) | Master rule index |
 | [CLAUDE.md](../CLAUDE.md) | Project instructions for Claude Code |
 | [.claude/CLAUDE_STRUCTURE_SPEC.md](../.claude/CLAUDE_STRUCTURE_SPEC.md) | .claude/ directory specification |
 

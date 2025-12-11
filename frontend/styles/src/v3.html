@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard – HuleEdu</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@400;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Design System Config -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        navy: '#1a1f2c',      
+                        burgundy: '#7a2e2e',  
+                        canvas: '#FDFBF7',    
+                        forest: '#2d4a3e',    
+                        paper: '#ffffff',
+                    },
+                    fontFamily: {
+                        sans: ['"IBM Plex Sans"', 'sans-serif'],
+                        serif: ['"IBM Plex Serif"', 'serif'],
+                    },
+                    boxShadow: {
+                        'brutal': '4px 4px 0 0 #1a1f2c',
+                        'brutal-red': '4px 4px 0 0 #7a2e2e',
+                        'floating': '8px 8px 0 0 rgba(26, 31, 44, 0.1)', // Mjukare men distinkt skugga för "flytande" kort
+                    },
+                    borderWidth: {
+                        '3': '3px',
+                    },
+                    letterSpacing: {
+                        'label': '0.05em',
+                        'tightest': '-0.02em',
+                    },
+                    backgroundImage: {
+                        'grid-pattern': `linear-gradient(to right, rgba(26, 31, 44, 0.05) 1px, transparent 1px),
+                                         linear-gradient(to bottom, rgba(26, 31, 44, 0.05) 1px, transparent 1px)`,
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #FDFBF7;
+            color: #1a1f2c;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* RUTNÄTSBAKGRUND (Från Landing Page) */
+        .bg-technical-grid {
+            background-size: 24px 24px;
+            background-image: linear-gradient(to right, rgba(26, 31, 44, 0.08) 1px, transparent 1px),
+                              linear-gradient(to bottom, rgba(26, 31, 44, 0.08) 1px, transparent 1px);
+        }
+
+        /* HEADER BOXAR (Från Landing Page) */
+        /* Varje sektion i headern är en box med border-right */
+        .header-section {
+            border-right: 1px solid #1a1f2c;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            padding: 0 1.5rem;
+        }
+
+        /* Ledger Row Hover - Hard switch */
+        .ledger-row {
+            transition: none; 
+        }
+        .ledger-row:hover {
+            background-color: #fff; /* White highlight on hover */
+            outline: 2px solid #1a1f2c; /* Hard outline instead of soft shadow */
+            z-index: 10;
+            position: relative;
+        }
+        
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 14px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #FDFBF7;
+            border-left: 1px solid #1a1f2c;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1a1f2c;
+            border: 4px solid #FDFBF7; 
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #7a2e2e;
+        }
+    </style>
+    
+    <!-- Icons -->
+    <svg style="display: none;">
+        <symbol id="icon-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </symbol>
+        <symbol id="icon-check" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <polyline points="20 6 9 17 4 12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline>
+        </symbol>
+        <symbol id="icon-arrow-right" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <line x1="5" y1="12" x2="19" y2="12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></line>
+            <polyline points="12 5 19 12 12 19" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline>
+        </symbol>
+        <symbol id="icon-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <rect x="3" y="3" width="7" height="7" stroke-width="2"></rect>
+            <rect x="14" y="3" width="7" height="7" stroke-width="2"></rect>
+            <rect x="14" y="14" width="7" height="7" stroke-width="2"></rect>
+            <rect x="3" y="14" width="7" height="7" stroke-width="2"></rect>
+        </symbol>
+        <symbol id="icon-list" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <line x1="8" y1="6" x2="21" y2="6" stroke-width="2" stroke-linecap="round"></line>
+            <line x1="8" y1="12" x2="21" y2="12" stroke-width="2" stroke-linecap="round"></line>
+            <line x1="8" y1="18" x2="21" y2="18" stroke-width="2" stroke-linecap="round"></line>
+            <line x1="3" y1="6" x2="3.01" y2="6" stroke-width="2" stroke-linecap="round"></line>
+            <line x1="3" y1="12" x2="3.01" y2="12" stroke-width="2" stroke-linecap="round"></line>
+            <line x1="3" y1="18" x2="3.01" y2="18" stroke-width="2" stroke-linecap="round"></line>
+        </symbol>
+        <symbol id="icon-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <line x1="12" y1="5" x2="12" y2="19" stroke-width="2" stroke-linecap="round"></line>
+            <line x1="5" y1="12" x2="19" y2="12" stroke-width="2" stroke-linecap="round"></line>
+        </symbol>
+        <symbol id="icon-file" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <polyline points="10 9 9 9 8 9"></polyline>
+        </symbol>
+    </svg>
+</head>
+<body class="font-sans text-navy h-screen flex flex-col overflow-hidden selection:bg-burgundy selection:text-white">
+
+    <!-- TOP HEADER: Structure mimicking the Landing Page (Boxed dividers) -->
+    <header class="h-16 flex-none border-b border-navy bg-canvas flex items-center z-50">
+        <!-- Logo Area -->
+        <div class="header-section w-64 shrink-0 justify-between bg-canvas">
+            <span class="font-serif font-bold text-2xl tracking-tight">HuleEdu.</span>
+        </div>
+
+        <!-- Utility Bar - Mimicking the "PRODUKTEN | VETENSKAP | OM OSS" structure -->
+        <div class="flex-1 flex h-full">
+            
+            <!-- Dashboard Title (Left aligned like Nav Items) -->
+            <div class="header-section">
+                <h1 class="text-xs font-bold uppercase tracking-widest text-navy">Lärardashboard</h1>
+            </div>
+
+            <div class="flex-1 border-r border-navy"></div> <!-- Spacer with border -->
+
+            <!-- Credits Display -->
+            <div class="header-section hover:bg-navy/5 cursor-help transition-colors">
+                <div class="flex items-center gap-2">
+                    <div class="h-2 w-2 rounded-full bg-burgundy"></div>
+                    <span class="font-mono text-sm font-bold">847 SEK</span>
+                    <span class="text-xs text-navy/40 uppercase tracking-widest font-bold ml-1">KREDITER</span>
+                </div>
+            </div>
+
+            <!-- User Profile -->
+            <div class="header-section hover:bg-navy/5 cursor-pointer transition-colors pr-6">
+                <div class="flex items-center gap-3">
+                    <span class="text-sm font-bold">Anna K.</span>
+                    <div class="h-8 w-8 bg-navy text-canvas flex items-center justify-center text-xs font-bold">AK</div>
+                </div>
+            </div>
+            
+            <!-- Logga ut (optional, to match Landing Page "LOGGA IN" slot) -->
+             <div class="header-section hover:bg-navy text-navy hover:text-white cursor-pointer transition-colors justify-center px-6">
+                <span class="text-xs font-bold uppercase tracking-widest">Logga ut</span>
+            </div>
+        </div>
+    </header>
+
+    <div class="flex-1 flex overflow-hidden">
+        
+        <!-- SIDEBAR -->
+        <nav class="w-64 flex-none border-r border-navy bg-canvas flex flex-col z-20 relative">
+            <div class="flex flex-col py-8">
+                <!-- Active Item -->
+                <a href="#" class="px-6 py-3 font-bold text-lg flex items-center gap-4 border-l-4 border-navy bg-navy/5">
+                    Översikt
+                </a>
+                <!-- Inactive Items -->
+                <a href="#" class="px-6 py-3 text-navy/60 hover:text-navy hover:bg-navy/5 font-medium text-lg flex items-center gap-4 transition-colors border-l-4 border-transparent">
+                    Klasser
+                </a>
+                <a href="#" class="px-6 py-3 text-navy/60 hover:text-navy hover:bg-navy/5 font-medium text-lg flex items-center gap-4 transition-colors border-l-4 border-transparent">
+                    Arkiv
+                </a>
+            </div>
+
+            <div class="mt-auto p-6 border-t border-navy">
+                <button class="w-full py-4 bg-navy text-white text-xs font-bold uppercase tracking-widest hover:bg-burgundy shadow-brutal active:shadow-none active:translate-x-[4px] active:translate-y-[4px] transition-all duration-75">
+                    + Ny Bunt
+                </button>
+            </div>
+        </nav>
+
+        <!-- MAIN CONTENT AREA with GRID BACKGROUND -->
+        <main class="flex-1 overflow-y-auto bg-technical-grid relative">
+            
+            <!-- SECTION 1: KRÄVER ÅTGÄRD -->
+            <!-- Using the card style from Landing Page: Floating white box on grid -->
+            <div class="p-10 pb-6 max-w-6xl">
+                <div class="flex items-center gap-3 mb-6 pl-1">
+                    <div class="w-2 h-2 bg-burgundy rounded-full"></div>
+                    <h2 class="text-xs font-bold uppercase tracking-widest text-burgundy">KRÄVER ÅTGÄRD (2)</h2>
+                </div>
+
+                <div class="grid gap-8">
+                    
+                    <!-- Primary Action Card - Mimicking "Analys Klar" card -->
+                    <div class="bg-white border-2 border-navy shadow-brutal p-0 flex flex-col md:flex-row relative">
+                        <!-- Top/Left accent line mimicking the landing page card detail -->
+                        <div class="absolute top-4 left-4 right-4 h-px bg-navy/10"></div>
+
+                        <div class="p-8 flex-1">
+                            <div class="flex items-center justify-between mb-4">
+                                <span class="text-xs font-bold text-navy/40 uppercase tracking-widest">ELEVMATCHNING #BATCH-882</span>
+                                <span class="w-2 h-2 bg-burgundy rounded-full animate-pulse"></span>
+                            </div>
+                            
+                            <h3 class="font-serif font-bold text-3xl mb-2 text-navy">SA22B · Argumenterande text</h3>
+                            <p class="font-serif text-lg text-navy/80 leading-relaxed max-w-2xl">
+                                Systemet har matchat 22 texter med hög säkerhet. 
+                                <span class="bg-burgundy/10 text-burgundy px-1 font-medium">2 texter avviker</span> och kräver din manuella bedömning innan export.
+                            </p>
+                            
+                            <div class="mt-8 flex gap-4">
+                                <button class="bg-burgundy text-white px-6 py-3 text-xs font-bold uppercase tracking-widest hover:bg-navy transition-colors shadow-brutal-sm hover:shadow-brutal active:shadow-none active:translate-x-[2px] active:translate-y-[2px]">
+                                    Hantera 2 avvikelser
+                                </button>
+                                <button class="border border-navy text-navy px-6 py-3 text-xs font-bold uppercase tracking-widest hover:bg-navy hover:text-white transition-colors">
+                                    Visa detaljer
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Right/Side Panel for Deadline -->
+                        <div class="border-t md:border-t-0 md:border-l border-navy bg-canvas p-8 md:w-64 flex flex-col justify-center items-center text-center">
+                            <span class="text-[10px] font-bold text-navy/50 uppercase tracking-widest mb-2">Autobekräftas om</span>
+                            <span class="font-mono text-3xl font-bold text-burgundy tracking-tight">22:00</span>
+                            <span class="text-xs text-navy/40 font-mono mt-1">timmar</span>
+                        </div>
+                    </div>
+
+                    <!-- Secondary Action Card -->
+                    <div class="bg-white border border-navy shadow-sm p-6 flex items-center justify-between hover:border-burgundy transition-colors group">
+                        <div>
+                             <div class="flex items-center gap-3 mb-1">
+                                <span class="text-[10px] font-bold bg-navy/5 px-2 py-0.5 uppercase tracking-wide">BETYGSFÖRSLAG</span>
+                                <span class="text-xs font-mono text-navy/40">EK21A</span>
+                             </div>
+                            <h3 class="font-bold text-lg text-navy">Nationella Provet (Del B)</h3>
+                            <p class="text-sm text-navy/60">4 betygsförslag ligger på gränsen.</p>
+                        </div>
+                        <button class="h-10 w-10 border border-navy flex items-center justify-center text-navy group-hover:bg-navy group-hover:text-white transition-colors">
+                            <svg class="w-4 h-4"><use href="#icon-arrow-right"></use></svg>
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- SECTION 2: THE LEDGER (Buntöversikt) -->
+            <!-- Adapting to look more like the data table implied in "Vetenskap"-style or landing page text blocks -->
+            <div class="p-10 pt-4 max-w-6xl">
+                 <div class="flex items-center gap-3 mb-4 pl-1 border-b border-navy pb-2">
+                    <div class="w-2 h-2 bg-navy rounded-full"></div>
+                    <h2 class="text-xs font-bold uppercase tracking-widest text-navy">Pågående och Arkiverat</h2>
+                </div>
+                
+                <div class="bg-white border-2 border-navy">
+                    
+                    <!-- Table Header -->
+                    <div class="grid grid-cols-12 border-b-2 border-navy bg-canvas text-[10px] font-bold uppercase tracking-widest text-navy">
+                        <div class="col-span-5 p-4 border-r border-navy">Uppgift</div>
+                        <div class="col-span-2 p-4 border-r border-navy">Status</div>
+                        <div class="col-span-4 p-4 border-r border-navy">Process</div>
+                        <div class="col-span-1 p-4 text-right">Tid</div>
+                    </div>
+
+                    <!-- Row 1 -->
+                    <div class="grid grid-cols-12 border-b border-navy ledger-row group cursor-pointer bg-white">
+                        <div class="col-span-5 p-4 border-r border-navy flex flex-col justify-center">
+                            <span class="font-bold text-sm text-navy group-hover:underline decoration-2 underline-offset-4 decoration-burgundy">EK21A · Novellanalys</span>
+                            <span class="text-xs text-navy/50 font-mono mt-1">18 texter · Ranking-läge</span>
+                        </div>
+                        <div class="col-span-2 p-4 border-r border-navy flex items-center">
+                            <span class="inline-block px-2 py-1 bg-[#FEF3C7] text-[#92400E] border border-[#D97706] text-[10px] font-bold uppercase tracking-wide">
+                                Bearbetar
+                            </span>
+                        </div>
+                        <div class="col-span-4 p-4 border-r border-navy flex flex-col justify-center gap-2">
+                            <div class="w-full bg-navy/10 h-2 border border-navy/20">
+                                <div class="bg-burgundy h-full" style="width: 67%"></div>
+                            </div>
+                            <span class="text-[10px] font-mono text-navy/60">CJ-BEDÖMNING PÅGÅR</span>
+                        </div>
+                        <div class="col-span-1 p-4 flex items-center justify-end text-xs font-mono text-navy/40">
+                            —
+                        </div>
+                    </div>
+
+                     <!-- Row 2 -->
+                    <div class="grid grid-cols-12 border-b border-navy ledger-row group cursor-pointer bg-white">
+                        <div class="col-span-5 p-4 border-r border-navy flex flex-col justify-center">
+                            <span class="font-bold text-sm text-navy group-hover:underline decoration-2 underline-offset-4 decoration-burgundy">Bunt #47 (Gäst)</span>
+                            <span class="text-xs text-navy/50 font-mono mt-1">12 texter · Snabbanalys</span>
+                        </div>
+                        <div class="col-span-2 p-4 border-r border-navy flex items-center">
+                            <span class="inline-block px-2 py-1 bg-[#FEF3C7] text-[#92400E] border border-[#D97706] text-[10px] font-bold uppercase tracking-wide">
+                                Bearbetar
+                            </span>
+                        </div>
+                        <div class="col-span-4 p-4 border-r border-navy flex flex-col justify-center gap-2">
+                            <div class="w-full bg-navy/10 h-2 border border-navy/20">
+                                <div class="bg-navy h-full" style="width: 89%"></div>
+                            </div>
+                             <span class="text-[10px] font-mono text-navy/60">TEXTANALYS KLAR</span>
+                        </div>
+                        <div class="col-span-1 p-4 flex items-center justify-end text-xs font-mono text-navy/40">
+                            —
+                        </div>
+                    </div>
+
+                     <!-- Row 3 -->
+                    <div class="grid grid-cols-12 ledger-row group cursor-pointer bg-white">
+                        <div class="col-span-5 p-4 border-r border-navy flex flex-col justify-center">
+                            <span class="font-bold text-sm text-navy group-hover:underline decoration-2 underline-offset-4 decoration-burgundy">NA21B · Källkritik</span>
+                            <span class="text-xs text-navy/50 font-mono mt-1">22 texter</span>
+                        </div>
+                        <div class="col-span-2 p-4 border-r border-navy flex items-center">
+                             <span class="inline-block px-2 py-1 bg-[#F0FDF4] text-[#166534] border border-[#166534] text-[10px] font-bold uppercase tracking-wide">
+                                KLAR
+                            </span>
+                        </div>
+                        <div class="col-span-4 p-4 border-r border-navy flex items-center">
+                            <span class="text-xs italic text-navy/60">Resultat redo för export</span>
+                        </div>
+                        <div class="col-span-1 p-4 flex items-center justify-end text-xs font-mono text-navy/60">
+                            14:32
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+</body>
+</html>

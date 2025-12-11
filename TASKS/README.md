@@ -127,7 +127,7 @@ Use this directory alongside:
 
 - `.claude/work/session/readme-first.md` – current sprint focus and CJ-critical patterns.
 - `.claude/work/session/handoff.md` – per-session active/next work.
-- `.claude/rules/` – global development and architecture standards.
+- `.agent/rules/` – global development and architecture standards.
 - `docs/operations/` – runbooks and operational guides.
 - `services/*/README.md` – service-specific patterns and constraints.
 

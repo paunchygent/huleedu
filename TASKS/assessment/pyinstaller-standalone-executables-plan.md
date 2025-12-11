@@ -593,7 +593,7 @@ from textual.widgets import Input, Select  # Removed TYPE_CHECKING guard
 - `form_layout.py`: RichLog import, CSS `text-wrap: wrap; overflow-x: hidden`
 - `build_standalone.sh`: TUI-only (CLI removed)
 - `.gitignore`: PyInstaller artifacts
-- `.claude/rules/095-textual-tui-patterns.md`: Sections 9-12 (workers, Log vs RichLog, API gotchas)
+- `.agent/rules/095-textual-tui-patterns.md`: Sections 9-12 (workers, Log vs RichLog, API gotchas)
 
 ### Success Criteria ✅
 

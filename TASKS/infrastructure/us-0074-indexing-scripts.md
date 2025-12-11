@@ -29,7 +29,7 @@ Create index generation scripts for docs and rules, mirroring `index_tasks.py` p
 - CLI: `pdm run index-docs`
 
 ### 2. `scripts/claude_mgmt/index_rules.py`
-- Generate `.claude/rules/INDEX.md`
+- Generate `.agent/rules/INDEX.md`
 - Group by type and scope
 - Include: ID, title, type, scope
 - Show parent/child relationships

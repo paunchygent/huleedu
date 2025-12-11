@@ -124,16 +124,16 @@ Before implementing this fix, read and understand:
    - `.claude/work/session/GUEST_BATCH_STUCK_INVESTIGATION_REPORT.md` (comprehensive evidence and analysis)
 
 2. **Architectural Context**:
-   - `.claude/rules/020-architectural-mandates.md` (DDD, service boundaries, transaction patterns)
-   - `.claude/rules/020.5-essay-lifecycle-service-architecture.md` (ELS responsibilities and patterns)
-   - `.claude/rules/042-async-patterns-and-di.md` (database session management, transaction boundaries)
+   - `.agent/rules/020-architectural-mandates.md` (DDD, service boundaries, transaction patterns)
+   - `.agent/rules/020.5-essay-lifecycle-service-architecture.md` (ELS responsibilities and patterns)
+   - `.agent/rules/042-async-patterns-and-di.md` (database session management, transaction boundaries)
 
 3. **Batch State Machine**:
    - `libs/common_core/src/common_core/status_enums.py` (lines 104-132: BatchStatus enum and guest batch flow)
 
 4. **Test Creation Standards**:
-   - `.claude/rules/075-test-creation-methodology.md` (test structure and coverage requirements)
-   - `.claude/rules/075.1-parallel-test-creation-methodology.md` (parallel test execution)
+   - `.agent/rules/075-test-creation-methodology.md` (test structure and coverage requirements)
+   - `.agent/rules/075.1-parallel-test-creation-methodology.md` (parallel test execution)
 
 ---
 

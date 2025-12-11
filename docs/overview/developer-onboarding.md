@@ -233,9 +233,9 @@ huledu-reboot/
 Start by reading these in order:
 
 1. **`CLAUDE.md`** - Comprehensive technical reference (workflow, commands, architecture)
-2. **`.claude/rules/000-rule-index.md`** - Index of all development rules
-3. **`.claude/rules/010-foundational-principles.md`** - Core architectural principles
-4. **`.claude/rules/020-architectural-mandates.md`** - DDD and service boundaries
+2. **`.agent/rules/000-rule-index.md`** - Index of all development rules
+3. **`.agent/rules/010-foundational-principles.md`** - Core architectural principles
+4. **`.agent/rules/020-architectural-mandates.md`** - DDD and service boundaries
 5. **`.claude/work/session/readme-first.md`** - Current development status
 
 ### First Service to Explore: File Service
@@ -279,10 +279,10 @@ services/file_service/
 
 HuleEdu uses event-driven architecture with Kafka. Read these flow documents:
 
-1. **`.claude/rules/035-complete-processing-flow-overview.md`** - High-level system flow
-2. **`.claude/rules/038-file-upload-processing-flow.md`** - File upload flow (FLOW-05)
-3. **`.claude/rules/036-phase1-processing-flow.md`** - Phase 1: Student matching
-4. **`.claude/rules/037-phase2-processing-flow.md`** - Phase 2: Pipeline processing
+1. **`.agent/rules/035-complete-processing-flow-overview.md`** - High-level system flow
+2. **`.agent/rules/038-file-upload-processing-flow.md`** - File upload flow (FLOW-05)
+3. **`.agent/rules/036-phase1-processing-flow.md`** - Phase 1: Student matching
+4. **`.agent/rules/037-phase2-processing-flow.md`** - Phase 2: Pipeline processing
 
 #### Key Event Concepts
 
@@ -368,7 +368,7 @@ docker exec huleedu_file_service_db psql -U huleedu_user -d huleedu_file -c "SEL
 
 #### Database Migrations
 
-HuleEdu uses Alembic for database migrations. See `.claude/rules/085-database-migration-standards.md` for detailed guidance.
+HuleEdu uses Alembic for database migrations. See `.agent/rules/085-database-migration-standards.md` for detailed guidance.
 
 ```bash
 # Generate migration for a service
@@ -601,7 +601,7 @@ app.register_blueprint(health_bp)
 
 ### Debugging Service Issues
 
-See `.claude/rules/044-service-debugging-and-troubleshooting.md` for comprehensive debugging guide.
+See `.agent/rules/044-service-debugging-and-troubleshooting.md` for comprehensive debugging guide.
 
 Quick debugging commands:
 
@@ -626,9 +626,9 @@ docker exec -it huleedu_redis redis-cli KEYS "*"
 
 After completing this onboarding:
 
-1. **Read architecture rules**: Start with `.claude/rules/010-foundational-principles.md`
+1. **Read architecture rules**: Start with `.agent/rules/010-foundational-principles.md`
 2. **Explore a second service**: Try Essay Lifecycle Service or Batch Orchestrator
-3. **Review event flows**: Study `.claude/rules/035-complete-processing-flow-overview.md`
+3. **Review event flows**: Study `.agent/rules/035-complete-processing-flow-overview.md`
 4. **Run integration tests**: Understand cross-service workflows
 5. **Pick a real task**: Check `TASKS/` for available work
 6. **Join team channels**: Ask questions and share learnings
@@ -638,29 +638,29 @@ After completing this onboarding:
 ### Documentation
 
 - **Technical reference**: `CLAUDE.md`
-- **Architecture rules**: `.claude/rules/`
-- **Service patterns**: `.claude/rules/040-service-implementation-guidelines.md`
-- **Testing guide**: `.claude/rules/075-test-creation-methodology.md`
-- **Docker workflow**: `.claude/rules/081.1-docker-development-workflow.md`
+- **Architecture rules**: `.agent/rules/`
+- **Service patterns**: `.agent/rules/040-service-implementation-guidelines.md`
+- **Testing guide**: `.agent/rules/075-test-creation-methodology.md`
+- **Docker workflow**: `.agent/rules/081.1-docker-development-workflow.md`
 
 ### Common Issues
 
-- **Import errors**: Check `.claude/rules/055-import-resolution-patterns.md`
-- **Docker problems**: See `.claude/rules/046-docker-container-debugging.md`
-- **Test failures**: Review `.claude/rules/075-test-creation-methodology.md`
+- **Import errors**: Check `.agent/rules/055-import-resolution-patterns.md`
+- **Docker problems**: See `.agent/rules/046-docker-container-debugging.md`
+- **Test failures**: Review `.agent/rules/075-test-creation-methodology.md`
 - **Database access**: Reference `CLAUDE.md` Database Access section
 
 ### Development Standards
 
-- **Python style**: `.claude/rules/050-python-coding-standards.md`
-- **Pydantic usage**: `.claude/rules/051-pydantic-v2-standards.md`
-- **SQLAlchemy patterns**: `.claude/rules/053-sqlalchemy-standards.md`
-- **Error handling**: `.claude/rules/048-structured-error-handling-standards.md`
+- **Python style**: `.agent/rules/050-python-coding-standards.md`
+- **Pydantic usage**: `.agent/rules/051-pydantic-v2-standards.md`
+- **SQLAlchemy patterns**: `.agent/rules/053-sqlalchemy-standards.md`
+- **Error handling**: `.agent/rules/048-structured-error-handling-standards.md`
 
 ### Getting Help
 
 - Check `.claude/work/session/handoff.md` for current development status
-- Review relevant service architecture in `.claude/rules/020.x-*-architecture.md`
+- Review relevant service architecture in `.agent/rules/020.x-*-architecture.md`
 - Search `TASKS/` for related task documentation
 - Ask in team communication channels
 

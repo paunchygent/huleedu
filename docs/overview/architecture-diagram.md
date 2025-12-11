@@ -541,8 +541,8 @@ Metrics, traces, and logs built into every service from day one, not retrofitted
 
 ## Reference Documentation
 
-- **Service Architectures**: `.claude/rules/020.x-*-architecture.md`
-- **Event Standards**: `.claude/rules/052-event-contract-standards.md`
-- **Processing Flows**: `.claude/rules/035-complete-processing-flow-overview.md`
-- **Testing Patterns**: `.claude/rules/075-test-creation-methodology.md`
-- **Docker Setup**: `.claude/rules/081.1-docker-development-workflow.md`
+- **Service Architectures**: `.agent/rules/020.x-*-architecture.md`
+- **Event Standards**: `.agent/rules/052-event-contract-standards.md`
+- **Processing Flows**: `.agent/rules/035-complete-processing-flow-overview.md`
+- **Testing Patterns**: `.agent/rules/075-test-creation-methodology.md`
+- **Docker Setup**: `.agent/rules/081.1-docker-development-workflow.md`

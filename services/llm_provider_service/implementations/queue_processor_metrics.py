@@ -274,6 +274,64 @@ class QueueProcessorMetrics:
                 model=model_override,
             ).observe(bundle_size)
 
+    def record_batch_api_job_scheduled(
+        self,
+        *,
+        provider: LLMProviderType,
+        model_override: str,
+        bundle_size: int,
+    ) -> None:
+        """Record metrics when a batch API job is scheduled."""
+
+        if not self.queue_metrics:
+            return
+
+        jobs_counter = self.queue_metrics.get("llm_batch_api_jobs_total")
+        items_hist = self.queue_metrics.get("llm_batch_api_items_per_job")
+
+        if jobs_counter is not None:
+            jobs_counter.labels(
+                provider=provider.value,
+                model=model_override,
+                status="scheduled",
+            ).inc()
+
+        if items_hist is not None:
+            items_hist.labels(
+                provider=provider.value,
+                model=model_override,
+            ).observe(bundle_size)
+
+    def record_batch_api_job_completed(
+        self,
+        *,
+        provider: LLMProviderType,
+        model_override: str,
+        job_started: float | None,
+        status: str,
+    ) -> None:
+        """Record metrics when a batch API job completes or fails."""
+
+        if not self.queue_metrics:
+            return
+
+        jobs_counter = self.queue_metrics.get("llm_batch_api_jobs_total")
+        duration_hist = self.queue_metrics.get("llm_batch_api_job_duration_seconds")
+
+        if jobs_counter is not None:
+            jobs_counter.labels(
+                provider=provider.value,
+                model=model_override,
+                status=status,
+            ).inc()
+
+        if duration_hist is not None and job_started is not None:
+            duration = max(time.perf_counter() - job_started, 0.0)
+            duration_hist.labels(
+                provider=provider.value,
+                model=model_override,
+            ).observe(duration)
+
     @staticmethod
     def _detect_scope(metadata: Dict[str, Any]) -> str:
         """Infer request scope for cache observability."""

@@ -212,6 +212,6 @@ Production (via API Gateway):
 
 - ADR-0007: BFF vs API Gateway Pattern
 - ADR-0023: BFF Frontend Build Integration and Static Serving
-- `.claude/rules/020.21-bff-teacher-service.md` - BFF service architecture rule
+- `.agent/rules/020.21-bff-teacher-service.md` - BFF service architecture rule
 - `frontend/.claude/work/session/handoff.md` - Frontend session context
-- `.claude/rules/200-frontend-core-rules.md` - Frontend coding standards
+- `.agent/rules/200-frontend-core-rules.md` - Frontend coding standards

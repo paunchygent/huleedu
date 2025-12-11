@@ -28,8 +28,11 @@ from scripts.schemas.rule_schema import RuleFrontmatter
 ROOT = Path(__file__).resolve().parents[2]
 CLAUDE_DIR = ROOT / ".claude"
 
-# Rule file naming pattern: NNN-descriptive-name.md or NNN.N-descriptive-name.md
-RULE_FILE_PATTERN = re.compile(r"^(\d{3}(?:\.\d+)?)-([a-z0-9-]+)\.md$")
+# Rule file naming patterns:
+# - Legacy .agent/rules: NNN-name.md or NNN.N-name.md
+# - Claude Code native: NN-name.md (in core/, backend/, frontend/)
+RULE_FILE_PATTERN_LEGACY = re.compile(r"^(\d{3}(?:\.\d+)?)-([a-z0-9-]+)\.md$")
+RULE_FILE_PATTERN_NATIVE = re.compile(r"^(\d{2})-([a-z0-9-]+)\.md$")
 
 
 def read_front_matter(p: Path) -> tuple[dict[str, Any], str]:
@@ -63,12 +66,28 @@ def read_front_matter(p: Path) -> tuple[dict[str, Any], str]:
     return data, body
 
 
-def validate_rule_file_naming(p: Path) -> list[str]:
+def is_native_rule(p: Path, rules_dir: Path) -> bool:
     """
-    Validate that rule file follows NNN-descriptive-name.md pattern.
+    Check if a rule file is a Claude Code native rule (in a subdirectory).
+
+    Native rules are in subdirectories like core/, backend/, frontend/
+    and use simpler NN-name.md naming without required frontmatter.
+    """
+    try:
+        rel = p.relative_to(rules_dir)
+        # If there's a parent directory (not just the filename), it's native
+        return len(rel.parts) > 1
+    except ValueError:
+        return False
+
+
+def validate_rule_file_naming(p: Path, is_native: bool) -> list[str]:
+    """
+    Validate that rule file follows appropriate naming pattern.
 
     Args:
         p: Path to rule file
+        is_native: Whether this is a Claude Code native rule
 
     Returns:
         List of error messages (empty if valid)
@@ -76,12 +95,20 @@ def validate_rule_file_naming(p: Path) -> list[str]:
     errors: list[str] = []
     filename = p.name
 
-    if not RULE_FILE_PATTERN.match(filename):
-        errors.append(
-            f"filename '{filename}' must follow pattern 'NNN-descriptive-name.md' "
-            "or 'NNN.N-descriptive-name.md' "
-            "(e.g., '010-foundational-principles.md' or '020.1-content-service-architecture.md')"
-        )
+    if is_native:
+        # Native rules use simpler NN-name.md pattern
+        if not RULE_FILE_PATTERN_NATIVE.match(filename):
+            errors.append(
+                f"filename '{filename}' must follow pattern 'NN-descriptive-name.md' "
+                "(e.g., '01-golden-rules.md' or '02-workflow.md')"
+            )
+    else:
+        # Legacy rules use NNN-name.md pattern
+        if not RULE_FILE_PATTERN_LEGACY.match(filename):
+            errors.append(
+                f"filename '{filename}' must follow pattern 'NNN-name.md' "
+                "or 'NNN.N-name.md' (e.g., '010-foundations.md', '020.1-arch.md')"
+            )
 
     return errors
 
@@ -146,13 +173,14 @@ def validate_rule_frontmatter(p: Path, fm: dict[str, Any], all_rule_ids: set[str
     return errors
 
 
-def validate_rule_file(p: Path, all_rule_ids: set[str]) -> list[str]:
+def validate_rule_file(p: Path, all_rule_ids: set[str], is_native: bool) -> list[str]:
     """
     Validate a rule file for compliance with .claude/ specification.
 
     Args:
         p: Path to rule file
         all_rule_ids: Set of all valid rule IDs for cross-validation
+        is_native: Whether this is a Claude Code native rule
 
     Returns:
         List of error messages (empty if valid)
@@ -160,11 +188,12 @@ def validate_rule_file(p: Path, all_rule_ids: set[str]) -> list[str]:
     errors: list[str] = []
 
     # Validate naming
-    errors.extend(validate_rule_file_naming(p))
+    errors.extend(validate_rule_file_naming(p, is_native))
 
-    # Parse and validate frontmatter
-    fm, _ = read_front_matter(p)
-    errors.extend(validate_rule_frontmatter(p, fm, all_rule_ids))
+    # Parse and validate frontmatter (only for legacy rules)
+    if not is_native:
+        fm, _ = read_front_matter(p)
+        errors.extend(validate_rule_frontmatter(p, fm, all_rule_ids))
 
     return errors
 
@@ -289,23 +318,27 @@ def main(argv: list[str]) -> int:
     # Validate rule files
     rules_dir = claude_root / "rules"
     if rules_dir.exists():
-        # First pass: collect all rule IDs
+        # First pass: collect all rule IDs (legacy rules only, for cross-validation)
         all_rule_ids: set[str] = set()
-        rule_files: list[Path] = []
+        rule_files: list[tuple[Path, bool]] = []  # (path, is_native)
 
-        for p in rules_dir.glob("*.md"):
+        # Find all .md files recursively
+        for p in rules_dir.glob("**/*.md"):
             # Skip non-normative files
             if p.name in ("README.md",):
                 continue
 
-            rule_files.append(p)
-            # Extract rule ID from filename
-            all_rule_ids.add(p.stem)
+            native = is_native_rule(p, rules_dir)
+            rule_files.append((p, native))
+
+            # Only collect IDs from legacy rules (for cross-validation)
+            if not native:
+                all_rule_ids.add(p.stem)
 
         # Second pass: validate each rule with complete ID set
-        for p in rule_files:
+        for p, native in rule_files:
             rel = p.relative_to(ROOT)
-            errs = validate_rule_file(p, all_rule_ids)
+            errs = validate_rule_file(p, all_rule_ids, native)
 
             if errs:
                 failures += 1

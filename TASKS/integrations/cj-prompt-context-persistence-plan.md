@@ -45,7 +45,7 @@ labels: []
 - JWT test helpers centralization (shared utilities for test token creation)
 - DI re-alignment with pure `_impl` pattern (restore Rule 042 compliance)
 
-**See**: `.claude/rules/048-structured-error-handling-standards.md` for Result monad usage guidelines (to be added)
+**See**: `.agent/rules/048-structured-error-handling-standards.md` for Result monad usage guidelines (to be added)
 
 ---
 

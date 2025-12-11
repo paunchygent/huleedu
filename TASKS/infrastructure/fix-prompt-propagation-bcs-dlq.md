@@ -275,11 +275,11 @@ This task defines a multi-PR fix plan to:
 Before implementing PR 5, the coding assistant **must** read and understand:
 
 1. **PR Context**: This task file sections for PR 1–4 (above) to understand the overall prompt propagation architecture.
-2. **Test Creation Standards**: `.claude/rules/075-test-creation-methodology.md` and `.claude/rules/075.1-parallel-test-creation-methodology.md`.
+2. **Test Creation Standards**: `.agent/rules/075-test-creation-methodology.md` and `.agent/rules/075.1-parallel-test-creation-methodology.md`.
 3. **Service Architecture Rules**:
-   - `.claude/rules/020-architectural-mandates.md` (DDD, service boundaries, explicit contracts)
-   - `.claude/rules/020.3-batch-orchestrator-service-architecture.md` (BOS ownership of batch context)
-   - `.claude/rules/020.10-api-gateway-service.md` (proxy patterns, JWT auth, identity injection)
+   - `.agent/rules/020-architectural-mandates.md` (DDD, service boundaries, explicit contracts)
+   - `.agent/rules/020.3-batch-orchestrator-service-architecture.md` (BOS ownership of batch context)
+   - `.agent/rules/020.10-api-gateway-service.md` (proxy patterns, JWT auth, identity injection)
 4. **Research Context**: The research-diagnostic agent investigation documented CJ Assessment Service's prompt attachment pattern (`services/cj_assessment_service/api/admin/student_prompts.py`) and confirmed BOS ownership of batch context via `BatchContextOperations`.
 
 **Primary Files:**

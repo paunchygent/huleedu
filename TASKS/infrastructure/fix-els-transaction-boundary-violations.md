@@ -34,7 +34,7 @@ Handlers incorrectly structure operations into multiple sequential `async with s
 
 ### Architectural Standard Violated
 
-**Rule**: `.claude/rules/042.1-transactional-outbox-pattern.md` (Lines 64-82, 137-143)
+**Rule**: `.agent/rules/042.1-transactional-outbox-pattern.md` (Lines 64-82, 137-143)
 
 **Pattern**: Handler-Level Unit of Work with Transactional Outbox
 
@@ -291,7 +291,7 @@ The already-completed work in this file (Phase 1) and the archived `fix-els-batc
 **Goal**: Capture the unified persistence and session pattern in documentation, aligning ELS, BOS, and CJ.
 
 - **Scope**:
-  - Update `.claude/rules/020.5-essay-lifecycle-service-architecture.md` to describe:
+  - Update `.agent/rules/020.5-essay-lifecycle-service-architecture.md` to describe:
     - ORM-backed `BatchPendingContent` repository pattern.
     - ELS session provider usage and where optional `AsyncSession` remains acceptable.
   - Cross-reference CJ's `SessionProviderProtocol` and BOS `BatchDatabaseInfrastructure` as reference implementations.

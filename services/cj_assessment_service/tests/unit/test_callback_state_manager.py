@@ -587,7 +587,9 @@ async def test_update_batch_completion_counters_error_only_increments_failed() -
 
     session = AsyncMock(spec=AsyncSession)
     batch_repository = AsyncMock(spec=CJBatchRepositoryProtocol)
-    batch_repository.get_batch_state.return_value = batch_state
+    # _update_batch_completion_counters now delegates to BatchCompletionPolicy,
+    # which uses the FOR UPDATE path for concurrency-safe counter updates.
+    batch_repository.get_batch_state_for_update.return_value = batch_state
 
     await _update_batch_completion_counters(
         session=session,
@@ -597,8 +599,10 @@ async def test_update_batch_completion_counters_error_only_increments_failed() -
         correlation_id=uuid4(),
     )
 
-    batch_repository.get_batch_state.assert_awaited_once_with(
-        session=session, batch_id=batch_state.batch_id
+    batch_repository.get_batch_state_for_update.assert_awaited_once_with(
+        session=session,
+        batch_id=batch_state.batch_id,
+        for_update=True,
     )
     assert batch_state.failed_comparisons == 3
     assert batch_state.completed_comparisons == 10

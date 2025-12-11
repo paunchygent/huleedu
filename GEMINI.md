@@ -4,7 +4,7 @@
 1. No vibe-coding, each implementation or change in production code behavior must be researche and have a decision, epic, and story/fix describing it.
 2. Avoid any legacy support and deprecation paths. HuleEdu is a pure prototype codebase with no production data to protect. Convoluted legacy paths and semantics add clutter and confusion in our high-churn, fast evolving codebase. 
 3. Respect SOLID, YAGNI and DDD/Clean Code SRP principles: always leave code cleaner than you found it. 
-4. Respect and USE .claude/rules and docs/. We have a comprehensive onboarding system built just for you.
+4. Respect and USE .agent/rules and docs/. We have a comprehensive onboarding system built just for you.
 
 ## Core Workflow
 
@@ -17,7 +17,7 @@ Before using pdm run, start an env-aware shell:
 ```
 
 ```markdown
-- FIRST ACTION: Load `.claude/rules/000-rule-index.md` first. The index contains onboard instructions for all services and project rules and standards. If the prompt contains a task description, use it to read and review all rule files related to the task at hand.
+- FIRST ACTION: Load `.agent/rules/000-rule-index.md` first. The index contains onboard instructions for all services and project rules and standards. If the prompt contains a task description, use it to read and review all rule files related to the task at hand.
 - SECOND ACTION Use the user's task description to read and review all rule files related to the task at hand.
 - THIRD ACTION Read `.claude/work/session/handoff.md` and `.claude/work/session/readme-first.md` for **critical** cross-service task context.
 
@@ -28,8 +28,8 @@ Before using pdm run, start an env-aware shell:
 
 ```markdown
 1. **To avoid immediate task failure**: Read `.claude/work/session/handoff.md` and `.claude/work/session/readme-first.md` for **critical** cross-service task context.
-2. **Select Mode**: Use `.claude/rules/110-ai-agent-interaction-modes.md` to choose mode (Planning, Coding, Debugging)
-3. **Rule Reference**: Consult `.claude/rules/000-rule-index.md` for relevant rules
+2. **Select Mode**: Use `.agent/rules/110-ai-agent-interaction-modes.md` to choose mode (Planning, Coding, Debugging)
+3. **Rule Reference**: Consult `.agent/rules/000-rule-index.md` for relevant rules
 cross-service task context.
 4. **Update**: After each task phase, Always stop to update 1. **active task documents** 2.`.claude/work/session/handoff.md` and `.claude/work/session/readme-first.md` with any new information + ask user any clarifying questions to retain alignment with user's intent.
 ```
@@ -83,7 +83,7 @@ pdm run python scripts/docs_mgmt/validate_docs_structure.py --verbose
 
 ### Architectural Overview
 
-### Architecture (.claude/rules/010-foundational-principles.md)
+### Architecture (.agent/rules/010-foundational-principles.md)
 
 ```markdown
 - **Pattern**: Event-driven microservices with STRICT DDD, CC principles, and small modular SRP files (<400-500 LoC HARD LIMIT FILE SIZE).
@@ -100,7 +100,7 @@ pdm run python scripts/docs_mgmt/validate_docs_structure.py --verbose
 
 **dependency resolution** full path relative root for all imports. **NEVER** use relative imports when importing dependencies from outside service directory.
 
-### Service Communication (.claude/rules/020-architectural-mandates.md)
+### Service Communication (.agent/rules/020-architectural-mandates.md)
 
 ```markdown
 - **Primary**: Asynchronous via Kafka
@@ -110,16 +110,16 @@ pdm run python scripts/docs_mgmt/validate_docs_structure.py --verbose
 - **Strict**: all error and exception handling done using centralized and quart/fastapi specific error handling patterns `libs/huleedu_service_libs/src/huleedu_service_libs/error_handling/`+ error models in `libs/common_core/src/common_core/error_enums.py`
 ```
 
-### Database & Persistence (.claude/rules/085-database-migration-standards.md)
+### Database & Persistence (.agent/rules/085-database-migration-standards.md)
 
 ```markdown
 - **ORM**: SQLAlchemy async with `asyncpg`
 - **Strict** ban on RAW SQL
 - **Isolation**: Each service has its own PostgreSQL database
-- **Migrations**: always consult .claude/rules/085-database-migration-standards.md
+- **Migrations**: always consult .agent/rules/085-database-migration-standards.md
 ```
 
-### HTTP Services (.claude/rules/042-async-patterns-and-di.md)
+### HTTP Services (.agent/rules/042-async-patterns-and-di.md)
 
 ```markdown
 - **app.py**: Setup only (<150 LoC)
@@ -127,14 +127,14 @@ pdm run python scripts/docs_mgmt/validate_docs_structure.py --verbose
 - **Example**: `@services/file_service/` structure
 ```
 
-### Worker Services (.claude/rules/042-async-patterns-and-di.md)
+### Worker Services (.agent/rules/042-async-patterns-and-di.md)
 
 - **Quart Deployment Patterns**:
   - [services/essay_lifecycle_service]: Standalone worker and API services (complex processing)
   - Other services: Integrated worker using Quart's `@app.before_serving` in `services/*/app.py` (simpler services)
 - **Example**: `services/spellchecker_service/` (integrated) vs `services/essay_lifecycle_service/` (standalone)
 
-### Dependency Injection (.claude/rules/042-async-patterns-and-di.md)
+### Dependency Injection (.agent/rules/042-async-patterns-and-di.md)
 
 ```markdown
 - **Interfaces**: Define with `typing.Protocol` in `protocols.py`
@@ -144,7 +144,7 @@ pdm run python scripts/docs_mgmt/validate_docs_structure.py --verbose
   - `REQUEST`: Per-operation instances (DB sessions)
 ```
 
-### Event System (.claude/rules/051-event-contract-standards.md)
+### Event System (.agent/rules/051-event-contract-standards.md)
 
 ```markdown
 - **Envelope**: All Kafka events use `EventEnvelope`
@@ -154,7 +154,7 @@ pdm run python scripts/docs_mgmt/validate_docs_structure.py --verbose
 
 ## Testing & Quality
 
-### Testing (strict adherence to `.claude/rules/075-test-creation-methodology.md` + `.claude/rules/075.1-parallel-test-creation-methodology.md`)
+### Testing (strict adherence to `.agent/rules/075-test-creation-methodology.md` + `.agent/rules/075.1-parallel-test-creation-methodology.md`)
 
 #### Test Types
 
@@ -273,7 +273,7 @@ pdm run prod-migrate               # Run production migrations
 
 ## Database Migrations
 
-### follow established pattern in `.claude/rules/085-database-migration-standards.md`
+### follow established pattern in `.agent/rules/085-database-migration-standards.md`
 
 ## Monitoring & Observability
 
@@ -287,7 +287,7 @@ pdm run prod-migrate               # Run production migrations
 
 ## Documentation
 
-### Standards (.claude/rules/090-documentation-standards.md)
+### Standards (.agent/rules/090-documentation-standards.md)
 
 - Keep documentation in sync with code changes
 - Use Google-style docstrings for all public interfaces

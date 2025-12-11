@@ -63,7 +63,7 @@ Design and specify an improved mock LLM provider that better mirrors production 
 
 - services/llm_provider_service/implementations/mock_provider_impl.py
 - tests/integration/test_cj_lps_metadata_roundtrip.py
-- .claude/rules/020.13-llm-provider-service-architecture.md
+- .agent/rules/020.13-llm-provider-service-architecture.md
 
 ---
 

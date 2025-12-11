@@ -12,7 +12,7 @@ This document is **normative**. All content in `.claude/` MUST comply.
 
 - Applies to all files and directories under `.claude/`
 - Covers:
-  - Claude Code rule files (`.claude/rules/`)
+  - Claude Code rule files (`.agent/rules/`)
   - Hook configurations (`.claude/hooks/`)
   - Session work artifacts (`.claude/work/`)
   - Archive policies (`.claude/archive/`)
@@ -36,7 +36,7 @@ The canonical `.claude/` root has the following structure:
 
 ### 3.1 Directory Semantics
 
-- `.claude/rules/`
+- `.agent/rules/`
   - Normative coding standards, architectural patterns, and development guidelines
   - Each rule file defines enforceable standards for the codebase
   - Must include frontmatter with metadata
@@ -67,7 +67,7 @@ The canonical `.claude/` root has the following structure:
   - Structure: `archive/YYYY/MM/DD/session-name/`
   - Used for completed sessions and historical reference
 
-## 4. Rule File Standards (.claude/rules/)
+## 4. Rule File Standards (.agent/rules/)
 
 ### 4.1 File Naming
 
@@ -194,10 +194,10 @@ Archive structure:
 
 ### 7.2 Documentation
 
-- **Normative standards**: `.claude/rules/` defines coding standards
+- **Normative standards**: `.agent/rules/` defines coding standards
 - **Human documentation**: `docs/` contains user-facing documentation
 - **Cross-linking**: Rules MAY link to `docs/` for detailed explanations
-- **No duplication**: Don't copy content between `.claude/rules/` and `docs/`
+- **No duplication**: Don't copy content between `.agent/rules/` and `docs/`
 
 ## 8. Validation and Enforcement
 
