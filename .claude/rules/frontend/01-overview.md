@@ -16,6 +16,10 @@ Work from `/frontend/` directory as your development root.
 ```bash
 pdm run fe-prototype-build  # Build CSS
 pdm run fe-dev              # Dev server with hot reload
+pdm run fe-lint       # Check
+pdm run fe-lint-fix   # Auto-fix
+
+all pdm scripts available in pyproject.toml
 ```
 
 ## Key Documentation

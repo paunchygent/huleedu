@@ -490,6 +490,10 @@ fe-preview.working_dir = "frontend"
 fe-prototype-build.cmd = "python -c \"import pytailwindcss; pytailwindcss.run(['-i', 'frontend/styles/src/input.css', '-o', 'frontend/styles/src/tailwind.css'], auto_install=True)\""
 fe-type-check.cmd = "pnpm run type-check"
 fe-type-check.working_dir = "frontend"
+fe-lint.cmd = "pnpm run lint"
+fe-lint.working_dir = "frontend"
+fe-lint-fix.cmd = "pnpm run lint:fix"
+fe-lint-fix.working_dir = "frontend"
 
 # BFF Teacher Service
 bff-build = "docker compose build bff_teacher_service"

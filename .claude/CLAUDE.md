@@ -3,12 +3,12 @@
 Rules are auto-loaded from `.claude/rules/`:
 - `core/` — Golden rules, workflow, documentation, testing
 - `backend/` — Architecture, services, database, events, docker
-- `frontend/` — Overview, design system, Svelte patterns, integration
+- `frontend/` — Overview, design system, Vue patterns, integration
 
 ## Quick Reference
 
 ### Detailed Rules
-For comprehensive guidance: `.agent/rules/000-rule-index.md`
+For comprehensive workflow guidance: `.agent/rules/000-rule-index.md`
 
 ### Session Context
 - Handoff: `.claude/work/session/handoff.md`

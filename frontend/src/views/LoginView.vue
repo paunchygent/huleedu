@@ -1,21 +1,21 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
-import { useAuth } from '@/composables/useAuth'
+import { ref } from "vue";
+import { RouterLink, useRouter } from "vue-router";
+import { useAuth } from "@/composables/useAuth";
 
-const router = useRouter()
-const { login, devLogin, isLoading, error } = useAuth()
+const router = useRouter();
+const { login, devLogin, isLoading, error } = useAuth();
 
-const email = ref('')
-const password = ref('')
+const email = ref("");
+const password = ref("");
 
 async function handleSubmit() {
-  await login({ email: email.value, password: password.value })
+  await login({ email: email.value, password: password.value });
 }
 
 function handleDevLogin() {
-  devLogin()
-  router.push('/app/dashboard')
+  devLogin();
+  router.push("/app/dashboard");
 }
 </script>
 
@@ -31,7 +31,7 @@ function handleDevLogin() {
       <div class="w-full max-w-sm">
         <h1 class="text-2xl font-bold text-navy mb-6 tracking-tightest">Login</h1>
 
-        <form @submit.prevent="handleSubmit" class="space-y-4">
+        <form class="space-y-4" @submit.prevent="handleSubmit">
           <div>
             <label for="email" class="block text-sm font-medium text-navy mb-1">
               E-post
@@ -77,8 +77,8 @@ function handleDevLogin() {
         <div class="mt-6 pt-6 border-t border-navy/20">
           <button
             type="button"
-            @click="handleDevLogin"
             class="w-full border border-navy/40 text-navy py-2 text-sm hover:bg-navy/5 transition-colors"
+            @click="handleDevLogin"
           >
             Dev Login (bypass auth)
           </button>

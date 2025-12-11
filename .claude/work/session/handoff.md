@@ -308,16 +308,23 @@ pdm run llm-mock-profile eng5-lower5
 | Tailwind v4 hover states | ✅ Fixed |
 | LedgerTable grid alignment | ✅ Fixed |
 
-### Tailwind v4 Hover Fix (RESOLVED)
+### Tailwind v4 Hover States (REFACTORED 2025-12-11)
 
-**Problem:** Tailwind v4 uses CSS nesting (`&:hover`) which isn't fully browser-supported.
+**Philosophy:** Tailwind v4 wraps hover in `@media (hover: hover)` by default - hover only on pointer devices. We now align with this.
 
-**Solution applied:**
-1. Added `@custom-variant hover (&:hover);` to `frontend/src/styles/main.css:4`
-2. Added explicit CSS hover rules for buttons (lines 306-328 in main.css):
-   - Secondary button (border-navy → filled navy on hover)
-   - Primary button (bg-burgundy → navy on hover)
-   - Sidebar button (bg-navy → burgundy on hover)
+**Implementation:**
+1. **Removed** `@custom-variant hover (&:hover);` override (was forcing hover on touch)
+2. All hover effects wrapped in `@media (hover: hover)` for pointer-only
+3. Button `:active` states added for touch feedback on ALL devices
+4. Ledger rows, batch rows, login cells - hover as enhancement only
+
+**Key CSS sections in main.css:**
+- Lines 110-125: Interactive state hovers (pointer only)
+- Lines 248-264: Ledger row hovers (pointer only)
+- Lines 310-325: Button `:active` states (all devices)
+- Lines 327-344: Button `:hover` states (pointer only)
+
+**Rule doc:** `.claude/rules/frontend/05-tailwind-v4.md`
 
 ### LedgerTable Grid Fix (RESOLVED)
 
@@ -350,8 +357,27 @@ pdm run llm-mock-profile eng5-lower5
 
 **Source of truth:** `frontend/styles/src/dashboard_brutalist_final.html`
 
+### ESLint Setup - ✅ COMPLETE (2025-12-11)
+
+**Config:** `frontend/eslint.config.js` (ESLint 9 flat config)
+
+| Setting | Value |
+|---------|-------|
+| Quotes | Double |
+| Indent | 2 spaces |
+| Semicolons | Required |
+| Vue API | script-setup only |
+| max-len | Disabled for .vue (Tailwind classes) |
+
+**Packages:** eslint@9.39.1, @eslint/js, typescript-eslint@8.49.0, eslint-plugin-vue@10.6.2
+
+**Commands:**
+```bash
+pdm run fe-lint       # Check
+pdm run fe-lint-fix   # Auto-fix
+```
+
 ### Next Session Focus
 
 1. **BFF Integration** - Wire real API endpoints via Teacher BFF
 2. **WebSocket updates** - Real-time batch status changes
-3. **Optional: ESLint setup for Vue frontend**

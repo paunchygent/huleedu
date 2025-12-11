@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "puppeteer": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["puppeteer-mcp-claude", "serve"]
+    }
+  }
+}

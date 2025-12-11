@@ -1,14 +1,14 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 // Enum mirroring BatchClientStatus from backend
 export const BatchClientStatusSchema = z.enum([
-  'pending_content',
-  'ready',
-  'processing',
-  'completed_successfully',
-  'completed_with_failures',
-  'failed',
-  'cancelled',
+  "pending_content",
+  "ready",
+  "processing",
+  "completed_successfully",
+  "completed_with_failures",
+  "failed",
+  "cancelled",
 ]);
 
 export type BatchClientStatus = z.infer<typeof BatchClientStatusSchema>;

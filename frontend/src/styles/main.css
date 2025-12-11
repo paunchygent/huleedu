@@ -1,8 +1,5 @@
 @import "tailwindcss";
 
-/* Override Tailwind v4 default hover behavior that wraps in @media (hover: hover) */
-@custom-variant hover (&:hover);
-
 /* ═══════════════════════════════════════════════════════════════
    THEME CONFIGURATION
    Consolidated design tokens for HuleEdu
@@ -102,26 +99,29 @@ body {
 
 /* ═══════════════════════════════════════════════════════════════
    INTERACTIVE STATES
+   Hover effects only for pointer devices (Tailwind v4 philosophy)
 ═══════════════════════════════════════════════════════════════ */
 
-/* Row hover effects */
-.ledger-row:hover .ledger-value {
-  color: var(--color-burgundy);
-  font-weight: 600;
-}
-
-.batch-row:hover {
-  background-color: rgba(28, 46, 74, 0.02);
-}
-
-/* Login cell hover */
+/* Login cell - transition for smooth state changes */
 .login-cell {
   transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-.login-cell:hover {
-  background-color: var(--color-navy);
-  color: var(--color-canvas);
+/* Hover effects - pointer devices only */
+@media (hover: hover) {
+  .ledger-row:hover .ledger-value {
+    color: var(--color-burgundy);
+    font-weight: 600;
+  }
+
+  .batch-row:hover {
+    background-color: rgba(28, 46, 74, 0.02);
+  }
+
+  .login-cell:hover {
+    background-color: var(--color-navy);
+    color: var(--color-canvas);
+  }
 }
 
 /* Refresh indicator */
@@ -238,25 +238,29 @@ input:focus-visible {
 /* ═══════════════════════════════════════════════════════════════
    LEDGER ROW SYSTEM
    Dashboard table rows with hover states and animations
+   Hover effects only for pointer devices
 ═══════════════════════════════════════════════════════════════ */
 
 .ledger-row {
   transition: background-color 0.1s ease;
 }
 
-.ledger-row:hover {
-  background-color: var(--color-canvas);
-  outline: 2px solid var(--color-navy);
-  outline-offset: -2px;
-  z-index: 10;
-  position: relative;
-}
+/* Ledger row hover - pointer devices only */
+@media (hover: hover) {
+  .ledger-row:hover {
+    background-color: var(--color-canvas);
+    outline: 2px solid var(--color-navy);
+    outline-offset: -2px;
+    z-index: 10;
+    position: relative;
+  }
 
-.ledger-row:hover .ledger-title {
-  text-decoration: underline;
-  text-decoration-thickness: 2px;
-  text-underline-offset: 4px;
-  text-decoration-color: var(--color-burgundy);
+  .ledger-row:hover .ledger-title {
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 4px;
+    text-decoration-color: var(--color-burgundy);
+  }
 }
 
 /* State change animation for real-time updates */
@@ -304,25 +308,44 @@ input:focus-visible {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   BUTTON HOVER STATES
-   Explicit hover rules - Tailwind v4 CSS nesting not fully supported
+   BUTTON INTERACTIVE STATES
+   - :active for touch feedback (works on all devices)
+   - :hover wrapped in @media (hover: hover) for pointer devices only
+   Aligns with Tailwind v4 philosophy: hover as enhancement
 ═══════════════════════════════════════════════════════════════ */
 
-/* Secondary button - outline to filled on hover */
-button.border-navy:hover,
-a.border-navy:hover {
+/* Active states - touch feedback for all devices */
+button.border-navy:active,
+a.border-navy:active {
   background-color: var(--color-navy);
   color: var(--color-canvas);
 }
 
-/* Primary button (burgundy) - to navy on hover */
-button.bg-burgundy:hover,
-a.bg-burgundy:hover {
+button.bg-burgundy:active,
+a.bg-burgundy:active {
   background-color: var(--color-navy);
 }
 
-/* Sidebar button (navy) - to burgundy on hover */
-button.bg-navy:hover,
-a.bg-navy:hover {
+button.bg-navy:active,
+a.bg-navy:active {
   background-color: var(--color-burgundy);
+}
+
+/* Hover states - only for devices with pointer capability */
+@media (hover: hover) {
+  button.border-navy:hover,
+  a.border-navy:hover {
+    background-color: var(--color-navy);
+    color: var(--color-canvas);
+  }
+
+  button.bg-burgundy:hover,
+  a.bg-burgundy:hover {
+    background-color: var(--color-navy);
+  }
+
+  button.bg-navy:hover,
+  a.bg-navy:hover {
+    background-color: var(--color-burgundy);
+  }
 }

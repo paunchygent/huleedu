@@ -21,6 +21,7 @@
 
 ## Validation
 ```bash
+pdm run new-task
 pdm run validate-tasks
 pdm run python scripts/docs_mgmt/validate_docs_structure.py --verbose
 ```

@@ -8,24 +8,24 @@
  *
  * Uses the dashboard store for state management.
  */
-import { onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { useDashboardStore } from '@/stores/dashboard'
-import type { DashboardBatch } from '@/stores/dashboard'
-import SectionHeader from '@/components/dashboard/SectionHeader.vue'
-import ActionCard from '@/components/dashboard/ActionCard.vue'
-import LedgerTable from '@/components/dashboard/LedgerTable.vue'
-import LedgerRow from '@/components/dashboard/LedgerRow.vue'
+import { onMounted } from "vue";
+import { useRouter } from "vue-router";
+import { useDashboardStore } from "@/stores/dashboard";
+import type { DashboardBatch } from "@/stores/dashboard";
+import SectionHeader from "@/components/dashboard/SectionHeader.vue";
+import ActionCard from "@/components/dashboard/ActionCard.vue";
+import LedgerTable from "@/components/dashboard/LedgerTable.vue";
+import LedgerRow from "@/components/dashboard/LedgerRow.vue";
 
-const dashboardStore = useDashboardStore()
-const router = useRouter()
+const dashboardStore = useDashboardStore();
+const router = useRouter();
 
 onMounted(() => {
-  dashboardStore.fetchDashboard()
-})
+  dashboardStore.fetchDashboard();
+});
 
 function handleBatchClick(batch: DashboardBatch) {
-  router.push(`/app/batch/${batch.id}`)
+  router.push(`/app/batch/${batch.id}`);
 }
 </script>
 
@@ -47,8 +47,8 @@ function handleBatchClick(batch: DashboardBatch) {
         <h2 class="font-bold text-burgundy mb-2">Fel vid inläsning</h2>
         <p class="text-navy/80 mb-4">{{ dashboardStore.error }}</p>
         <button
-          @click="dashboardStore.fetchDashboard"
           class="border border-navy text-navy px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-navy hover:text-white transition-colors"
+          @click="dashboardStore.fetchDashboard"
         >
           Försök igen
         </button>

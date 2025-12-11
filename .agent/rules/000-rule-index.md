@@ -93,6 +93,7 @@ scope: "all"
 - [085-database-migration-standards.md](mdc:085-database-migration-standards.md): Database migration standards for HuleEdu microservices
 - [086-mypy-configuration-standards.md](mdc:086-mypy-configuration-standards.md): MyPy configuration and monorepo type checking standards with module conflict resolution
 - [087-docker-development-container-patterns.md](mdc:087-docker-development-container-patterns.md): Docker development container patterns and optimization standards for layer caching and hot-reload
+- [088-notebook-colab-development-patterns.md](mdc:088-notebook-colab-development-patterns.md): Hybrid local/Colab notebook development patterns (environment isolation, secret injection, dynamic paths)
 - [090-documentation-standards.md](mdc:090-documentation-standards.md): Service, contract, and architectural documentation
 - [095-textual-tui-patterns.md](mdc:095-textual-tui-patterns.md): Textual TUI development patterns and corrections to AI training data
 

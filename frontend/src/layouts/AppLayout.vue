@@ -8,23 +8,23 @@
  *
  * Uses the brutalist ledger-frame pattern with strict grid alignment.
  */
-import { RouterView, useRoute } from 'vue-router'
-import { watch } from 'vue'
-import AppHeader from '@/components/layout/AppHeader.vue'
-import AppSidebar from '@/components/layout/AppSidebar.vue'
-import { useNavigationStore } from '@/stores/navigation'
+import { RouterView, useRoute } from "vue-router";
+import { watch } from "vue";
+import AppHeader from "@/components/layout/AppHeader.vue";
+import AppSidebar from "@/components/layout/AppSidebar.vue";
+import { useNavigationStore } from "@/stores/navigation";
 
-const route = useRoute()
-const navigationStore = useNavigationStore()
+const route = useRoute();
+const navigationStore = useNavigationStore();
 
 // Sync navigation state with route
 watch(
   () => route.path,
   (newPath) => {
-    navigationStore.setSectionFromRoute(newPath)
+    navigationStore.setSectionFromRoute(newPath);
   },
-  { immediate: true }
-)
+  { immediate: true },
+);
 </script>
 
 <template>

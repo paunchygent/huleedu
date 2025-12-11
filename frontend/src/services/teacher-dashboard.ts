@@ -1,9 +1,9 @@
-import { apiClient } from '@/lib/api-client'
+import { apiClient } from "@/lib/api-client";
 import {
   TeacherDashboardResponseSchema,
   type TeacherDashboardResponse,
   type BatchClientStatus,
-} from '@/schemas/teacher-dashboard'
+} from "@/schemas/teacher-dashboard";
 
 /**
  * Service for interacting with the Teacher Dashboard BFF endpoints.
@@ -31,22 +31,22 @@ export interface TeacherDashboardParams {
  * @throws ZodError if the response schema is invalid
  */
 export async function fetchTeacherDashboard(
-  params: TeacherDashboardParams = {}
+  params: TeacherDashboardParams = {},
 ): Promise<TeacherDashboardResponse> {
-  const searchParams = new URLSearchParams()
+  const searchParams = new URLSearchParams();
 
   if (params.limit !== undefined) {
-    searchParams.set('limit', params.limit.toString())
+    searchParams.set("limit", params.limit.toString());
   }
   if (params.offset !== undefined) {
-    searchParams.set('offset', params.offset.toString())
+    searchParams.set("offset", params.offset.toString());
   }
   if (params.status) {
-    searchParams.set('status', params.status)
+    searchParams.set("status", params.status);
   }
 
-  const query = searchParams.toString()
-  const endpoint = query ? `/bff/v1/teacher/dashboard?${query}` : '/bff/v1/teacher/dashboard'
+  const query = searchParams.toString();
+  const endpoint = query ? `/bff/v1/teacher/dashboard?${query}` : "/bff/v1/teacher/dashboard";
 
-  return apiClient.getWithValidation(endpoint, TeacherDashboardResponseSchema)
+  return apiClient.getWithValidation(endpoint, TeacherDashboardResponseSchema);
 }

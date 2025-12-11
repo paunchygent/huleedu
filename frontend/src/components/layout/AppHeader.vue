@@ -5,29 +5,29 @@
  * Structure:
  * [Logo Section | Page Title | Spacer | Credits | User | Logout]
  */
-import { useAuth } from '@/composables/useAuth'
-import { useAuthStore } from '@/stores/auth'
-import { useDashboardStore } from '@/stores/dashboard'
+import { useAuth } from "@/composables/useAuth";
+import { useAuthStore } from "@/stores/auth";
+import { useDashboardStore } from "@/stores/dashboard";
 
-const { logout } = useAuth()
-const authStore = useAuthStore()
-const dashboardStore = useDashboardStore()
+const { logout } = useAuth();
+const authStore = useAuthStore();
+const dashboardStore = useDashboardStore();
 
 // Get user initials
 function getUserInitials(): string {
-  const user = authStore.user
-  if (!user?.email) return '?'
-  const name = user.email.split('@')[0]
-  const parts = name.split(/[._-]/)
+  const user = authStore.user;
+  if (!user?.email) return "?";
+  const name = user.email.split("@")[0];
+  const parts = name.split(/[._-]/);
   if (parts.length >= 2) {
-    return (parts[0][0] + parts[1][0]).toUpperCase()
+    return (parts[0][0] + parts[1][0]).toUpperCase();
   }
-  return name.substring(0, 2).toUpperCase()
+  return name.substring(0, 2).toUpperCase();
 }
 
 function formatCredits(credits: number | null): string {
-  if (credits === null) return '---'
-  return `${credits} SEK`
+  if (credits === null) return "---";
+  return `${credits} SEK`;
 }
 </script>
 
@@ -71,8 +71,8 @@ function formatCredits(credits: number | null): string {
 
       <!-- Logout -->
       <button
-        @click="logout"
         class="h-full px-6 flex items-center justify-center hover:bg-navy hover:text-white cursor-pointer transition-colors"
+        @click="logout"
       >
         <span class="text-xs font-bold uppercase tracking-widest">Logga ut</span>
       </button>

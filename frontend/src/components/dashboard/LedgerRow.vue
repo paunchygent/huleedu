@@ -5,10 +5,10 @@
  * States: attention, processing, complete, archived
  * Uses the ledger-row hover pattern from main.css
  */
-import { computed } from 'vue'
-import type { DashboardBatch } from '@/stores/dashboard'
-import ProgressBar from '@/components/ui/ProgressBar.vue'
-import PulsingDot from '@/components/ui/PulsingDot.vue'
+import { computed } from "vue";
+import type { DashboardBatch } from "@/stores/dashboard";
+import ProgressBar from "@/components/ui/ProgressBar.vue";
+import PulsingDot from "@/components/ui/PulsingDot.vue";
 
 interface Props {
   batch: DashboardBatch
@@ -17,111 +17,111 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   isAnimating: false,
-})
+});
 
 const emit = defineEmits<{
-  (e: 'click', batch: DashboardBatch): void
-}>()
+  (e: "click", batch: DashboardBatch): void
+}>();
 
 // Compute the display title with optional class name
 const displayTitle = computed(() => {
   if (props.batch.className) {
-    return props.batch.className + ' \u00B7 ' + props.batch.title
+    return props.batch.className + " \u00B7 " + props.batch.title;
   }
-  return props.batch.title
-})
+  return props.batch.title;
+});
 
 // Compute the subtitle based on state
 const subtitle = computed(() => {
-  if (props.batch.state === 'attention' && props.batch.deviationCount) {
-    return props.batch.deviationCount + ' avvikelser kräver åtgärd'
+  if (props.batch.state === "attention" && props.batch.deviationCount) {
+    return props.batch.deviationCount + " avvikelser kräver åtgärd";
   }
-  const suffix = props.batch.progressLabel ? ' \u00B7 ' + props.batch.progressLabel : ''
-  return props.batch.totalEssays + ' texter' + suffix
-})
+  const suffix = props.batch.progressLabel ? " \u00B7 " + props.batch.progressLabel : "";
+  return props.batch.totalEssays + " texter" + suffix;
+});
 
 // Get row classes based on state
 const rowClasses = computed(() => {
-  const base = 'grid grid-cols-12 ledger-row cursor-pointer bg-white'
-  const batch = props.batch
+  const base = "grid grid-cols-12 ledger-row cursor-pointer bg-white";
+  const batch = props.batch;
 
   switch (batch.state) {
-    case 'attention':
-      return base + ' border-b-2 border-burgundy bg-burgundy/[0.02]'
-    case 'processing':
-      return base + ' border-b border-navy'
+    case "attention":
+      return base + " border-b-2 border-burgundy bg-burgundy/[0.02]";
+    case "processing":
+      return base + " border-b border-navy";
     default:
-      return base + ' border-b border-navy'
+      return base + " border-b border-navy";
   }
-})
+});
 
 // Processing state left border color
 const processingBorderClass = computed(() => {
-  if (props.batch.state !== 'processing') return ''
-  return props.batch.isHighPriority ? 'border-l-4 border-l-burgundy' : 'border-l-4 border-l-navy'
-})
+  if (props.batch.state !== "processing") return "";
+  return props.batch.isHighPriority ? "border-l-4 border-l-burgundy" : "border-l-4 border-l-navy";
+});
 
 // Get status label color
 const statusColor = computed(() => {
-  const batch = props.batch
+  const batch = props.batch;
   switch (batch.state) {
-    case 'attention':
-      return 'text-burgundy font-bold'
-    case 'processing':
-      return batch.isHighPriority ? 'text-burgundy' : 'text-navy/60'
-    case 'complete':
-      return 'text-navy/40'
-    case 'archived':
-      return 'text-navy/30'
+    case "attention":
+      return "text-burgundy font-bold";
+    case "processing":
+      return batch.isHighPriority ? "text-burgundy" : "text-navy/60";
+    case "complete":
+      return "text-navy/40";
+    case "archived":
+      return "text-navy/30";
     default:
-      return 'text-navy/40'
+      return "text-navy/40";
   }
-})
+});
 
 // Get title opacity based on state
 const titleOpacity = computed(() => {
   switch (props.batch.state) {
-    case 'complete':
-      return 'text-navy/70'
-    case 'archived':
-      return 'text-navy/60'
+    case "complete":
+      return "text-navy/70";
+    case "archived":
+      return "text-navy/60";
     default:
-      return 'text-navy'
+      return "text-navy";
   }
-})
+});
 
 // Get subtitle color
 const subtitleColor = computed(() => {
-  if (props.batch.state === 'attention') {
-    return 'text-burgundy'
+  if (props.batch.state === "attention") {
+    return "text-burgundy";
   }
   switch (props.batch.state) {
-    case 'archived':
-      return 'text-navy/30'
-    case 'complete':
-      return 'text-navy/40'
+    case "archived":
+      return "text-navy/30";
+    case "complete":
+      return "text-navy/40";
     default:
-      return 'text-navy/50'
+      return "text-navy/50";
   }
-})
+});
 
 // Get progress message for complete/archived states
 const progressMessage = computed(() => {
   if (props.batch.progressLabel) {
-    return props.batch.progressLabel
+    return props.batch.progressLabel;
   }
-  return 'Redo for export'
-})
+  return "Redo for export";
+});
 
 // Progress bar variant
 const progressVariant = computed(() => {
-  return props.batch.isHighPriority ? 'burgundy' : 'navy'
-})
+  return props.batch.isHighPriority ? "burgundy" : "navy";
+});
 
 // Pulsing dot variant
 const dotVariant = computed(() => {
-  return props.batch.isHighPriority ? 'burgundy' : 'navy'
-})
+  return props.batch.isHighPriority ? "burgundy" : "navy";
+});
 </script>
 
 <template>

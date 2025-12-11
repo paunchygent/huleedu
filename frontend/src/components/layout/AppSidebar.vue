@@ -7,10 +7,10 @@
  * [Spacer]
  * [Ny Bunt button]
  */
-import { RouterLink } from 'vue-router'
-import { useNavigationStore } from '@/stores/navigation'
+import { RouterLink } from "vue-router";
+import { useNavigationStore } from "@/stores/navigation";
 
-const navigationStore = useNavigationStore()
+const navigationStore = useNavigationStore();
 </script>
 
 <template>

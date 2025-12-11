@@ -5,23 +5,23 @@
  * Used in the "Kräver åtgärd" section for items requiring teacher attention.
  * Matches the prototype primary action card layout.
  */
-import type { ActionItem } from '@/stores/dashboard'
-import { useRouter } from 'vue-router'
-import PulsingDot from '@/components/ui/PulsingDot.vue'
+import type { ActionItem } from "@/stores/dashboard";
+import { useRouter } from "vue-router";
+import PulsingDot from "@/components/ui/PulsingDot.vue";
 
 interface Props {
   item: ActionItem
 }
 
-const props = defineProps<Props>()
-const router = useRouter()
+const props = defineProps<Props>();
+const router = useRouter();
 
 function handlePrimaryAction() {
-  router.push(props.item.primaryAction.route)
+  router.push(props.item.primaryAction.route);
 }
 
 function handleSecondaryAction() {
-  router.push(props.item.secondaryAction.route)
+  router.push(props.item.secondaryAction.route);
 }
 </script>
 
@@ -45,14 +45,14 @@ function handleSecondaryAction() {
 
       <div class="mt-8 flex gap-4">
         <button
-          @click="handlePrimaryAction"
           class="btn-brutal bg-burgundy text-white px-6 py-3 text-xs font-bold uppercase tracking-widest hover:bg-navy shadow-brutal-sm transition-all duration-75"
+          @click="handlePrimaryAction"
         >
           {{ item.primaryAction.label }}
         </button>
         <button
-          @click="handleSecondaryAction"
           class="border border-navy text-navy px-6 py-3 text-xs font-bold uppercase tracking-widest hover:bg-navy hover:text-white transition-colors"
+          @click="handleSecondaryAction"
         >
           {{ item.secondaryAction.label }}
         </button>

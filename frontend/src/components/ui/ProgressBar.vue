@@ -8,14 +8,14 @@
 
 interface Props {
   percent: number
-  variant?: 'navy' | 'burgundy'
+  variant?: "navy" | "burgundy"
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  variant: 'navy',
-})
+  variant: "navy",
+});
 
-const fillClass = props.variant === 'burgundy' ? 'bg-burgundy' : 'bg-navy'
+const fillClass = props.variant === "burgundy" ? "bg-burgundy" : "bg-navy";
 </script>
 
 <template>

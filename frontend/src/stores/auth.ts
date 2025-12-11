@@ -1,5 +1,5 @@
-import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { defineStore } from "pinia";
+import { ref, computed } from "vue";
 
 export interface User {
   id: string
@@ -8,24 +8,24 @@ export interface User {
   roles: string[]
 }
 
-export const useAuthStore = defineStore('auth', () => {
+export const useAuthStore = defineStore("auth", () => {
   // State
-  const token = ref<string | null>(null)
-  const user = ref<User | null>(null)
+  const token = ref<string | null>(null);
+  const user = ref<User | null>(null);
 
   // Getters
-  const isAuthenticated = computed(() => token.value !== null)
-  const userRoles = computed(() => user.value?.roles ?? [])
+  const isAuthenticated = computed(() => token.value !== null);
+  const userRoles = computed(() => user.value?.roles ?? []);
 
   // Actions
   function setAuth(newToken: string, newUser: User) {
-    token.value = newToken
-    user.value = newUser
+    token.value = newToken;
+    user.value = newUser;
   }
 
   function clearAuth() {
-    token.value = null
-    user.value = null
+    token.value = null;
+    user.value = null;
   }
 
   return {
@@ -38,5 +38,5 @@ export const useAuthStore = defineStore('auth', () => {
     // Actions
     setAuth,
     clearAuth,
-  }
-})
+  };
+});

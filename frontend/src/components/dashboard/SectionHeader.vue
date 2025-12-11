@@ -8,16 +8,16 @@
 interface Props {
   title: string
   count?: number
-  variant?: 'burgundy' | 'navy'
+  variant?: "burgundy" | "navy"
   showBorder?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  variant: 'navy',
+  variant: "navy",
   showBorder: false,
-})
+});
 
-const dotClass = props.variant === 'burgundy' ? 'bg-burgundy' : 'bg-navy'
+const dotClass = props.variant === "burgundy" ? "bg-burgundy" : "bg-navy";
 </script>
 
 <template>
