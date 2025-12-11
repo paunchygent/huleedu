@@ -2,7 +2,7 @@
 /**
  * ActionCard - Primary action card with countdown timer
  *
- * Used in the "Kraver atgard" section for items requiring teacher attention.
+ * Used in the "Kräver åtgärd" section for items requiring teacher attention.
  * Matches the prototype primary action card layout.
  */
 import type { ActionItem } from '@/stores/dashboard'

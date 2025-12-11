@@ -34,7 +34,7 @@ const displayTitle = computed(() => {
 // Compute the subtitle based on state
 const subtitle = computed(() => {
   if (props.batch.state === 'attention' && props.batch.deviationCount) {
-    return props.batch.deviationCount + ' avvikelser kraver atgard'
+    return props.batch.deviationCount + ' avvikelser kräver åtgärd'
   }
   const suffix = props.batch.progressLabel ? ' \u00B7 ' + props.batch.progressLabel : ''
   return props.batch.totalEssays + ' texter' + suffix
@@ -157,7 +157,7 @@ const dotVariant = computed(() => {
         </span>
       </template>
       <template v-else-if="batch.state === 'attention'">
-        <span class="text-xs text-burgundy">Hantera innan autobekraftelse &#8594;</span>
+        <span class="text-xs text-burgundy">Hantera innan autobekräftelse &#8594;</span>
       </template>
       <template v-else-if="batch.state === 'complete'">
         <span class="text-xs text-navy/50">{{ progressMessage }} &#8594;</span>

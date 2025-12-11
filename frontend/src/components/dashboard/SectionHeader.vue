@@ -2,7 +2,7 @@
 /**
  * SectionHeader - Section title with dot indicator
  *
- * Used for dashboard sections like "Kraver atgard" and "Pagaende och Arkiverat"
+ * Used for dashboard sections like "Kräver åtgärd" and "Pågående och Arkiverat"
  */
 
 interface Props {

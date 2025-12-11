@@ -44,23 +44,23 @@ function handleBatchClick(batch: DashboardBatch) {
     <!-- Error state -->
     <div v-else-if="dashboardStore.error" class="p-10">
       <div class="bg-white border-2 border-burgundy p-6">
-        <h2 class="font-bold text-burgundy mb-2">Fel vid inlasning</h2>
+        <h2 class="font-bold text-burgundy mb-2">Fel vid inläsning</h2>
         <p class="text-navy/80 mb-4">{{ dashboardStore.error }}</p>
         <button
           @click="dashboardStore.fetchDashboard"
           class="border border-navy text-navy px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-navy hover:text-white transition-colors"
         >
-          Forsok igen
+          Försök igen
         </button>
       </div>
     </div>
 
     <!-- Dashboard content -->
     <template v-else>
-      <!-- Section: Kraver atgard -->
+      <!-- Section: Kräver åtgärd -->
       <div v-if="dashboardStore.hasActionItems" class="p-10 pb-6 max-w-6xl">
         <SectionHeader
-          :title="'Kraver atgard'"
+          :title="'Kräver åtgärd'"
           :count="dashboardStore.attentionCount"
           variant="burgundy"
         />
@@ -72,10 +72,10 @@ function handleBatchClick(batch: DashboardBatch) {
         />
       </div>
 
-      <!-- Section: Pagaende och Arkiverat -->
+      <!-- Section: Pågående och Arkiverat -->
       <div class="p-10 pt-4 max-w-6xl">
         <SectionHeader
-          title="Pagaende och Arkiverat"
+          title="Pågående och Arkiverat"
           variant="navy"
           :show-border="true"
         />
@@ -97,9 +97,9 @@ function handleBatchClick(batch: DashboardBatch) {
         class="p-10 max-w-6xl"
       >
         <div class="bg-white border-2 border-navy p-8 text-center">
-          <h2 class="font-bold text-navy mb-2">Inga inlamningar</h2>
+          <h2 class="font-bold text-navy mb-2">Inga inlämningar</h2>
           <p class="text-navy/60 mb-6">
-            Du har inga batchar annu. Skapa en ny bunt for att komma igang.
+            Du har inga batchar ännu. Skapa en ny bunt för att komma igång.
           </p>
           <button
             class="btn-brutal bg-navy text-white px-6 py-3 text-xs font-bold uppercase tracking-widest hover:bg-burgundy shadow-brutal transition-all duration-75"
