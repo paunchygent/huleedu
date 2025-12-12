@@ -26,7 +26,7 @@ SCRIPT_DIR=$(cd -- "$(dirname "$0")" && pwd)
 REPO_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
 DEPS_IMAGE_TAG=""
 
-# IMPORTANT: Source .env file to ensure docker-compose uses .env values
+# IMPORTANT: Source .env file to ensure docker compose uses .env values
 # This overrides any conflicting shell environment variables
 if [ -f "$REPO_ROOT/.env" ]; then
     set -a  # automatically export all variables
@@ -123,9 +123,9 @@ build_dev() {
     ensure_deps_image ""
 
     if [ ${#services[@]} -gt 0 ]; then
-        docker-compose -f docker-compose.yml -f docker-compose.dev.yml build --parallel "${services[@]}"
+        docker compose -f docker-compose.yml -f docker-compose.dev.yml build --parallel "${services[@]}"
     else
-        docker-compose -f docker-compose.yml -f docker-compose.dev.yml build --parallel
+        docker compose -f docker-compose.yml -f docker-compose.dev.yml build --parallel
     fi
 
     echo_dev "Development build complete!"
@@ -144,9 +144,9 @@ build_clean_dev() {
     ensure_deps_image "clean"
 
     if [ ${#services[@]} -gt 0 ]; then
-        docker-compose -f docker-compose.yml -f docker-compose.dev.yml build --no-cache --parallel "${services[@]}"
+        docker compose -f docker-compose.yml -f docker-compose.dev.yml build --no-cache --parallel "${services[@]}"
     else
-        docker-compose -f docker-compose.yml -f docker-compose.dev.yml build --no-cache --parallel
+        docker compose -f docker-compose.yml -f docker-compose.dev.yml build --no-cache --parallel
     fi
 
     echo_dev "Clean development build complete!"
@@ -168,17 +168,17 @@ start_dev() {
     echo_info "Checking for required builds..."
     ensure_deps_image ""
     if [ ${#services[@]} -gt 0 ]; then
-        docker-compose -f docker-compose.yml -f docker-compose.dev.yml build --parallel "${services[@]}"
+        docker compose -f docker-compose.yml -f docker-compose.dev.yml build --parallel "${services[@]}"
     else
-        docker-compose -f docker-compose.yml -f docker-compose.dev.yml build --parallel
+        docker compose -f docker-compose.yml -f docker-compose.dev.yml build --parallel
     fi
 
     # Then start
     echo_info "Starting containers..."
     if [ ${#services[@]} -gt 0 ]; then
-        docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d "${services[@]}"
+        docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d "${services[@]}"
     else
-        docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+        docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
     fi
 
     echo_dev "Development environment running!"
@@ -202,9 +202,9 @@ start_dev_nobuild() {
     # Start without building
     echo_info "Starting containers..."
     if [ ${#services[@]} -gt 0 ]; then
-        docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d --no-build "${services[@]}"
+        docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --no-build "${services[@]}"
     else
-        docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d --no-build
+        docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --no-build
     fi
 
     echo_dev "Development environment running!"
@@ -223,9 +223,9 @@ stop_dev() {
     echo_dev "Stopping DEVELOPMENT containers: ${display}"
 
     if [ ${#services[@]} -gt 0 ]; then
-        docker-compose -f docker-compose.yml -f docker-compose.dev.yml stop "${services[@]}"
+        docker compose -f docker-compose.yml -f docker-compose.dev.yml stop "${services[@]}"
     else
-        docker-compose -f docker-compose.yml -f docker-compose.dev.yml stop
+        docker compose -f docker-compose.yml -f docker-compose.dev.yml stop
     fi
 
     echo_dev "Development containers stopped"
@@ -242,9 +242,9 @@ restart_dev() {
     echo_dev "Restarting DEVELOPMENT containers: ${display}"
 
     if [ ${#services[@]} -gt 0 ]; then
-        docker-compose -f docker-compose.yml -f docker-compose.dev.yml restart "${services[@]}"
+        docker compose -f docker-compose.yml -f docker-compose.dev.yml restart "${services[@]}"
     else
-        docker-compose -f docker-compose.yml -f docker-compose.dev.yml restart
+        docker compose -f docker-compose.yml -f docker-compose.dev.yml restart
     fi
 
     echo_dev "Development containers restarted"
@@ -300,11 +300,11 @@ recreate_dev() {
             echo_warn "No non-database services to recreate"
             return
         fi
-        docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d --force-recreate --no-build "${filtered[@]}"
+        docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --force-recreate --no-build "${filtered[@]}"
     else
         # Recreate all non-database services
         local all_services
-        all_services=$(docker-compose -f docker-compose.yml -f docker-compose.dev.yml config --services)
+        all_services=$(docker compose -f docker-compose.yml -f docker-compose.dev.yml config --services)
         local recreate_list=()
         for svc in $all_services; do
             local is_db=false
@@ -320,9 +320,9 @@ recreate_dev() {
         done
 
         if [ ${#recreate_list[@]} -gt 0 ]; then
-            docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d --force-recreate --no-build "${recreate_list[@]}"
+            docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --force-recreate --no-build "${recreate_list[@]}"
         else
-            echo_warn "No non-database services discovered via docker-compose config"
+            echo_warn "No non-database services discovered via docker compose config"
         fi
     fi
 
@@ -361,10 +361,10 @@ recreate_db_dev() {
 
     if [ ${#services[@]} -gt 0 ]; then
         # User specified services - recreate only those
-        docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d --force-recreate --no-build "${services[@]}"
+        docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --force-recreate --no-build "${services[@]}"
     else
         # Recreate all database services
-        docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d --force-recreate --no-build "${db_services[@]}"
+        docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --force-recreate --no-build "${db_services[@]}"
     fi
 
     echo_dev "Development database containers recreated"
@@ -382,9 +382,9 @@ remove_dev() {
     echo_warn "This will remove containers but preserve images"
 
     if [ ${#services[@]} -gt 0 ]; then
-        docker-compose -f docker-compose.yml -f docker-compose.dev.yml rm -f "${services[@]}"
+        docker compose -f docker-compose.yml -f docker-compose.dev.yml rm -f "${services[@]}"
     else
-        docker-compose -f docker-compose.yml -f docker-compose.dev.yml rm -f
+        docker compose -f docker-compose.yml -f docker-compose.dev.yml rm -f
     fi
 
     echo_dev "Development containers removed"
@@ -401,9 +401,9 @@ logs_dev() {
     echo_info "Press Ctrl+C to exit"
 
     if [ ${#services[@]} -gt 0 ]; then
-        docker-compose -f docker-compose.yml -f docker-compose.dev.yml logs -f --tail=50 "${services[@]}"
+        docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f --tail=50 "${services[@]}"
     else
-        docker-compose -f docker-compose.yml -f docker-compose.dev.yml logs -f --tail=50
+        docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f --tail=50
     fi
 }
 
@@ -417,9 +417,9 @@ ps_dev() {
     echo_dev "Container status (DEVELOPMENT): ${display}"
 
     if [ ${#services[@]} -gt 0 ]; then
-        docker-compose -f docker-compose.yml -f docker-compose.dev.yml ps "${services[@]}"
+        docker compose -f docker-compose.yml -f docker-compose.dev.yml ps "${services[@]}"
     else
-        docker-compose -f docker-compose.yml -f docker-compose.dev.yml ps
+        docker compose -f docker-compose.yml -f docker-compose.dev.yml ps
     fi
 }
 

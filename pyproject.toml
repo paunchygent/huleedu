@@ -360,7 +360,7 @@ markers = [
     "slow: marks tests as slow running",
     "performance: marks tests that perform load testing or performance benchmarking",
     "integration: marks tests requiring external services like Kafka",
-    "docker: marks tests that need docker-compose setup",
+    "docker: marks tests that need docker compose setup",
     "kafka: marks tests requiring a Kafka instance",
     "e2e: marks tests as end-to-end pipeline tests",
     "functional: marks functional tests that verify cross-service behavior",
@@ -401,7 +401,7 @@ typecheck-libs = {shell = "cd libs && mypy -p common_core -p huleedu_service_lib
 typecheck-common-core = {shell = "cd libs && mypy -p common_core --show-error-codes"}
 typecheck-service-libs = {shell = "cd libs && mypy -p huleedu_service_libs --show-error-codes"}
 typecheck-path = { shell = "mypy --config-file pyproject.toml --follow-imports=silent \"$@\"" }
-validate-config = "python scripts/validate_service_config.py"  # Validate service configurations against docker-compose
+validate-config = "python scripts/validate_service_config.py"  # Validate service configurations against docker compose
 validate-config-strict = "python scripts/validate_service_config.py --strict"  # Validate with warnings as errors
 validate-enum-drift = "python scripts/validate_enum_drift.py"  # Ensure Python enums exist in DB enums
 test-all = "pytest"

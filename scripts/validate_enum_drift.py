@@ -13,7 +13,7 @@ Usage:
     pdm run validate-enum-drift
     pdm run validate-enum-drift --strict  # also fails on extra DB values
 
-The script expects local dev databases (docker-compose.dev) to be running and
+The script expects local dev databases (docker compose dev) to be running and
 credentials in `.env` (HULEEDU_DB_USER / HULEEDU_DB_PASSWORD).
 """
 

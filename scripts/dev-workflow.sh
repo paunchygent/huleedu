@@ -30,7 +30,7 @@ build_with_cache() {
     
     # First, build only dependency layers (these cache well)
     echo_info "Step 1: Building dependency layers..."
-    docker-compose build --parallel $services
+    docker compose build --parallel $services
     
     echo_info "Build complete! Services: $services"
 }
@@ -42,12 +42,12 @@ build_dev_service() {
     if [ -z "$service" ]; then
         echo_info "Building all services for development..."
         # Build all services with dev configuration in parallel
-        docker-compose -f docker-compose.yml -f docker-compose.dev.yml build --parallel
+        docker compose -f docker-compose.yml -f docker-compose.dev.yml build --parallel
         echo_info "Development build complete for all services"
     else
         echo_info "Building $service for development..."
         # Build specific service with dev configuration
-        docker-compose -f docker-compose.yml -f docker-compose.dev.yml build $service
+        docker compose -f docker-compose.yml -f docker-compose.dev.yml build $service
         echo_info "Development build complete for $service"
     fi
 }
@@ -58,10 +58,10 @@ start_dev() {
     echo_info "Starting development environment with hot-reload..."
     
     # Use development compose with volume mounts
-    docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d $services
+    docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d $services
     
     echo_info "Development environment started. Code changes will be auto-reloaded."
-    echo_info "View logs with: docker-compose -f docker-compose.yml -f docker-compose.dev.yml logs -f $services"
+    echo_info "View logs with: docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f $services"
 }
 
 # Function to do incremental rebuild (only changed services)
@@ -69,7 +69,7 @@ incremental_build() {
     echo_info "Performing incremental build (detects changes automatically)..."
     
     # Build without --no-cache to use layer caching
-    docker-compose build --parallel
+    docker compose build --parallel
     
     echo_info "Incremental build complete!"
 }
@@ -81,9 +81,9 @@ clean_build() {
     
     # Remove images first
     if [ -n "$services" ]; then
-        docker-compose build --no-cache --parallel $services
+        docker compose build --no-cache --parallel $services
     else
-        docker-compose build --no-cache --parallel
+        docker compose build --no-cache --parallel
     fi
     
     echo_info "Clean build complete!"

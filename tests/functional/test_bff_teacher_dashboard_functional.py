@@ -2,7 +2,7 @@
 Functional Tests for BFF Teacher Dashboard Endpoint
 
 Tests the BFF Teacher Service dashboard endpoint with real backend services
-(RAS, CMS) running via docker-compose.
+(RAS, CMS) running via docker compose.
 
 Requires:
 - `pdm run dev-start` to start the full service stack
@@ -31,7 +31,7 @@ from tests.utils.service_test_manager import ServiceTestManager
 class TestBFFTeacherDashboardFunctional:
     """Functional tests for BFF Teacher dashboard endpoint.
 
-    These tests require the full docker-compose stack to be running.
+    These tests require the full docker compose stack to be running.
     They validate HTTP communication across BFF → RAS and BFF → CMS.
     """
 

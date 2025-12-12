@@ -14,12 +14,30 @@ All completed work, patterns, and decisions live in:
 
 ## CURRENT STATUS (2025-12-12)
 
+### Teacher Dashboard Live Data Integration (Planning Complete)
+
+Created inside-out roadmap with 7 new stories (Phases 4-10) for backend→frontend integration:
+- `TASKS/programs/teacher_dashboard_integration/HUB.md` — updated with new phases
+- 7 new TASK files created, all status `blocked` pending prioritization
+- Task alignment updates applied:
+  - `current_phase` semantics clarified: `PhaseName | null`, only during pipeline execution (avoid “next phase” UX ambiguity)
+  - CMS validation endpoint specified as bulk (avoid N+1), using `pending_validation` semantics
+  - WebSocket updates specified via existing `TeacherNotificationRequestedV1` forwarding (no new contract)
+- **No code changes** — planning/documentation only
+- **Entry point:** Phase 4 `ras-processing-phase-derivation.md` (RAS current_phase fix)
+
+### ENG5 Heavy‑C provider_batch_api (Stabilized + Locally Validated)
+
 ENG5 Heavy‑C **provider_batch_api** harness coverage + metrics assertions are implemented:
 
 - CJ regular-batch docker semantics now has a provider_batch_api variant using the ENG5 runner metadata hint pipe.
 - ENG5 mock profile parity now includes a batch_api queue + job-metrics suite.
 - Harness scripts + CI workflow are extended to run both serial_bundle and batch_api slices.
 - TASK docs + runbooks are updated to reflect the new harness behavior.
+- Local validation (2025-12-12): both required slices pass repeatedly:
+  - `pdm run eng5-cj-docker-suite batch-api`
+  - `pdm run llm-mock-profile cj-generic-batch-api`
+- CI parity: provider_batch_api docker semantics passes with `CJ_ASSESSMENT_SERVICE_ENABLE_LLM_BATCHING_METADATA_HINTS=false` (matches `.github/workflows/eng5-heavy-suites.yml`).
 
 Source-of-truth trackers:
 - `TASKS/integrations/llm-provider-batch-api-phase-2.md` (Phase 2.5 complete)
@@ -55,6 +73,12 @@ Source-of-truth trackers:
   - Adds `batch-api` scenario: `pdm run eng5-cj-docker-suite batch-api`.
 - `scripts/llm_mgmt/mock_profile_helper.sh`
   - Adds `cj-generic-batch-api` profile and validates `LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE=batch_api`.
+- `tests/functional/conftest.py`
+  - Stabilises functional suite Redis cleanup:
+    - Bounded Redis readiness check (PING with retries).
+    - Uses `SCAN` instead of `KEYS` when deleting `test:*` / `ws:*` keys.
+- `tests/eng5_profiles/test_cj_mock_batch_api_metrics_generic.py`
+  - Fix: reads the 202 response body inside the `aiohttp` response context manager (prevents `ClientConnectionError: Connection closed`).
 - `.github/workflows/eng5-heavy-suites.yml`
   - Adds provider_batch_api docker step and cj-generic-batch-api profile step.
 - `.agent/rules/101-ci-lanes-and-heavy-suites.md`
@@ -97,19 +121,25 @@ Run:
 pdm run llm-mock-profile cj-generic-batch-api
 ```
 
+### Troubleshooting (Local)
+
+- If you see `Connection reset by peer` talking to Redis/Kafka/Postgres from the host (common with long-lived Docker Desktop infra), restart the affected containers and retry:
+  - `docker restart huleedu_redis`
+  - `docker restart huleedu_kafka`
+  - `docker restart huleedu_cj_assessment_db`
+
 ---
 
 ## NEXT SESSION INSTRUCTION
 
-Role: You are the lead developer and architect of HuleEdu. The scope of the next session is **stabilization + incremental expansion** of the batch_api heavy suites.
+Role: You are the lead developer and architect of HuleEdu. The scope of the next session is **stabilization** of the batch_api heavy suites.
 
 ### Focus
 1. Run the updated `ENG5 Heavy CJ/ENG5 Suites` CI workflow and confirm the new batch_api steps are green.
 2. If anything is flaky:
    - Prefer reducing request counts / timeouts in the new tests over adding retries.
    - Keep serial_bundle tests unchanged.
-3. Consider extending batch_api coverage beyond cj-generic:
-   - Add an `eng5-anchor` and/or `eng5-lower5` batch_api metrics slice (profile-level only) if needed.
+3. Keep batch_api Heavy‑C coverage limited to `cj_generic_batch` for now (avoid long-running profile expansion until we have stability + runtime budget).
 4. Optional observability polish:
    - Extend `scripts/cj_experiments_runners/eng5_np/logging_support.py::print_batching_metrics_hints` to include batch_api job metric PromQL hints.
 5. Keep `TASKS/` + runbooks aligned with any adjustments.

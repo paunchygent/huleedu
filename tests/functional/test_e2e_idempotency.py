@@ -6,7 +6,7 @@ Tests the v2 API with service namespacing and comprehensive error handling.
 
 Tests are organized into two categories:
 
-1. AUTHENTIC REDIS TESTS: Use real Redis instance from docker-compose
+1. AUTHENTIC REDIS TESTS: Use real Redis instance from docker compose
 2. CONTROLLED SCENARIO TESTS: Use test utilities for specific v2 edge cases
 
 This approach ensures both real-world validation and controlled testing scenarios,
@@ -37,10 +37,10 @@ from tests.utils.service_test_manager import ServiceTestManager
 
 
 class RealRedisTestHelper:
-    """Helper for testing with the actual Redis instance running in docker-compose."""
+    """Helper for testing with the actual Redis instance running in docker compose."""
 
     def __init__(self) -> None:
-        self.redis_url = "redis://localhost:6379"  # Real Redis from docker-compose
+        self.redis_url = "redis://localhost:6379"  # Real Redis from docker compose
         self.test_key_prefix = f"test:idempotency:{uuid.uuid4().hex[:8]}"
 
     async def cleanup_test_keys(self) -> None:
@@ -72,7 +72,7 @@ class RealRedisTestHelper:
 @pytest.mark.asyncio
 @pytest.mark.timeout(60)
 class TestAuthenticRedisIdempotency:
-    """E2E tests using the real Redis instance from docker-compose.
+    """E2E tests using the real Redis instance from docker compose.
 
     These tests validate v2 idempotency behavior with real Redis infrastructure
     to ensure the new service-namespaced keys and TTL configurations work correctly.

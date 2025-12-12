@@ -3,7 +3,7 @@ Migration test for total_budget and current_iteration defaults.
 
 Per rule 085.4: "Service-level smoke test: every service MUST provide an automated
 check (CI or local script) that provisions an ephemeral PostgreSQL instance
-(TestContainers or docker-compose) and runs `../../.venv/bin/alembic upgrade head`.
+(TestContainers or docker compose) and runs `../../.venv/bin/alembic upgrade head`.
 This regression test guards against enum/type duplication and other DDL conflicts
 before migrations merge."
 

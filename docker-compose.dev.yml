@@ -1,5 +1,5 @@
 # Development-optimized Docker Compose with volume mounts for hot-reload
-# Usage: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 # 
 # This file overrides ALL services to use development Dockerfiles and configurations.
 # It ensures that development containers are started instead of production ones.

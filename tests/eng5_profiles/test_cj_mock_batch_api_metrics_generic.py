@@ -133,10 +133,9 @@ class TestCJMockBatchApiMetricsGeneric:
                     headers={"Content-Type": "application/json"},
                 ) as response:
                     assert response.status == 202, f"Expected 202 (queued), got {response.status}"
-
-                data = await response.json()
-                queued = LLMQueuedResponse.model_validate(data)
-                request_ids.append(str(queued.queue_id))
+                    data = await response.json()
+                    queued = LLMQueuedResponse.model_validate(data)
+                    request_ids.append(str(queued.queue_id))
 
         callbacks: list[LLMComparisonResultV1] = []
 

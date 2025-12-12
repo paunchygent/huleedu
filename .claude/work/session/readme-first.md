@@ -146,6 +146,14 @@ curl http://localhost:<port>/healthz
 pdm run dev-logs [service]
 ```
 
+**Host port resets (Docker Desktop, long-lived infra):**
+```bash
+# If you see "Connection reset by peer" when tests hit Redis/Kafka/Postgres
+docker restart huleedu_redis
+docker restart huleedu_kafka
+docker restart huleedu_cj_assessment_db
+```
+
 **Database access:**
 ```bash
 source .env  # Required first

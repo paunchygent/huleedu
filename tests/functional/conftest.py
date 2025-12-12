@@ -8,7 +8,7 @@ and session-level resource management for optimal performance.
 import asyncio
 import logging
 import os
-from typing import AsyncGenerator
+from typing import Any, AsyncGenerator, cast
 
 import aiohttp
 import pytest
@@ -73,7 +73,7 @@ def _mock_llm_enabled() -> bool:
         if flag is not None:
             provided_flags.append(flag)
     if not provided_flags:
-        return True  # docker-compose defaults keep mock mode on
+        return True  # docker compose defaults keep mock mode on
     return all(flag.lower() not in {"false", "0", "no"} for flag in provided_flags)
 
 
@@ -139,10 +139,37 @@ async def ensure_kafka_topics() -> AsyncGenerator[None, None]:
 async def _delete_prefixed_keys(client: aioredis.Redis, prefixes: list[str]) -> None:
     """Delete keys matching the provided prefix patterns."""
     for prefix in prefixes:
-        keys = await client.keys(prefix)
-        if keys:
-            await client.delete(*keys)
-            logger.info(f"🧹 Cleared {len(keys)} Redis keys with prefix '{prefix}'")
+        keys_to_delete: list[str] = []
+        deleted_count = 0
+        async for key in client.scan_iter(match=prefix, count=1000):
+            keys_to_delete.append(key)
+            if len(keys_to_delete) >= 200:
+                await client.delete(*keys_to_delete)
+                deleted_count += len(keys_to_delete)
+                keys_to_delete.clear()
+
+        if keys_to_delete:
+            await client.delete(*keys_to_delete)
+            deleted_count += len(keys_to_delete)
+
+        if deleted_count:
+            logger.info(f"🧹 Cleared {deleted_count} Redis keys with prefix '{prefix}'")
+
+
+async def _wait_for_redis_ready(client: aioredis.Redis) -> None:
+    """Wait for Redis to accept commands (bounded retries)."""
+    deadline = asyncio.get_event_loop().time() + READINESS_TIMEOUT_SECONDS
+    last_error: Exception | None = None
+
+    while asyncio.get_event_loop().time() < deadline:
+        try:
+            await cast(Any, client.ping())
+            return
+        except Exception as exc:  # noqa: BLE001 - bounded retries for flaky local Docker networking
+            last_error = exc
+            await asyncio.sleep(READINESS_RETRY_SECONDS)
+
+    raise RuntimeError(f"Redis not ready after {READINESS_TIMEOUT_SECONDS}s: {last_error}")
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -157,6 +184,7 @@ async def cleanup_redis_test_keys() -> AsyncGenerator[None, None]:
         socket_timeout=5,
     )
     try:
+        await _wait_for_redis_ready(client)
         await _delete_prefixed_keys(client, ["test:*", "ws:*"])
         yield
         await _delete_prefixed_keys(client, ["test:*", "ws:*"])

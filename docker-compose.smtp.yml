@@ -2,7 +2,7 @@
 # 
 # Usage: 
 #   # Enable SMTP for all services
-#   docker-compose -f docker-compose.yml -f docker-compose.services.yml -f docker-compose.smtp.yml up -d
+#   docker compose -f docker-compose.yml -f docker-compose.services.yml -f docker-compose.smtp.yml up -d
 #   
 #   # Enable SMTP for development with hot-reload  
 #   EMAIL_EMAIL_PROVIDER=smtp pdm run dev dev email_service

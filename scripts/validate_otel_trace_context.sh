@@ -19,7 +19,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Priority services to validate (all services with logger timing fix applied)
-# Note: Container names match actual docker-compose service names
+# Note: Container names match actual docker compose service names
 # - essay_lifecycle: split into _api and _worker containers
 PRIORITY_SERVICES=(
     "batch_conductor_service"

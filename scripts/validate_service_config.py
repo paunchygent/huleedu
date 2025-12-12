@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate service configurations against docker-compose setup.
+"""Validate service configurations against docker compose setup.
 
 This script checks for common configuration issues:
 - Missing JWT_SECRET_KEY for services requiring authentication
@@ -133,7 +133,10 @@ class ConfigValidator:
             )
             self.error(
                 service_name,
-                (f"Inherits JWTValidationSettings but missing {required_var} in docker-compose"),
+                (
+                    f"Inherits JWTValidationSettings but missing {required_var} "
+                    "in docker compose config"
+                ),
                 fix,
             )
 
@@ -205,7 +208,7 @@ class ConfigValidator:
             # Service might not have a config.py (e.g., databases, infrastructure)
             return
 
-        # Get service environment variables from docker-compose
+        # Get service environment variables from docker compose
         service_env = service_config.get("environment", [])
 
         # Convert dict-style environment to list of strings
@@ -225,7 +228,7 @@ class ConfigValidator:
         """Run all validation checks."""
         print("🔍 Validating Service Configurations...\n")
 
-        # Load docker-compose
+        # Load docker compose
         try:
             compose_config = self.load_docker_compose()
         except Exception as e:
@@ -273,7 +276,7 @@ class ConfigValidator:
 def main() -> int:
     """Main entry point."""
     parser = argparse.ArgumentParser(
-        description="Validate service configurations against docker-compose setup"
+        description="Validate service configurations against docker compose setup"
     )
     parser.add_argument(
         "--strict",

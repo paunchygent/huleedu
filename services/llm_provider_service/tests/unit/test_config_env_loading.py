@@ -136,7 +136,7 @@ class TestDockerEnvironmentSimulation:
         """Simulate docker-compose.yml passing prefixed env vars to container."""
         # docker-compose.yml has:
         # - LLM_PROVIDER_SERVICE_OPENAI_API_KEY=${OPENAI_API_KEY}
-        # This means docker-compose reads OPENAI_API_KEY from .env
+        # This means docker compose reads OPENAI_API_KEY from .env
         # and passes it to container as LLM_PROVIDER_SERVICE_OPENAI_API_KEY
 
         docker_env = {

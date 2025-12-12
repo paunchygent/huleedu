@@ -6,7 +6,7 @@ This script ensures all service databases are properly initialized with:
 1. Applied migrations (via Alembic)
 2. Seeded reference data (courses, etc.)
 
-Run this after docker-compose up or database reset.
+Run this after docker compose up or database reset.
 """
 
 import asyncio

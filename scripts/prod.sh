@@ -46,7 +46,7 @@ build_prod() {
     echo_info "Using Dockerfile with 'production' target"
     echo_info "Optimizations enabled, debug features disabled"
 
-    docker-compose build --parallel $services
+    docker compose build --parallel $services
 
     echo_prod "Production build complete!"
 }
@@ -57,7 +57,7 @@ build_clean_prod() {
     echo_prod "Clean build for PRODUCTION (no cache): ${services:-all services}"
     echo_warn "This will take longer as all layers will be rebuilt"
 
-    docker-compose build --no-cache --parallel $services
+    docker compose build --no-cache --parallel $services
 
     echo_prod "Clean production build complete!"
 }
@@ -71,11 +71,11 @@ start_prod() {
 
     # Build first if needed
     echo_info "Checking for required builds..."
-    docker-compose build --parallel $services
+    docker compose build --parallel $services
 
     # Then start
     echo_info "Starting containers..."
-    docker-compose up -d $services
+    docker compose up -d $services
 
     echo_prod "Production environment running!"
     echo_info "View logs: pdm run prod-logs ${services}"
@@ -86,7 +86,7 @@ stop_prod() {
     local services="$1"
     echo_prod "Stopping PRODUCTION containers: ${services:-all}"
 
-    docker-compose stop $services
+    docker compose stop $services
 
     echo_prod "Production containers stopped"
 }
@@ -97,7 +97,7 @@ restart_prod() {
     echo_prod "Restarting PRODUCTION containers: ${services:-all}"
     echo_warn "This performs a graceful restart"
 
-    docker-compose restart $services
+    docker compose restart $services
 
     echo_prod "Production containers restarted"
 }
@@ -108,7 +108,7 @@ remove_prod() {
     echo_prod "Removing PRODUCTION containers: ${services:-all}"
     echo_warn "This will remove containers but preserve images"
 
-    docker-compose rm -f $services
+    docker compose rm -f $services
 
     echo_prod "Production containers removed"
 }
@@ -119,7 +119,7 @@ logs_prod() {
     echo_prod "Following PRODUCTION logs: ${services:-all services}"
     echo_info "Press Ctrl+C to exit"
 
-    docker-compose logs -f --tail=50 $services
+    docker compose logs -f --tail=50 $services
 }
 
 # Health check for production
@@ -127,7 +127,7 @@ health_check() {
     echo_prod "Checking health of production services..."
 
     # List all running containers
-    local running=$(docker-compose ps --services --filter "status=running")
+    local running=$(docker compose ps --services --filter "status=running")
 
     if [ -z "$running" ]; then
         echo_error "No services are running"
@@ -162,7 +162,7 @@ deploy_prod() {
 
     # Start
     echo_info "Step 2/3: Starting services..."
-    docker-compose up -d $services
+    docker compose up -d $services
 
     # Give services time to initialize
     echo_info "Step 3/3: Waiting for services to stabilize..."
