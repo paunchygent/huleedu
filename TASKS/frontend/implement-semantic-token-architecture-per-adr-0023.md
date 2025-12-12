@@ -2,7 +2,7 @@
 id: 'implement-semantic-token-architecture-per-adr-0023'
 title: 'Implement semantic token architecture per ADR-0023'
 type: 'task'
-status: 'research'
+status: 'in_progress'
 priority: 'high'
 domain: 'frontend'
 service: ''
@@ -37,16 +37,17 @@ ADR-0023 defines a three-tier architecture: Primitives → Semantic → Componen
 
 ## Plan
 
-### Phase 1: Add primitive color scales (non-breaking)
-1. Define navy scale (50-900) in `main.css` @theme block
-2. Define burgundy scale (50-900)
-3. Ensure primitives pass contrast requirements
+### Phase 1: Add primitive color scales (non-breaking) ✅ COMPLETE (2025-12-11)
+1. ✅ Define navy scale (50-900) in `main.css` @theme block
+2. ✅ Define burgundy scale (50-900)
+3. ✅ Ensure primitives pass contrast requirements
 
-### Phase 2: Add semantic tokens
-1. Define `--color-text-primary` (navy-900, 4.9:1)
-2. Define `--color-text-secondary` (navy-700, 4.5:1)
-3. Define `--color-text-muted` (navy-500, 4.5:1 large text)
-4. Define `--color-text-disabled` (navy-400)
+### Phase 2: Add semantic tokens ✅ COMPLETE (2025-12-11)
+1. ✅ Define `--color-text-primary` (navy-900, 12:1)
+2. ✅ Define `--color-text-secondary` (navy-700, 7:1)
+3. ✅ Define `--color-text-muted` (navy-500, 4.5:1 large text)
+4. ✅ Define `--color-text-disabled` (navy-300)
+5. ✅ Add utility classes: `.text-primary`, `.text-secondary`, `.text-muted`, `.text-disabled`
 
 ### Phase 3: Replace inline opacity values
 Files to update:

@@ -12,16 +12,18 @@ import { RouterView, useRoute } from "vue-router";
 import { watch } from "vue";
 import AppHeader from "@/components/layout/AppHeader.vue";
 import AppSidebar from "@/components/layout/AppSidebar.vue";
+import MobileDrawer from "@/components/layout/MobileDrawer.vue";
 import { useNavigationStore } from "@/stores/navigation";
 
 const route = useRoute();
 const navigationStore = useNavigationStore();
 
-// Sync navigation state with route
+// Sync navigation state with route and close drawer on navigation
 watch(
   () => route.path,
   (newPath) => {
     navigationStore.setSectionFromRoute(newPath);
+    navigationStore.closeDrawer();
   },
   { immediate: true },
 );
@@ -29,6 +31,9 @@ watch(
 
 <template>
   <div class="font-sans text-navy h-screen flex flex-col overflow-hidden selection:bg-burgundy selection:text-white">
+    <!-- Mobile Drawer -->
+    <MobileDrawer />
+
     <!-- Header -->
     <AppHeader />
 

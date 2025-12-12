@@ -11,10 +11,47 @@
   --font-family-display: "IBM Plex Serif", Georgia, serif;
   --font-family-mono: "IBM Plex Mono", ui-monospace, monospace;
 
+  /* ═══════════════════════════════════════════════════════════════
+     PRIMITIVE COLOR SCALES
+     Derived from existing brand colors for visual coherence
+  ═══════════════════════════════════════════════════════════════ */
+
+  /* Navy scale - derived from base #1a1f2c */
+  --color-navy-50: #f5f6f7;
+  --color-navy-100: #e8eaec;
+  --color-navy-300: #9da3ad;
+  --color-navy-500: #525a68;
+  --color-navy-700: #333a47;
+  --color-navy-900: #1a1f2c;
+
+  /* Burgundy scale - derived from base #7a2e2e */
+  --color-burgundy-50: #fdf5f5;
+  --color-burgundy-100: #f9e6e6;
+  --color-burgundy-300: #c97575;
+  --color-burgundy-500: #9a4848;
+  --color-burgundy-700: #7a2e2e;
+  --color-burgundy-900: #5a1f1f;
+
+  /* ═══════════════════════════════════════════════════════════════
+     SEMANTIC TOKENS
+     Purpose-driven tokens that reference primitives
+  ═══════════════════════════════════════════════════════════════ */
+
+  /* Text colors - WCAG AA compliant */
+  --color-text-primary: var(--color-navy-900);
+  --color-text-secondary: var(--color-navy-700);
+  --color-text-muted: var(--color-navy-500);
+  --color-text-disabled: var(--color-navy-300);
+
+  /* ═══════════════════════════════════════════════════════════════
+     LEGACY BRAND COLORS
+     Retained for backward compatibility
+  ═══════════════════════════════════════════════════════════════ */
+
   /* Brand Colors - aligned with dashboard prototype */
   --color-canvas: #FDFBF7;
-  --color-navy: #1a1f2c;
-  --color-burgundy: #7a2e2e;
+  --color-navy: var(--color-navy-900);
+  --color-burgundy: var(--color-burgundy-700);
   --color-paper: #ffffff;
 
   /* Extended palette */
@@ -218,6 +255,12 @@ input:focus-visible {
 .border-navy { border-color: var(--color-navy); }
 .border-burgundy { border-color: var(--color-burgundy); }
 
+/* Semantic text utilities */
+.text-primary { color: var(--color-text-primary); }
+.text-secondary { color: var(--color-text-secondary); }
+.text-muted { color: var(--color-text-muted); }
+.text-disabled { color: var(--color-text-disabled); }
+
 /* Skip link for accessibility */
 .skip-link {
   position: absolute;
@@ -354,5 +397,46 @@ a.bg-navy:active {
   button.bg-navy:hover,
   a.bg-navy:hover {
     background-color: var(--color-burgundy);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MOBILE DRAWER
+   Slide-out navigation for mobile devices
+═══════════════════════════════════════════════════════════════ */
+
+/* Backdrop transition */
+.drawer-backdrop-enter-active,
+.drawer-backdrop-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.drawer-backdrop-enter-from,
+.drawer-backdrop-leave-to {
+  opacity: 0;
+}
+
+/* Drawer slide transition */
+.drawer-slide-enter-active,
+.drawer-slide-leave-active {
+  transition: transform 0.25s ease-out;
+}
+
+.drawer-slide-enter-from,
+.drawer-slide-leave-to {
+  transform: translateX(-100%);
+}
+
+/* Drawer nav item active states - touch feedback */
+.drawer-nav-item:active {
+  background-color: var(--color-navy);
+  color: var(--color-canvas);
+  border-color: var(--color-burgundy);
+}
+
+/* Drawer nav item hover - pointer devices only */
+@media (hover: hover) {
+  .drawer-nav-item:hover {
+    background-color: rgba(26, 31, 44, 0.05);
   }
 }

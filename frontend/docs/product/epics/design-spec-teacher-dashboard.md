@@ -960,7 +960,12 @@ Hamburger menu with slide-out drawer:
 - "Ny Bunt" CTA at bottom
 - Close on navigation or outside tap
 
-**Implementation:** Not yet implemented. Sidebar currently hidden on mobile.
+**Implementation:** ✅ Implemented (2025-12-11)
+
+- `MobileDrawer.vue` - Slide-out drawer component with Vue Teleport and Transition
+- `AppHeader.vue` - Hamburger button (mobile only) with responsive layout
+- `navigation.ts` - Drawer state management via Pinia store
+- `main.css` - Drawer animation styles (backdrop fade, panel slide)
 
 ### 9.5 Mobile LedgerRow Layout
 

@@ -13,6 +13,7 @@ export interface NavItem {
 export const useNavigationStore = defineStore("navigation", () => {
   // State
   const currentSection = ref<NavSection>("oversikt");
+  const isDrawerOpen = ref(false);
 
   // Getters
   const navItems = computed<NavItem[]>(() => [
@@ -53,14 +54,31 @@ export const useNavigationStore = defineStore("navigation", () => {
     }
   }
 
+  // Drawer actions
+  function openDrawer() {
+    isDrawerOpen.value = true;
+  }
+
+  function closeDrawer() {
+    isDrawerOpen.value = false;
+  }
+
+  function toggleDrawer() {
+    isDrawerOpen.value = !isDrawerOpen.value;
+  }
+
   return {
     // State
     currentSection,
+    isDrawerOpen,
     // Getters
     navItems,
     activeNavItem,
     // Actions
     setSection,
     setSectionFromRoute,
+    openDrawer,
+    closeDrawer,
+    toggleDrawer,
   };
 });
