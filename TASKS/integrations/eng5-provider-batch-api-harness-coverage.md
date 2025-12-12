@@ -2,7 +2,7 @@
 id: 'eng5-provider-batch-api-harness-coverage'
 title: 'ENG5 Provider Batch API Harness Coverage'
 type: 'task'
-status: 'research'
+status: completed
 priority: 'medium'
 domain: 'integrations'
 service: ''
@@ -10,7 +10,7 @@ owner_team: 'agents'
 owner: ''
 program: ''
 created: '2025-12-11'
-last_updated: '2025-12-11'
+last_updated: '2025-12-12'
 related: ['TASKS/integrations/llm-provider-batch-api-phase-2.md']
 labels: ['eng5', 'provider-batch-api', 'harness']
 ---
@@ -34,39 +34,36 @@ Design and implement ENG5‑focused harness coverage for `LLMBatchingMode.PROVID
 
 ## Plan
 
-1. **CJ ENG5 docker variants**
-   - Extend the regular ENG5 CJ docker semantics test (e.g. `tests/functional/cj_eng5/test_cj_regular_batch_callbacks_docker.py`) with a `provider_batch_api` variant; **small‑net coverage is explicitly out of scope for this task**.
-   - Configure trials so that:
-     - CJ’s effective batching mode is selected **per batch** via the ENG5 runner (`--llm-batching-mode provider_batch_api`), wired into `BatchConfigOverrides.llm_batching_mode_override` in CJ.
-     - LPS queue mode uses `QueueProcessingMode.BATCH_API` via env:
-       - `LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE=batch_api`
-       - Provider‑specific `*_BATCH_API_MODE` flags set per ADR‑0004.
-   - Assert CJ metrics:
+1. **CJ ENG5 docker variants** ✅
+   - Added a provider-batch regular-batch docker semantics test using ENG5 runner semantics:
+     - `tests/functional/cj_eng5/test_cj_regular_batch_provider_batch_api_docker.py`
+   - Harness entrypoint:
+     - `pdm run eng5-cj-docker-suite batch-api` (wired in `scripts/llm_mgmt/eng5_cj_docker_suite.sh`)
+   - Assertions:
      - `cj_llm_requests_total{batching_mode="provider_batch_api"} >= 1`
-     - `cj_llm_batches_started_total{batching_mode="provider_batch_api"} >= 1`.
+     - `cj_llm_batches_started_total{batching_mode="provider_batch_api"} >= 1`
+     - `CJBatchState.processing_metadata["llm_batching_mode"] == "provider_batch_api"`
+     - Stored original request contains `batch_config_overrides.llm_batching_mode_override == "provider_batch_api"`
 
-2. **ENG5 mock‑profile parity extensions**
-   - Add a provider‑batch profile/parameter to `tests/eng5_profiles/*` using the mock provider + ENG5 model pair.
-   - Assert LPS queue + job metrics for `batch_api` (keeping Prometheus‑style **seconds** as the canonical time unit, with bucket ranges chosen to cover multi‑hour jobs):
-     - `llm_provider_queue_wait_time_seconds{queue_processing_mode="batch_api",result}`
-     - `llm_provider_comparison_callbacks_total{queue_processing_mode="batch_api",result}`
-     - `llm_provider_batch_api_jobs_total{provider,model,status}`
-     - `llm_provider_batch_api_items_per_job{provider,model}`
-     - `llm_provider_batch_api_job_duration_seconds{provider,model}`.
+2. **ENG5 mock‑profile parity extensions** ✅
+   - Added a batch_api metrics-focused suite for `cj_generic_batch`:
+     - `tests/eng5_profiles/test_cj_mock_batch_api_metrics_generic.py`
+   - Added shared assertions:
+     - `tests/eng5_profiles/eng5_lps_metrics_assertions.py::assert_lps_batch_api_metrics_for_mock_profile`
+   - Added a helper profile to run it:
+     - `pdm run llm-mock-profile cj-generic-batch-api` (in `scripts/llm_mgmt/mock_profile_helper.sh`)
 
-3. **ENG5 runner configuration & observability**
-   - Rely on the existing ENG5 → CJ plumbing so that:
-     - `--llm-batching-mode` on the ENG5 runner sets `llm_batching_mode_hint` in request metadata, which CJ maps into `CJAssessmentRequestData.batch_config_overrides["llm_batching_mode_override"]` and then into `BatchConfigOverrides.llm_batching_mode_override` / `resolve_effective_llm_batching_mode(...)`.
-   - Ensure ENG5 docker/profile harness runs and artefacts clearly label provider‑batch trials (requested batching mode, effective CJ/LPS modes, job metrics snapshot), using the per‑batch override pipeline as a prerequisite rather than re‑implementing it here.
+3. **ENG5 runner configuration & observability** ✅
+   - Reused the existing pipe (`--llm-batching-mode` → `llm_batching_mode_hint` → CJ overrides) without re-implementation.
+   - Provider-batch docker semantics test validates the stored override payload to ensure the pipe is actually used.
 
-4. **Runbooks and CI lanes**
-   - Update `docs/operations/eng5-np-runbook.md` and `docs/operations/cj-assessment-runbook.md`:
-     - Document how to run ENG5 provider‑batch trials locally (flags, env, example commands).
-     - Clarify which suites exercise `provider_batch_api` vs `serial_bundle`.
-   - Plan for a future CI lane that:
-     - Uses an **instant‑return mock** for batch jobs (no long‑running “realistic” provider batch tests).
-     - Focuses on semantic correctness and metrics invariants rather than end‑to‑end wall‑clock behaviour.
-     - Is documented in `.agent/rules/101-ci-lanes-and-heavy-suites.md` once stable.
+4. **Runbooks and CI lanes** ✅
+   - Updated runbooks:
+     - `docs/operations/eng5-np-runbook.md`
+     - `docs/operations/cj-assessment-runbook.md`
+   - Updated CI + lane docs:
+     - `.github/workflows/eng5-heavy-suites.yml` (adds provider_batch_api + batch_api mock profile steps)
+     - `.agent/rules/101-ci-lanes-and-heavy-suites.md`
 
 ## Success Criteria
 

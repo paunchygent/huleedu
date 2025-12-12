@@ -10,7 +10,7 @@ owner_team: agents
 owner: ''
 program: ''
 created: '2025-11-27'
-last_updated: '2025-12-11'
+last_updated: '2025-12-12'
 related: ["docs/decisions/0004-llm-provider-batching-mode-selection.md", "docs/decisions/0015-cj-assessment-convergence-tuning-strategy.md", "docs/decisions/0017-cj-assessment-wave-submission-pattern.md", "docs/operations/cj-assessment-runbook.md", "docs/operations/eng5-np-runbook.md", "services/llm_provider_service/README.md", "TASKS/assessment/cj-llm-serial-bundle-validation-fixes.md", "TASKS/integrations/llm-provider-batch-api-phase-2.md"]
 labels: []
 ---
@@ -142,6 +142,11 @@ This task is a follow-on to `TASKS/assessment/cj-llm-serial-bundle-validation-fi
   - `pdm run pytest-root services/cj_assessment_service/tests/unit/test_workflow_continuation.py`
   - `pdm run pytest-root services/cj_assessment_service/tests/unit/test_comparison_processing.py -k provider_batch_api`
   - `pdm run pytest-root scripts/tests/test_eng5_np_runner.py -k batching`
+- ENG5 Heavy-C harness (docker/profile):
+  - CJ regular-batch docker semantics (provider_batch_api):
+    - `pdm run eng5-cj-docker-suite batch-api`
+  - LPS mock profile (batch_api queue + job metrics):
+    - `pdm run llm-mock-profile cj-generic-batch-api`
 - End-to-end smoke (after LPS side is ready):
   - ENG5 execute mode with `llm-batching-mode=provider_batch_api` and realistic `--max-comparisons`:
     - Confirm a single wave of comparisons is submitted from CJ.

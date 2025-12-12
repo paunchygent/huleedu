@@ -4,6 +4,7 @@
 #
 # Usage (from repo root, in an env-aware shell):
 #   pdm run llm-mock-profile cj-generic
+#   pdm run llm-mock-profile cj-generic-batch-api
 #   pdm run llm-mock-profile eng5-anchor
 #   pdm run llm-mock-profile eng5-lower5
 #
@@ -48,7 +49,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../../" && pwd)"
 PROFILE="${1:-}"
 if [[ -z "$PROFILE" ]]; then
   echo "Usage: $0 <profile>" >&2
-  echo "Profiles: cj-generic | eng5-anchor | eng5-lower5" >&2
+  echo "Profiles: cj-generic | cj-generic-batch-api | eng5-anchor | eng5-lower5" >&2
   exit 1
 fi
 
@@ -66,18 +67,26 @@ case "$PROFILE" in
   cj-generic)
     EXPECTED_MODE="cj_generic_batch"
     TEST_PATH="tests/eng5_profiles/test_cj_mock_parity_generic.py"
+    EXPECTED_QUEUE_MODE=""
+    ;;
+  cj-generic-batch-api)
+    EXPECTED_MODE="cj_generic_batch"
+    EXPECTED_QUEUE_MODE="batch_api"
+    TEST_PATH="tests/eng5_profiles/test_cj_mock_batch_api_metrics_generic.py"
     ;;
   eng5-anchor)
     EXPECTED_MODE="eng5_anchor_gpt51_low"
     TEST_PATH="tests/eng5_profiles/test_eng5_mock_parity_full_anchor.py"
+    EXPECTED_QUEUE_MODE=""
     ;;
   eng5-lower5)
     EXPECTED_MODE="eng5_lower5_gpt51_low"
     TEST_PATH="tests/eng5_profiles/test_eng5_mock_parity_lower5.py"
+    EXPECTED_QUEUE_MODE=""
     ;;
   *)
     echo "Unknown profile: $PROFILE" >&2
-    echo "Profiles: cj-generic | eng5-anchor | eng5-lower5" >&2
+    echo "Profiles: cj-generic | cj-generic-batch-api | eng5-anchor | eng5-lower5" >&2
     exit 1
     ;;
 esac
@@ -92,9 +101,17 @@ if [[ "${LLM_PROVIDER_SERVICE_MOCK_MODE:-}" != "$EXPECTED_MODE" ]]; then
   exit 1
 fi
 
+if [[ -n "${EXPECTED_QUEUE_MODE:-}" ]] && [[ "${LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE:-}" != "$EXPECTED_QUEUE_MODE" ]]; then
+  echo "LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE must be '$EXPECTED_QUEUE_MODE' for profile '$PROFILE' (current: '${LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE:-}')." >&2
+  exit 1
+fi
+
 echo "✅ .env mock profile validated:"
 echo "   LLM_PROVIDER_SERVICE_USE_MOCK_LLM=$LLM_PROVIDER_SERVICE_USE_MOCK_LLM"
 echo "   LLM_PROVIDER_SERVICE_MOCK_MODE=$LLM_PROVIDER_SERVICE_MOCK_MODE"
+if [[ -n "${EXPECTED_QUEUE_MODE:-}" ]]; then
+  echo "   LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE=$LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE"
+fi
 
 echo "🔄 Restarting llm_provider_service to pick up profile..."
 pdm run dev-recreate llm_provider_service

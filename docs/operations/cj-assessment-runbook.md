@@ -2,7 +2,7 @@
 type: runbook
 service: cj_assessment_service
 severity: high
-last_reviewed: 2025-12-07
+last_reviewed: 2025-12-12
 ---
 
 # CJ Assessment & LLM Provider Foundation (Working Reference)
@@ -279,11 +279,13 @@ Operational usage:
 - `LLMBatchingMode.SERIAL_BUNDLE`:
   - CJ submits comparisons in waves where compatible requests are bundled into single provider calls (`QueueProcessingMode.SERIAL_BUNDLE` in LPS).
   - Continuation logic may request additional waves when stability and budget heuristics indicate more comparisons are needed, including Phase‑2 RESAMPLING for small nets.
-- `LLMBatchingMode.PROVIDER_BATCH_API` (Phase 2 – in progress):
+- `LLMBatchingMode.PROVIDER_BATCH_API` (Phase 2):
   - Initial submission persists `"llm_batching_mode": "provider_batch_api"` into `CJBatchState.processing_metadata` and threads `cj_llm_batching_mode="provider_batch_api"` through LLM metadata hints.
   - `workflow_continuation.trigger_existing_workflow_continuation` resolves the effective batching mode from this metadata and, when it is `provider_batch_api`, **never calls** `comparison_processing.request_additional_comparisons_for_batch(...)`. No further comparison waves are scheduled once the initial provider‑batch wave has been submitted.
   - Finalization remains driven by the completion denominator / comparison budget, with success‑rate guards deciding between `FINALIZE_SCORING` and `FINALIZE_FAILURE`. Stability checks are diagnostic for this mode rather than a trigger for new waves.
-  - **Note:** Pair generation currently reuses the existing comparison‑budget normalization; a follow‑up slice (tracked in `TASKS/assessment/cj-llm-provider-batch-api-mode.md`) will tighten the “all‑at‑once up to cap” guarantee for large nets.
+  - ENG5 Heavy-C harness coverage:
+    - CJ docker semantics: `tests/functional/cj_eng5/test_cj_regular_batch_provider_batch_api_docker.py` asserts `cj_llm_requests_total{batching_mode="provider_batch_api"}` and `cj_llm_batches_started_total{batching_mode="provider_batch_api"}`.
+    - LPS mock profile: `tests/eng5_profiles/test_cj_mock_batch_api_metrics_generic.py` asserts `queue_processing_mode="batch_api"` metrics and job-level batch API metrics.
 
 ## Planned PR: staged submission for serial bundles (non-batch-API)
 - Purpose/story: prevent flooding the full comparison budget at once. Submit comparisons in waves (N bundles per wave), wait for callbacks, run stability check (`SCORE_STABILITY_THRESHOLD`, `MIN_COMPARISONS_FOR_STABILITY_CHECK`), then decide whether to enqueue the next wave. Goal: earlier convergence, lower cost/latency, clearer observability.

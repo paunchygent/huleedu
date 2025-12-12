@@ -2,7 +2,7 @@
 type: runbook
 service: global
 severity: medium
-last_reviewed: 2025-11-21
+last_reviewed: 2025-12-12
 ---
 
 # ENG5 NP Runner – Execute & Alignment Runbook
@@ -75,6 +75,36 @@ pdm run eng5-np-run \
 ```
 
 > Optional: `--max-comparisons N` is now published as metadata for CJ to interpret (the runner no longer slices essays locally). Set it only when you need downstream observability/cost limits.
+
+> Advanced rollout control: `--llm-batching-mode per_request|serial_bundle|provider_batch_api` publishes `llm_batching_mode_hint` in the CJ request envelope metadata. This is a per-batch hint only; CJ and LLM Provider remain authoritative via their own env vars.
+
+### Provider batch API trials (Phase 2)
+
+To request provider-native batching for a single ENG5 batch:
+
+1. Configure services (via `.env` + container restart):
+   - LPS: `LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE=batch_api`
+   - CJ: keep `CJ_ASSESSMENT_SERVICE_LLM_BATCHING_MODE=serial_bundle` (tests the per-batch override pipe)
+2. Run execute mode with the batching hint:
+
+```bash
+pdm run eng5-np-run \
+  --mode execute \
+  --batch-id dev-batch-batch-api-$(date +%Y%m%d-%H%M) \
+  --llm-batching-mode provider_batch_api \
+  --max-comparisons 200 \
+  --await-completion
+```
+
+Local harness validation (Heavy C-lane):
+
+```bash
+# CJ docker semantics: provider_batch_api variant
+pdm run eng5-cj-docker-suite batch-api
+
+# LPS mock profile: batch_api queue + job metrics
+pdm run llm-mock-profile cj-generic-batch-api
+```
 
 4. On success the CLI prints a comparison/cost summary and the artefact lives under
    `.claude/research/data/eng5_np_2016/assessment_run.execute.json`.

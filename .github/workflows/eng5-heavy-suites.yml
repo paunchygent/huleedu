@@ -52,6 +52,25 @@ jobs:
           pdm run eng5-cj-docker-suite regular
           pdm run eng5-cj-docker-suite small-net
 
+      - name: Run ENG5 CJ docker suite (provider_batch_api regular)
+        run: |
+          cat > .env << 'EOF'
+          # CI-generated for ENG5 heavy suites (provider_batch_api)
+          LLM_PROVIDER_SERVICE_USE_MOCK_LLM=true
+          LLM_PROVIDER_SERVICE_MOCK_MODE=cj_generic_batch
+          LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE=batch_api
+          LLM_PROVIDER_SERVICE_BATCH_API_MODE=disabled
+          LLM_PROVIDER_SERVICE_MOCK_PROVIDER_SEED=42
+          LLM_PROVIDER_SERVICE_ALLOW_MOCK_PROVIDER=true
+          CJ_ASSESSMENT_SERVICE_LLM_BATCHING_MODE=serial_bundle
+          CJ_ASSESSMENT_SERVICE_ENABLE_LLM_BATCHING_METADATA_HINTS=false
+          CJ_ASSESSMENT_SERVICE_PAIR_GENERATION_SEED=42
+          CJ_ASSESSMENT_SERVICE_MAX_PAIRWISE_COMPARISONS=288
+          EOF
+          sed -i 's/^[[:space:]]*//' .env
+          echo "Generated .env for provider_batch_api:" && cat .env
+          pdm run eng5-cj-docker-suite batch-api
+
   eng5-profile-parity-suite:
     name: ENG5 Mock Profile Parity Suite
     runs-on: ubuntu-latest
@@ -86,6 +105,20 @@ jobs:
           echo "Generated .env for cj-generic:" && cat .env
           pdm run llm-mock-profile cj-generic
 
+      - name: Run CJ generic mock profile batch_api metrics
+        run: |
+          cat > .env << 'EOF'
+          LLM_PROVIDER_SERVICE_USE_MOCK_LLM=true
+          LLM_PROVIDER_SERVICE_MOCK_MODE=cj_generic_batch
+          LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE=batch_api
+          LLM_PROVIDER_SERVICE_BATCH_API_MODE=disabled
+          LLM_PROVIDER_SERVICE_MOCK_PROVIDER_SEED=42
+          LLM_PROVIDER_SERVICE_ALLOW_MOCK_PROVIDER=true
+          EOF
+          sed -i 's/^[[:space:]]*//' .env
+          echo "Generated .env for cj-generic-batch-api:" && cat .env
+          pdm run llm-mock-profile cj-generic-batch-api
+
       - name: Run ENG5 anchor mock profile parity
         run: |
           cat > .env << 'EOF'
@@ -113,4 +146,3 @@ jobs:
           sed -i 's/^[[:space:]]*//' .env
           echo "Generated .env for eng5-lower5:" && cat .env
           pdm run llm-mock-profile eng5-lower5
-

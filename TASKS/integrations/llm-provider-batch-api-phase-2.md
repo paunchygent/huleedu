@@ -10,7 +10,7 @@ owner_team: 'agents'
 owner: ''
 program: ''
 created: '2025-12-10'
-last_updated: '2025-12-11'
+last_updated: '2025-12-12'
 related: ['docs/decisions/0004-llm-provider-batching-mode-selection.md', 'TASKS/assessment/cj-llm-provider-batch-api-mode.md', 'TASKS/integrations/eng5-provider-batch-api-harness-coverage.md']
 labels: []
 ---
@@ -280,9 +280,9 @@ Once Phase‑2 BATCH_API execution is implemented:
     - Normalize hints to `LLMBatchingMode` string values and feed them into `BatchConfigOverrides.llm_batching_mode_override` and `resolve_effective_llm_batching_mode(...)`.
 
 - **Phase 2.5 – ENG5 Heavy‑C coverage and runbooks**
-  - [ ] Extend ENG5 docker semantics tests with `provider_batch_api` variants.
-  - [ ] Extend ENG5 mock profile parity suite with `queue_processing_mode="batch_api"` metrics.
-  - [ ] Update:
+  - [x] Extend ENG5 docker semantics tests with `provider_batch_api` variants.
+  - [x] Extend ENG5 mock profile parity suite with `queue_processing_mode="batch_api"` metrics.
+  - [x] Update:
     - `docs/operations/eng5-np-runbook.md` (batch_api section).
     - `docs/operations/cj-assessment-runbook.md` (CJ modes table).
     - Any relevant CI lane docs (`.agent/rules/101-ci-lanes-and-heavy-suites.md`, ADR‑0004).

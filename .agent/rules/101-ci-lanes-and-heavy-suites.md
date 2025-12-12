@@ -2,7 +2,7 @@
 id: 101-ci-lanes-and-heavy-suites
 type: standards
 created: '2025-12-09'
-last_updated: '2025-12-09'
+last_updated: '2025-12-12'
 scope: all
 ---
 # 101: CI Lanes and Heavy Suites
@@ -86,22 +86,24 @@ This rule underpins ADR-0024 and EPIC-011 and complements `070-testing-and-quali
 ## 3. ENG5 Heavy Suite Placement
 
 ### 3.1 CJ Docker Semantics Tests
-- **Location**: `tests/functional/cj_eng5/test_cj_small_net_continuation_docker.py`, `tests/functional/cj_eng5/test_cj_regular_batch_resampling_docker.py`, `tests/functional/cj_eng5/test_cj_regular_batch_callbacks_docker.py`
+- **Location**: `tests/functional/cj_eng5/test_cj_small_net_continuation_docker.py`, `tests/functional/cj_eng5/test_cj_regular_batch_resampling_docker.py`, `tests/functional/cj_eng5/test_cj_regular_batch_callbacks_docker.py`, `tests/functional/cj_eng5/test_cj_regular_batch_provider_batch_api_docker.py`
 - **Lane**: C only.
 - **Execution**:
   - Local:
     - `pdm run eng5-cj-docker-suite`
     - `pdm run eng5-cj-docker-suite regular`
     - `pdm run eng5-cj-docker-suite small-net`
+    - `pdm run eng5-cj-docker-suite batch-api`
   - CI:
     - `eng5-cj-docker-regular-and-small-net` job in `.github/workflows/eng5-heavy-suites.yml`
 
 ### 3.2 ENG5 Mock Profile Parity Tests
-- **Location**: `tests/eng5_profiles/test_cj_mock_parity_generic.py`, `test_eng5_mock_parity_full_anchor.py`, `test_eng5_mock_parity_lower5.py`, `test_eng5_profile_suite.py`
+- **Location**: `tests/eng5_profiles/test_cj_mock_parity_generic.py`, `tests/eng5_profiles/test_cj_mock_batch_api_metrics_generic.py`, `test_eng5_mock_parity_full_anchor.py`, `test_eng5_mock_parity_lower5.py`, `test_eng5_profile_suite.py`
 - **Lane**: C only.
 - **Execution**:
   - Local:
     - `pdm run llm-mock-profile cj-generic`
+    - `pdm run llm-mock-profile cj-generic-batch-api`
     - `pdm run llm-mock-profile eng5-anchor`
     - `pdm run llm-mock-profile eng5-lower5`
   - CI:

@@ -6,6 +6,7 @@
 #   pdm run eng5-cj-docker-suite            # run both small-net and regular-batch CJ tests
 #   pdm run eng5-cj-docker-suite small-net  # only LOWER5 small-net CJ tests
 #   pdm run eng5-cj-docker-suite regular    # only regular-batch CJ tests
+#   pdm run eng5-cj-docker-suite batch-api  # regular-batch provider_batch_api variant
 #
 # This helper:
 #   - Ensures .env exists
@@ -72,6 +73,11 @@ run_regular_batch_tests() {
   pdm run pytest-root tests/functional/cj_eng5/test_cj_regular_batch_callbacks_docker.py -m 'docker and integration' -v
 }
 
+run_batch_api_regular_tests() {
+  echo "🧪 Running regular-batch CJ docker tests (provider_batch_api)..."
+  pdm run pytest-root tests/functional/cj_eng5/test_cj_regular_batch_provider_batch_api_docker.py -m 'docker and integration' -v
+}
+
 case "$SCENARIO" in
   small-net|small|lower5)
     run_small_net_tests
@@ -79,13 +85,16 @@ case "$SCENARIO" in
   regular|large|generic)
     run_regular_batch_tests
     ;;
+  batch-api|provider-batch-api|provider-batch)
+    run_batch_api_regular_tests
+    ;;
   all)
     run_small_net_tests
     run_regular_batch_tests
     ;;
   *)
     echo "Unknown scenario: $SCENARIO" >&2
-    echo "Usage: $0 [all|small-net|regular]" >&2
+    echo "Usage: $0 [all|small-net|regular|batch-api]" >&2
     exit 1
     ;;
 esac
