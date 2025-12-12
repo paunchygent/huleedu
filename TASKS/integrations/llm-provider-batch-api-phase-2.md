@@ -286,7 +286,10 @@ Once Phase‑2 BATCH_API execution is implemented:
     - `docs/operations/eng5-np-runbook.md` (batch_api section).
     - `docs/operations/cj-assessment-runbook.md` (CJ modes table).
     - Any relevant CI lane docs (`.agent/rules/101-ci-lanes-and-heavy-suites.md`, ADR‑0004).
-  - Note: per‑batch plumbing from ENG5 (`llm_batching_mode_hint`) into CJ’s `BatchConfigOverrides.llm_batching_mode_override` is now in place; this sub‑phase is blocked only on ENG5 docker/profile harness coverage and documentation updates (tracked in `TASKS/integrations/eng5-provider-batch-api-harness-coverage.md`).
+  - Note: ENG5 harness coverage is complete and validated locally via:
+    - `pdm run eng5-cj-docker-suite batch-api`
+    - `pdm run llm-mock-profile cj-generic-batch-api`
+    - Stability fixes are tracked in `TASKS/integrations/eng5-provider-batch-api-harness-coverage.md`.
 
 ## Recommended Implementation Sequence (Developer Checklist)
 

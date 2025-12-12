@@ -26,7 +26,7 @@ This is the **final step** in the inside-out integration. All backend work must 
 - RAS exposes accurate `current_phase`
 - BFF exposes extended fields (`failed_essays`, `completed_at`, `processing_phase`)
 - CMS validation endpoint provides `deviation_count`, `auto_confirm_deadline`
-- WebSocket pushes real-time updates
+- WebSocket pushes real-time updates (via existing `TeacherNotificationRequestedV1` forwarding)
 - Credits endpoint available
 
 Only then should frontend switch to live data.
@@ -76,11 +76,16 @@ export function mapBatchItemToDashboard(item: TeacherBatchItem): DashboardBatch 
 | `ready` | "Redo" | "Klicka för att starta" |
 | `processing` (spellcheck) | "Bearbetar" | "Stavningskontroll pågår" |
 | `processing` (cj_assessment) | "Bearbetar" | "CJ-bedömning pågår" |
-| `processing` (feedback) | "Bearbetar" | "Genererar feedback" |
+| `processing` (ai_feedback) | "Bearbetar" | "Genererar feedback" |
 | `completed_successfully` | "Klar" | "Redo för granskning" |
 | `completed_with_failures` | "Klar" | "{n} avvikelser" |
 | `failed` | "Misslyckades" | null |
 | `cancelled` | "Avbruten" | null |
+
+**Notes:**
+- `processing_phase` values are `PhaseName` enum values (`spellcheck`, `cj_assessment`, `ai_feedback`, ...).
+- AI feedback (`ai_feedback`) is next-sprint scope and may not appear in live data yet.
+- `processing_phase` may be `null` even when `status == processing` (e.g., non-pipeline workflow steps); UI must handle gracefully.
 
 **Time display:**
 - Processing: empty

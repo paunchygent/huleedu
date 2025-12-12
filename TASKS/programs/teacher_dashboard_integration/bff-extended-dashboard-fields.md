@@ -43,6 +43,9 @@ Current BFF dashboard endpoint returns minimal fields. RAS already has these fie
 - `services/bff_teacher_service/api/v1/teacher_routes.py`
 - `services/bff_teacher_service/tests/contract/*.py`
 
+**Enums:**
+- Prefer `PhaseName` from `common_core.pipeline_models` for `processing_phase` (avoid free-form strings).
+
 **Extended DTO:**
 ```python
 class TeacherBatchItemV1(BaseModel):
@@ -55,7 +58,7 @@ class TeacherBatchItemV1(BaseModel):
     failed_essays: int = 0              # NEW
     created_at: datetime
     completed_at: datetime | None = None # NEW
-    processing_phase: str | None = None  # NEW
+    processing_phase: PhaseName | None = None  # NEW (serializes as "spellcheck"/"cj_assessment"/...)
 ```
 
 **Field mapping in route:**

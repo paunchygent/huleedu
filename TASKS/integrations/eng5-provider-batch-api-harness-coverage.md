@@ -73,6 +73,18 @@ Design and implement ENG5‑focused harness coverage for `LLMBatchingMode.PROVID
 - ENG5 runbooks clearly describe how to run and interpret provider‑batch ENG5 trials, including the runner override and env settings.
 - `TASKS/integrations/llm-provider-batch-api-phase-2.md` Phase 2.5 checklist items for ENG5 coverage can be marked complete once this task’s work is merged and validated.
 
+## Stabilization Notes (2025-12-12)
+
+- Fixed `tests/eng5_profiles/test_cj_mock_batch_api_metrics_generic.py` to read the 202 response body inside the `aiohttp` response context manager (previously raised `ClientConnectionError: Connection closed`).
+- Hardened `tests/functional/conftest.py` Redis cleanup to:
+  - wait for Redis readiness via bounded `PING`, and
+  - use `SCAN` iteration instead of `KEYS` for deleting `test:*` / `ws:*` prefixed keys.
+- Deliberate scope limit: kept batch_api Heavy‑C coverage limited to `cj_generic_batch` to avoid expanding runtime with additional ENG5 profiles (anchor/lower5).
+- Local validation (host-driven, Docker-backed):
+  - `pdm run eng5-cj-docker-suite batch-api`
+  - `pdm run llm-mock-profile cj-generic-batch-api`
+- CI parity check (local): provider_batch_api docker semantics also passes with `CJ_ASSESSMENT_SERVICE_ENABLE_LLM_BATCHING_METADATA_HINTS=false` (matches `.github/workflows/eng5-heavy-suites.yml`).
+
 ## Related
 
 - `TASKS/integrations/llm-provider-batch-api-phase-2.md`

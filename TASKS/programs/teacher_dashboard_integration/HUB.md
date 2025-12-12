@@ -171,6 +171,7 @@ This programme establishes patterns for future BFF integrations:
 ## 7. Change Log
 
 - **2025-12-12** – Live data integration roadmap added: 7 new stories (Phases 4-10) for inside-out backend→frontend integration. Frontend live data switch blocked until all backend phases complete.
+- **2025-12-12** – Task alignment updates (Phases 4-10): `current_phase` derives as `PhaseName | null` only during pipeline execution; AI feedback maps to `PhaseName.AI_FEEDBACK` but is next-sprint scope; CMS validation endpoint specified as bulk (avoid N+1) with `pending_validation` semantics.
 - **2025-12-10 (session 8)** – Phase 3 completed: API contract validation. OpenAPI schema exported, TypeScript types created, 23 contract tests added.
 - **2025-12-10 (session 2)** – Functional tests validated (4/4 pass). Fixed BFF startup issue (`response_model=None` for union return types). Fixed RAS `ALLOWED_SERVICE_IDS` env var (prefix mismatch).
 - **2025-12-10** – Phase 1 completed: RAS/CMS clients with Dishka DI, 19 unit tests, middleware extraction.

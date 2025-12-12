@@ -147,6 +147,7 @@ This task is a follow-on to `TASKS/assessment/cj-llm-serial-bundle-validation-fi
     - `pdm run eng5-cj-docker-suite batch-api`
   - LPS mock profile (batch_api queue + job metrics):
     - `pdm run llm-mock-profile cj-generic-batch-api`
+  - Status 2025-12-12: both slices validated locally; see `TASKS/integrations/eng5-provider-batch-api-harness-coverage.md` for stabilization notes.
 - End-to-end smoke (after LPS side is ready):
   - ENG5 execute mode with `llm-batching-mode=provider_batch_api` and realistic `--max-comparisons`:
     - Confirm a single wave of comparisons is submitted from CJ.

@@ -34,48 +34,49 @@ For dashboard UX:
 
 ## Acceptance Criteria
 
-- [ ] Define batch update event contract (`BatchStatusUpdatedV1`)
-- [ ] BFF (or RAS) publishes batch updates to user's Redis channel
-- [ ] WebSocket service relays to connected frontend clients
-- [ ] Event includes all fields needed to update dashboard item
+- [ ] Define a `TeacherNotificationRequestedV1` notification_type + payload shape for dashboard batch updates
+- [ ] RAS publishes `TeacherNotificationRequestedV1` for relevant batch transitions (phase completion / batch completion)
+- [ ] WebSocket service relays notifications to connected frontend clients (existing forwarder pattern)
+- [ ] Payload includes all fields needed to update a dashboard item without refetching
 - [ ] Frontend Vue composable for WebSocket connection (separate frontend task)
 
 ## Implementation Notes
 
-**Event contract:**
-```python
-class BatchStatusUpdatedV1(BaseModel):
-    """WebSocket event for batch status change."""
-    event_type: Literal["batch_status_updated"] = "batch_status_updated"
-    batch_id: str
-    status: BatchClientStatus
-    completed_essays: int
-    failed_essays: int
-    processing_phase: str | None
-    completed_at: datetime | None
-```
+**Do NOT add a new WebSocket event contract model.**
 
-**Publishing pattern (in RAS or via Kafka consumer):**
+WebSocket delivery uses the existing `TeacherNotificationRequestedV1` contract
+(`common_core.events.notification_events.TeacherNotificationRequestedV1`), which the
+WebSocket service forwards to Redis and connected clients.
+
+**Publishing pattern (recommended):**
 ```python
-await redis_pubsub.publish_user_notification(
-    user_id=batch.user_id,
-    notification=BatchStatusUpdatedV1(
-        batch_id=batch.batch_id,
-        status=batch.status,
-        # ... other fields
-    ),
+# RAS emits TeacherNotificationRequestedV1 (via outbox + notification projector)
+TeacherNotificationRequestedV1(
+    teacher_id=<resolved teacher/user>,
+    notification_type="batch_status_updated",
+    category=WebSocketEventCategory.BATCH_PROGRESS,
+    priority=NotificationPriority.STANDARD,
+    payload={
+        "batch_id": "<uuid>",
+        "status": "<batch_client_status>",
+        "completed_essays": 12,
+        "failed_essays": 1,
+        "processing_phase": "spellcheck" | "cj_assessment" | None,
+        "completed_at": "<iso>" | None,
+    },
+    correlation_id="<corr>",
+    batch_id="<uuid>",
 )
 ```
 
-**Architecture decision needed:**
-- Option A: RAS publishes directly to Redis on status change
-- Option B: Dedicated Kafka consumer listens for batch events and publishes to Redis
-- Option C: BFF publishes when it detects changes (less real-time)
+**Architecture decision (set):**
+- RAS is the source of truth for batch status/progress and will publish dashboard update
+  notifications via `TeacherNotificationRequestedV1`.
+- WebSocket service remains a pure forwarder (no business logic, no polling, no Redis writes from BFF).
 
 **Files to modify:**
-- `services/websocket_service/` - ensure event type handling
-- `libs/common_core/` - event contract definition
-- RAS or dedicated consumer - publishing logic
+- `services/result_aggregator_service/` - publish `TeacherNotificationRequestedV1` on relevant transitions
+- `services/websocket_service/` - no new contract; validate forwarding behavior remains intact
 
 ## Blocked By
 

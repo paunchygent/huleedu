@@ -18,14 +18,20 @@ labels: ["entitlements", "credits", "bff"]
 
 ## Objective
 
-Expose user credit balance for dashboard display, determining whether this belongs in BFF or a dedicated entitlements service.
+Expose credit balance for dashboard display, deciding how the frontend should fetch it (BFF aggregation vs separate call).
 
 ## Context
 
 The Teacher Dashboard header shows credit balance (e.g., "847 credits"). This requires:
-1. Determining where credit data lives (entitlements_service? org_service?)
-2. Creating an endpoint to fetch current balance
-3. Including in BFF or separate API call
+1. Using the existing Entitlements Service as source of truth
+2. Exposing the balance to the frontend via either:
+   - BFF aggregation (single dashboard response), or
+   - a separate endpoint/call (parallel fetch)
+
+**Current state:**
+- `entitlements_service` exists and already exposes a balance endpoint:
+  - `GET /v1/entitlements/balance/<user_id>` (returns `user_balance`, `org_balance`, `org_id`).
+- Org-aware balance is not fully wired yet (Entitlements has an explicit TODO to derive org context).
 
 ## Acceptance Criteria
 
@@ -44,13 +50,9 @@ The Teacher Dashboard header shows credit balance (e.g., "847 credits"). This re
 - Single API call for dashboard
 
 **Option B: Separate endpoint**
-- `GET /api/v1/user/credits` (via API Gateway)
+- BFF exposes `GET /bff/v1/teacher/credits` (or similar) and proxies to Entitlements
 - Frontend makes parallel call
 - Better separation of concerns
-
-**Option C: API Gateway responsibility**
-- Gateway injects credits into response
-- Transparent to BFF
 
 **Response model (if BFF):**
 ```python
@@ -62,15 +64,12 @@ class TeacherDashboardResponseV1(BaseModel):
     credits: int | None = None  # NEW
 ```
 
-**Research needed:**
-- Where is credit data currently stored?
-- Is there an existing entitlements service?
-- What's the credit deduction model?
+**Known constraints / follow-ups:**
+- Decide whether to display `user_balance` only for this sprint, or to extend Entitlements to accept org context.
 
 ## Blocked By
 
 - `websocket-batch-updates` - complete Phase 4 before Phase 5
-- Research: entitlements service existence
 
 ## Blocks
 

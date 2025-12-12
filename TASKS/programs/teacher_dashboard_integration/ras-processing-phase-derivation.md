@@ -18,7 +18,7 @@ labels: ["ras", "processing-phase", "internal-api"]
 
 ## Objective
 
-Fix `current_phase` in RAS `BatchStatusResponse` to derive from essay processing states instead of being hardcoded to `SPELLCHECK`.
+Fix `current_phase` in RAS `BatchStatusResponse` to be derived from stored phase state instead of being hardcoded.
 
 ## Context
 
@@ -27,15 +27,25 @@ The `BatchStatusResponse.current_phase` field is currently hardcoded in `from_do
 **Current behavior:**
 ```python
 # services/result_aggregator_service/models_api.py
-current_phase=ProcessingPhase.SPELLCHECK  # Hardcoded!
+current_phase=PhaseName.SPELLCHECK  # Hardcoded!
 ```
 
 **Required behavior:**
-Derive phase from essay processing states:
-- If any essays have `spellcheck_status == processing` → `SPELLCHECK`
-- If spellcheck done and any essays have `cj_assessment_status == processing` → `CJ_ASSESSMENT`
-- If CJ done and any essays pending feedback → `FEEDBACK`
-- If all done → `COMPLETED` (or None)
+Derive phase from RAS-stored phase state, with UX-safe semantics:
+
+- `current_phase` is only meaningful while the batch is actively executing pipelines
+  (`BatchStatus.PROCESSING_PIPELINES`). For READY/PENDING/terminal states, return `None`.
+- Within Phase 4 scope (Spellcheck + CJ assessment), derive **the first incomplete phase**:
+  - If spellcheck is incomplete for any essay → `PhaseName.SPELLCHECK`
+  - Else if CJ assessment is incomplete for any essay → `PhaseName.CJ_ASSESSMENT`
+  - Else → `None`
+
+**Notes:**
+- Use `ProcessingStage.terminal()` to define completion (COMPLETED/FAILED/CANCELLED). Treat `None`
+  as incomplete (not yet completed).
+- UX label “FEEDBACK” maps to `PhaseName.AI_FEEDBACK`, but AI feedback is explicitly **out of scope**
+  for this sprint (service not yet implemented). Keep the derivation helper structured so
+  `AI_FEEDBACK` can be added next sprint when RAS persists its phase status.
 
 ## Acceptance Criteria
 
@@ -49,36 +59,31 @@ Derive phase from essay processing states:
 **Files to modify:**
 - `services/result_aggregator_service/models_api.py` - `BatchStatusResponse.from_domain()`
 
-**Processing phase enum:**
-```python
-class ProcessingPhase(str, Enum):
-    UPLOAD = "upload"
-    SPELLCHECK = "spellcheck"
-    CJ_ASSESSMENT = "cj_assessment"
-    FEEDBACK = "feedback"
-    COMPLETED = "completed"
-```
+**Enums to use (do not create new enums):**
+- `PhaseName` in `libs/common_core/src/common_core/pipeline_models.py`
+- `BatchStatus`, `ProcessingStage` in `libs/common_core/src/common_core/status_enums.py`
 
 **Derivation logic sketch:**
 ```python
-def derive_processing_phase(essays: list[EssayResult]) -> ProcessingPhase | None:
-    if not essays:
+from common_core.pipeline_models import PhaseName
+from common_core.status_enums import BatchStatus, ProcessingStage
+
+TERMINAL = ProcessingStage.terminal()
+
+def _is_phase_incomplete(value: ProcessingStage | None) -> bool:
+    return value is None or value not in TERMINAL
+
+def derive_current_phase(batch: BatchResult) -> PhaseName | None:
+    if batch.overall_status != BatchStatus.PROCESSING_PIPELINES:
+        return None
+    if not batch.essays:
         return None
 
-    # Check if any essay is in spellcheck
-    if any(e.spellcheck_status == "processing" for e in essays):
-        return ProcessingPhase.SPELLCHECK
-
-    # Check if any essay is in CJ assessment
-    if any(e.cj_assessment_status == "processing" for e in essays):
-        return ProcessingPhase.CJ_ASSESSMENT
-
-    # Check if any essay awaits feedback
-    if any(e.feedback_status == "pending" for e in essays):
-        return ProcessingPhase.FEEDBACK
-
-    # All done
-    return ProcessingPhase.COMPLETED
+    if any(_is_phase_incomplete(e.spellcheck_status) for e in batch.essays):
+        return PhaseName.SPELLCHECK
+    if any(_is_phase_incomplete(e.cj_assessment_status) for e in batch.essays):
+        return PhaseName.CJ_ASSESSMENT
+    return None
 ```
 
 ## Blocked By
