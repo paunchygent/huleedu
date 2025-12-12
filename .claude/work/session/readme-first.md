@@ -163,7 +163,7 @@ docker exec huleedu_<service>_db psql -U "$HULEEDU_DB_USER" -d <db_name>
 | Mode | CJ Env | LPS Env | Status |
 |------|--------|---------|--------|
 | serial_bundle | `CJ_ASSESSMENT_SERVICE_LLM_BATCHING_MODE=serial_bundle` | `LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE=serial_bundle` | Production |
-| provider_batch_api | `=provider_batch_api` | `=batch_api` | Phase-2 (LPS job manager + BATCH_API path implemented; CJ now persists `llm_batching_mode` and disables additional waves in this mode; single-wave “all-at-once up to cap” semantics + ENG5 harness variants still in progress – see TASKS/integrations/llm-provider-batch-api-phase-2.md and TASKS/assessment/cj-llm-provider-batch-api-mode.md) |
+| provider_batch_api | `=provider_batch_api` | `=batch_api` | Phase-2 (LPS job manager + BATCH_API path implemented; CJ now persists `llm_batching_mode`, disables additional waves in this mode, and accepts per-batch overrides from ENG5 `llm_batching_mode_hint` into `BatchConfigOverrides.llm_batching_mode_override`; ENG5 docker/profile harness variants and metrics assertions are still in progress – see TASKS/integrations/llm-provider-batch-api-phase-2.md, TASKS/integrations/eng5-provider-batch-api-harness-coverage.md, and TASKS/assessment/cj-llm-provider-batch-api-mode.md) |
 
 **ENG5 metrics guardrails:**
 - Queue wait-time: `0 <= avg <= 120s` (broad guardrail for heavy C-lane)

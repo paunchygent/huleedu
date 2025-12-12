@@ -6,12 +6,30 @@ for CJ assessment workflows.
 
 from __future__ import annotations
 
+from typing import Any
+
 from common_core.events.cj_assessment_events import ELS_CJAssessmentRequestV1
 
 from services.cj_assessment_service.models_api import (
     CJAssessmentRequestData,
     EssayToProcess,
 )
+
+
+def _normalize_llm_batching_mode_hint(raw_hint: Any) -> str | None:
+    """Normalize batching mode hints from metadata into canonical string values.
+
+    Accepts case-insensitive forms of the known LLMBatchingMode values and
+    returns the normalized string, or None if the hint is invalid.
+    """
+    if not isinstance(raw_hint, str):
+        return None
+
+    normalized = raw_hint.strip().lower()
+    allowed_values = {"per_request", "serial_bundle", "provider_batch_api"}
+    if normalized in allowed_values:
+        return normalized
+    return None
 
 
 def transform_cj_assessment_request(
@@ -45,12 +63,25 @@ def transform_cj_assessment_request(
         for essay_ref in request_event_data.essays_for_cj
     ]
 
-    # Extract max_comparisons override from metadata if provided
-    max_comparisons_override = None
-    if metadata_payload:
+    max_comparisons_override: int | None = None
+    batch_config_overrides: dict[str, Any] | None = None
+
+    if metadata_payload and isinstance(metadata_payload, dict):
         raw_max = metadata_payload.get("max_comparisons")
         if isinstance(raw_max, int) and raw_max > 0:
             max_comparisons_override = raw_max
+
+        existing_overrides = metadata_payload.get("batch_config_overrides")
+        if isinstance(existing_overrides, dict):
+            batch_config_overrides = dict(existing_overrides)
+
+        normalized_hint = _normalize_llm_batching_mode_hint(
+            metadata_payload.get("llm_batching_mode_hint"),
+        )
+        if normalized_hint is not None:
+            if batch_config_overrides is None:
+                batch_config_overrides = {}
+            batch_config_overrides["llm_batching_mode_override"] = normalized_hint
 
     # Build internal request data model
     return CJAssessmentRequestData(
@@ -66,7 +97,8 @@ def transform_cj_assessment_request(
         judge_rubric_text=judge_rubric_text,
         judge_rubric_storage_id=judge_rubric_storage_id,
         llm_config_overrides=request_event_data.llm_config_overrides,
+        batch_config_overrides=batch_config_overrides,
+        max_comparisons_override=max_comparisons_override,
         user_id=request_event_data.user_id,
         org_id=request_event_data.org_id,
-        max_comparisons_override=max_comparisons_override,
     )

@@ -275,6 +275,9 @@ Once Phase‑2 BATCH_API execution is implemented:
   - [x] Adjust continuation logic to:
     - Finalize when callbacks hit the denominator/cap.
     - Never schedule additional comparison waves in `provider_batch_api` mode.
+  - [x] Accept per‑batch LLM batching overrides from ENG5 runner metadata:
+    - Thread `llm_batching_mode_hint` from ENG5 request metadata into `CJAssessmentRequestData.batch_config_overrides["llm_batching_mode_override"]` via the CJ request transformer.
+    - Normalize hints to `LLMBatchingMode` string values and feed them into `BatchConfigOverrides.llm_batching_mode_override` and `resolve_effective_llm_batching_mode(...)`.
 
 - **Phase 2.5 – ENG5 Heavy‑C coverage and runbooks**
   - [ ] Extend ENG5 docker semantics tests with `provider_batch_api` variants.
@@ -283,6 +286,7 @@ Once Phase‑2 BATCH_API execution is implemented:
     - `docs/operations/eng5-np-runbook.md` (batch_api section).
     - `docs/operations/cj-assessment-runbook.md` (CJ modes table).
     - Any relevant CI lane docs (`.agent/rules/101-ci-lanes-and-heavy-suites.md`, ADR‑0004).
+  - Note: per‑batch plumbing from ENG5 (`llm_batching_mode_hint`) into CJ’s `BatchConfigOverrides.llm_batching_mode_override` is now in place; this sub‑phase is blocked only on ENG5 docker/profile harness coverage and documentation updates (tracked in `TASKS/integrations/eng5-provider-batch-api-harness-coverage.md`).
 
 ## Recommended Implementation Sequence (Developer Checklist)
 

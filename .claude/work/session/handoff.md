@@ -14,25 +14,26 @@ All completed work, patterns, and decisions live in:
 
 ## NEXT SESSION INSTRUCTION
 
-Role: You are the lead developer and architect of HuleEdu. The scope of this session is **Phase‑2 provider_batch_api metrics + ENG5 harness**, building on the now‑fixed CJ callback completion counters and existing BATCH_API execution path.
+Role: You are the lead developer and architect of HuleEdu. The scope of this session is **ENG5 provider_batch_api docker + profile harness coverage and metrics assertions**, building on the existing CJ/LPS `provider_batch_api` semantics and the newly wired per‑batch ENG5 → CJ batching‑mode override plumbing.
 
 ---
 
-### Scope: Phase‑2 provider_batch_api follow‑up (metrics + ENG5)
+### Scope: ENG5 provider_batch_api harness + metrics
 
 You are picking up from sessions that have:
-- Implemented LPS `QueueProcessingMode.BATCH_API` and `BatchApiStrategy` with per‑request error mapping.
-- Persisted `llm_batching_mode` into `CJBatchState.processing_metadata` and guarded continuation so `provider_batch_api` never schedules extra waves.
-- Fixed CJ callback completion counter regressions by realigning `_update_batch_completion_counters` tests to the canonical `BatchCompletionPolicy` implementation (FOR UPDATE row‑locks, partial‑scoring thresholds) and rerunning targeted CJ + LPS unit suites.
-- Wired initial LPS job‑level metrics for BATCH_API:
-  - `llm_provider_batch_api_jobs_total{provider,model,status}`.
-  - `llm_provider_batch_api_items_per_job{provider,model}`.
-  - `llm_provider_batch_api_job_duration_seconds{provider,model}`.
+- Implemented LPS `QueueProcessingMode.BATCH_API` and `BatchApiStrategy` with per‑request error mapping and job‑level metrics.
+- Completed the core CJ `provider_batch_api` semantics:
+  - Initial submission persists `llm_batching_mode` in `CJBatchState.processing_metadata` and attempts single‑wave generation up to `max_pairs_cap`.
+  - Continuation resolves the effective batching mode and skips additional COVERAGE/RESAMPLING waves when `llm_batching_mode == "provider_batch_api"`.
+- Wired per‑batch ENG5 → CJ override plumbing:
+  - ENG5 runner `--llm-batching-mode` sets `llm_batching_mode_hint` in request metadata.
+  - CJ request transformer maps this hint into `CJAssessmentRequestData.batch_config_overrides["llm_batching_mode_override"]`.
+  - `ComparisonRequestNormalizer` and `resolve_effective_llm_batching_mode(...)` consume `BatchConfigOverrides.llm_batching_mode_override` to select the per‑batch effective mode subject to provider allow‑list guardrails.
 
 Your focus is to:
-1. Finish CJ `provider_batch_api` single‑wave semantics (generation + continuation).
-2. Extend ENG5 Heavy‑C harness with `provider_batch_api` variants and metrics assertions.
-3. Keep existing serial_bundle semantics and metrics untouched.
+1. Extend ENG5 Heavy‑C CJ docker semantics tests with at least one `provider_batch_api` variant and CJ metrics assertions.
+2. Extend ENG5 mock‑profile parity suites with `provider_batch_api` coverage and LPS queue + job‑level metrics assertions.
+3. Keep existing `serial_bundle` harness semantics and metrics untouched, and keep TASK docs + this handoff file in sync with what you actually implement (including writing a fresh NEXT SESSION INSTRUCTION for your successor).
 
 ---
 
@@ -187,7 +188,7 @@ If frontend design is not the focus, the backend sprint continues below:
 - Confirmed CJ `provider_batch_api` semantics are largely implemented and unit-tested:
   - Initial submission persists `llm_batching_mode` and uses `max_pairs_per_call == max_pairs_cap` to attempt a single-wave generation via `pair_generation.generate_comparison_tasks(...)`.
   - Continuation resolves `llm_batching_mode` from metadata and skips additional COVERAGE/RESAMPLING waves when in `provider_batch_api` mode, finalizing once caps/denominator are reached.
-- ENG5 runner exposes `--llm-batching-mode` and threads `llm_batching_mode_hint` into CJ request metadata, but Heavy‑C harness tests still run only `serial_bundle` variants (no `provider_batch_api` docker/parity coverage yet).
+- ENG5 runner exposes `--llm-batching-mode` and threads `llm_batching_mode_hint` into CJ request metadata; CJ now maps this hint into per‑batch `BatchConfigOverrides.llm_batching_mode_override`, but Heavy‑C harness tests still run only `serial_bundle` variants (no `provider_batch_api` docker/parity coverage yet).
 - TASK status snapshot:
   - `TASKS/integrations/llm-provider-batch-api-phase-2.md`: Phase 2.3 (LPS job manager + BATCH_API) is effectively ✅; Phase 2.4 CJ semantics are partially complete (metadata + continuation guards ✅, single-wave semantics implemented but not yet validated in ENG5 harness); Phase 2.5 ENG5 coverage + runbook alignment remains ☐.
   - `TASKS/assessment/cj-llm-provider-batch-api-mode.md`: PR1/PR2 code paths and unit tests are in place; PR3 ENG5 runner override is CLI/metadata-only so far, with no end-to-end ENG5 provider_batch_api docker tests.
@@ -195,6 +196,30 @@ If frontend design is not the focus, the backend sprint continues below:
   - Tighten and document “all-at-once up to cap” behaviour for large nets (additional CJ unit tests +, eventually, ENG5 docker runs with `LLM_BATCHING_MODE=provider_batch_api` / `QUEUE_PROCESSING_MODE=batch_api`).
   - Extend ENG5 Heavy‑C harness with at least one `provider_batch_api` variant in CJ docker semantics + one ENG5 mock‑profile parity run, asserting key CJ/LPS metrics.
   - Once harness coverage is in place, update the `status` + checkboxes in both TASK docs and align the `eng5-np-runbook` / `cj-assessment-runbook` wording with the implemented semantics.
+
+#### Session 2025-12-11 – ENG5 per-batch batching override plumbing (coding + tests)
+
+- Implemented end-to-end plumbing so ENG5’s `--llm-batching-mode` flag can drive CJ’s per-batch batching mode:
+  - Extended `transform_cj_assessment_request(...)` (`services/cj_assessment_service/cj_core_logic/request_transformer.py`) to:
+    - Read `llm_batching_mode_hint` from envelope metadata, normalize case-insensitive hints to `"per_request" | "serial_bundle" | "provider_batch_api"`, and ignore invalid values.
+    - Populate `CJAssessmentRequestData.batch_config_overrides["llm_batching_mode_override"]` for valid hints, shallow-merging with any existing overrides.
+  - Verified that `ComparisonRequestNormalizer.normalize(...)` (`comparison_request_normalizer.py`) consumes `batch_config_overrides` by constructing `BatchConfigOverrides(**request_data.batch_config_overrides)`, allowing Pydantic to coerce `"provider_batch_api"` strings into `LLMBatchingMode.PROVIDER_BATCH_API`.
+  - Confirmed that `resolve_effective_llm_batching_mode(...)` (in `llm_batching.py`) continues to prefer per-batch overrides via `BatchConfigOverrides.llm_batching_mode_override` before falling back to `Settings.LLM_BATCHING_MODE`, with provider allow-list guardrails unchanged.
+- Added focused CJ unit tests to lock in the new behaviour:
+  - `services/cj_assessment_service/tests/unit/test_request_transformer.py`:
+    - Asserts that a valid `"provider_batch_api"` `llm_batching_mode_hint` produces `batch_config_overrides={"llm_batching_mode_override": "provider_batch_api"}` on `CJAssessmentRequestData`.
+    - Asserts that an invalid hint (`"unknown_mode"`) leaves `batch_config_overrides` unset.
+  - `services/cj_assessment_service/tests/unit/test_comparison_request_normalizer.py`:
+    - Builds a minimal `CJAssessmentRequestData` with `batch_config_overrides={"llm_batching_mode_override": "provider_batch_api"}` and verifies that `ComparisonRequestNormalizer(Settings()).normalize(...)` produces a `NormalizedComparisonRequest` whose `batch_config_overrides.llm_batching_mode_override is LLMBatchingMode.PROVIDER_BATCH_API`.
+  - Ran both files via:
+    - `pdm run pytest-root services/cj_assessment_service/tests/unit/test_request_transformer.py`
+    - `pdm run pytest-root services/cj_assessment_service/tests/unit/test_comparison_request_normalizer.py`
+- Updated TASK docs to reflect that per-batch override plumbing is now available while ENG5 harness coverage remains outstanding:
+  - `TASKS/integrations/llm-provider-batch-api-phase-2.md`:
+    - Phase 2.4 now explicitly calls out acceptance of ENG5 `llm_batching_mode_hint` into `BatchConfigOverrides.llm_batching_mode_override` and notes that Phase 2.5 is blocked only on ENG5 docker/profile harness coverage and runbook/docs updates.
+  - `TASKS/integrations/eng5-provider-batch-api-harness-coverage.md`:
+    - Context section now states that CJ already threads ENG5 `llm_batching_mode_hint` into `BatchConfigOverrides.llm_batching_mode_override`.
+    - Plan section clarifies that this task should **reuse** the existing ENG5 → CJ override plumbing and focus on ENG5 docker/profile harness work and observability (logs + metrics snapshots), rather than re-implementing the pipe.
 
 You are picking up from sessions that:
 - Completed Phase‑1 `serial_bundle` and Phase‑2 LPS scaffolding (BatchJob* models, `BatchJobManagerProtocol`, in‑memory manager, and a real `QueueProcessingMode.BATCH_API` path wired through `BatchApiStrategy` and `QueuedRequestExecutor.execute_batch_api`).
@@ -206,7 +231,7 @@ You are picking up from sessions that:
   - Resolve the effective batching mode in `workflow_continuation._resolve_batching_mode(...)`.
   - Guard continuation so `comparison_processing.request_additional_comparisons_for_batch(...)` is **never** called when `llm_batching_mode == "provider_batch_api"` (no further waves in this mode).
 
-Your focus is to finish **CJ provider_batch_api single‑wave generation semantics** and to plan/extend **ENG5 Heavy‑C harness coverage** for the new mode.
+Your focus is to extend **ENG5 Heavy‑C harness coverage** and metrics assertions for `provider_batch_api`, using the existing CJ semantics and per‑batch override plumbing (ENG5 `llm_batching_mode_hint` → CJ `BatchConfigOverrides.llm_batching_mode_override` → `resolve_effective_llm_batching_mode(...)`).
 
 ---
 
@@ -429,9 +454,40 @@ pdm run fe-lint-fix   # Auto-fix
 
 **Task created:** `TASKS/frontend/implement-semantic-token-architecture-per-adr-0023.md`
 
+### Mobile Hamburger Navigation - ✅ COMPLETE (2025-12-11)
+
+**Implementation:**
+- `MobileDrawer.vue` - Slide-out drawer with Vue Teleport and Transition
+- `AppHeader.vue` - Hamburger button (mobile only), responsive header layout
+- `navigation.ts` - `isDrawerOpen` state + `openDrawer`/`closeDrawer`/`toggleDrawer` actions
+- `AppLayout.vue` - MobileDrawer integration with route-close behavior
+- `main.css` - Drawer animation styles (backdrop fade, panel slide)
+
+**Behavior:**
+- Hamburger icon visible on mobile (`md:hidden`)
+- Drawer slides from left with dimmed backdrop
+- Same nav items as desktop sidebar + "Ny Bunt" CTA
+- Closes on: backdrop tap, nav item click, close button, route change
+- Touch feedback via `:active` states, hover via `@media (hover: hover)`
+
+### Semantic Token Foundation - ✅ PHASE 1 & 2 COMPLETE (2025-12-11)
+
+**Primitives added to main.css @theme:**
+- Navy scale: 50, 100, 300, 500, 700, 900 (derived from base #1a1f2c)
+- Burgundy scale: 50, 100, 300, 500, 700, 900 (derived from base #7a2e2e)
+
+**Semantic tokens:**
+- `--color-text-primary`: navy-900 (12:1 contrast)
+- `--color-text-secondary`: navy-700 (7:1 contrast)
+- `--color-text-muted`: navy-500 (4.5:1 large text)
+- `--color-text-disabled`: navy-300 (decorative)
+
+**Utility classes:** `.text-primary`, `.text-secondary`, `.text-muted`, `.text-disabled`
+
+**TASK:** `TASKS/frontend/implement-semantic-token-architecture-per-adr-0023.md` (Phase 1-2 complete, Phase 3-4 pending)
+
 ### Next Session Focus
 
-1. **Mobile hamburger menu** - Slide-out drawer navigation (spec'd in design-spec Section 9.4)
-2. **Semantic token implementation** - Replace opacity values with WCAG-compliant tokens (TASK created)
-3. **BFF Integration** - Wire real API endpoints via Teacher BFF
-4. **WebSocket updates** - Real-time batch status changes
+1. **Semantic token Phase 3** - Replace inline opacity values (`text-navy/60`, `text-navy/40`) in 7 Vue components
+2. **BFF Integration** - Wire real API endpoints via Teacher BFF
+3. **WebSocket updates** - Real-time batch status changes

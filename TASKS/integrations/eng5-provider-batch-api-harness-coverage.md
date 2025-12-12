@@ -25,6 +25,7 @@ Design and implement ENG5‑focused harness coverage for `LLMBatchingMode.PROVID
 - Phase‑2 provider batch API semantics are implemented and unit‑tested in:
   - CJ (`provider_batch_api` initial submission, single‑wave generation up to cap, continuation without additional waves).
   - LPS (`QueueProcessingMode.BATCH_API` via `BatchApiStrategy` + `BatchJobManager`, with job‑level metrics).
+  - CJ now accepts per‑batch LLM batching overrides from ENG5 by threading `llm_batching_mode_hint` in ENG5 request metadata into `BatchConfigOverrides.llm_batching_mode_override` via the CJ request transformer and comparison request normalizer.
 - The primary gap is **ENG5 Heavy‑C validation**:
   - CJ ENG5 docker semantics tests currently only cover `serial_bundle`.
   - ENG5 mock‑profile parity suites pin `queue_processing_mode="serial_bundle"` metrics only.
@@ -54,9 +55,9 @@ Design and implement ENG5‑focused harness coverage for `LLMBatchingMode.PROVID
      - `llm_provider_batch_api_job_duration_seconds{provider,model}`.
 
 3. **ENG5 runner configuration & observability**
-   - Wire the ENG5 runner `--llm-batching-mode` flag so that:
-     - `llm_batching_mode_hint` in the ENG5 request metadata is mapped to `BatchConfigOverrides.llm_batching_mode_override` in CJ, enabling **real per‑batch overrides** while env vars remain the default.
-   - Ensure run logs and artefacts clearly label provider‑batch trials (requested batching mode, effective CJ/LPS modes, job metrics snapshot).
+   - Rely on the existing ENG5 → CJ plumbing so that:
+     - `--llm-batching-mode` on the ENG5 runner sets `llm_batching_mode_hint` in request metadata, which CJ maps into `CJAssessmentRequestData.batch_config_overrides["llm_batching_mode_override"]` and then into `BatchConfigOverrides.llm_batching_mode_override` / `resolve_effective_llm_batching_mode(...)`.
+   - Ensure ENG5 docker/profile harness runs and artefacts clearly label provider‑batch trials (requested batching mode, effective CJ/LPS modes, job metrics snapshot), using the per‑batch override pipeline as a prerequisite rather than re‑implementing it here.
 
 4. **Runbooks and CI lanes**
    - Update `docs/operations/eng5-np-runbook.md` and `docs/operations/cj-assessment-runbook.md`:
