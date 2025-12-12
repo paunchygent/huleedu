@@ -88,6 +88,7 @@ pdm run pytest-root tests/integration/
 ```bash
 # Validate .env + restart LPS + run profile-specific suite
 pdm run llm-mock-profile cj-generic
+pdm run llm-mock-profile cj-generic-batch-api
 pdm run llm-mock-profile eng5-anchor
 pdm run llm-mock-profile eng5-lower5
 ```
@@ -98,6 +99,7 @@ pdm run llm-mock-profile eng5-lower5
 pdm run eng5-cj-docker-suite           # all
 pdm run eng5-cj-docker-suite small-net # only LOWER5 small-net
 pdm run eng5-cj-docker-suite regular   # only regular ENG5 batch
+pdm run eng5-cj-docker-suite batch-api # regular-batch provider_batch_api variant
 ```
 
 All individual tests remain runnable via `pytest-root`, for example:
@@ -117,11 +119,13 @@ pdm run pytest-root tests/eng5_profiles/test_eng5_mock_parity_lower5.py -m "dock
     ```bash
     pdm run eng5-cj-docker-suite regular
     pdm run eng5-cj-docker-suite small-net
+    pdm run eng5-cj-docker-suite batch-api
     ```
 - `ENG5 Mock Profile Parity Suite` (`eng5-profile-parity-suite` in `.github/workflows/eng5-heavy-suites.yml`)
   - Reproduces locally with:
     ```bash
     pdm run llm-mock-profile cj-generic
+    pdm run llm-mock-profile cj-generic-batch-api
     pdm run llm-mock-profile eng5-anchor
     pdm run llm-mock-profile eng5-lower5
     ```
@@ -163,7 +167,7 @@ docker exec huleedu_<service>_db psql -U "$HULEEDU_DB_USER" -d <db_name>
 | Mode | CJ Env | LPS Env | Status |
 |------|--------|---------|--------|
 | serial_bundle | `CJ_ASSESSMENT_SERVICE_LLM_BATCHING_MODE=serial_bundle` | `LLM_PROVIDER_SERVICE_QUEUE_PROCESSING_MODE=serial_bundle` | Production |
-| provider_batch_api | `=provider_batch_api` | `=batch_api` | Phase-2 (LPS job manager + BATCH_API path implemented; CJ now persists `llm_batching_mode`, disables additional waves in this mode, and accepts per-batch overrides from ENG5 `llm_batching_mode_hint` into `BatchConfigOverrides.llm_batching_mode_override`; ENG5 docker/profile harness variants and metrics assertions are still in progress – see TASKS/integrations/llm-provider-batch-api-phase-2.md, TASKS/integrations/eng5-provider-batch-api-harness-coverage.md, and TASKS/assessment/cj-llm-provider-batch-api-mode.md) |
+| provider_batch_api | `=provider_batch_api` | `=batch_api` | Phase-2 (LPS job manager + BATCH_API path implemented; CJ persists `llm_batching_mode`, skips additional waves in this mode, and accepts per-batch overrides from ENG5 `llm_batching_mode_hint` into `BatchConfigOverrides.llm_batching_mode_override`; ENG5 docker/profile harness coverage + metrics assertions implemented – see `tests/functional/cj_eng5/test_cj_regular_batch_provider_batch_api_docker.py` and `tests/eng5_profiles/test_cj_mock_batch_api_metrics_generic.py`) |
 
 **ENG5 metrics guardrails:**
 - Queue wait-time: `0 <= avg <= 120s` (broad guardrail for heavy C-lane)

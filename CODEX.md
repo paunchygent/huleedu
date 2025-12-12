@@ -32,6 +32,7 @@ Before using pdm run, start an env-aware shell:
 3. **Rule Reference**: Consult `.agent/rules/000-rule-index.md` for relevant rules
 cross-service task context.
 4. **Update**: After each task phase, Always stop to update 1. **active task documents** 2.`.claude/work/session/handoff.md` and `.claude/work/session/readme-first.md` with any new information + ask user any clarifying questions to retain alignment with user's intent.
+5. **avoit user input** **NEVER** RUN GIT COMMANDS OR delete files you have not created WITHOUT ASKING FOR PERMISSION!
 ```
 
 ### 3. Error Resolution Protocol

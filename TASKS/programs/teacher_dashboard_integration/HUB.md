@@ -10,7 +10,7 @@ owner_team: "frontend"
 owner: ""
 program: "teacher_dashboard_integration"
 created: "2025-12-09"
-last_updated: "2025-12-10"
+last_updated: "2025-12-12"
 related:
   - "frontend/TASKS/integration/bff-service-implementation-plan.md"
   - "docs/decisions/0007-bff-vs-api-gateway-pattern.md"
@@ -21,14 +21,28 @@ labels: ["bff", "frontend-integration", "teacher-dashboard"]
 
 ## 1. Programme Snapshot
 
+### Completed Phases (BFF Foundation)
+
 | Workstream | Task File | Status | Blocking Items |
 | --- | --- | --- | --- |
 | CMS Internal Endpoint | `cms-batch-class-info-internal-endpoint.md` | ✅ Completed | - |
-| BFF Service Clients | `bff-teacher-service-internal-clients.md` | ✅ Completed (func tests validated) | - |
-| BFF Dashboard Endpoint | `bff-teacher-dashboard-endpoint.md` | ✅ Completed (pagination, status filter) | - |
-| API Contract Validation | `bff-teacher-api-contract-validation.md` | ✅ Completed (23 contract tests) | - |
+| BFF Service Clients | `bff-teacher-service-internal-clients.md` | ✅ Completed | - |
+| BFF Dashboard Endpoint | `bff-teacher-dashboard-endpoint.md` | ✅ Completed | - |
+| API Contract Validation | `bff-teacher-api-contract-validation.md` | ✅ Completed | - |
 
-_Last refresh: 2025-12-10 (session 8)_
+### Live Data Integration Phases (Inside-Out)
+
+| Phase | Task File | Status | Service | Blocking |
+| --- | --- | --- | --- | --- |
+| 4. RAS Phase Derivation | `ras-processing-phase-derivation.md` | 🔒 Blocked | RAS | - |
+| 5. BFF Extended Fields | `bff-extended-dashboard-fields.md` | 🔒 Blocked | BFF | Phase 4 |
+| 6. CMS Validation Endpoint | `cms-student-validation-endpoint.md` | 🔒 Blocked | CMS | Phase 5 |
+| 7. BFF CMS Integration | `bff-cms-validation-integration.md` | 🔒 Blocked | BFF | Phase 6 |
+| 8. WebSocket Updates | `websocket-batch-updates.md` | 🔒 Blocked | WS | Phase 7 |
+| 9. Entitlements/Credits | `entitlements-credits-endpoint.md` | 🔒 Blocked | TBD | Phase 8 |
+| 10. Frontend Live Data | `frontend-live-data-integration.md` | 🔒 Blocked | Frontend | Phases 4-9 |
+
+_Last refresh: 2025-12-12_
 
 ## 2. Active Workstreams
 
@@ -119,12 +133,25 @@ pdm run typecheck-all
 
 ## 5. Upcoming Milestones
 
+### Completed Milestones
+
 | Target Date | Milestone | Blocking Items |
 | --- | --- | --- |
 | ~~2025-12-10~~ | ✅ CMS endpoint implemented + tested | - |
 | ~~2025-12-12~~ | ✅ BFF clients + DI setup complete | - |
 | ~~2025-12-13~~ | ✅ Dashboard endpoint polished (pagination, status filter) | - |
 | ~~2025-12-16~~ | ✅ API contracts validated + exported | - |
+
+### Live Data Integration Milestones
+
+| Target Date | Milestone | Blocking Items |
+| --- | --- | --- |
+| TBD | Phase 4: RAS processing phase derivation | Prioritization |
+| TBD | Phase 5: BFF extended dashboard fields | Phase 4 |
+| TBD | Phase 6-7: CMS validation integration | Phase 5 |
+| TBD | Phase 8: WebSocket real-time updates | Phase 7 |
+| TBD | Phase 9: Entitlements/credits | Research needed |
+| TBD | Phase 10: Frontend live data switch | Phases 4-9 |
 
 ## 6. Future Service Integration Template
 
@@ -143,7 +170,8 @@ This programme establishes patterns for future BFF integrations:
 
 ## 7. Change Log
 
-- **2025-12-10 (session 8)** – Phase 3 completed: API contract validation. OpenAPI schema exported, TypeScript types created, 23 contract tests added. Programme COMPLETE.
+- **2025-12-12** – Live data integration roadmap added: 7 new stories (Phases 4-10) for inside-out backend→frontend integration. Frontend live data switch blocked until all backend phases complete.
+- **2025-12-10 (session 8)** – Phase 3 completed: API contract validation. OpenAPI schema exported, TypeScript types created, 23 contract tests added.
 - **2025-12-10 (session 2)** – Functional tests validated (4/4 pass). Fixed BFF startup issue (`response_model=None` for union return types). Fixed RAS `ALLOWED_SERVICE_IDS` env var (prefix mismatch).
 - **2025-12-10** – Phase 1 completed: RAS/CMS clients with Dishka DI, 19 unit tests, middleware extraction.
 - **2025-12-09** – CMS internal endpoint completed: `GET /internal/v1/batches/class-info` with auth hook, 9 unit tests.
