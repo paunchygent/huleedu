@@ -13,6 +13,7 @@ All completed work, patterns, and decisions live in:
 ## Editing Rules (Do Not Ignore)
 
 - Treat this file as **append-only** for active workstreams.
+- Do **not** change the `status:` frontmatter of any `TASKS/**` file unless that task is **in the current session scope** or the user explicitly asks.
 - **Only completed tasks** may be removed, and only from the **RECENTLY COMPLETED** section.
 - Before removing/compressing anything under **RECENTLY COMPLETED**, first decide if it is
   **critical sprint developer knowledge**; if yes, compact/migrate it into
