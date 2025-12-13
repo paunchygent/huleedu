@@ -88,3 +88,6 @@ frontend/*.local
 
 .gemini/
 gha-creds-*.json
+
+# Notebooks
+.ipynb_checkpoints/
