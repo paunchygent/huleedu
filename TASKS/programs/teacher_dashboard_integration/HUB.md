@@ -34,13 +34,13 @@ labels: ["bff", "frontend-integration", "teacher-dashboard"]
 
 | Phase | Task File | Status | Service | Blocking |
 | --- | --- | --- | --- | --- |
-| 4. RAS Phase Derivation | `ras-processing-phase-derivation.md` | 🔒 Blocked | RAS | - |
-| 5. BFF Extended Fields | `bff-extended-dashboard-fields.md` | 🔒 Blocked | BFF | Phase 4 |
+| 4. RAS Phase Derivation | `ras-processing-phase-derivation.md` | ✅ Completed | RAS | - |
+| 5. BFF Extended Fields | `bff-extended-dashboard-fields.md` | 🔒 Blocked | BFF | - |
 | 6. CMS Validation Endpoint | `cms-student-validation-endpoint.md` | 🔒 Blocked | CMS | Phase 5 |
 | 7. BFF CMS Integration | `bff-cms-validation-integration.md` | 🔒 Blocked | BFF | Phase 6 |
 | 8. WebSocket Updates | `websocket-batch-updates.md` | 🔒 Blocked | WS | Phase 7 |
 | 9. Entitlements/Credits | `entitlements-credits-endpoint.md` | 🔒 Blocked | TBD | Phase 8 |
-| 10. Frontend Live Data | `frontend-live-data-integration.md` | 🔒 Blocked | Frontend | Phases 4-9 |
+| 10. Frontend Live Data | `frontend-live-data-integration.md` | 🔒 Blocked | Frontend | Phases 5-9 |
 
 _Last refresh: 2025-12-12_
 

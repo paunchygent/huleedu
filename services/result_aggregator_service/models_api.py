@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence
 from uuid import uuid4
 
 from common_core.pipeline_models import PhaseName
 
 # Use common_core enums directly (no re-exports)
-from common_core.status_enums import BatchClientStatus
+from common_core.status_enums import BatchClientStatus, BatchStatus, ProcessingStage
 from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
@@ -65,6 +65,60 @@ class BatchStatusResponse(BaseModel):
     processing_completed_at: Optional[datetime] = None
     student_prompt_ref: Optional[Dict[str, Any]] = None
 
+    @staticmethod
+    def _is_processing_stage_incomplete(value: ProcessingStage | None) -> bool:
+        """Return True if a phase is not yet terminal (or missing)."""
+        return value is None or value not in ProcessingStage.terminal()
+
+    @classmethod
+    def _derive_current_phase_from_essays(cls, essays: Sequence[Any]) -> PhaseName | None:
+        """Derive current phase from essay-level processing stages (Phase 4 scope)."""
+        if not essays:
+            return None
+
+        if any(
+            cls._is_processing_stage_incomplete(getattr(essay, "spellcheck_status", None))
+            for essay in essays
+        ):
+            return PhaseName.SPELLCHECK
+
+        if any(
+            cls._is_processing_stage_incomplete(getattr(essay, "cj_assessment_status", None))
+            for essay in essays
+        ):
+            return PhaseName.CJ_ASSESSMENT
+
+        return None
+
+    @staticmethod
+    def _parse_current_phase_from_metadata(metadata: dict[str, Any]) -> PhaseName | None:
+        """Parse a PhaseName from BOS fallback metadata, if present and valid."""
+        raw_current_phase = metadata.get("current_phase")
+        if not isinstance(raw_current_phase, str):
+            return None
+        try:
+            return PhaseName[raw_current_phase]
+        except KeyError:
+            return None
+
+    @classmethod
+    def _derive_current_phase(
+        cls,
+        *,
+        overall_status: BatchStatus,
+        essays: Sequence[Any],
+        metadata: dict[str, Any],
+    ) -> PhaseName | None:
+        """Derive current phase with UX-safe semantics (only while processing pipelines)."""
+        if overall_status != BatchStatus.PROCESSING_PIPELINES:
+            return None
+
+        essay_phase = cls._derive_current_phase_from_essays(essays)
+        if essay_phase is not None or essays:
+            return essay_phase
+
+        return cls._parse_current_phase_from_metadata(metadata)
+
     @classmethod
     def from_domain(cls, batch_result: "BatchResult") -> "BatchStatusResponse":
         """Convert from domain model."""
@@ -100,7 +154,11 @@ class BatchStatusResponse(BaseModel):
             completed_essay_count=batch_result.completed_essay_count,
             failed_essay_count=batch_result.failed_essay_count,
             requested_pipeline=batch_result.requested_pipeline,
-            current_phase=PhaseName.SPELLCHECK,  # Derive from data
+            current_phase=cls._derive_current_phase(
+                overall_status=batch_result.overall_status,
+                essays=batch_result.essays,
+                metadata=metadata,
+            ),
             essays=[
                 EssayResultResponse(
                     essay_id=essay.essay_id,

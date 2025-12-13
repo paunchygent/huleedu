@@ -2,7 +2,7 @@
 id: 'ras-processing-phase-derivation'
 title: 'RAS Processing Phase Derivation'
 type: 'task'
-status: 'blocked'
+status: 'completed'
 priority: 'high'
 domain: 'programs'
 service: 'result_aggregator_service'
@@ -49,15 +49,18 @@ Derive phase from RAS-stored phase state, with UX-safe semantics:
 
 ## Acceptance Criteria
 
-- [ ] `BatchStatusResponse.current_phase` derives from essay states
-- [ ] Phase derivation logic handles edge cases (empty batch, mixed states)
-- [ ] Unit tests validate phase derivation for all scenarios
-- [ ] Existing RAS tests continue to pass
+- [x] `BatchStatusResponse.current_phase` derives from essay states (Spellcheck + CJ assessment)
+- [x] Derivation gated on `BatchStatus.PROCESSING_PIPELINES`, otherwise `None`
+- [x] Phase derivation logic handles edge cases (empty batch, mixed states)
+- [x] Unit tests validate phase derivation for all scenarios (incl. BOS fallback metadata)
+- [x] Existing RAS unit tests continue to pass
 
 ## Implementation Notes
 
 **Files to modify:**
 - `services/result_aggregator_service/models_api.py` - `BatchStatusResponse.from_domain()`
+  - New helper: `BatchStatusResponse._derive_current_phase(...)`
+  - Optional BOS fallback: parse `batch_metadata["current_phase"]` via `PhaseName[raw]` when essays are unavailable
 
 **Enums to use (do not create new enums):**
 - `PhaseName` in `libs/common_core/src/common_core/pipeline_models.py`
@@ -86,10 +89,19 @@ def derive_current_phase(batch: BatchResult) -> PhaseName | None:
     return None
 ```
 
+## Validation (local)
+
+```bash
+pdm run pytest-root services/result_aggregator_service/tests/unit -v
+pdm run typecheck-all
+pdm run format-all
+pdm run lint-fix --unsafe-fixes
+```
+
 ## Blocked By
 
-None - this is the first step in the live data integration chain. Status is "blocked" until prioritized for active development.
+None.
 
-## Blocks
+## Unblocks
 
 - `bff-extended-dashboard-fields` - BFF needs accurate phase from RAS

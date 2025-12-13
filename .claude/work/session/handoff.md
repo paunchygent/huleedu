@@ -10,23 +10,47 @@ All completed work, patterns, and decisions live in:
 - **AGENTS.md** – Workflow, rules, and service conventions
 - **.agent/rules/** – Implementation standards
 
+## Editing Rules (Do Not Ignore)
+
+- Treat this file as **append-only** for active workstreams.
+- **Only completed tasks** may be removed, and only from the **RECENTLY COMPLETED** section.
+- Before removing/compressing anything under **RECENTLY COMPLETED**, first decide if it is
+  **critical sprint developer knowledge**; if yes, compact/migrate it into
+  `.claude/work/session/readme-first.md` instead of deleting it.
+
 ---
 
-## CURRENT STATUS (2025-12-12)
+## CURRENT FOCUS (2025-12-12)
 
-### Teacher Dashboard Live Data Integration (Planning Complete)
+### Teacher Dashboard Live Data Integration
 
-Created inside-out roadmap with 7 new stories (Phases 4-10) for backend→frontend integration:
-- `TASKS/programs/teacher_dashboard_integration/HUB.md` — updated with new phases
-- 7 new TASK files created, all status `blocked` pending prioritization
-- Task alignment updates applied:
-  - `current_phase` semantics clarified: `PhaseName | null`, only during pipeline execution (avoid “next phase” UX ambiguity)
-  - CMS validation endpoint specified as bulk (avoid N+1), using `pending_validation` semantics
-  - WebSocket updates specified via existing `TeacherNotificationRequestedV1` forwarding (no new contract)
-- **No code changes** — planning/documentation only
-- **Entry point:** Phase 4 `ras-processing-phase-derivation.md` (RAS current_phase fix)
+- Next story: Phase 5 `TASKS/programs/teacher_dashboard_integration/bff-extended-dashboard-fields.md`
+- Programme hub: `TASKS/programs/teacher_dashboard_integration/HUB.md`
 
-### ENG5 Heavy‑C provider_batch_api (Stabilized + Locally Validated)
+---
+
+## RECENTLY COMPLETED
+
+### 2025-12-12 — Phase 4: RAS Processing Phase Derivation (COMPLETED)
+
+- Task: `TASKS/programs/teacher_dashboard_integration/ras-processing-phase-derivation.md`
+- Change summary:
+  - `BatchStatusResponse.current_phase` stays `PhaseName | null`
+  - UX gating: only set while `BatchStatus.PROCESSING_PIPELINES`, else `null`
+  - Derivation (Phase 4 scope): first incomplete phase from essay `ProcessingStage`:
+    - Spellcheck incomplete for any essay → `PhaseName.SPELLCHECK`
+    - Else CJ assessment incomplete for any essay → `PhaseName.CJ_ASSESSMENT`
+    - Else → `null`
+  - Optional BOS fallback: if essays unavailable, parse `batch_metadata["current_phase"]` (e.g. `"CJ_ASSESSMENT"`) into `PhaseName`
+- Code: `services/result_aggregator_service/models_api.py`
+- Tests: `services/result_aggregator_service/tests/unit/test_batch_status_response_current_phase.py`
+- Local validation:
+  - `pdm run pytest-root services/result_aggregator_service/tests/unit -v`
+  - `pdm run typecheck-all`
+  - `pdm run format-all`
+  - `pdm run lint-fix --unsafe-fixes`
+
+### 2025-12-12 — ENG5 Heavy‑C provider_batch_api (Stabilized + Locally Validated)
 
 ENG5 Heavy‑C **provider_batch_api** harness coverage + metrics assertions are implemented:
 
@@ -47,6 +71,13 @@ Source-of-truth trackers:
 ---
 
 ## What Changed
+
+### RAS (Phase 4)
+
+- Code: `services/result_aggregator_service/models_api.py` (`BatchStatusResponse._derive_current_phase(...)` + `from_domain()` wiring)
+- Tests: `services/result_aggregator_service/tests/unit/test_batch_status_response_current_phase.py`
+
+### ENG5 Heavy‑C provider_batch_api
 
 **New tests**
 - `tests/functional/cj_eng5/test_cj_regular_batch_provider_batch_api_docker.py`
@@ -94,7 +125,7 @@ Source-of-truth trackers:
 
 ---
 
-## How To Run (Local)
+## How To Run (Local) — ENG5 Heavy‑C provider_batch_api
 
 ### CJ docker semantics: provider_batch_api regular batch
 
@@ -132,14 +163,26 @@ pdm run llm-mock-profile cj-generic-batch-api
 
 ## NEXT SESSION INSTRUCTION
 
-Role: You are the lead developer and architect of HuleEdu. The scope of the next session is **stabilization** of the batch_api heavy suites.
+Role: You are the lead developer and architect of HuleEdu. The scope of the next session is **Phase 5 only** — implement `BFF Extended Fields` for the Teacher Dashboard integration (no frontend work unless explicitly requested).
 
-### Focus
-1. Run the updated `ENG5 Heavy CJ/ENG5 Suites` CI workflow and confirm the new batch_api steps are green.
-2. If anything is flaky:
-   - Prefer reducing request counts / timeouts in the new tests over adding retries.
-   - Keep serial_bundle tests unchanged.
-3. Keep batch_api Heavy‑C coverage limited to `cj_generic_batch` for now (avoid long-running profile expansion until we have stability + runtime budget).
-4. Optional observability polish:
-   - Extend `scripts/cj_experiments_runners/eng5_np/logging_support.py::print_batching_metrics_hints` to include batch_api job metric PromQL hints.
-5. Keep `TASKS/` + runbooks aligned with any adjustments.
+Before touching code (from repo root):
+- Read `AGENTS.md`
+- Read rules:
+  - `.agent/rules/000-rule-index.md`
+  - `.agent/rules/020.21-bff-teacher-service.md` (BFF patterns + boundaries)
+  - `.agent/rules/070-testing-and-quality-assurance.md`
+  - `.agent/rules/075-test-creation-methodology.md`
+  - `.agent/rules/110-ai-agent-interaction-modes.md`
+- Read session context:
+  - `.claude/work/session/handoff.md`
+  - `.claude/work/session/readme-first.md`
+- Read task docs (source-of-truth):
+  - `TASKS/programs/teacher_dashboard_integration/HUB.md`
+  - `TASKS/programs/teacher_dashboard_integration/bff-extended-dashboard-fields.md`
+
+Next concrete steps:
+1. Confirm Phase 4 is complete (RAS `current_phase` derivation) in `services/result_aggregator_service/models_api.py`.
+2. Implement Phase 5 as specified in the task doc (extend BFF dashboard DTOs using the updated RAS `current_phase` semantics).
+3. Add focused unit tests in `services/bff_teacher_service/tests/unit/` for any new field mapping/validation.
+4. Run (from root): `pdm run pytest-root services/bff_teacher_service/tests/unit -v`, `pdm run typecheck-all`, `pdm run format-all`, `pdm run lint-fix --unsafe-fixes`.
+5. Update `TASKS/...` + `.claude/work/session/handoff.md` to reflect what you actually implemented, then write a new NEXT SESSION INSTRUCTION for your successor.
