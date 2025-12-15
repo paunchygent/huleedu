@@ -1,0 +1,458 @@
+/**
+ * HuleEdu Design Tokens
+ * =====================
+ * Standalone CSS custom properties for harmonizing external projects
+ * with the HuleEdu design system.
+ *
+ * Usage:
+ *   1. Import this file: @import url('huleedu-design-tokens.css');
+ *   2. Or link directly: <link rel="stylesheet" href="huleedu-design-tokens.css">
+ *   3. Add Google Fonts in your HTML head:
+ *      <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700;800&family=IBM+Plex+Serif:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+ */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DESIGN TOKENS (CSS Custom Properties)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ─────────────────────────────────────────────────────────────────────────
+     COLORS - Core Brand Palette
+     ───────────────────────────────────────────────────────────────────────── */
+  --huleedu-canvas: #F9F8F2;        /* Warm off-white background */
+  --huleedu-navy: #1C2E4A;          /* Primary dark blue */
+  --huleedu-burgundy: #6B1C2E;      /* Accent/CTA color */
+
+  /* Color with opacity variants (pre-computed for compatibility) */
+  --huleedu-navy-02: rgba(28, 46, 74, 0.02);
+  --huleedu-navy-05: rgba(28, 46, 74, 0.05);
+  --huleedu-navy-10: rgba(28, 46, 74, 0.1);
+  --huleedu-navy-20: rgba(28, 46, 74, 0.2);
+  --huleedu-navy-30: rgba(28, 46, 74, 0.3);
+  --huleedu-navy-40: rgba(28, 46, 74, 0.4);
+  --huleedu-navy-50: rgba(28, 46, 74, 0.5);
+  --huleedu-navy-60: rgba(28, 46, 74, 0.6);
+  --huleedu-navy-70: rgba(28, 46, 74, 0.7);
+  --huleedu-navy-80: rgba(28, 46, 74, 0.8);
+
+  --huleedu-burgundy-05: rgba(107, 28, 46, 0.05);
+  --huleedu-burgundy-10: rgba(107, 28, 46, 0.1);
+  --huleedu-burgundy-20: rgba(107, 28, 46, 0.2);
+  --huleedu-burgundy-30: rgba(107, 28, 46, 0.3);
+  --huleedu-burgundy-40: rgba(107, 28, 46, 0.4);
+
+  --huleedu-canvas-15: rgba(249, 248, 242, 0.15);
+  --huleedu-canvas-30: rgba(249, 248, 242, 0.3);
+  --huleedu-canvas-50: rgba(249, 248, 242, 0.5);
+  --huleedu-canvas-80: rgba(249, 248, 242, 0.8);
+
+  /* Semantic colors */
+  --huleedu-success: #059669;       /* emerald-600 */
+  --huleedu-warning: #D97706;       /* amber-600 */
+  --huleedu-error: #DC2626;         /* red-600 */
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     TYPOGRAPHY
+     ───────────────────────────────────────────────────────────────────────── */
+  --huleedu-font-sans: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  --huleedu-font-serif: "IBM Plex Serif", Georgia, "Times New Roman", serif;
+  --huleedu-font-mono: "IBM Plex Mono", ui-monospace, "Courier New", monospace;
+
+  /* Font sizes */
+  --huleedu-text-xs: 0.75rem;       /* 12px - labels, meta */
+  --huleedu-text-sm: 0.875rem;      /* 14px - body small, buttons */
+  --huleedu-text-base: 1rem;        /* 16px - body default */
+  --huleedu-text-lg: 1.125rem;      /* 18px - body large */
+  --huleedu-text-xl: 1.25rem;       /* 20px - section titles */
+  --huleedu-text-2xl: 1.5rem;       /* 24px - headings */
+  --huleedu-text-3xl: 1.875rem;     /* 30px - headings */
+  --huleedu-text-4xl: 2.25rem;      /* 36px - hero mobile */
+  --huleedu-text-5xl: 3rem;         /* 48px - hero tablet */
+  --huleedu-text-6xl: 3.75rem;      /* 60px - hero desktop */
+
+  /* Font weights */
+  --huleedu-font-normal: 400;
+  --huleedu-font-medium: 500;
+  --huleedu-font-semibold: 600;
+  --huleedu-font-bold: 700;
+  --huleedu-font-extrabold: 800;
+
+  /* Letter spacing */
+  --huleedu-tracking-tightest: -0.02em;  /* Hero headings */
+  --huleedu-tracking-tight: -0.01em;     /* Subheadings */
+  --huleedu-tracking-normal: 0;
+  --huleedu-tracking-label: 0.08em;      /* Uppercase labels */
+  --huleedu-tracking-wide: 0.1em;
+
+  /* Line heights */
+  --huleedu-leading-none: 1;
+  --huleedu-leading-tight: 1.05;         /* Hero headings */
+  --huleedu-leading-snug: 1.25;
+  --huleedu-leading-normal: 1.5;
+  --huleedu-leading-relaxed: 1.625;      /* Body text */
+  --huleedu-leading-loose: 2;            /* Essay/content */
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     SPACING (4px base scale)
+     ───────────────────────────────────────────────────────────────────────── */
+  --huleedu-space-0: 0;
+  --huleedu-space-0-5: 0.125rem;    /* 2px */
+  --huleedu-space-1: 0.25rem;       /* 4px */
+  --huleedu-space-1-5: 0.375rem;    /* 6px */
+  --huleedu-space-2: 0.5rem;        /* 8px */
+  --huleedu-space-2-5: 0.625rem;    /* 10px */
+  --huleedu-space-3: 0.75rem;       /* 12px */
+  --huleedu-space-4: 1rem;          /* 16px */
+  --huleedu-space-5: 1.25rem;       /* 20px */
+  --huleedu-space-6: 1.5rem;        /* 24px */
+  --huleedu-space-8: 2rem;          /* 32px */
+  --huleedu-space-10: 2.5rem;       /* 40px */
+  --huleedu-space-12: 3rem;         /* 48px */
+  --huleedu-space-16: 4rem;         /* 64px */
+  --huleedu-space-20: 5rem;         /* 80px */
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     BORDERS & RADIUS
+     ───────────────────────────────────────────────────────────────────────── */
+  --huleedu-border-width: 1px;
+  --huleedu-border-width-2: 2px;
+  --huleedu-border-color: var(--huleedu-navy);
+  --huleedu-border-color-subtle: var(--huleedu-navy-30);
+
+  --huleedu-radius-none: 0;
+  --huleedu-radius-sm: 2px;         /* Buttons, inputs */
+  --huleedu-radius-md: 4px;
+  --huleedu-radius-lg: 8px;
+  --huleedu-radius-xl: 12px;
+  --huleedu-radius-full: 9999px;    /* Pills, dots */
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     SHADOWS (Brutalist style)
+     ───────────────────────────────────────────────────────────────────────── */
+  --huleedu-shadow-brutal: 6px 6px 0px 0px var(--huleedu-navy);
+  --huleedu-shadow-brutal-sm: 4px 4px 0px 0px var(--huleedu-navy);
+  --huleedu-shadow-brutal-xs: 2px 2px 0px 0px var(--huleedu-navy);
+
+  /* Standard shadows (for softer contexts) */
+  --huleedu-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --huleedu-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     TRANSITIONS
+     ───────────────────────────────────────────────────────────────────────── */
+  --huleedu-duration-fast: 100ms;
+  --huleedu-duration-default: 150ms;
+  --huleedu-duration-slow: 300ms;
+  --huleedu-ease-default: cubic-bezier(0.4, 0, 0.2, 1);
+  --huleedu-ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --huleedu-ease-out: cubic-bezier(0, 0, 0.2, 1);
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     Z-INDEX SCALE
+     ───────────────────────────────────────────────────────────────────────── */
+  --huleedu-z-dropdown: 10;
+  --huleedu-z-sticky: 20;
+  --huleedu-z-overlay: 30;
+  --huleedu-z-modal: 40;
+  --huleedu-z-popover: 50;
+  --huleedu-z-tooltip: 60;
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     LAYOUT
+     ───────────────────────────────────────────────────────────────────────── */
+  --huleedu-header-height: 4rem;    /* 64px */
+  --huleedu-sidebar-width: 240px;
+  --huleedu-max-width-sm: 24rem;    /* 384px */
+  --huleedu-max-width-md: 28rem;    /* 448px */
+  --huleedu-max-width-lg: 32rem;    /* 512px */
+  --huleedu-max-width-xl: 36rem;    /* 576px */
+  --huleedu-max-width-2xl: 42rem;   /* 672px */
+  --huleedu-max-width-6xl: 72rem;   /* 1152px */
+
+  /* Grid background pattern size */
+  --huleedu-grid-size: 24px;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BASE STYLES (Optional - include if desired)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.huleedu-base {
+  font-family: var(--huleedu-font-sans);
+  background-color: var(--huleedu-canvas);
+  color: var(--huleedu-navy);
+  line-height: var(--huleedu-leading-normal);
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   UTILITY CLASSES (Apply these directly in HTMX templates)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Typography */
+.huleedu-font-sans { font-family: var(--huleedu-font-sans); }
+.huleedu-font-serif { font-family: var(--huleedu-font-serif); }
+.huleedu-font-mono { font-family: var(--huleedu-font-mono); }
+
+/* Colors - Background */
+.huleedu-bg-canvas { background-color: var(--huleedu-canvas); }
+.huleedu-bg-navy { background-color: var(--huleedu-navy); }
+.huleedu-bg-burgundy { background-color: var(--huleedu-burgundy); }
+.huleedu-bg-white { background-color: #fff; }
+
+/* Colors - Text */
+.huleedu-text-canvas { color: var(--huleedu-canvas); }
+.huleedu-text-navy { color: var(--huleedu-navy); }
+.huleedu-text-burgundy { color: var(--huleedu-burgundy); }
+.huleedu-text-muted { color: var(--huleedu-navy-60); }
+
+/* Colors - Border */
+.huleedu-border-canvas { border-color: var(--huleedu-canvas); }
+.huleedu-border-navy { border-color: var(--huleedu-navy); }
+.huleedu-border-burgundy { border-color: var(--huleedu-burgundy); }
+.huleedu-border-subtle { border-color: var(--huleedu-navy-30); }
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   COMPONENT CLASSES
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Ledger Frame - Page wrapper with signature border */
+.huleedu-frame {
+  border: var(--huleedu-border-width) solid var(--huleedu-border-color);
+  min-height: 100vh;
+}
+
+@media (min-width: 768px) {
+  .huleedu-frame {
+    margin: var(--huleedu-space-4);
+    min-height: calc(100vh - var(--huleedu-space-8));
+  }
+}
+
+/* Card with brutalist shadow */
+.huleedu-card {
+  background-color: #fff;
+  border: var(--huleedu-border-width) solid var(--huleedu-border-color);
+  padding: var(--huleedu-space-6);
+  box-shadow: var(--huleedu-shadow-brutal);
+}
+
+.huleedu-card-sm {
+  padding: var(--huleedu-space-4);
+  box-shadow: var(--huleedu-shadow-brutal-sm);
+}
+
+/* Primary Button */
+.huleedu-btn {
+  display: inline-block;
+  background-color: var(--huleedu-burgundy);
+  color: var(--huleedu-canvas);
+  padding: var(--huleedu-space-4) var(--huleedu-space-8);
+  font-family: var(--huleedu-font-sans);
+  font-size: var(--huleedu-text-sm);
+  font-weight: var(--huleedu-font-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--huleedu-tracking-label);
+  text-decoration: none;
+  text-align: center;
+  border: none;
+  border-radius: var(--huleedu-radius-sm);
+  cursor: pointer;
+  transition: background-color var(--huleedu-duration-default) var(--huleedu-ease-default);
+}
+
+.huleedu-btn:hover {
+  background-color: var(--huleedu-navy);
+}
+
+.huleedu-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.huleedu-btn:focus-visible {
+  outline: 2px solid var(--huleedu-navy);
+  outline-offset: 2px;
+}
+
+/* Secondary Button */
+.huleedu-btn-secondary {
+  background-color: transparent;
+  color: var(--huleedu-navy);
+  border: var(--huleedu-border-width) solid var(--huleedu-navy);
+}
+
+.huleedu-btn-secondary:hover {
+  background-color: var(--huleedu-navy);
+  color: var(--huleedu-canvas);
+}
+
+/* Text Link with underline */
+.huleedu-link {
+  color: var(--huleedu-navy-70);
+  font-size: var(--huleedu-text-xs);
+  font-weight: var(--huleedu-font-medium);
+  text-decoration: none;
+  border-bottom: 1px solid var(--huleedu-navy-40);
+  padding-bottom: var(--huleedu-space-0-5);
+  transition: color var(--huleedu-duration-default) var(--huleedu-ease-default),
+              border-color var(--huleedu-duration-default) var(--huleedu-ease-default);
+}
+
+.huleedu-link:hover {
+  color: var(--huleedu-burgundy);
+  border-color: var(--huleedu-burgundy);
+}
+
+/* Label (uppercase, tracked) */
+.huleedu-label {
+  display: block;
+  font-size: var(--huleedu-text-xs);
+  font-weight: var(--huleedu-font-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--huleedu-tracking-label);
+  color: var(--huleedu-navy-60);
+  margin-bottom: var(--huleedu-space-2);
+}
+
+/* Form Input */
+.huleedu-input {
+  width: 100%;
+  font-family: var(--huleedu-font-sans);
+  font-size: var(--huleedu-text-base);
+  color: var(--huleedu-navy);
+  background-color: var(--huleedu-canvas);
+  border: var(--huleedu-border-width) solid var(--huleedu-navy-30);
+  padding: var(--huleedu-space-3) var(--huleedu-space-4);
+  transition: border-color var(--huleedu-duration-default) var(--huleedu-ease-default),
+              box-shadow var(--huleedu-duration-default) var(--huleedu-ease-default);
+}
+
+.huleedu-input::placeholder {
+  color: var(--huleedu-navy-30);
+}
+
+.huleedu-input:focus {
+  outline: none;
+  border-color: var(--huleedu-navy);
+  box-shadow: 0 0 0 1px var(--huleedu-navy);
+}
+
+/* Select Dropdown */
+.huleedu-select {
+  width: 100%;
+  font-family: var(--huleedu-font-sans);
+  font-size: var(--huleedu-text-base);
+  color: var(--huleedu-navy);
+  background-color: var(--huleedu-canvas);
+  border: var(--huleedu-border-width) solid var(--huleedu-navy-30);
+  padding: var(--huleedu-space-3) var(--huleedu-space-4);
+  padding-right: var(--huleedu-space-10);
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%231C2E4A' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right var(--huleedu-space-4) center;
+  cursor: pointer;
+}
+
+.huleedu-select:focus {
+  outline: none;
+  border-color: var(--huleedu-navy);
+  box-shadow: 0 0 0 1px var(--huleedu-navy);
+}
+
+/* Status Dot */
+.huleedu-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--huleedu-radius-full);
+  flex-shrink: 0;
+}
+
+.huleedu-dot-active { background-color: var(--huleedu-burgundy); }
+.huleedu-dot-success { background-color: var(--huleedu-success); }
+.huleedu-dot-warning { background-color: var(--huleedu-warning); }
+.huleedu-dot-error { background-color: var(--huleedu-error); }
+
+/* Grid Background Pattern */
+.huleedu-grid-bg {
+  background-image:
+    linear-gradient(var(--huleedu-navy) 1px, transparent 1px),
+    linear-gradient(90deg, var(--huleedu-navy) 1px, transparent 1px);
+  background-size: var(--huleedu-grid-size) var(--huleedu-grid-size);
+  opacity: 0.04;
+}
+
+/* Ledger Row (interactive table row) */
+.huleedu-row {
+  display: grid;
+  border-bottom: var(--huleedu-border-width) solid var(--huleedu-border-color);
+  cursor: default;
+  transition: background-color var(--huleedu-duration-default) var(--huleedu-ease-default);
+}
+
+.huleedu-row:hover {
+  background-color: var(--huleedu-navy-02);
+}
+
+.huleedu-row:hover .huleedu-row-value {
+  color: var(--huleedu-burgundy);
+  font-weight: var(--huleedu-font-semibold);
+}
+
+/* Header (sticky nav bar) */
+.huleedu-header {
+  position: sticky;
+  top: 0;
+  z-index: var(--huleedu-z-sticky);
+  height: var(--huleedu-header-height);
+  background-color: var(--huleedu-canvas);
+  border-bottom: var(--huleedu-border-width) solid var(--huleedu-border-color);
+}
+
+/* Section Divider (thick top border) */
+.huleedu-section-divider {
+  border-top: var(--huleedu-border-width-2) solid var(--huleedu-border-color);
+}
+
+/* Skip Link (accessibility) */
+.huleedu-skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: var(--huleedu-navy);
+  color: var(--huleedu-canvas);
+  padding: var(--huleedu-space-2) var(--huleedu-space-4);
+  z-index: 100;
+  text-decoration: none;
+  font-weight: var(--huleedu-font-semibold);
+}
+
+.huleedu-skip-link:focus {
+  top: 0;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ANIMATIONS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@keyframes huleedu-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.huleedu-pulse {
+  animation: huleedu-pulse 2.5s ease-in-out infinite;
+}
+
+/* HTMX loading indicator */
+.htmx-request .huleedu-loading {
+  opacity: 0.5;
+}
+
+.htmx-request.huleedu-loading {
+  opacity: 0.5;
+}
