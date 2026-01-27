@@ -9,6 +9,11 @@ x-logging: &default-logging
     compress: "true"      # Compress rotated logs
     labels: "service,environment"
 
+# GPU access via host llama-server (hemma.hule.education:8082)
+x-gpu-access: &gpu-access
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+
 services:
   kafka_topic_setup:
     build:
@@ -557,6 +562,7 @@ services:
 
 
   llm_provider_service:
+    <<: *gpu-access
     build:
       context: .
       dockerfile: services/llm_provider_service/Dockerfile
@@ -589,6 +595,9 @@ services:
       - LLM_PROVIDER_SERVICE_GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - LLM_PROVIDER_SERVICE_GOOGLE_PROJECT_ID=${GOOGLE_PROJECT_ID:-}
       - LLM_PROVIDER_SERVICE_OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      # Local GPU inference (llama.cpp on host, or via SSH tunnel) for small tasks
+      - LLM_PROVIDER_SERVICE_LOCAL_LLM_ENABLED=${LLM_PROVIDER_SERVICE_LOCAL_LLM_ENABLED:-false}
+      - LLM_PROVIDER_SERVICE_LOCAL_LLM_URL=http://host.docker.internal:8082
       # Provider Selection
       - LLM_PROVIDER_SERVICE_DEFAULT_LLM_PROVIDER=${DEFAULT_LLM_PROVIDER:-openai}
       - LLM_PROVIDER_SERVICE_PROVIDER_SELECTION_STRATEGY=${PROVIDER_SELECTION_STRATEGY:-priority}
@@ -669,6 +678,7 @@ services:
       start_period: 20s
 
   nlp_service:
+    <<: *gpu-access
     build:
       context: .
       dockerfile: services/nlp_service/Dockerfile
@@ -693,6 +703,9 @@ services:
       - NLP_SERVICE_CONTENT_SERVICE_URL=http://content_service:8000/v1/content
       - NLP_SERVICE_LOG_LEVEL=INFO
       - NLP_SERVICE_REDIS_URL=redis://redis:6379
+      # Local GPU inference (llama.cpp on host, or via SSH tunnel)
+      - NLP_SERVICE_LOCAL_LLM_ENABLED=${NLP_SERVICE_LOCAL_LLM_ENABLED:-false}
+      - NLP_SERVICE_LOCAL_LLM_URL=http://host.docker.internal:8082
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
       - OTEL_SERVICE_NAME=nlp_service
       - OTEL_TRACES_EXPORTER=otlp

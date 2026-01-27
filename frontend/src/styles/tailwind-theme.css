@@ -1,0 +1,21 @@
+@theme inline {
+  /* Fonts */
+  --font-sans: var(--huleedu-font-sans);
+  --font-serif: var(--huleedu-font-serif);
+  --font-mono: var(--huleedu-font-mono);
+
+  /* Core brand colors */
+  --color-canvas: var(--huleedu-canvas);
+  --color-navy: var(--huleedu-navy);
+  --color-burgundy: var(--huleedu-burgundy);
+
+  /* Feedback */
+  --color-success: var(--huleedu-success);
+  --color-warning: var(--huleedu-warning);
+  --color-error: var(--huleedu-error);
+
+  /* Shadows */
+  --shadow-brutal: var(--huleedu-shadow-brutal-sm);
+  --shadow-brutal-sm: var(--huleedu-shadow-brutal-xs);
+  --shadow-brutal-burgundy: 4px 4px 0px 0px var(--huleedu-burgundy);
+}

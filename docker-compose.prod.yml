@@ -1,0 +1,368 @@
+# HuleEdu Production Overrides for hemma.hule.education
+#
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Prerequisites:
+# 1. External network exists: docker network create hule-network
+# 2. Databases created in shared-postgres (see commands below)
+# 3. Environment variables in .env (see below)
+#
+# === Create databases in shared-postgres ===
+# docker exec -it shared-postgres psql -U postgres -c "
+# CREATE DATABASE huleedu_batch_conductor;
+# CREATE DATABASE huleedu_batch_orchestrator;
+# CREATE DATABASE huleedu_cj_assessment;
+# CREATE DATABASE huleedu_class_management;
+# CREATE DATABASE huleedu_content;
+# CREATE DATABASE huleedu_email;
+# CREATE DATABASE huleedu_entitlements;
+# CREATE DATABASE huleedu_essay_lifecycle;
+# CREATE DATABASE huleedu_file_service;
+# CREATE DATABASE huleedu_identity;
+# CREATE DATABASE huleedu_nlp;
+# CREATE DATABASE huleedu_result_aggregator;
+# CREATE DATABASE huleedu_spellchecker;
+# "
+#
+# === Required .env variables ===
+# HULEEDU_DB_USER=huleedu_user
+# HULEEDU_PROD_DB_PASSWORD=<production-password>
+# HULEEDU_INTERNAL_API_KEY=<internal-api-key>
+# JWT_SECRET_KEY=<jwt-secret>
+# ANTHROPIC_API_KEY=<if-using-anthropic>
+# OPENAI_API_KEY=<if-using-openai>
+# NLP_SERVICE_LOCAL_LLM_ENABLED=true
+# LLM_PROVIDER_SERVICE_LOCAL_LLM_ENABLED=true
+
+networks:
+  hule-network:
+    external: true
+
+# Shared production DB environment
+x-prod-db-env: &prod-db-env
+  HULEEDU_PROD_DB_HOST: shared-postgres
+  HULEEDU_PROD_DB_PORT: "5432"
+  HULEEDU_PROD_DB_PASSWORD: ${HULEEDU_PROD_DB_PASSWORD}
+
+services:
+  # =============================================================
+  # DISABLED: Individual database containers (use shared-postgres)
+  # =============================================================
+  batch_orchestrator_db:
+    deploy:
+      replicas: 0
+
+  essay_lifecycle_db:
+    deploy:
+      replicas: 0
+
+  cj_assessment_db:
+    deploy:
+      replicas: 0
+
+  class_management_db:
+    deploy:
+      replicas: 0
+
+  file_service_db:
+    deploy:
+      replicas: 0
+
+  content_service_db:
+    deploy:
+      replicas: 0
+
+  spellchecker_db:
+    deploy:
+      replicas: 0
+
+  result_aggregator_db:
+    deploy:
+      replicas: 0
+
+  nlp_db:
+    deploy:
+      replicas: 0
+
+  batch_conductor_db:
+    deploy:
+      replicas: 0
+
+  identity_db:
+    deploy:
+      replicas: 0
+
+  email_db:
+    deploy:
+      replicas: 0
+
+  entitlements_db:
+    deploy:
+      replicas: 0
+
+  # =============================================================
+  # APPLICATION SERVICES: Add prod DB config
+  # =============================================================
+
+  content_service:
+    depends_on:
+      kafka_topic_setup:
+        condition: service_completed_successfully
+      # Removed: content_service_db dependency
+    networks:
+      - huleedu_internal_network
+      - hule-network  # For shared-postgres access
+    environment:
+      <<: *prod-db-env
+
+  result_aggregator_service:
+    depends_on:
+      kafka_topic_setup:
+        condition: service_completed_successfully
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      # Removed: result_aggregator_db dependency
+    networks:
+      - huleedu_internal_network
+      - hule-network
+    environment:
+      <<: *prod-db-env
+
+  batch_conductor_service:
+    depends_on:
+      kafka_topic_setup:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      # Removed: batch_conductor_db dependency
+    networks:
+      - huleedu_internal_network
+      - hule-network
+    environment:
+      <<: *prod-db-env
+
+  spellchecker_service:
+    depends_on:
+      kafka_topic_setup:
+        condition: service_completed_successfully
+      content_service:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      # Removed: spellchecker_db dependency
+    networks:
+      - huleedu_internal_network
+      - hule-network
+    environment:
+      <<: *prod-db-env
+
+  batch_orchestrator_service:
+    depends_on:
+      kafka_topic_setup:
+        condition: service_completed_successfully
+      content_service:
+        condition: service_healthy
+      essay_lifecycle_api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      # Removed: batch_orchestrator_db dependency
+    networks:
+      - huleedu_internal_network
+      - hule-network
+    environment:
+      <<: *prod-db-env
+
+  essay_lifecycle_api:
+    depends_on:
+      kafka_topic_setup:
+        condition: service_completed_successfully
+      content_service:
+        condition: service_healthy
+      file_service:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      # Removed: essay_lifecycle_db dependency
+    networks:
+      - huleedu_internal_network
+      - hule-network
+    environment:
+      <<: *prod-db-env
+
+  essay_lifecycle_worker:
+    depends_on:
+      kafka_topic_setup:
+        condition: service_completed_successfully
+      content_service:
+        condition: service_healthy
+      file_service:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      # Removed: essay_lifecycle_db dependency
+    networks:
+      - huleedu_internal_network
+      - hule-network
+    environment:
+      <<: *prod-db-env
+
+  file_service:
+    depends_on:
+      kafka_topic_setup:
+        condition: service_completed_successfully
+      content_service:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      # Removed: file_service_db dependency
+    networks:
+      - huleedu_internal_network
+      - hule-network
+    environment:
+      <<: *prod-db-env
+
+  cj_assessment_service:
+    depends_on:
+      kafka_topic_setup:
+        condition: service_completed_successfully
+      content_service:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      llm_provider_service:
+        condition: service_healthy
+      # Removed: cj_assessment_db dependency
+    networks:
+      - huleedu_internal_network
+      - hule-network
+    environment:
+      <<: *prod-db-env
+
+  class_management_service:
+    depends_on:
+      kafka_topic_setup:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      # Removed: class_management_db dependency
+    networks:
+      - huleedu_internal_network
+      - hule-network
+    environment:
+      <<: *prod-db-env
+
+  nlp_service:
+    depends_on:
+      kafka_topic_setup:
+        condition: service_completed_successfully
+      content_service:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      # Removed: nlp_db dependency
+    networks:
+      - huleedu_internal_network
+      - hule-network
+    environment:
+      <<: *prod-db-env
+
+  identity_service:
+    depends_on:
+      kafka_topic_setup:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      # Removed: identity_db dependency
+    networks:
+      - huleedu_internal_network
+      - hule-network
+    environment:
+      <<: *prod-db-env
+
+  email_service:
+    depends_on:
+      kafka_topic_setup:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      # Removed: email_db dependency
+    networks:
+      - huleedu_internal_network
+      - hule-network
+    environment:
+      <<: *prod-db-env
+
+  entitlements_service:
+    depends_on:
+      kafka_topic_setup:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      # Removed: entitlements_db dependency
+    networks:
+      - huleedu_internal_network
+      - hule-network
+    environment:
+      <<: *prod-db-env
+
+  # =============================================================
+  # EXTERNAL-FACING SERVICES: nginx-proxy integration
+  # =============================================================
+
+  # API Gateway - main API entry point
+  api_gateway_service:
+    networks:
+      - huleedu_internal_network
+      - hule-network
+    environment:
+      VIRTUAL_HOST: api.huleedu.hule.education
+      VIRTUAL_PORT: "8080"
+      LETSENCRYPT_HOST: api.huleedu.hule.education
+
+  # BFF Teacher - serves frontend SPA
+  bff_teacher_service:
+    networks:
+      - huleedu_internal_network
+      - hule-network
+    environment:
+      VIRTUAL_HOST: huleedu.hule.education
+      VIRTUAL_PORT: "4101"
+      LETSENCRYPT_HOST: huleedu.hule.education
+
+  # WebSocket service - real-time updates
+  websocket_service:
+    networks:
+      - huleedu_internal_network
+      - hule-network
+    environment:
+      VIRTUAL_HOST: ws.huleedu.hule.education
+      VIRTUAL_PORT: "8080"
+      LETSENCRYPT_HOST: ws.huleedu.hule.education
+
+  # =============================================================
+  # INFRASTRUCTURE: Ensure network connectivity
+  # =============================================================
+
+  kafka:
+    networks:
+      - huleedu_internal_network
+
+  redis:
+    networks:
+      - huleedu_internal_network
+
+  zookeeper:
+    networks:
+      - huleedu_internal_network
+
+  llm_provider_service:
+    networks:
+      - huleedu_internal_network
+      - hule-network

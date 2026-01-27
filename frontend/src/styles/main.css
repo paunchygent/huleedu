@@ -1,73 +1,6 @@
 @import "tailwindcss";
-
-/* ═══════════════════════════════════════════════════════════════
-   THEME CONFIGURATION
-   Consolidated design tokens for HuleEdu
-═══════════════════════════════════════════════════════════════ */
-@theme {
-  /* Typography - IBM Plex industrial type system */
-  --font-family-sans: "IBM Plex Sans", system-ui, sans-serif;
-  --font-family-serif: "IBM Plex Serif", Georgia, serif;
-  --font-family-display: "IBM Plex Serif", Georgia, serif;
-  --font-family-mono: "IBM Plex Mono", ui-monospace, monospace;
-
-  /* ═══════════════════════════════════════════════════════════════
-     PRIMITIVE COLOR SCALES
-     Derived from existing brand colors for visual coherence
-  ═══════════════════════════════════════════════════════════════ */
-
-  /* Navy scale - derived from base #1a1f2c */
-  --color-navy-50: #f5f6f7;
-  --color-navy-100: #e8eaec;
-  --color-navy-300: #9da3ad;
-  --color-navy-500: #525a68;
-  --color-navy-700: #333a47;
-  --color-navy-900: #1a1f2c;
-
-  /* Burgundy scale - derived from base #7a2e2e */
-  --color-burgundy-50: #fdf5f5;
-  --color-burgundy-100: #f9e6e6;
-  --color-burgundy-300: #c97575;
-  --color-burgundy-500: #9a4848;
-  --color-burgundy-700: #7a2e2e;
-  --color-burgundy-900: #5a1f1f;
-
-  /* ═══════════════════════════════════════════════════════════════
-     SEMANTIC TOKENS
-     Purpose-driven tokens that reference primitives
-  ═══════════════════════════════════════════════════════════════ */
-
-  /* Text colors - WCAG AA compliant */
-  --color-text-primary: var(--color-navy-900);
-  --color-text-secondary: var(--color-navy-700);
-  --color-text-muted: var(--color-navy-500);
-  --color-text-disabled: var(--color-navy-300);
-
-  /* ═══════════════════════════════════════════════════════════════
-     LEGACY BRAND COLORS
-     Retained for backward compatibility
-  ═══════════════════════════════════════════════════════════════ */
-
-  /* Brand Colors - aligned with dashboard prototype */
-  --color-canvas: #FDFBF7;
-  --color-navy: var(--color-navy-900);
-  --color-burgundy: var(--color-burgundy-700);
-  --color-paper: #ffffff;
-
-  /* Extended palette */
-  --color-brand-primary: oklch(65% 0.2 258);
-  --color-brand-accent: oklch(78% 0.16 210);
-
-  /* Spacing */
-  --spacing-handout: 1.75rem;
-
-  /* Border Radius */
-  --radius-handout-card: 18px;
-
-  /* Letter Spacing */
-  --letter-spacing-tightest: -0.02em;
-  --letter-spacing-label: 0.08em;
-}
+@import "./tokens.css";
+@import "./tailwind-theme.css";
 
 /* ═══════════════════════════════════════════════════════════════
    BASE STYLES
@@ -192,10 +125,10 @@ input:focus-visible {
 
 /* Grid background - 24px baseline from prototype */
 .bg-grid {
-  background-size: 24px 24px;
+  background-size: var(--huleedu-grid-size) var(--huleedu-grid-size);
   background-image:
-    linear-gradient(to right, rgba(26, 31, 44, 0.06) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(26, 31, 44, 0.06) 1px, transparent 1px);
+    linear-gradient(to right, var(--huleedu-navy-05) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--huleedu-navy-05) 1px, transparent 1px);
 }
 
 /* Legacy grid background (hero sections) */
@@ -203,21 +136,8 @@ input:focus-visible {
   background-image:
     linear-gradient(var(--color-navy) 1px, transparent 1px),
     linear-gradient(90deg, var(--color-navy) 1px, transparent 1px);
-  background-size: 24px 24px;
+  background-size: var(--huleedu-grid-size) var(--huleedu-grid-size);
   opacity: 0.04;
-}
-
-/* Brutalist shadows - aligned with prototype */
-.shadow-brutal {
-  box-shadow: 4px 4px 0 0 var(--color-navy);
-}
-
-.shadow-brutal-sm {
-  box-shadow: 2px 2px 0 0 var(--color-navy);
-}
-
-.shadow-brutal-burgundy {
-  box-shadow: 4px 4px 0 0 var(--color-burgundy);
 }
 
 /* Status indicator dots */
@@ -235,31 +155,12 @@ input:focus-visible {
 
 /* Typography utilities */
 .tracking-tightest {
-  letter-spacing: var(--letter-spacing-tightest);
+  letter-spacing: var(--huleedu-tracking-tightest);
 }
 
 .tracking-label {
-  letter-spacing: var(--letter-spacing-label);
+  letter-spacing: var(--huleedu-tracking-label);
 }
-
-/* Color utilities */
-.bg-canvas { background-color: var(--color-canvas); }
-.bg-navy { background-color: var(--color-navy); }
-.bg-burgundy { background-color: var(--color-burgundy); }
-
-.text-canvas { color: var(--color-canvas); }
-.text-navy { color: var(--color-navy); }
-.text-burgundy { color: var(--color-burgundy); }
-
-.border-canvas { border-color: var(--color-canvas); }
-.border-navy { border-color: var(--color-navy); }
-.border-burgundy { border-color: var(--color-burgundy); }
-
-/* Semantic text utilities */
-.text-primary { color: var(--color-text-primary); }
-.text-secondary { color: var(--color-text-secondary); }
-.text-muted { color: var(--color-text-muted); }
-.text-disabled { color: var(--color-text-disabled); }
 
 /* Skip link for accessibility */
 .skip-link {
