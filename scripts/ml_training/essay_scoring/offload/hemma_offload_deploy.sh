@@ -1,7 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_ROOT="$(cd -- "$(dirname "$0")/../../../../.." && pwd)"
+REPO_ROOT="$(cd -- "$(dirname "$0")/../../../.." && pwd)"
+
+if [ ! -d "$REPO_ROOT/.git" ]; then
+  cat <<EOF >&2
+ERROR: Expected REPO_ROOT to be a git checkout, but no .git found.
+Computed REPO_ROOT: $REPO_ROOT
+
+Run this script from inside the repo, e.g.:
+  cd ~/apps/huleedu
+  ./scripts/ml_training/essay_scoring/offload/hemma_offload_deploy.sh
+EOF
+  exit 1
+fi
 
 IMAGE_TAG="${IMAGE_TAG:-huleedu-essay-embed-offload:dev}"
 CONTAINER_NAME="${CONTAINER_NAME:-huleedu-embed-offload}"
@@ -10,7 +22,11 @@ HOST_BIND="${HOST_BIND:-127.0.0.1}"
 PORT="${PORT:-9000}"
 
 DATA_ROOT="${DATA_ROOT:-/srv/scratch/huleedu}"
-HF_CACHE_HOST="${HF_CACHE_HOST:-$DATA_ROOT/cache/huggingface}"
+HF_CACHE_DATA_DISK="${HF_CACHE_DATA_DISK:-$DATA_ROOT/cache/huggingface}"
+
+# NOTE: On some Hemma setups Docker is snap-installed and cannot mount from /srv/*
+# directly. We bind-mount the data-disk directory into $HOME, then mount from there.
+HF_CACHE_HOME_MOUNT="${HF_CACHE_HOME_MOUNT:-$HOME/.data/huleedu/cache/huggingface}"
 
 echo "== HuleEdu DeBERTa offload (ROCm/HIP) deploy =="
 echo "repo_root=$REPO_ROOT"
@@ -18,7 +34,8 @@ echo "image_tag=$IMAGE_TAG"
 echo "container_name=$CONTAINER_NAME"
 echo "base_image=$BASE_IMAGE"
 echo "bind=$HOST_BIND:$PORT"
-echo "hf_cache_host=$HF_CACHE_HOST"
+echo "hf_cache_data_disk=$HF_CACHE_DATA_DISK"
+echo "hf_cache_home_mount=$HF_CACHE_HOME_MOUNT"
 echo
 
 echo "== Stop any ROCm llama.cpp container (VRAM) =="
@@ -32,8 +49,13 @@ cd "$REPO_ROOT"
 git pull --ff-only
 
 echo "== Ensure HF cache dir on data disk =="
-sudo mkdir -p "$HF_CACHE_HOST"
+sudo mkdir -p "$HF_CACHE_DATA_DISK"
 sudo chown -R "$(id -u):$(id -g)" "$DATA_ROOT" || true
+
+echo "== Bind-mount HF cache into home (for Docker volume mounts) =="
+mkdir -p "$HF_CACHE_HOME_MOUNT"
+sudo umount "$HF_CACHE_HOME_MOUNT" >/dev/null 2>&1 || true
+sudo mount --bind "$HF_CACHE_DATA_DISK" "$HF_CACHE_HOME_MOUNT"
 
 echo "== Build image =="
 sudo /snap/bin/docker build \
@@ -55,7 +77,7 @@ sudo /snap/bin/docker run -d \
   --shm-size 8g \
   -e HF_HOME=/cache/huggingface \
   -e TRANSFORMERS_CACHE=/cache/huggingface \
-  -v "$HF_CACHE_HOST:/cache/huggingface" \
+  -v "$HF_CACHE_HOME_MOUNT:/cache/huggingface" \
   "$IMAGE_TAG"
 
 echo "== Wait for healthz =="
@@ -83,4 +105,3 @@ if torch.cuda.is_available():
 PY
 
 echo "== Done =="
-
