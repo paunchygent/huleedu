@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Scaffold a new documentation file (runbook, ADR, or epic) with YAML frontmatter.
+Scaffold a new documentation file with YAML frontmatter.
 
 Usage examples:
   pdm run new-doc --type runbook --title "Service Recovery" \
@@ -9,6 +9,13 @@ Usage examples:
   pdm run new-doc --type adr --title "Cache Strategy"
 
   pdm run new-doc --type epic --title "User Dashboard" --id EPIC-010
+
+  pdm run new-doc --type review --title "Review: Story approval" \
+    --story us-00ya-workflow-continuation-refactor--phase-6 --reviewer @lead
+
+  pdm run new-doc --type reference --title "TASKS lifecycle v2"
+
+  pdm run new-doc --type research --title "Investigate Jira ↔ TASKS sync options"
 """
 
 from __future__ import annotations
@@ -26,6 +33,12 @@ from scripts.schemas.docs_schema import (
     DecisionFrontmatter,
     EpicFrontmatter,
     EpicStatus,
+    ReferenceFrontmatter,
+    ReferenceStatus,
+    ResearchFrontmatter,
+    ResearchStatus,
+    ReviewFrontmatter,
+    ReviewStatus,
     RunbookFrontmatter,
     RunbookSeverity,
     get_allowed_values,
@@ -39,13 +52,16 @@ DOC_OUTPUT_PATHS = {
     "runbook": ROOT / "docs" / "operations",
     "adr": ROOT / "docs" / "decisions",
     "epic": ROOT / "docs" / "product" / "epics",
+    "review": ROOT / "docs" / "product" / "reviews",
+    "reference": ROOT / "docs" / "reference",
+    "research": ROOT / "docs" / "research",
 }
 
 
 def slugify(text: str) -> str:
     """Convert title to kebab-case filename slug."""
     text = text.strip()
-    text = re.sub(r"[\s/]+", "-", text)
+    text = re.sub(r"[\s/_]+", "-", text)
     text = re.sub(r"[^A-Za-z0-9_-]+", "", text)
     return text.lower().strip("-")
 
@@ -165,12 +181,101 @@ def create_epic(args: argparse.Namespace, today: str) -> tuple[Path, dict, str]:
     return dest, fm, body
 
 
+def create_review(args: argparse.Namespace, today: str) -> tuple[Path, dict, str]:
+    """Create review frontmatter and body."""
+    slug = slugify(args.story or args.title)
+    dest = DOC_OUTPUT_PATHS["review"] / f"review-{slug}.md"
+
+    fm = {
+        "type": "review",
+        "id": f"REV-{slug}",
+        "title": args.title,
+        "status": args.status,
+        "created": today,
+        "last_updated": today,
+        "story": args.story,
+        "reviewer": args.reviewer,
+    }
+
+    body = f"""# {args.title}
+
+## TL;DR
+
+## Problem Statement
+
+## Proposed Solution
+
+## Scope
+
+## Risks / Unknowns
+
+## Verdict
+
+**Status:** `{args.status}`
+"""
+    return dest, fm, body
+
+
+def create_reference(args: argparse.Namespace, today: str) -> tuple[Path, dict, str]:
+    """Create reference frontmatter and body."""
+    slug = slugify(args.title)
+    dest = DOC_OUTPUT_PATHS["reference"] / f"ref-{slug}.md"
+
+    fm = {
+        "type": "reference",
+        "id": f"REF-{slug}",
+        "title": args.title,
+        "status": args.status,
+        "created": today,
+        "last_updated": today,
+        "topic": args.topic,
+    }
+
+    body = f"""# {args.title}
+
+## Purpose
+
+## Canonical Rules
+
+## Examples
+"""
+    return dest, fm, body
+
+
+def create_research(args: argparse.Namespace, today: str) -> tuple[Path, dict, str]:
+    """Create research frontmatter and body."""
+    slug = slugify(args.title)
+    dest = DOC_OUTPUT_PATHS["research"] / f"research-{slug}.md"
+
+    fm = {
+        "type": "research",
+        "id": f"RES-{slug}",
+        "title": args.title,
+        "status": args.status,
+        "created": today,
+        "last_updated": today,
+    }
+
+    body = f"""# {args.title}
+
+## Question
+
+## Findings
+
+## Decision / Next Steps
+"""
+    return dest, fm, body
+
+
 def validate_frontmatter(doc_type: str, fm: dict) -> bool:
     """Validate frontmatter against appropriate schema."""
     schema_map = {
         "runbook": RunbookFrontmatter,
         "adr": DecisionFrontmatter,
         "epic": EpicFrontmatter,
+        "review": ReviewFrontmatter,
+        "reference": ReferenceFrontmatter,
+        "research": ResearchFrontmatter,
     }
     schema = schema_map[doc_type]
 
@@ -198,7 +303,7 @@ def main(argv: list[str]) -> int:
     p.add_argument(
         "--type",
         required=True,
-        choices=["runbook", "adr", "epic"],
+        choices=["runbook", "adr", "epic", "review", "reference", "research"],
         help="Document type to create",
     )
     p.add_argument("--title", required=True, help="Human title for the document")
@@ -215,12 +320,17 @@ def main(argv: list[str]) -> int:
     p.add_argument("--id", help="Epic ID (e.g., EPIC-010), auto-generated if omitted")
     p.add_argument(
         "--status",
-        choices=list(get_args(EpicStatus)),
-        default="draft",
-        help="Epic status",
+        help="Document status (enum depends on --type)",
     )
     p.add_argument("--phase", type=int, help="Epic phase number")
     p.add_argument("--sprint-target", dest="sprint_target", help="Target sprint")
+
+    # Review-specific args
+    p.add_argument("--story", help="Optional TASKS story id being reviewed (kebab-case)")
+    p.add_argument("--reviewer", help="Optional reviewer handle (e.g., @lead)")
+
+    # Reference-specific args
+    p.add_argument("--topic", help="Optional topic tag for reference docs")
 
     args = p.parse_args(argv)
     today = dt.date.today().isoformat()
@@ -239,6 +349,8 @@ def main(argv: list[str]) -> int:
         dest, fm, body = create_adr(args, today)
 
     elif args.type == "epic":
+        if not args.status:
+            args.status = "draft"
         # Validate epic ID format if provided
         if args.id and not re.match(r"^EPIC-\d{3}$", args.id):
             print(
@@ -246,7 +358,38 @@ def main(argv: list[str]) -> int:
                 file=sys.stderr,
             )
             return 1
+        if args.status not in list(get_args(EpicStatus)):
+            allowed = ", ".join(list(get_args(EpicStatus)))
+            print(f"Error: --status must be one of: {allowed}", file=sys.stderr)
+            return 1
         dest, fm, body = create_epic(args, today)
+
+    elif args.type == "review":
+        if not args.status:
+            args.status = "pending"
+        if args.status not in list(get_args(ReviewStatus)):
+            allowed = ", ".join(list(get_args(ReviewStatus)))
+            print(f"Error: --status must be one of: {allowed}", file=sys.stderr)
+            return 1
+        dest, fm, body = create_review(args, today)
+
+    elif args.type == "reference":
+        if not args.status:
+            args.status = "active"
+        if args.status not in list(get_args(ReferenceStatus)):
+            allowed = ", ".join(list(get_args(ReferenceStatus)))
+            print(f"Error: --status must be one of: {allowed}", file=sys.stderr)
+            return 1
+        dest, fm, body = create_reference(args, today)
+
+    elif args.type == "research":
+        if not args.status:
+            args.status = "active"
+        if args.status not in list(get_args(ResearchStatus)):
+            allowed = ", ".join(list(get_args(ResearchStatus)))
+            print(f"Error: --status must be one of: {allowed}", file=sys.stderr)
+            return 1
+        dest, fm, body = create_research(args, today)
 
     else:
         print(f"Error: Unknown type {args.type}", file=sys.stderr)

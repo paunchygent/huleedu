@@ -1,16 +1,16 @@
 ---
-id: 'tasks-readme'
-title: 'TASKS README'
-type: 'doc'
-status: 'completed'
-priority: 'medium'
-domain: 'architecture'
+id: tasks-readme
+title: TASKS README
+type: doc
+status: done
+priority: medium
+domain: architecture
 service: ''
-owner_team: 'architecture'
+owner_team: architecture
 owner: ''
 program: ''
 created: '2025-11-13'
-last_updated: '2025-11-30'
+last_updated: '2026-02-01'
 related: []
 labels: []
 ---
@@ -26,6 +26,11 @@ For full machine-readable rules, see:
 - `scripts/schemas/task_schema.py`
 
 Those documents and this README describe the **same** source of truth.
+
+## Lifecycle v2 (reference)
+
+- `docs/reference/ref-tasks-lifecycle-v2.md`
+- `docs/decisions/0027-tasks-lifecycle-v2-story-review-gate-done-status-research-docs.md`
 
 ## Directory taxonomy
 
@@ -55,8 +60,9 @@ matching the canonical schema:
 - `title` – short, factual title.
 - `type` – typically `task`, `story`, `doc`, or `programme`.
 - `status` – one of:
-  - `research`, `blocked`, `in_progress`,
-  - `completed`, `paused`, `archived`.
+  - `proposed`, `in_review`, `approved`,
+  - `blocked`, `in_progress`, `done`,
+  - `paused`, `archived`.
 - `priority` – `low` | `medium` | `high` | `critical`.
 - `domain` – one of the top-level domains above (including `programs`).
 - `service` – optional service name (e.g. `cj_assessment_service`).

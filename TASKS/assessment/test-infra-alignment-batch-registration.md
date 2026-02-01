@@ -1,16 +1,17 @@
 ---
-id: "test-infra-alignment-batch-registration"
-title: "Task: Test Infrastructure Alignment for Batch Registration via API Gateway (Revised)"
-type: "task"
-status: "research"
-priority: "medium"
-domain: "assessment"
-service: ""
-owner_team: "agents"
-owner: ""
-program: ""
-created: "2025-09-05"
-last_updated: "2025-11-26"
+id: test-infra-alignment-batch-registration
+title: 'Task: Test Infrastructure Alignment for Batch Registration via API Gateway
+  (Revised)'
+type: task
+status: proposed
+priority: medium
+domain: assessment
+service: ''
+owner_team: agents
+owner: ''
+program: ''
+created: '2025-09-05'
+last_updated: '2026-02-01'
 related: []
 labels: []
 ---

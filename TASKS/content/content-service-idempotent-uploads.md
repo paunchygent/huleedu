@@ -2,12 +2,12 @@
 id: content-service-idempotent-uploads
 title: Content Service Idempotent Uploads
 type: task
-status: research
+status: proposed
 priority: medium
 domain: content
 owner_team: agents
 created: '2025-11-21'
-last_updated: '2025-11-21'
+last_updated: '2026-02-01'
 service: content_service
 owner: ''
 program: ''

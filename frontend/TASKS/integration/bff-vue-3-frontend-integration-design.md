@@ -2,15 +2,15 @@
 id: bff-vue-3-frontend-integration-design
 title: Designing a BFF Layer for Vue 3 Frontend Integration
 type: doc
-status: research
+status: proposed
 priority: high
 domain: integration
-service: ""
+service: ''
 owner_team: frontend
-owner: ""
-program: ""
+owner: ''
+program: ''
 created: 2025-11-24
-last_updated: 2025-11-24
+last_updated: '2026-02-01'
 related: []
 labels: []
 ---

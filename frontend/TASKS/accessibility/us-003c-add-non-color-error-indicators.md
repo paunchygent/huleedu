@@ -2,7 +2,7 @@
 id: us-003c-add-non-color-error-indicators
 title: Add Non-Color Error Indicators for WCAG 1.4.1 Compliance
 type: story
-status: research
+status: proposed
 priority: medium
 domain: accessibility
 service: ''
@@ -10,9 +10,15 @@ owner_team: agents
 owner: ''
 program: ''
 created: 2025-12-08
-last_updated: 2025-12-08
-related: ["ADR-0023", "EPIC-010", "us-003a-fix-wcag-aa-contrast-violations"]
-labels: ["accessibility", "design-system", "wcag"]
+last_updated: '2026-02-01'
+related:
+- ADR-0023
+- EPIC-010
+- us-003a-fix-wcag-aa-contrast-violations
+labels:
+- accessibility
+- design-system
+- wcag
 ---
 
 # US-003C: Add Non-Color Error Indicators for WCAG 1.4.1 Compliance

@@ -1,18 +1,24 @@
 ---
-id: 'eng5-heavy-ci-matrix-and-healthcheck-tuning'
-title: 'ENG5 Heavy CI Matrix and Healthcheck Tuning'
-type: 'task'
-status: 'research'
-priority: 'medium'
-domain: 'infrastructure'
+id: eng5-heavy-ci-matrix-and-healthcheck-tuning
+title: ENG5 Heavy CI Matrix and Healthcheck Tuning
+type: task
+status: proposed
+priority: medium
+domain: infrastructure
 service: ''
-owner_team: 'agents'
+owner_team: agents
 owner: ''
-program: 'eng5'
+program: eng5
 created: '2025-12-09'
-last_updated: '2025-12-09'
-related: ['EPIC-011', 'EPIC-005', 'EPIC-008']
-labels: ['ci', 'eng5', 'heavy-lane']
+last_updated: '2026-02-01'
+related:
+- EPIC-011
+- EPIC-005
+- EPIC-008
+labels:
+- ci
+- eng5
+- heavy-lane
 ---
 # ENG5 Heavy CI Matrix and Healthcheck Tuning
 

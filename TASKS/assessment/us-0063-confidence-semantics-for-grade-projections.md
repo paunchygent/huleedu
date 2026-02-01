@@ -1,16 +1,16 @@
 ---
-id: 'us-0063-confidence-semantics-for-grade-projections'
+id: us-0063-confidence-semantics-for-grade-projections
 title: 'US-006.3: Confidence semantics for grade projections'
-type: 'task'
-status: 'research'
-priority: 'medium'
-domain: 'assessment'
-service: 'cj_assessment_service'
-owner_team: 'agents'
+type: task
+status: proposed
+priority: medium
+domain: assessment
+service: cj_assessment_service
+owner_team: agents
 owner: ''
 program: ''
 created: '2025-11-28'
-last_updated: '2025-11-28'
+last_updated: '2026-02-01'
 related: []
 labels: []
 ---

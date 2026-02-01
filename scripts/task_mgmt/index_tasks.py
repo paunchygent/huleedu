@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """
 Generate TASKS/INDEX.md summarizing tasks by domain, status, and programme.
-No external dependencies; parses simple front matter only.
+Parses YAML frontmatter via shared frontmatter utilities.
 """
 
 from __future__ import annotations
 
 import argparse
 import datetime as dt
-import re
 import sys
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, Tuple
+
+from scripts.utils.frontmatter_utils import read_front_matter
 
 ROOT = Path(__file__).resolve().parents[2]
 TASKS_DIR = ROOT / "TASKS"
@@ -39,31 +39,6 @@ def _display_path(p: Path) -> str:
         return str(p.relative_to(ROOT))
     except ValueError:
         return str(p)
-
-
-def read_front_matter(p: Path) -> Tuple[Dict[str, Any], str]:
-    text = p.read_text(encoding="utf-8")
-    if not text.startswith("---\n"):
-        return {}, text
-    parts = text.split("\n---\n", 1)
-    if len(parts) != 2:
-        return {}, text
-    header = parts[0][4:]
-    body = parts[1]
-    data: Dict[str, Any] = {}
-    for line in header.splitlines():
-        if not line.strip() or line.strip().startswith("#"):
-            continue
-        m = re.match(r"^([A-Za-z0-9_]+):\s*(.*)$", line)
-        if not m:
-            continue
-        k, v = m.group(1), m.group(2).strip()
-        if v.startswith("[") and v.endswith("]"):
-            items = [i.strip().strip("'\"") for i in v[1:-1].split(",") if i.strip()]
-            data[k] = items
-        else:
-            data[k] = v.strip("'\"")
-    return data, body
 
 
 def main(argv: list[str]) -> int:

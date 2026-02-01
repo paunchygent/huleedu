@@ -1,18 +1,22 @@
 ---
-id: 'cms-batch-class-info-internal-endpoint'
-title: 'CMS Batch Class Info Internal Endpoint'
-type: 'task'
-status: 'completed'
-priority: 'critical'
-domain: 'programs'
-service: 'class_management_service'
-owner_team: 'agents'
+id: cms-batch-class-info-internal-endpoint
+title: CMS Batch Class Info Internal Endpoint
+type: task
+status: done
+priority: critical
+domain: programs
+service: class_management_service
+owner_team: agents
 owner: ''
-program: 'teacher_dashboard_integration'
+program: teacher_dashboard_integration
 created: '2025-12-09'
-last_updated: '2025-12-09'
-related: ["TASKS/programs/teacher_dashboard_integration/HUB.md"]
-labels: ["blocking", "cms", "internal-api"]
+last_updated: '2026-02-01'
+related:
+- TASKS/programs/teacher_dashboard_integration/HUB.md
+labels:
+- blocking
+- cms
+- internal-api
 ---
 # CMS Batch Class Info Internal Endpoint
 

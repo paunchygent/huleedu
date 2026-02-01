@@ -13,11 +13,13 @@ from pydantic.config import ConfigDict
 class TaskStatus(str, Enum):
     """Allowed status values for task frontmatter."""
 
-    research = "research"
+    proposed = "proposed"
+    in_review = "in_review"
+    approved = "approved"
     blocked = "blocked"
     in_progress = "in_progress"
     paused = "paused"
-    completed = "completed"
+    done = "done"
     archived = "archived"
 
 
@@ -79,6 +81,52 @@ class TaskFrontmatter(BaseModel):
     labels: list[str] = Field(default_factory=list)
 
     model_config = ConfigDict(extra="allow")
+
+    def _allowed_statuses_for_type(self) -> set[str]:
+        if self.type == TaskType.story:
+            return {
+                TaskStatus.proposed.value,
+                TaskStatus.in_review.value,
+                TaskStatus.approved.value,
+                TaskStatus.in_progress.value,
+                TaskStatus.blocked.value,
+                TaskStatus.paused.value,
+                TaskStatus.done.value,
+                TaskStatus.archived.value,
+            }
+
+        if self.type == TaskType.task:
+            # Keep tasks lean: no review gate, but still support "proposed" as a backlog state.
+            return {
+                TaskStatus.proposed.value,
+                TaskStatus.in_progress.value,
+                TaskStatus.blocked.value,
+                TaskStatus.paused.value,
+                TaskStatus.done.value,
+                TaskStatus.archived.value,
+            }
+
+        if self.type == TaskType.programme:
+            return {
+                TaskStatus.proposed.value,
+                TaskStatus.in_progress.value,
+                TaskStatus.blocked.value,
+                TaskStatus.paused.value,
+                TaskStatus.done.value,
+                TaskStatus.archived.value,
+            }
+
+        # Docs in TASKS are excluded from validation today, but keep a sane default.
+        return {e.value for e in TaskStatus}
+
+    def model_post_init(self, __context: object) -> None:  # noqa: D401
+        allowed = self._allowed_statuses_for_type()
+        if self.status.value not in allowed:
+            allowed_str = ", ".join(sorted(allowed))
+            raise ValueError(
+                f"status '{self.status.value}' invalid for type '{self.type.value}' "
+                f"(allowed: {allowed_str})"
+            )
 
 
 def get_allowed_values() -> dict[str, list[str]]:

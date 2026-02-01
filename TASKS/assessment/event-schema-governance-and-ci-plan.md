@@ -1,16 +1,16 @@
 ---
-id: "event-schema-governance-and-ci-plan"
-title: "Event Schema Governance & CI Gate (Weeks 6–8)"
-type: "task"
-status: "research"
-priority: "medium"
-domain: "assessment"
-service: ""
-owner_team: "agents"
-owner: ""
-program: ""
-created: "2025-11-16"
-last_updated: "2025-11-17"
+id: event-schema-governance-and-ci-plan
+title: Event Schema Governance & CI Gate (Weeks 6–8)
+type: task
+status: proposed
+priority: medium
+domain: assessment
+service: ''
+owner_team: agents
+owner: ''
+program: ''
+created: '2025-11-16'
+last_updated: '2026-02-01'
 related: []
 labels: []
 ---

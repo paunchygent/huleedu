@@ -1,16 +1,16 @@
 ---
-id: 'cj-completion-semantics-v2-enforce-total-budget-and-remove-nc2-fallback'
+id: cj-completion-semantics-v2-enforce-total-budget-and-remove-nc2-fallback
 title: 'CJ completion semantics v2: enforce total_budget and remove nC2 fallback'
-type: 'task'
-status: 'completed'
-priority: 'medium'
-domain: 'assessment'
+type: task
+status: done
+priority: medium
+domain: assessment
 service: ''
-owner_team: 'agents'
+owner_team: agents
 owner: ''
 program: ''
 created: '2025-12-03'
-last_updated: '2025-12-07'
+last_updated: '2026-02-01'
 related: []
 labels: []
 ---

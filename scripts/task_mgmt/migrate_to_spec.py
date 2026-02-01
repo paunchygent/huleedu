@@ -305,7 +305,7 @@ def generate_frontmatter(
         "id": task_id,
         "title": title,
         "type": "task",
-        "status": TaskStatus.research.value,
+        "status": TaskStatus.proposed.value,
         "priority": "medium",
         "domain": domain,
         "service": "",

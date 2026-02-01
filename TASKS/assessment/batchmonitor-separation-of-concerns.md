@@ -1,18 +1,25 @@
 ---
-id: 'batchmonitor-separation-of-concerns'
+id: batchmonitor-separation-of-concerns
 title: 'US-005.6: BatchMonitor Separation of Concerns'
-type: 'task'
-status: 'completed'
-priority: 'medium'
-domain: 'assessment'
-service: 'cj_assessment_service'
-owner_team: 'agents'
+type: task
+status: done
+priority: medium
+domain: assessment
+service: cj_assessment_service
+owner_team: agents
 owner: ''
 program: ''
 created: '2025-12-07'
-last_updated: '2025-12-09'
-related: ['ADR-0020', 'ADR-0022', 'EPIC-005']
-labels: ['refactoring', 'ddd', 'srp', 'technical-debt']
+last_updated: '2026-02-01'
+related:
+- ADR-0020
+- ADR-0022
+- EPIC-005
+labels:
+- refactoring
+- ddd
+- srp
+- technical-debt
 ---
 # US-005.6: BatchMonitor Separation of Concerns
 

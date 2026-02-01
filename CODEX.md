@@ -238,6 +238,68 @@ pdm run dev-check                    # Check what needs rebuilding
 
 ```
 
+---
+
+## Hemma Remote Development (SSH Tunnels)
+
+We offload heavy NLP workloads (LanguageTool + DeBERTa/spaCy feature extraction) to the
+Hemma server and tunnel localhost-only ports back to the dev machine.
+
+Canonical references in this repo:
+- Ops: `docs/operations/hemma-server-operations-huleedu.md`
+- GPU ops: `docs/operations/gpu-ai-workloads-on-hemma-huleedu.md`
+- ADR: `docs/decisions/0025-hemma-hosted-nlp-feature-offload-for-essay-scoring-research-binary-protocol.md`
+
+### SSH defaults (hemma)
+
+Assumption: local SSH host aliases are configured (non-root default), similar to the
+Skriptoteket setup.
+
+```bash
+ssh hemma
+```
+
+### Quick tunnels (manual)
+
+```bash
+# HuleEdu LanguageTool service HTTP API (POST /v1/check) on Hemma
+ssh hemma -L 18085:127.0.0.1:8085 -N
+
+# Hemma DeBERTa+spaCy feature offload service (binary protocol) (planned)
+ssh hemma -L 19000:127.0.0.1:9000 -N
+```
+
+Health checks:
+```bash
+curl -fsS http://127.0.0.1:18085/healthz
+curl -fsS http://127.0.0.1:19000/healthz
+```
+
+### Persistent tunnels (recommended)
+
+Use `autossh` to keep tunnels alive (matches the approach used for Hemma GPU services
+in Skriptoteket runbooks).
+
+```bash
+brew install autossh
+autossh -M 0 -N \
+  -o "ServerAliveInterval=30" \
+  -o "ServerAliveCountMax=3" \
+  -o "ExitOnForwardFailure=yes" \
+  -L 18085:localhost:8085 hemma
+```
+
+### Containers calling tunneled services
+
+Local containers reach tunneled host ports via `host.docker.internal` (and an
+`extra_hosts` entry when needed).
+
+Example:
+```text
+http://host.docker.internal:18085
+http://host.docker.internal:19000
+```
+
 ### Database Access (Common Issue)
 
 ```markdown

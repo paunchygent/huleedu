@@ -1,6 +1,9 @@
 ---
 type: research
-status: draft
+id: RES-ml-essay-scoring-source-traceability-matrix
+title: "ML Essay Scoring Source Traceability Matrix"
+status: active
+created: 2025-12-06
 source: docs/product/epics/ml-essay-scoring-pipeline.md
 related:
   - docs/decisions/0021-ml-scoring-integration-in-nlp-service.md

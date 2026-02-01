@@ -42,6 +42,15 @@ ALLOWED_RUNBOOK_SEVERITIES = {"low", "medium", "high", "critical"}
 # Decision record statuses (§6)
 ALLOWED_DECISION_STATUSES = {"proposed", "accepted", "superseded", "rejected"}
 
+# Review record statuses (docs/product/reviews/)
+ALLOWED_REVIEW_STATUSES = {"pending", "approved", "changes_requested", "rejected"}
+
+# Reference doc statuses (docs/reference/)
+ALLOWED_REFERENCE_STATUSES = {"active", "deprecated"}
+
+# Research doc statuses (docs/research/)
+ALLOWED_RESEARCH_STATUSES = {"active", "archived"}
+
 # File naming patterns (§4)
 # kebab-case: lowercase letters, digits, hyphens only
 KEBAB_CASE_PATTERN = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
@@ -326,6 +335,129 @@ def validate_decision_frontmatter(p: Path, docs_root: Path) -> list[str]:
     return warnings
 
 
+def validate_review_frontmatter(p: Path, docs_root: Path) -> list[str]:
+    """
+    Validate review frontmatter in product/reviews/ (warnings).
+
+    Reviews are optional as a category, but if present they should be structured.
+    """
+    warnings: list[str] = []
+    rel_path = p.relative_to(docs_root)
+
+    if not ("product" in rel_path.parts and "reviews" in rel_path.parts):
+        return warnings
+
+    fm, _ = read_front_matter(p)
+    if not fm:
+        warnings.append("[WARNING] review record missing frontmatter")
+        return warnings
+
+    if fm.get("type") != "review":
+        warnings.append("[WARNING] review record frontmatter should have type: review")
+
+    required_fields = ["id", "title", "status", "created", "last_updated"]
+    for field in required_fields:
+        if field not in fm or not str(fm[field]).strip():
+            warnings.append(f"[WARNING] review record missing frontmatter field '{field}'")
+
+    status = fm.get("status")
+    if status and status not in ALLOWED_REVIEW_STATUSES:
+        valid_str = "|".join(sorted(ALLOWED_REVIEW_STATUSES))
+        warnings.append(f"[WARNING] review status '{status}' invalid (expected: {valid_str})")
+
+    for field in ["created", "last_updated"]:
+        date_val = fm.get(field)
+        if date_val:
+            try:
+                dt.date.fromisoformat(str(date_val))
+            except ValueError:
+                warnings.append(
+                    f"[WARNING] review record {field} '{date_val}' invalid (expected: YYYY-MM-DD)"
+                )
+
+    return warnings
+
+
+def validate_reference_frontmatter(p: Path, docs_root: Path) -> list[str]:
+    """Validate reference frontmatter in reference/ (warnings).
+
+    To avoid churn, only validates when frontmatter exists.
+    """
+    warnings: list[str] = []
+    rel_path = p.relative_to(docs_root)
+    if "reference" not in rel_path.parts:
+        return warnings
+
+    fm, _ = read_front_matter(p)
+    if not fm:
+        return warnings
+
+    if fm.get("type") != "reference":
+        warnings.append("[WARNING] reference doc frontmatter should have type: reference")
+
+    required_fields = ["id", "title", "status", "created", "last_updated"]
+    for field in required_fields:
+        if field not in fm or not str(fm[field]).strip():
+            warnings.append(f"[WARNING] reference doc missing frontmatter field '{field}'")
+
+    status = fm.get("status")
+    if status and status not in ALLOWED_REFERENCE_STATUSES:
+        valid_str = "|".join(sorted(ALLOWED_REFERENCE_STATUSES))
+        warnings.append(f"[WARNING] reference status '{status}' invalid (expected: {valid_str})")
+
+    for field in ["created", "last_updated"]:
+        date_val = fm.get(field)
+        if date_val:
+            try:
+                dt.date.fromisoformat(str(date_val))
+            except ValueError:
+                warnings.append(
+                    f"[WARNING] reference doc {field} '{date_val}' invalid (expected: YYYY-MM-DD)"
+                )
+
+    return warnings
+
+
+def validate_research_frontmatter(p: Path, docs_root: Path) -> list[str]:
+    """Validate research frontmatter in research/ (warnings).
+
+    To avoid churn, only validates when frontmatter exists.
+    """
+    warnings: list[str] = []
+    rel_path = p.relative_to(docs_root)
+    if "research" not in rel_path.parts:
+        return warnings
+
+    fm, _ = read_front_matter(p)
+    if not fm:
+        return warnings
+
+    if fm.get("type") != "research":
+        warnings.append("[WARNING] research doc frontmatter should have type: research")
+
+    required_fields = ["id", "title", "status", "created", "last_updated"]
+    for field in required_fields:
+        if field not in fm or not str(fm[field]).strip():
+            warnings.append(f"[WARNING] research doc missing frontmatter field '{field}'")
+
+    status = fm.get("status")
+    if status and status not in ALLOWED_RESEARCH_STATUSES:
+        valid_str = "|".join(sorted(ALLOWED_RESEARCH_STATUSES))
+        warnings.append(f"[WARNING] research status '{status}' invalid (expected: {valid_str})")
+
+    for field in ["created", "last_updated"]:
+        date_val = fm.get(field)
+        if date_val:
+            try:
+                dt.date.fromisoformat(str(date_val))
+            except ValueError:
+                warnings.append(
+                    f"[WARNING] research doc {field} '{date_val}' invalid (expected: YYYY-MM-DD)"
+                )
+
+    return warnings
+
+
 def validate_file(p: Path, docs_root: Path) -> Tuple[list[str], list[str]]:
     """
     Validate a documentation file for compliance with DOCS_STRUCTURE_SPEC.
@@ -354,6 +486,15 @@ def validate_file(p: Path, docs_root: Path) -> Tuple[list[str], list[str]]:
 
     # Validate decision frontmatter (warnings)
     warnings.extend(validate_decision_frontmatter(p, docs_root))
+
+    # Validate review frontmatter (warnings)
+    warnings.extend(validate_review_frontmatter(p, docs_root))
+
+    # Validate reference frontmatter (warnings)
+    warnings.extend(validate_reference_frontmatter(p, docs_root))
+
+    # Validate research frontmatter (warnings)
+    warnings.extend(validate_research_frontmatter(p, docs_root))
 
     return errors, warnings
 

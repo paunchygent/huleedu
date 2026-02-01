@@ -1,18 +1,23 @@
 ---
-id: 'propagate-assignment-id-from-cj-to-ras-storage-phase-b'
-title: 'Propagate assignment_id from CJ to RAS storage (Phase B)'
-type: 'task'
-status: 'completed'
-priority: 'high'
-domain: 'assessment'
-service: 'result_aggregator_service'
-owner_team: 'agents'
+id: propagate-assignment-id-from-cj-to-ras-storage-phase-b
+title: Propagate assignment_id from CJ to RAS storage (Phase B)
+type: task
+status: done
+priority: high
+domain: assessment
+service: result_aggregator_service
+owner_team: agents
 owner: ''
 program: ''
 created: '2025-11-27'
-last_updated: '2025-11-27'
-related: ['TASKS/assessment/propagate-assignment-id-from-bos-to-cj-request-phase-a.md', '.claude/plans/cuddly-churning-sloth.md']
-labels: ['cross-service', 'event-contract', 'migration-required']
+last_updated: '2026-02-01'
+related:
+- TASKS/assessment/propagate-assignment-id-from-bos-to-cj-request-phase-a.md
+- .claude/plans/cuddly-churning-sloth.md
+labels:
+- cross-service
+- event-contract
+- migration-required
 ---
 # Propagate assignment_id from CJ to RAS storage (Phase B)
 

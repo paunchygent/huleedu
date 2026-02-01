@@ -1,18 +1,22 @@
 ---
-id: 'eng5-provider-batch-api-harness-coverage'
-title: 'ENG5 Provider Batch API Harness Coverage'
-type: 'task'
-status: completed
-priority: 'medium'
-domain: 'integrations'
+id: eng5-provider-batch-api-harness-coverage
+title: ENG5 Provider Batch API Harness Coverage
+type: task
+status: done
+priority: medium
+domain: integrations
 service: ''
-owner_team: 'agents'
+owner_team: agents
 owner: ''
 program: ''
 created: '2025-12-11'
-last_updated: '2025-12-12'
-related: ['TASKS/integrations/llm-provider-batch-api-phase-2.md']
-labels: ['eng5', 'provider-batch-api', 'harness']
+last_updated: '2026-02-01'
+related:
+- TASKS/integrations/llm-provider-batch-api-phase-2.md
+labels:
+- eng5
+- provider-batch-api
+- harness
 ---
 # ENG5 Provider Batch API Harness Coverage
 

@@ -1,18 +1,23 @@
 ---
-id: 'filename-propagation-from-els-to-ras-for-teacher-result-visibility'
-title: 'Filename propagation from ELS to RAS for teacher result visibility'
-type: 'task'
-status: 'completed'
-priority: 'high'
-domain: 'assessment'
-service: 'result_aggregator_service'
-owner_team: 'agents'
+id: filename-propagation-from-els-to-ras-for-teacher-result-visibility
+title: Filename propagation from ELS to RAS for teacher result visibility
+type: task
+status: done
+priority: high
+domain: assessment
+service: result_aggregator_service
+owner_team: agents
 owner: ''
 program: ''
 created: '2025-11-27'
-last_updated: '2025-11-27'
-related: ['docs/operations/cj-assessment-runbook.md', '.claude/work/reports/2025-11-27-filename-propagation-flow-mapping.md']
-labels: ['cross-service', 'event-contract', 'teacher-ux']
+last_updated: '2026-02-01'
+related:
+- docs/operations/cj-assessment-runbook.md
+- .claude/work/reports/2025-11-27-filename-propagation-flow-mapping.md
+labels:
+- cross-service
+- event-contract
+- teacher-ux
 ---
 
 # Filename Propagation from ELS to RAS for Teacher Result Visibility

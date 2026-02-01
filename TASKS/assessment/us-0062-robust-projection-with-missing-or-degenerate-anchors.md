@@ -1,16 +1,16 @@
 ---
-id: 'us-0062-robust-projection-with-missing-or-degenerate-anchors'
+id: us-0062-robust-projection-with-missing-or-degenerate-anchors
 title: 'US-006.2: Robust projection with missing or degenerate anchors'
-type: 'task'
-status: 'research'
-priority: 'medium'
-domain: 'assessment'
-service: 'cj_assessment_service'
-owner_team: 'agents'
+type: task
+status: proposed
+priority: medium
+domain: assessment
+service: cj_assessment_service
+owner_team: agents
 owner: ''
 program: ''
 created: '2025-11-28'
-last_updated: '2025-11-28'
+last_updated: '2026-02-01'
 related: []
 labels: []
 ---

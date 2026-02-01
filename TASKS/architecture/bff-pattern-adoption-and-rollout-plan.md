@@ -1,16 +1,16 @@
 ---
-id: "bff-pattern-adoption-and-rollout-plan"
-title: "Backend-For-Frontend (BFF) Pattern — Adoption & Rollout Plan"
-type: "task"
-status: "research"
-priority: "medium"
-domain: "architecture"
-service: ""
-owner_team: "agents"
-owner: ""
-program: ""
-created: "2025-08-24"
-last_updated: "2025-11-17"
+id: bff-pattern-adoption-and-rollout-plan
+title: Backend-For-Frontend (BFF) Pattern — Adoption & Rollout Plan
+type: task
+status: proposed
+priority: medium
+domain: architecture
+service: ''
+owner_team: agents
+owner: ''
+program: ''
+created: '2025-08-24'
+last_updated: '2026-02-01'
 related: []
 labels: []
 ---

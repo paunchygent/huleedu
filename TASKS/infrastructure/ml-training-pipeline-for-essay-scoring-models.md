@@ -1,16 +1,16 @@
 ---
-id: 'ml-training-pipeline-for-essay-scoring-models'
-title: 'ML Training Pipeline for Essay Scoring Models'
-type: 'task'
-status: 'research'
-priority: 'medium'
-domain: 'infrastructure'
+id: ml-training-pipeline-for-essay-scoring-models
+title: ML Training Pipeline for Essay Scoring Models
+type: task
+status: proposed
+priority: medium
+domain: infrastructure
 service: ''
-owner_team: 'agents'
+owner_team: agents
 owner: ''
 program: ''
 created: '2025-12-05'
-last_updated: '2025-12-05'
+last_updated: '2026-02-01'
 related: []
 labels: []
 ---

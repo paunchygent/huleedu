@@ -1,18 +1,26 @@
 ---
-id: 'us-0051-callback-driven-continuation-and-safe-completion-gating'
+id: us-0051-callback-driven-continuation-and-safe-completion-gating
 title: 'US-005.1: Callback-driven continuation and safe completion gating'
-type: 'task'
-status: 'completed'
-priority: 'medium'
-domain: 'assessment'
-service: 'cj_assessment_service'
-owner_team: 'agents'
+type: task
+status: done
+priority: medium
+domain: assessment
+service: cj_assessment_service
+owner_team: agents
 owner: ''
 program: ''
 created: '2025-11-28'
-last_updated: '2025-12-07'
-related: ['EPIC-005', 'pr-7-phase-2-resampling-and-convergence-harness', 'llm-mock-provider-cj-behavioural-parity-tests']
-labels: ['docker', 'integration-tests', 'small-net', 'eng5', 'llm-provider']
+last_updated: '2026-02-01'
+related:
+- EPIC-005
+- pr-7-phase-2-resampling-and-convergence-harness
+- llm-mock-provider-cj-behavioural-parity-tests
+labels:
+- docker
+- integration-tests
+- small-net
+- eng5
+- llm-provider
 ---
 # US-005.1: Callback-driven continuation and safe completion gating
 

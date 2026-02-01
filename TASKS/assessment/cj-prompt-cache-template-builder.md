@@ -2,17 +2,21 @@
 id: cj-prompt-cache-template-builder
 title: CJ Prompt Cache Template Builder
 type: task
-status: completed
+status: done
 priority: high
 domain: assessment
 owner_team: agents
 created: '2025-11-22'
-last_updated: '2025-11-23'
+last_updated: '2026-02-01'
 service: cj_assessment_service, llm_provider_service
 owner: ''
 program: ''
-related: [lps-rate-limiting-implementation]
-labels: [cache-optimization, cost-reduction, anthropic-api]
+related:
+- lps-rate-limiting-implementation
+labels:
+- cache-optimization
+- cost-reduction
+- anthropic-api
 ---
 
 # TASK: CJ Prompt Cache Template Builder

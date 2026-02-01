@@ -1,18 +1,22 @@
 ---
-id: 'ml-model-serving-infrastructure-for-essay-scoring'
-title: 'ML Model Serving Infrastructure for Essay Scoring'
-type: 'task'
-status: 'research'
-priority: 'medium'
-domain: 'infrastructure'
-service: 'cj_assessment_service'
-owner_team: 'agents'
+id: ml-model-serving-infrastructure-for-essay-scoring
+title: ML Model Serving Infrastructure for Essay Scoring
+type: task
+status: proposed
+priority: medium
+domain: infrastructure
+service: cj_assessment_service
+owner_team: agents
 owner: ''
 program: ''
 created: '2025-12-05'
-last_updated: '2025-12-05'
-related: ['task-054-suggested-improvements-to-bayesian-model']
-labels: ['mlops', 'infrastructure', 'deployment']
+last_updated: '2026-02-01'
+related:
+- task-054-suggested-improvements-to-bayesian-model
+labels:
+- mlops
+- infrastructure
+- deployment
 ---
 # ML Model Serving Infrastructure for Essay Scoring
 

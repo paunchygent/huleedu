@@ -1,16 +1,16 @@
 ---
-id: "codebase-result-jwt-di-alignment"
-title: "Codebase Alignment: Result Monad, JWT Helpers, Content Client DI"
-type: "task"
-status: "research"
-priority: "medium"
-domain: "identity"
-service: ""
-owner_team: "agents"
-owner: ""
-program: ""
-created: "2025-11-16"
-last_updated: "2025-11-17"
+id: codebase-result-jwt-di-alignment
+title: 'Codebase Alignment: Result Monad, JWT Helpers, Content Client DI'
+type: task
+status: proposed
+priority: medium
+domain: identity
+service: ''
+owner_team: agents
+owner: ''
+program: ''
+created: '2025-11-16'
+last_updated: '2026-02-01'
 related: []
 labels: []
 ---

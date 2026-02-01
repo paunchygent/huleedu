@@ -1,16 +1,16 @@
 ---
-id: "phase3-cj-confidence-hub"
-title: "Phase 3 – CJ Confidence Programme Hub"
-type: "programme"
-status: "research"
-priority: "medium"
-domain: "programs"
-service: ""
-owner_team: "agents"
-owner: ""
-program: "cj_confidence"
-created: "2025-11-09"
-last_updated: "2025-11-17"
+id: phase3-cj-confidence-hub
+title: Phase 3 – CJ Confidence Programme Hub
+type: programme
+status: proposed
+priority: medium
+domain: programs
+service: ''
+owner_team: agents
+owner: ''
+program: cj_confidence
+created: '2025-11-09'
+last_updated: '2026-02-01'
 related: []
 labels: []
 ---

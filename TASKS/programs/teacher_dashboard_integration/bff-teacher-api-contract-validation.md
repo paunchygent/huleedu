@@ -1,18 +1,23 @@
 ---
-id: 'bff-teacher-api-contract-validation'
-title: 'BFF Teacher API Contract Validation'
-type: 'task'
-status: 'completed'
-priority: 'medium'
-domain: 'programs'
-service: 'bff_teacher_service'
-owner_team: 'agents'
+id: bff-teacher-api-contract-validation
+title: BFF Teacher API Contract Validation
+type: task
+status: done
+priority: medium
+domain: programs
+service: bff_teacher_service
+owner_team: agents
 owner: ''
-program: 'teacher_dashboard_integration'
+program: teacher_dashboard_integration
 created: '2025-12-09'
-last_updated: '2025-12-10'
-related: ["TASKS/programs/teacher_dashboard_integration/HUB.md", "bff-teacher-dashboard-endpoint"]
-labels: ["openapi", "contract-testing", "typescript"]
+last_updated: '2026-02-01'
+related:
+- TASKS/programs/teacher_dashboard_integration/HUB.md
+- bff-teacher-dashboard-endpoint
+labels:
+- openapi
+- contract-testing
+- typescript
 ---
 # BFF Teacher API Contract Validation
 

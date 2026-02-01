@@ -1,18 +1,23 @@
 ---
-id: 'propagate-assignment-id-from-bos-to-cj-request-phase-a'
-title: 'Propagate assignment_id from BOS to CJ request (Phase A)'
-type: 'task'
-status: 'completed'
-priority: 'high'
-domain: 'assessment'
-service: 'batch_orchestrator_service'
-owner_team: 'agents'
+id: propagate-assignment-id-from-bos-to-cj-request-phase-a
+title: Propagate assignment_id from BOS to CJ request (Phase A)
+type: task
+status: done
+priority: high
+domain: assessment
+service: batch_orchestrator_service
+owner_team: agents
 owner: ''
 program: ''
 created: '2025-11-27'
-last_updated: '2025-11-27'
-related: ['TASKS/assessment/propagate-assignment-id-from-cj-to-ras-storage-phase-b.md', '.claude/plans/cuddly-churning-sloth.md']
-labels: ['cross-service', 'event-contract', 'anchor-mixing']
+last_updated: '2026-02-01'
+related:
+- TASKS/assessment/propagate-assignment-id-from-cj-to-ras-storage-phase-b.md
+- .claude/plans/cuddly-churning-sloth.md
+labels:
+- cross-service
+- event-contract
+- anchor-mixing
 ---
 # Propagate assignment_id from BOS to CJ request (Phase A)
 

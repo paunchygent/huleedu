@@ -4,7 +4,8 @@ Scaffold a new TASKS markdown file with minimal YAML front matter and a standard
 
 Usage examples:
   pdm run new-task --title "Svelte 5 + Vite CORS" --domain frontend
-  pdm run new-task --title "CJ Phase 3 Hub" --program cj_confidence --domain assessment
+  pdm run new-task --title "Teacher dashboard integration hub" --domain programs \
+    --type programme --program teacher_dashboard_integration
   pdm run new-task --title "AI Feedback Service" --domain assessment --priority high
 """
 
@@ -23,6 +24,7 @@ from scripts.schemas.task_schema import (
     TaskFrontmatter,
     TaskPriority,
     TaskStatus,
+    TaskType,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -32,14 +34,12 @@ TASKS_DIR = ROOT / "TASKS"
 
 def slugify(text: str) -> str:
     text = text.strip()
-    text = re.sub(r"[\s/]+", "-", text)
+    text = re.sub(r"[\s/_]+", "-", text)
     text = re.sub(r"[^A-Za-z0-9_-]+", "", text)
     return text.lower().strip("-")
 
 
-def build_path(domain: str, program: str | None, filename: str) -> Path:
-    if program:
-        return TASKS_DIR / "programmes" / program / filename
+def build_path(domain: str, filename: str) -> Path:
     return TASKS_DIR / domain / filename
 
 
@@ -47,10 +47,11 @@ def main(argv: list[str]) -> int:
     p = argparse.ArgumentParser(description="Create a new task document")
     p.add_argument("--title", required=True, help="Human title for the task")
     p.add_argument("--domain", required=True, choices=sorted([d.value for d in TaskDomain]))
+    p.add_argument("--type", default=TaskType.task.value, choices=[t.value for t in TaskType])
     p.add_argument("--program", help="Optional programme bucket (e.g., cj_confidence)")
     p.add_argument("--service", help="Optional service slug (e.g., nlp_lang_tool_service)")
     p.add_argument(
-        "--status", default=TaskStatus.research.value, choices=[s.value for s in TaskStatus]
+        "--status", default=TaskStatus.proposed.value, choices=[s.value for s in TaskStatus]
     )
     p.add_argument(
         "--priority", default=TaskPriority.medium.value, choices=[p.value for p in TaskPriority]
@@ -72,7 +73,18 @@ def main(argv: list[str]) -> int:
         fn = f"{slug}.md"
         default_id = slug
 
-    dest = build_path(args.domain, args.program, fn)
+    if args.type == TaskType.programme.value:
+        if not args.program:
+            print("Error: --program is required when --type programme", file=sys.stderr)
+            return 2
+        if args.domain != TaskDomain.programs.value:
+            print("Error: --domain must be 'programs' when --type programme", file=sys.stderr)
+            return 2
+        # Canonical programme hub path
+        dest = TASKS_DIR / "programs" / args.program / "HUB.md"
+        default_id = f"{slugify(args.program)}-hub"
+    else:
+        dest = build_path(args.domain, fn)
 
     if dest.exists():
         print(f"Error: {dest} already exists", file=sys.stderr)
@@ -83,7 +95,7 @@ def main(argv: list[str]) -> int:
     fm_dict = {
         "id": args.id or default_id,
         "title": args.title,
-        "type": "task",
+        "type": args.type,
         "status": args.status,
         "priority": args.priority,
         "domain": args.domain,

@@ -1,17 +1,18 @@
 ---
-id: 'us-00yb-workflow-continuation-module-split-and-observability'
-title: 'US-00YB Workflow continuation module split and observability'
-type: 'story'
-status: 'research'
-priority: 'medium'
-domain: 'assessment'
-service: 'cj_assessment_service'
-owner_team: 'agents'
+id: us-00yb-workflow-continuation-module-split-and-observability
+title: US-00YB Workflow continuation module split and observability
+type: story
+status: proposed
+priority: medium
+domain: assessment
+service: cj_assessment_service
+owner_team: agents
 owner: ''
 program: ''
 created: '2025-11-30'
-last_updated: '2025-11-30'
-related: ['us-00ya-workflow-continuation-refactor--phase-6']
+last_updated: '2026-02-01'
+related:
+- us-00ya-workflow-continuation-refactor--phase-6
 labels: []
 ---
 # US-00YB: Workflow continuation module split and observability

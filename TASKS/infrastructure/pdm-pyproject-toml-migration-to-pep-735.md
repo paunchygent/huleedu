@@ -1,17 +1,22 @@
 ---
-id: 'pdm-pyproject-toml-migration-to-pep-735'
-title: 'PDM pyproject.toml Migration to PEP 735'
-status: 'in_progress'
-priority: 'medium'
-domain: 'infrastructure'
+id: pdm-pyproject-toml-migration-to-pep-735
+title: PDM pyproject.toml Migration to PEP 735
+status: in_progress
+priority: medium
+domain: infrastructure
 service: ''
-owner_team: 'agents'
+owner_team: agents
 owner: ''
 program: ''
 created: '2025-11-22'
-last_updated: '2025-11-22'
+last_updated: '2026-02-01'
 related: []
-labels: ['pdm', 'dependencies', 'pep-735', 'migration']
+labels:
+- pdm
+- dependencies
+- pep-735
+- migration
+type: task
 ---
 # PDM pyproject.toml Migration to PEP 735
 

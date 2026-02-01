@@ -1,18 +1,22 @@
 ---
-id: 'us-0075-unified-validation'
-title: 'US-007.5 Unified Validation'
-type: 'story'
-status: 'research'
-priority: 'high'
-domain: 'infrastructure'
+id: us-0075-unified-validation
+title: US-007.5 Unified Validation
+type: story
+status: proposed
+priority: high
+domain: infrastructure
 service: ''
-owner_team: 'agents'
+owner_team: agents
 owner: ''
 program: ''
 created: '2025-12-01'
-last_updated: '2025-12-01'
-related: ['EPIC-007', 'ADR-0019', 'us-0071-shared-utilities-extraction']
-labels: ['dev-tooling']
+last_updated: '2026-02-01'
+related:
+- EPIC-007
+- ADR-0019
+- us-0071-shared-utilities-extraction
+labels:
+- dev-tooling
 ---
 # US-007.5 Unified Validation
 

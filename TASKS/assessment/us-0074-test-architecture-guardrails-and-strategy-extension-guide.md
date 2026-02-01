@@ -1,16 +1,16 @@
 ---
-id: 'us-0074-test-architecture-guardrails-and-strategy-extension-guide'
+id: us-0074-test-architecture-guardrails-and-strategy-extension-guide
 title: 'US-007.4: Test architecture guardrails and strategy extension guide'
-type: 'task'
-status: 'research'
-priority: 'medium'
-domain: 'assessment'
-service: 'cj_assessment_service'
-owner_team: 'agents'
+type: task
+status: proposed
+priority: medium
+domain: assessment
+service: cj_assessment_service
+owner_team: agents
 owner: ''
 program: ''
 created: '2025-11-28'
-last_updated: '2025-11-28'
+last_updated: '2026-02-01'
 related: []
 labels: []
 ---

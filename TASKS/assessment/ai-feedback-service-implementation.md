@@ -1,16 +1,16 @@
 ---
-id: "ai-feedback-service-implementation"
-title: "AI Feedback Service Implementation Task"
-type: "task"
-status: "research"
-priority: "medium"
-domain: "assessment"
-service: ""
-owner_team: "agents"
-owner: ""
-program: ""
-created: "2025-11-06"
-last_updated: "2025-11-17"
+id: ai-feedback-service-implementation
+title: AI Feedback Service Implementation Task
+type: task
+status: proposed
+priority: medium
+domain: assessment
+service: ''
+owner_team: agents
+owner: ''
+program: ''
+created: '2025-11-06'
+last_updated: '2026-02-01'
 related: []
 labels: []
 ---

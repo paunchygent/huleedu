@@ -1,16 +1,16 @@
 ---
-id: 'eng5-boundary-test-mode-research'
-title: 'ENG5 Boundary Test Mode Research'
-type: 'task'
-status: 'research'
-priority: 'medium'
-domain: 'assessment'
+id: eng5-boundary-test-mode-research
+title: ENG5 Boundary Test Mode Research
+type: task
+status: proposed
+priority: medium
+domain: assessment
 service: ''
-owner_team: 'agents'
+owner_team: agents
 owner: ''
-program: 'eng5'
+program: eng5
 created: '2025-11-30'
-last_updated: '2025-11-30'
+last_updated: '2026-02-01'
 related: []
 labels: []
 ---

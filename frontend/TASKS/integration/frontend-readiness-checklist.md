@@ -1,16 +1,16 @@
 ---
-id: "frontend-readiness-checklist"
-title: "Frontend Readiness Preparation Checklist"
-type: "task"
-status: "research"
-priority: "medium"
+id: frontend-readiness-checklist
+title: Frontend Readiness Preparation Checklist
+type: task
+status: proposed
+priority: medium
 domain: integration
-service: ""
-owner_team: "agents"
-owner: ""
-program: ""
-created: "2025-11-08"
-last_updated: "2025-11-17"
+service: ''
+owner_team: agents
+owner: ''
+program: ''
+created: '2025-11-08'
+last_updated: '2026-02-01'
 related: []
 labels: []
 ---

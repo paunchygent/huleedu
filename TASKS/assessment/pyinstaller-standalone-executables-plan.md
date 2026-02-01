@@ -1,16 +1,16 @@
 ---
-id: "pyinstaller-standalone-executables-plan"
-title: "PyInstaller Standalone Executables Plan"
-type: "task"
-status: "research"
-priority: "medium"
-domain: "assessment"
-service: ""
-owner_team: "agents"
-owner: ""
-program: ""
-created: "2025-11-02"
-last_updated: "2025-11-17"
+id: pyinstaller-standalone-executables-plan
+title: PyInstaller Standalone Executables Plan
+type: task
+status: proposed
+priority: medium
+domain: assessment
+service: ''
+owner_team: agents
+owner: ''
+program: ''
+created: '2025-11-02'
+last_updated: '2026-02-01'
 related: []
 labels: []
 ---

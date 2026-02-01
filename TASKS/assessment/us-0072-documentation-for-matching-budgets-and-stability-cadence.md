@@ -1,16 +1,16 @@
 ---
-id: 'us-0072-documentation-for-matching-budgets-and-stability-cadence'
+id: us-0072-documentation-for-matching-budgets-and-stability-cadence
 title: 'US-007.2: Documentation for matching budgets and stability cadence'
-type: 'task'
-status: 'research'
-priority: 'medium'
-domain: 'assessment'
-service: 'cj_assessment_service'
-owner_team: 'agents'
+type: task
+status: proposed
+priority: medium
+domain: assessment
+service: cj_assessment_service
+owner_team: agents
 owner: ''
 program: ''
 created: '2025-11-28'
-last_updated: '2025-11-28'
+last_updated: '2026-02-01'
 related: []
 labels: []
 ---

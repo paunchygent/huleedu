@@ -1,18 +1,29 @@
 ---
-id: 'llm-mock-provider-cj-behavioural-parity-tests'
-title: 'LLM mock provider CJ behavioural parity tests'
-type: 'task'
-status: 'research'
-priority: 'medium'
-domain: 'infrastructure'
-service: 'llm_provider_service'
-owner_team: 'agents'
+id: llm-mock-provider-cj-behavioural-parity-tests
+title: LLM mock provider CJ behavioural parity tests
+type: task
+status: proposed
+priority: medium
+domain: infrastructure
+service: llm_provider_service
+owner_team: agents
 owner: ''
-program: 'eng5'
+program: eng5
 created: '2025-12-04'
-last_updated: '2025-12-09'
-related: ['EPIC-005', 'EPIC-008', 'EPIC-011', 'llm-provider-openai-gpt-5x-reasoning-controls', 'llm-provider-anthropic-thinking-controls', 'cj-small-net-coverage-and-continuation-docker-validation']
-labels: ['llm-provider', 'cj', 'eng5', 'mock-provider', 'parity']
+last_updated: '2026-02-01'
+related:
+- EPIC-005
+- EPIC-008
+- EPIC-011
+- llm-provider-openai-gpt-5x-reasoning-controls
+- llm-provider-anthropic-thinking-controls
+- cj-small-net-coverage-and-continuation-docker-validation
+labels:
+- llm-provider
+- cj
+- eng5
+- mock-provider
+- parity
 ---
 # LLM mock provider CJ behavioural parity tests
 

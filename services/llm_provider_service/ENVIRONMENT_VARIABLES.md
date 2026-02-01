@@ -187,6 +187,6 @@ pdm run pytest-root services/llm_provider_service/tests/unit/test_config_env_loa
 
 ## References
 
-- Pydantic v2 Settings: https://docs.pydantic.dev/latest/concepts/pydantic_settings/
+- Pydantic v2 Settings: <https://docs.pydantic.dev/latest/concepts/pydantic_settings/>
 - API Gateway pattern: `services/api_gateway_service/config.py:96-114`
-- Pydantic AliasChoices: https://docs.pydantic.dev/latest/api/pydantic/#pydantic.AliasChoices
+- Pydantic AliasChoices: <https://docs.pydantic.dev/latest/api/pydantic/#pydantic.AliasChoices>

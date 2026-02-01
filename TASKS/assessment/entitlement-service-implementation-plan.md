@@ -1,16 +1,16 @@
 ---
-id: "entitlement-service-implementation-plan"
-title: "Entitlements Service — Final Implementation Reference"
-type: "task"
-status: "research"
-priority: "medium"
-domain: "assessment"
-service: ""
-owner_team: "agents"
-owner: ""
-program: ""
-created: "2025-09-21"
-last_updated: "2025-11-17"
+id: entitlement-service-implementation-plan
+title: Entitlements Service — Final Implementation Reference
+type: task
+status: proposed
+priority: medium
+domain: assessment
+service: ''
+owner_team: agents
+owner: ''
+program: ''
+created: '2025-09-21'
+last_updated: '2026-02-01'
 related: []
 labels: []
 ---

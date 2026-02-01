@@ -1,16 +1,16 @@
 ---
-id: 'infrastructure-readme'
-title: 'Infrastructure & Orchestration Tasks README'
-type: 'doc'
-status: 'completed'
-priority: 'medium'
-domain: 'infrastructure'
+id: infrastructure-readme
+title: Infrastructure & Orchestration Tasks README
+type: doc
+status: done
+priority: medium
+domain: infrastructure
 service: ''
-owner_team: 'infrastructure'
+owner_team: infrastructure
 owner: ''
 program: ''
 created: '2025-11-13'
-last_updated: '2025-11-13'
+last_updated: '2026-02-01'
 related: []
 labels: []
 ---
@@ -68,28 +68,19 @@ Tasks that fit in this directory include:
 
 ## Current Infrastructure Tasks
 
-### Active Tasks
+This README intentionally does **not** list “current tasks” (it drifts quickly).
+Use the query tools instead:
 
-#### [SMOKETEST_AUTOMATION_DESIGN.md](./SMOKETEST_AUTOMATION_DESIGN.md)
+```bash
+# In-progress infrastructure tasks
+pdm run tasks --domain infrastructure --status in_progress
 
-**Status**: 🔵 RESEARCH & PLANNING
-**Priority**: HIGH
-**Description**: Design comprehensive automated smoketest suite for validating platform health, service integration, and critical user workflows across dev, CI, and production environments.
+# Proposed infrastructure tasks (next-up)
+pdm run tasks --domain infrastructure --status proposed
 
-#### [001-database-url-centralization.md](./001-database-url-centralization.md)
-
-**Status**: ✅ COMPLETED
-**Description**: Centralized database URL construction with proper password encoding across all services to handle special characters and prevent startup failures.
-
-### Planning Tasks
-
-#### [EVENT_SCHEMA_GOVERNANCE_AND_CI_PLAN.md](./EVENT_SCHEMA_GOVERNANCE_AND_CI_PLAN.md)
-
-**Description**: Establish governance patterns and CI validation for event schemas to prevent breaking changes in event-driven communication.
-
-#### [TASK-DEV-DOCKER-LOCK-ALIGNMENT.md](./TASK-DEV-DOCKER-LOCK-ALIGNMENT.md)
-
-**Description**: Align Docker container dependencies with PDM lockfile to ensure consistent environments between local development and containerized deployments.
+# Recently done infrastructure tasks
+pdm run tasks --domain infrastructure --status done --updated-last-days 30
+```
 
 ---
 
@@ -100,7 +91,7 @@ When creating new infrastructure tasks, use this structure:
 ```markdown
 # TASK: [Descriptive Title]
 
-**Status**: 🔵 RESEARCH / 🟡 BLOCKED / 🟢 IN PROGRESS / ✅ COMPLETED
+**Status**: proposed / in_progress / blocked / done
 **Priority**: LOW / MEDIUM / HIGH / CRITICAL
 **Created**: YYYY-MM-DD
 **Type**: Infrastructure / CI/CD / Tooling / Platform

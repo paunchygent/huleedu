@@ -1,16 +1,16 @@
 ---
-id: 'us-0061-anchor-calibration-semantics-and-isotonic-constraints'
+id: us-0061-anchor-calibration-semantics-and-isotonic-constraints
 title: 'US-006.1: Anchor calibration semantics and isotonic constraints'
-type: 'task'
-status: 'research'
-priority: 'medium'
-domain: 'assessment'
-service: 'cj_assessment_service'
-owner_team: 'agents'
+type: task
+status: proposed
+priority: medium
+domain: assessment
+service: cj_assessment_service
+owner_team: agents
 owner: ''
 program: ''
 created: '2025-11-28'
-last_updated: '2025-11-28'
+last_updated: '2026-02-01'
 related: []
 labels: []
 ---

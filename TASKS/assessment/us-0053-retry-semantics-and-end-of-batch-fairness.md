@@ -1,16 +1,16 @@
 ---
-id: 'us-0053-retry-semantics-and-end-of-batch-fairness'
+id: us-0053-retry-semantics-and-end-of-batch-fairness
 title: 'US-005.3: Retry semantics and end-of-batch fairness'
-type: 'task'
-status: 'research'
-priority: 'medium'
-domain: 'assessment'
-service: 'cj_assessment_service'
-owner_team: 'agents'
+type: task
+status: proposed
+priority: medium
+domain: assessment
+service: cj_assessment_service
+owner_team: agents
 owner: ''
 program: ''
 created: '2025-11-28'
-last_updated: '2025-11-28'
+last_updated: '2026-02-01'
 related: []
 labels: []
 ---

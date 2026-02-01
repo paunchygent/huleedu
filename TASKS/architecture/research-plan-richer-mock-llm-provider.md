@@ -1,16 +1,16 @@
 ---
-id: 'research-plan-richer-mock-llm-provider'
+id: research-plan-richer-mock-llm-provider
 title: 'Research plan: richer mock LLM provider'
-type: 'task'
-status: 'research'
-priority: 'medium'
-domain: 'architecture'
+type: task
+status: proposed
+priority: medium
+domain: architecture
 service: ''
-owner_team: 'agents'
+owner_team: agents
 owner: ''
 program: ''
 created: '2025-11-26'
-last_updated: '2025-11-26'
+last_updated: '2026-02-01'
 related: []
 labels: []
 ---

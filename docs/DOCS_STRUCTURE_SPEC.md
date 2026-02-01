@@ -109,6 +109,66 @@ last_updated: YYYY-MM-DD
 ---
 ```
 
+## 6.1 Review Records (product/reviews/)
+
+Reviews capture the explicit approval record for moving **stories** from
+`status: in_review` → `status: approved` in `TASKS/`.
+
+Review records SHOULD live under `docs/product/reviews/` and SHOULD include
+frontmatter:
+
+```yaml
+---
+type: review
+id: REV-some-story-id
+title: "Review: Some story"
+status: pending          # pending|approved|changes_requested|rejected
+created: YYYY-MM-DD
+last_updated: YYYY-MM-DD
+story: some-story-id     # Optional: TASKS story id
+reviewer: "@handle"      # Optional
+---
+```
+
+## 6.2 Reference Documents (reference/)
+
+Reference docs are stable, canonical information for agents and developers
+(checklists, conventions, mappings, contracts, etc.).
+
+Reference docs SHOULD live under `docs/reference/` and SHOULD include
+frontmatter:
+
+```yaml
+---
+type: reference
+id: REF-some-topic
+title: "Some topic"
+status: active           # active|deprecated
+created: YYYY-MM-DD
+last_updated: YYYY-MM-DD
+topic: "optional-tag"    # Optional
+---
+```
+
+## 6.3 Research Documents (research/)
+
+Research docs are exploratory investigations and experiments. They are **not**
+work item status. They exist to capture findings and link back to `TASKS/`.
+
+Research docs SHOULD live under `docs/research/` and SHOULD include
+frontmatter:
+
+```yaml
+---
+type: research
+id: RES-some-investigation
+title: "Some investigation"
+status: active           # active|archived
+created: YYYY-MM-DD
+last_updated: YYYY-MM-DD
+---
+```
+
 ## 7. Service Documentation (services/)
 
 - `docs/services/` MUST contain one Markdown file per major service or a small set of service grouping files.

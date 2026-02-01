@@ -1,16 +1,16 @@
 ---
-id: 'cj-pre-specified-comparisons-research'
-title: 'CJ Pre-Specified Comparisons Research'
-type: 'task'
-status: 'research'
-priority: 'medium'
-domain: 'assessment'
+id: cj-pre-specified-comparisons-research
+title: CJ Pre-Specified Comparisons Research
+type: task
+status: proposed
+priority: medium
+domain: assessment
 service: ''
-owner_team: 'agents'
+owner_team: agents
 owner: ''
 program: ''
 created: '2025-11-30'
-last_updated: '2025-11-30'
+last_updated: '2026-02-01'
 related: []
 labels: []
 ---

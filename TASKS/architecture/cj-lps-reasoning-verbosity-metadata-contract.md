@@ -1,16 +1,16 @@
 ---
-id: 'cj-lps-reasoning-verbosity-metadata-contract'
-title: 'CJ LPS reasoning-verbosity metadata contract'
-type: 'task'
-status: 'completed'
-priority: 'medium'
-domain: 'architecture'
+id: cj-lps-reasoning-verbosity-metadata-contract
+title: CJ LPS reasoning-verbosity metadata contract
+type: task
+status: done
+priority: medium
+domain: architecture
 service: ''
-owner_team: 'agents'
+owner_team: agents
 owner: ''
 program: ''
 created: '2025-12-02'
-last_updated: '2025-12-02'
+last_updated: '2026-02-01'
 related: []
 labels: []
 ---

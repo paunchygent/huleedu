@@ -2,12 +2,12 @@
 id: fix-anchor-essay-infrastructure
 title: Fix Anchor Essay Infrastructure
 type: task
-status: completed
+status: done
 priority: high
 domain: assessment
 owner_team: agents
 created: '2025-11-21'
-last_updated: '2025-11-21'
+last_updated: '2026-02-01'
 service: essay_lifecycle_service
 owner: ''
 program: ''

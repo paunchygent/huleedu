@@ -2,12 +2,12 @@
 id: llm-batch-strategy-serial-bundle
 title: Llm Batch Strategy Serial Bundle
 type: task
-status: completed
+status: done
 priority: high
 domain: integrations
 owner_team: agents
 created: '2025-11-21'
-last_updated: '2025-11-21'
+last_updated: '2026-02-01'
 service: llm_provider_service
 owner: ''
 program: ''

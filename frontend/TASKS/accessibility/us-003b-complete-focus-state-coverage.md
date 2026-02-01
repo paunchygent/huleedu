@@ -2,7 +2,7 @@
 id: us-003b-complete-focus-state-coverage
 title: Complete Focus State Coverage for All Interactive Elements
 type: story
-status: research
+status: proposed
 priority: high
 domain: accessibility
 service: ''
@@ -10,9 +10,15 @@ owner_team: agents
 owner: ''
 program: ''
 created: 2025-12-08
-last_updated: 2025-12-08
-related: ["ADR-0023", "EPIC-010", "us-003a-fix-wcag-aa-contrast-violations"]
-labels: ["accessibility", "design-system", "keyboard-navigation"]
+last_updated: '2026-02-01'
+related:
+- ADR-0023
+- EPIC-010
+- us-003a-fix-wcag-aa-contrast-violations
+labels:
+- accessibility
+- design-system
+- keyboard-navigation
 ---
 
 # US-003B: Complete Focus State Coverage for All Interactive Elements

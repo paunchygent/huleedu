@@ -30,7 +30,44 @@ pdm run typecheck-all
 # Tests
 pdm run pytest-root services/<service>/tests/
 pdm run pytest-root tests/integration/
+
+# Docs & TASKS (docs-as-code)
+pdm run validate-docs
+pdm run validate-tasks
+pdm run index-tasks
 ```
+
+## Research Tools (Essay Scoring)
+
+```bash
+# Install research ML deps
+pdm install -G ml-research
+
+# macOS OpenMP runtime for XGBoost
+brew install libomp
+
+# Run the whitebox research pipeline CLI
+pdm run essay-scoring-research --help
+
+# Readability metrics use TextDescriptives via spaCy (Tier 1 extractor)
+```
+
+Note: DeBERTa embeddings require `sentencepiece` + `tiktoken` (included in `ml-research`)
+and the first run will download model weights from Hugging Face.
+
+### Hemma Offload (WIP)
+
+Planned workflow (see ADR + runbooks):
+- Run `language_tool_service` on Hemma and access via SSH tunnel to `http://127.0.0.1:18085`.
+- Run a DeBERTa + spaCy feature offload service on Hemma and access via SSH tunnel to
+  `http://127.0.0.1:19000`.
+
+Implemented (2026-02-01):
+- Embedding offload server (research-scoped): `scripts/ml_training/essay_scoring/offload/server.py`
+- Dockerfile: `scripts/ml_training/essay_scoring/offload/Dockerfile`
+- Research CLI flags:
+  - `--language-tool-service-url http://127.0.0.1:18085`
+  - `--embedding-service-url http://127.0.0.1:19000`
 
 ---
 
@@ -159,6 +196,10 @@ docker restart huleedu_cj_assessment_db
 source .env  # Required first
 docker exec huleedu_<service>_db psql -U "$HULEEDU_DB_USER" -d <db_name>
 ```
+
+**Codex config warning (local):**
+If you see a deprecation warning for `[features].web_search_request`, update
+`~/.codex/config.toml` to use `web_search = "live"` (or `"cached"` / `"disabled"`).
 
 ---
 

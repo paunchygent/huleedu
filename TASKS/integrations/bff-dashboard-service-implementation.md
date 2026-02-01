@@ -2,17 +2,23 @@
 id: bff-dashboard-service-implementation
 title: BFF Dashboard Service Implementation
 type: task
-status: completed
+status: done
 priority: medium
 domain: integration
 service: frontend
 owner_team: frontend
-owner: ""
+owner: ''
 program: teacher_dashboard_integration
 created: 2025-12-09
-last_updated: 2025-12-09
-related: ["frontend/TASKS/integration/bff-vue-3-frontend-integration-design.md", "frontend/src/schemas/teacher-dashboard.ts", "frontend/src/lib/api-client.ts"]
-labels: ["frontend", "bff", "integration"]
+last_updated: '2026-02-01'
+related:
+- frontend/TASKS/integration/bff-vue-3-frontend-integration-design.md
+- frontend/src/schemas/teacher-dashboard.ts
+- frontend/src/lib/api-client.ts
+labels:
+- frontend
+- bff
+- integration
 ---
 
 # BFF Dashboard Service Implementation

@@ -2,12 +2,12 @@
 id: eng5-runner-testing-plan
 title: Eng5 Runner Testing Plan
 type: task
-status: research
+status: proposed
 priority: medium
 domain: programs
 owner_team: agents
 created: '2025-11-21'
-last_updated: '2025-11-21'
+last_updated: '2026-02-01'
 service: ''
 owner: ''
 program: ''

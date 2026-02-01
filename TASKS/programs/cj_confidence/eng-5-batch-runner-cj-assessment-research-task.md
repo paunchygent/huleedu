@@ -1,16 +1,16 @@
 ---
-id: "eng-5-batch-runner-cj-assessment-research-task"
-title: "ENG5 Runner & Essay Assessment Architecture"
-type: "task"
-status: "research"
-priority: "medium"
-domain: "programs"
-service: ""
-owner_team: "agents"
-owner: ""
-program: "cj_confidence"
-created: "2025-11-10"
-last_updated: "2025-11-17"
+id: eng-5-batch-runner-cj-assessment-research-task
+title: ENG5 Runner & Essay Assessment Architecture
+type: task
+status: proposed
+priority: medium
+domain: programs
+service: ''
+owner_team: agents
+owner: ''
+program: cj_confidence
+created: '2025-11-10'
+last_updated: '2026-02-01'
 related: []
 labels: []
 ---

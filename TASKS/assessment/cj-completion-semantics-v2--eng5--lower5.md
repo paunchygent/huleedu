@@ -1,16 +1,16 @@
 ---
-id: 'cj-completion-semantics-v2--eng5--lower5'
-title: 'CJ completion semantics v2 – ENG5 & LOWER5'
-type: 'task'
-status: 'research'
-priority: 'medium'
-domain: 'assessment'
+id: cj-completion-semantics-v2--eng5--lower5
+title: CJ completion semantics v2 – ENG5 & LOWER5
+type: task
+status: proposed
+priority: medium
+domain: assessment
 service: ''
-owner_team: 'agents'
+owner_team: agents
 owner: ''
 program: ''
 created: '2025-12-02'
-last_updated: '2025-12-04'
+last_updated: '2026-02-01'
 related: []
 labels: []
 ---

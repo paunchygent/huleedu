@@ -1,16 +1,16 @@
 ---
-id: 'cj-completion-semantics-v2--budget-vs-coverage'
-title: 'CJ completion semantics v2 – budget vs coverage'
-type: 'task'
-status: 'research'
-priority: 'medium'
-domain: 'assessment'
+id: cj-completion-semantics-v2--budget-vs-coverage
+title: CJ completion semantics v2 – budget vs coverage
+type: task
+status: proposed
+priority: medium
+domain: assessment
 service: ''
-owner_team: 'agents'
+owner_team: agents
 owner: ''
 program: ''
 created: '2025-12-02'
-last_updated: '2025-12-02'
+last_updated: '2026-02-01'
 related: []
 labels: []
 ---

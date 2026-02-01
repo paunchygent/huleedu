@@ -39,7 +39,7 @@ pdm run tasks --status in_progress
 pdm run tasks --status blocked --status paused
 
 # Recently completed tasks
-pdm run tasks --status completed --updated-last-days 7
+pdm run tasks --status done --updated-last-days 7
 ```
 
 ### By Domain
@@ -154,7 +154,7 @@ By default, archived tasks are excluded. Include them with:
 
 ```bash
 # Include archived tasks
-pdm run tasks --include-archive --status completed
+pdm run tasks --include-archive --status done
 
 # See all archived tasks
 pdm run tasks --include-archive --status archived
@@ -172,11 +172,11 @@ pdm run tasks --status in_progress --format list
 pdm run tasks --status blocked --format list
 ```
 
-### Sprint Planning
+### Planning
 
 ```bash
-# High-priority research tasks ready to start
-pdm run tasks --priority high --status research
+# High-priority proposed tasks ready to start
+pdm run tasks --priority high --status proposed
 
 # Count tasks by domain
 pdm run tasks --domain assessment --count-only
@@ -200,7 +200,7 @@ pdm run tasks --service llm_provider_service --status in_progress
 pdm run tasks --updated-last-days 7 --sort updated
 
 # Recent completions
-pdm run tasks --status completed --updated-last-days 14
+pdm run tasks --status done --updated-last-days 14
 ```
 
 ### Stale Task Detection
@@ -209,8 +209,8 @@ pdm run tasks --status completed --updated-last-days 14
 # In-progress tasks not updated in 30 days
 pdm run tasks --status in_progress --format list | grep -E 'Updated: 2025-10-'
 
-# Research tasks older than 60 days (may need archiving)
-pdm run tasks --status research --created-before 2025-09-01
+# Proposed tasks older than 60 days (may need archiving)
+pdm run tasks --status proposed --created-before 2025-09-01
 ```
 
 ## Tips

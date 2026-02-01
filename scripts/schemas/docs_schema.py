@@ -22,6 +22,12 @@ DecisionStatus = Literal["proposed", "accepted", "superseded", "rejected"]
 
 EpicStatus = Literal["draft", "active", "completed", "cancelled"]
 
+ReferenceStatus = Literal["active", "deprecated"]
+
+ResearchStatus = Literal["active", "archived"]
+
+ReviewStatus = Literal["pending", "approved", "changes_requested", "rejected"]
+
 
 class RunbookFrontmatter(BaseModel):
     """Schema for operations/ runbook files.
@@ -131,6 +137,135 @@ class EpicFrontmatter(BaseModel):
     )
 
 
+class ReferenceFrontmatter(BaseModel):
+    """Schema for reference/ files.
+
+    Lean, agent-first: stable knowledge, conventions, checklists, or canonical mappings.
+    """
+
+    type: Literal["reference"] = Field(
+        default="reference",
+        description="Document type identifier",
+    )
+
+    id: str = Field(
+        ...,
+        description="Reference doc ID (e.g., 'REF-task-lifecycle-v2')",
+        pattern=r"^REF-[a-z0-9]+(-[a-z0-9]+)*$",
+    )
+
+    title: str = Field(
+        ...,
+        description="Reference doc title",
+    )
+
+    status: ReferenceStatus = Field(
+        ...,
+        description="Current status of the reference doc",
+    )
+
+    created: date = Field(
+        ...,
+        description="Date doc was created (YYYY-MM-DD)",
+    )
+
+    last_updated: date = Field(
+        ...,
+        description="Date of last update (YYYY-MM-DD)",
+    )
+
+    topic: str | None = Field(
+        default=None,
+        description="Optional topic tag (free-form)",
+    )
+
+
+class ResearchFrontmatter(BaseModel):
+    """Schema for research/ files.
+
+    Exploratory but still structured: spikes, experiments, and investigation notes.
+    """
+
+    type: Literal["research"] = Field(
+        default="research",
+        description="Document type identifier",
+    )
+
+    id: str = Field(
+        ...,
+        description="Research doc ID (e.g., 'RES-task-lifecycle-v2-migration')",
+        pattern=r"^RES-[a-z0-9]+(-[a-z0-9]+)*$",
+    )
+
+    title: str = Field(
+        ...,
+        description="Research doc title",
+    )
+
+    status: ResearchStatus = Field(
+        ...,
+        description="Current status of the research doc",
+    )
+
+    created: date = Field(
+        ...,
+        description="Date doc was created (YYYY-MM-DD)",
+    )
+
+    last_updated: date = Field(
+        ...,
+        description="Date of last update (YYYY-MM-DD)",
+    )
+
+
+class ReviewFrontmatter(BaseModel):
+    """Schema for product/reviews/ files.
+
+    Reviews are the canonical approval record for moving stories from proposed -> approved.
+    """
+
+    type: Literal["review"] = Field(
+        default="review",
+        description="Document type identifier",
+    )
+
+    id: str = Field(
+        ...,
+        description="Review doc ID (e.g., 'REV-us-0123-some-story')",
+        pattern=r"^REV-[a-z0-9]+(-[a-z0-9]+)*$",
+    )
+
+    title: str = Field(
+        ...,
+        description="Review doc title",
+    )
+
+    status: ReviewStatus = Field(
+        ...,
+        description="Current status of the review",
+    )
+
+    created: date = Field(
+        ...,
+        description="Date review was created (YYYY-MM-DD)",
+    )
+
+    last_updated: date = Field(
+        ...,
+        description="Date of last update (YYYY-MM-DD)",
+    )
+
+    story: str | None = Field(
+        default=None,
+        description="Optional TASKS story id being reviewed (kebab-case)",
+    )
+
+    reviewer: str | None = Field(
+        default=None,
+        description="Optional reviewer handle",
+    )
+
+
 def get_allowed_values() -> dict[str, list[str]]:
     """Return dict of field names to allowed values for CLI hints.
 
@@ -141,4 +276,7 @@ def get_allowed_values() -> dict[str, list[str]]:
         "runbook_severity": list(get_args(RunbookSeverity)),
         "decision_status": list(get_args(DecisionStatus)),
         "epic_status": list(get_args(EpicStatus)),
+        "reference_status": list(get_args(ReferenceStatus)),
+        "research_status": list(get_args(ResearchStatus)),
+        "review_status": list(get_args(ReviewStatus)),
     }

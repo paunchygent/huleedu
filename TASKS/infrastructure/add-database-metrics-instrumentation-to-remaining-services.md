@@ -1,19 +1,23 @@
 ---
-id: 'add-database-metrics-instrumentation-to-remaining-services'
-title: 'Add Database Metrics Instrumentation to Remaining Services'
-type: 'task'
-status: 'completed'
-priority: 'medium'
-domain: 'infrastructure'
+id: add-database-metrics-instrumentation-to-remaining-services
+title: Add Database Metrics Instrumentation to Remaining Services
+type: task
+status: done
+priority: medium
+domain: infrastructure
 service: ''
-owner_team: 'agents'
+owner_team: agents
 owner: ''
 program: ''
 created: '2025-11-30'
-last_updated: '2025-11-30'
-epic: 'EPIC-009'
-related: ['docs/product/epics/observability-metrics-alignment-epic.md']
-labels: ['observability', 'metrics', 'database']
+last_updated: '2026-02-01'
+epic: EPIC-009
+related:
+- docs/product/epics/observability-metrics-alignment-epic.md
+labels:
+- observability
+- metrics
+- database
 ---
 # Add Database Metrics Instrumentation to Remaining Services
 

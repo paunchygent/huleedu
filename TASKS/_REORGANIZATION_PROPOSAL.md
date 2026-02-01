@@ -80,10 +80,12 @@ Files MUST be placed according to these rules. Ambiguous items default to the mo
 
 - Status is stored **only** in frontmatter, not in directory names or emojis.
 - Allowed values for `status`:
-  - `research`
+  - `proposed`
+  - `in_review`
+  - `approved`
   - `blocked`
   - `in_progress`
-  - `completed`
+  - `done`
   - `paused`
   - `archived`
 - Any other value is invalid and MUST fail validation.
@@ -98,7 +100,7 @@ Every task or programme-related file under `TASKS/` (excluding this spec and gen
 id: task-id-or-hub-id          # Globally unique identifier (kebab-case, matches filename)
 title: Short, factual title
 type: task                     # One of: task | story | doc | programme
-status: research               # One of: research | blocked | in_progress | completed | paused | archived
+status: proposed               # One of: proposed | in_review | approved | blocked | in_progress | done | paused | archived
 priority: medium               # One of: low | medium | high | critical
 domain: assessment             # One of: assessment | content | identity | frontend | infrastructure | security | integrations | architecture | programs
 service: ""                    # Optional: service name (e.g. cj_assessment_service)

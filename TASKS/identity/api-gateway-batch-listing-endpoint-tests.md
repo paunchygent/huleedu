@@ -1,18 +1,21 @@
 ---
-id: 'api-gateway-batch-listing-endpoint-tests'
-title: 'API Gateway batch listing endpoint tests'
-type: 'task'
-status: 'completed'
-priority: 'medium'
-domain: 'identity'
-service: 'api_gateway_service'
-owner_team: 'agents'
+id: api-gateway-batch-listing-endpoint-tests
+title: API Gateway batch listing endpoint tests
+type: task
+status: done
+priority: medium
+domain: identity
+service: api_gateway_service
+owner_team: agents
 owner: ''
 program: ''
 created: '2025-12-10'
-last_updated: '2025-12-10'
-related: ["TASKS/architecture/bff-pattern-adoption-and-rollout-plan.md"]
-labels: ['api-gateway', 'testing']
+last_updated: '2026-02-01'
+related:
+- TASKS/architecture/bff-pattern-adoption-and-rollout-plan.md
+labels:
+- api-gateway
+- testing
 ---
 # API Gateway batch listing endpoint tests
 

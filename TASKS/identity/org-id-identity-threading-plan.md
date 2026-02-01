@@ -1,16 +1,16 @@
 ---
-id: "org-id-identity-threading-plan"
-title: "Task: Org Identity Threading for Cost Attribution (Development-Only)"
-type: "task"
-status: "research"
-priority: "medium"
-domain: "identity"
-service: ""
-owner_team: "agents"
-owner: ""
-program: ""
-created: "2025-08-31"
-last_updated: "2025-11-17"
+id: org-id-identity-threading-plan
+title: 'Task: Org Identity Threading for Cost Attribution (Development-Only)'
+type: task
+status: proposed
+priority: medium
+domain: identity
+service: ''
+owner_team: agents
+owner: ''
+program: ''
+created: '2025-08-31'
+last_updated: '2026-02-01'
 related: []
 labels: []
 ---

@@ -1,18 +1,23 @@
 ---
-id: 'bff-teacher-dashboard-endpoint'
-title: 'BFF Teacher Dashboard Endpoint'
-type: 'task'
-status: 'completed'
-priority: 'high'
-domain: 'programs'
-service: 'bff_teacher_service'
-owner_team: 'agents'
+id: bff-teacher-dashboard-endpoint
+title: BFF Teacher Dashboard Endpoint
+type: task
+status: done
+priority: high
+domain: programs
+service: bff_teacher_service
+owner_team: agents
 owner: ''
-program: 'teacher_dashboard_integration'
+program: teacher_dashboard_integration
 created: '2025-12-09'
-last_updated: '2025-12-10'
-related: ["TASKS/programs/teacher_dashboard_integration/HUB.md", "bff-teacher-service-internal-clients"]
-labels: ["bff", "dashboard", "aggregation"]
+last_updated: '2026-02-01'
+related:
+- TASKS/programs/teacher_dashboard_integration/HUB.md
+- bff-teacher-service-internal-clients
+labels:
+- bff
+- dashboard
+- aggregation
 ---
 # BFF Teacher Dashboard Endpoint
 

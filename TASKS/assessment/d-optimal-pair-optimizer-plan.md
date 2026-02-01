@@ -1,16 +1,16 @@
 ---
-id: "d-optimal-pair-optimizer-plan"
-title: "D-Optimal Pair Optimizer Rollout Plan"
-type: "task"
-status: "research"
-priority: "medium"
-domain: "assessment"
-service: ""
-owner_team: "agents"
-owner: ""
-program: ""
-created: "2025-11-02"
-last_updated: "2025-11-17"
+id: d-optimal-pair-optimizer-plan
+title: D-Optimal Pair Optimizer Rollout Plan
+type: task
+status: proposed
+priority: medium
+domain: assessment
+service: ''
+owner_team: agents
+owner: ''
+program: ''
+created: '2025-11-02'
+last_updated: '2026-02-01'
 related: []
 labels: []
 ---

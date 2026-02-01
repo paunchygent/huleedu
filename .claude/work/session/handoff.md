@@ -30,7 +30,105 @@ All completed work, patterns, and decisions live in:
 
 ---
 
+## CURRENT FOCUS (2026-02-01)
+
+### Whitebox Essay Scoring Research Build (Standalone)
+
+- Task: `TASKS/assessment/nlp_lang_tool/nlp-lang-tool-whitebox-research-build.md`
+- Scope: Research pipeline only (no Kafka/outbox/DI/service wiring).
+- Added: `scripts/ml_training/essay_scoring/` modular pipeline (dataset loader, splitters,
+  tiered feature extractors, embeddings, feature combiner, XGBoost trainer/eval,
+  SHAP artifacts, grade-scale report) + CLI entrypoint.
+- PDM script: `essay-scoring-research` → `python -m scripts.ml_training.essay_scoring.cli`
+- Dependencies: new `ml-research` group in `pyproject.toml` (xgboost, torch,
+  transformers, shap, spacy, sentence-transformers, textdescriptives, wordfreq,
+  lexical-diversity, langdetect, gensim, nltk, etc.).
+- Added `tiktoken` + `sentencepiece` to `ml-research` for DeBERTa tokenizer support.
+- Note: macOS requires OpenMP runtime for XGBoost (`brew install libomp`).
+- Update: Tier 1 readability now uses TextDescriptives (spaCy) and a shared spaCy
+  `nlp` instance is wired through `FeaturePipeline` for Tier 1 + Tier 2 extractors.
+- Docs aligned to TextDescriptives for readability indices in EPIC/ADR references.
+  - Renamed non-kebab files in `docs/research/` to satisfy docs validator.
+- Added Matplotlib cache setup to avoid unwritable home cache warnings.
+- Added Rich logging for research runs (console + per-run `run.log`).
+- Ruff now excludes `output/` to avoid linting cached LanguageTool files.
+
+Local verification (2026-02-01):
+- `pdm lock -G ml-research`
+- `pdm install -G ml-research`
+- `brew install libomp`
+- `pdm run pytest-root scripts/ml_training/tests -v`
+- `pdm run format-all`
+- `pdm run lint-fix --unsafe-fixes`
+- `pdm run typecheck-all`
+
+Additional verification (2026-02-01):
+- `pdm lock -G ml-research`
+- `pdm install -G ml-research`
+- `pdm run essay-scoring-research --help` (warned about non-writable matplotlib/fontconfig caches; suggests setting `MPLCONFIGDIR`)
+- `pdm run essay-scoring-research run --help`
+- `pdm run essay-scoring-research ablation --dataset-path /tmp/ielts_small_ablation.csv` (downloaded LanguageTool + model weights; long-running)
+- `pdm run format-all`
+- `pdm run lint-fix --unsafe-fixes`
+- `pdm run typecheck-all`
+- `pdm run validate-tasks`
+- `pdm run python scripts/task_mgmt/index_tasks.py --root "$(pwd)/TASKS" --out "/tmp/huleedu_tasks_index.md" --fail-on-missing`
+- `pdm run python scripts/docs_mgmt/validate_docs_structure.py --verbose`
+
+Additional verification (2026-02-01, later run):
+- `pdm install -G ml-research` (installed `tiktoken`, `sentencepiece`)
+- `pdm run essay-scoring-research ablation --dataset-path /tmp/ielts_small_ablation.csv`
+  - Outputs:
+    - `output/essay_scoring/20260201_091815_handcrafted`
+    - `output/essay_scoring/20260201_092125_embeddings`
+    - `output/essay_scoring/20260201_092230_combined` (SHAP PNGs + grade report)
+
+### Hemma Offload (LanguageTool + DeBERTa/spaCy) — Planning + Docs (2026-02-01)
+
+- Tasks:
+  - `TASKS/infrastructure/hemma-operations-runbooks-huleedu--gpu.md`
+  - `TASKS/infrastructure/huleedu-devops-codex-skill-for-hemma-server.md`
+  - `TASKS/assessment/offload-deberta--spacy-features-to-hemma-binary-embedding-service.md`
+- Runbooks:
+  - `docs/operations/hemma-server-operations-huleedu.md`
+  - `docs/operations/gpu-ai-workloads-on-hemma-huleedu.md`
+- ADR:
+  - `docs/decisions/0025-hemma-hosted-nlp-feature-offload-for-essay-scoring-research-binary-protocol.md`
+- Codex skill source:
+  - `scripts/codex_skills/huledu-devops-hemma/SKILL.md`
+
+Implementation progress (2026-02-01):
+- Added research-scoped embedding offload server:
+  - `scripts/ml_training/essay_scoring/offload/server.py`
+  - `scripts/ml_training/essay_scoring/offload/Dockerfile`
+- Wired research pipeline to optionally use Hemma via tunnel:
+  - `scripts/ml_training/essay_scoring/config.py` (`OffloadConfig`)
+  - CLI flags: `--embedding-service-url`, `--language-tool-service-url`
+- Updated runbooks:
+  - `docs/operations/hemma-alpha-rollout-days-1-3.md`
+  - `docs/operations/hemma-server-operations-huleedu.md`
+
+### TASKS Lifecycle v2 (Stories: review gate, status: done) — Implemented (2026-02-01)
+
+- Decision: `docs/decisions/0027-tasks-lifecycle-v2-story-review-gate-done-status-research-docs.md`
+- Reference: `docs/reference/ref-tasks-lifecycle-v2.md`
+- Changes:
+  - `TASKS/` status enum is now work-state only (`proposed|in_review|approved|in_progress|blocked|paused|done|archived`).
+  - `status: research` removed (research is now `docs/research/`).
+  - Stories are review-gated (`in_review` → `approved`); tasks remain lean (no review gate).
+- Tooling:
+  - `pdm run validate-docs`
+  - `pdm run index-tasks`
+  - `pdm run migrate-task-statuses-v2 [--root <path>] --write`
+
+---
+
 ## RECENTLY COMPLETED
+
+### 2026-02-01 - Codex config web_search deprecation fix (COMPLETED)
+
+- Updated `~/.codex/config.toml` to replace deprecated `[features].web_search_request` with `web_search = "live"`.
+- New setting uses supported values: `"live"`, `"cached"`, or `"disabled"`.
 
 ### 2025-12-12 — Phase 4: RAS Processing Phase Derivation (COMPLETED)
 

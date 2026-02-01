@@ -6,7 +6,7 @@ status: draft
 phase: 1
 sprint_target: null
 created: '2025-12-05'
-last_updated: '2025-12-05'
+last_updated: '2026-01-31'
 ---
 # EPIC-010: ML Essay Scoring Pipeline
 
@@ -20,7 +20,7 @@ Build a **whitebox** ML pipeline for automated essay scoring as a checks-and-bal
 
 **Scope Boundaries**:
 - **In Scope**: DeBERTa-v3-base embedding extraction ([CLS] pooling), tiered hand-rolled feature pipeline, XGBoost ordinal regression with QWK early stopping, SHAP explainability, model serving in NLP Service
-- **Out of Scope**: Swedish grade mapping (future), automated CJ validation pipeline (future)
+- **Out of Scope**: Swedish grade mapping (future; requires grade-scale behavior report), automated CJ validation pipeline (future)
 
 ## Deliverables
 
@@ -41,6 +41,7 @@ Build a **whitebox** ML pipeline for automated essay scoring as a checks-and-bal
 - [ ] Feature combiner (embeddings + ~25-30 hand-rolled → combined vector)
 - [ ] Feature schema with Pydantic V2 models
 - [ ] Train/validation/test split utilities
+- [ ] Grade-scale behavior report (assumption-light diagnostics; required before Swedish mapping)
 
 ### Phase 2: Model Training Pipeline
 - [ ] XGBoost ordinal regressor (`reg:squarederror` objective, predictions rounded to nearest 0.5 band)
@@ -198,8 +199,8 @@ data/cefr_ielts_datasets/ielts_writing_dataset.csv
 | **DeBERTa-v3-base Embeddings** | [CLS] token pooling, max_length=512 | 768 | transformers |
 | **Tier 1 (Highest Signal)** | | | |
 | └── Error density | grammar_density, spelling_density, punct_errors | 3+ | LanguageTool |
-| └── Readability | flesch_kincaid, smog, coleman_liau, ari | 4 | textstat |
-| └── Core length | avg_sentence_length, ttr, word_count, avg_word_length | 4 | NLTK |
+| └── Readability | flesch_kincaid, smog, coleman_liau, ari | 4 | textdescriptives |
+| └── Core length | avg_sentence_length, ttr, word_count, avg_word_length | 4 | spaCy |
 | **Tier 2 (Strong Signal)** | | | |
 | └── Syntactic | parse_tree_depth, clause_count, passive_ratio, dep_distance | 4 | spaCy |
 | └── Cohesion | connective_diversity, sent_similarity_variance | 2 | spaCy |
@@ -220,7 +221,7 @@ services/nlp_service/
 │       ├── models.py            # EssayFeatures, ScoringResult, TieredFeatures
 │       ├── extractors/
 │       │   ├── deberta_embeddings.py      # DeBERTa-v3-base (768-dim, [CLS] pooling)
-│       │   ├── tier1_error_readability.py # LanguageTool + textstat
+│       │   ├── tier1_error_readability.py # LanguageTool + textdescriptives
 │       │   ├── tier2_syntactic_cohesion.py # spaCy + sentence-transformers
 │       │   ├── tier3_structure.py         # Paragraph/intro/conclusion
 │       │   └── feature_combiner.py        # Merge embeddings + all tiers
@@ -287,7 +288,7 @@ params = {
 ### Python Packages
 - **Embeddings**: transformers, torch (`microsoft/deberta-v3-base`)
 - **Regressor**: xgboost, scikit-learn
-- **Tier 1 Features**: language-tool-python, textstat, nltk
+- **Tier 1 Features**: language-tool-python, textdescriptives, spaCy
 - **Tier 2 Features**: spacy (en_core_web_sm), sentence-transformers
 - **Data**: pandas, numpy
 - **Explainability**: shap (TreeExplainer for XGBoost)
@@ -300,6 +301,39 @@ params = {
 - XGBoost feature importance shows Tier 1 hand-rolled features in top splits (not dominated by embeddings)
 - SHAP explanations generate meaningful teacher-facing feedback
 - Regularization prevents embedding dominance over interpretable features
+
+## Grade-Scale Behavior Report (Template)
+
+Complete this report **before** any Swedish grade mapping work. Do not assume equal spacing between grade bands until validated by data.
+
+**Dataset & Context**
+- Dataset version/source:
+- Grade scale definition (labels + rubric reference):
+- Prompt/task coverage:
+- Rater context (single vs multiple raters; moderation process):
+
+**Distribution Checks**
+- Overall grade distribution:
+- Per-prompt grade distributions:
+- Missingness or sparsity notes:
+
+**Assumption-Light Diagnostics**
+- Monotonicity: Spearman correlation between latent score and grade:
+- Isotonic fit shape (monotone curve notes):
+- Boundary spacing: overlap between adjacent grade score distributions:
+- Prompt/cohort stability: cut-point shifts across subsets:
+- Adjacent confusion matrix (most frequent near-boundary errors):
+- Length bias check (correlation with length proxies):
+
+**Mapping Decision**
+- Chosen mapping: learned cut-points / isotonic / fixed intervals (only with evidence)
+- Rationale:
+- Open questions / risks:
+
+**Decision Outcome**
+- Approved by:
+- Date:
+- Next review trigger:
 
 ## Notes
 - **Whitebox purpose**: Independent validation of CJ blackbox rankings

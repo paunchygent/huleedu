@@ -1,16 +1,16 @@
 ---
-id: "svelte5-cors-and-dev-utilities"
-title: "Svelte 5 + Vite CORS Configuration and Development Utilities"
-type: "task"
-status: "research"
-priority: "medium"
+id: svelte5-cors-and-dev-utilities
+title: Svelte 5 + Vite CORS Configuration and Development Utilities
+type: task
+status: proposed
+priority: medium
 domain: integration
-service: ""
-owner_team: "agents"
-owner: ""
-program: ""
-created: "2025-11-08"
-last_updated: "2025-11-17"
+service: ''
+owner_team: agents
+owner: ''
+program: ''
+created: '2025-11-08'
+last_updated: '2026-02-01'
 related: []
 labels: []
 ---

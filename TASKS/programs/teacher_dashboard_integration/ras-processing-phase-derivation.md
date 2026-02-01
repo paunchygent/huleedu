@@ -1,18 +1,23 @@
 ---
-id: 'ras-processing-phase-derivation'
-title: 'RAS Processing Phase Derivation'
-type: 'task'
-status: 'completed'
-priority: 'high'
-domain: 'programs'
-service: 'result_aggregator_service'
-owner_team: 'agents'
+id: ras-processing-phase-derivation
+title: RAS Processing Phase Derivation
+type: task
+status: done
+priority: high
+domain: programs
+service: result_aggregator_service
+owner_team: agents
 owner: ''
-program: 'teacher_dashboard_integration'
+program: teacher_dashboard_integration
 created: '2025-12-12'
-last_updated: '2025-12-12'
-related: ["TASKS/programs/teacher_dashboard_integration/HUB.md", "bff-extended-dashboard-fields"]
-labels: ["ras", "processing-phase", "internal-api"]
+last_updated: '2026-02-01'
+related:
+- TASKS/programs/teacher_dashboard_integration/HUB.md
+- bff-extended-dashboard-fields
+labels:
+- ras
+- processing-phase
+- internal-api
 ---
 # RAS Processing Phase Derivation
 

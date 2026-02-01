@@ -86,7 +86,7 @@ services/nlp_service/
 │       ├── models.py              # EssayFeatures, ScoringResult, TieredFeatures
 │       ├── extractors/
 │       │   ├── deberta_embeddings.py      # DeBERTa-v3-base (768-dim, [CLS] pooling)
-│       │   ├── tier1_error_readability.py # LanguageTool + textstat
+│       │   ├── tier1_error_readability.py # LanguageTool + textdescriptives
 │       │   ├── tier2_syntactic_cohesion.py # spaCy + sentence-transformers
 │       │   ├── tier3_structure.py         # Paragraph/intro/conclusion
 │       │   └── feature_combiner.py        # Merge embeddings + all tiers
@@ -113,7 +113,7 @@ Essay Text + Prompt
     │
     ├──> DeBERTa-v3-base [CLS] ──> [768-dim embedding]
     │
-    ├──> Tier 1 (LanguageTool + textstat) ──> [~11 features]
+    ├──> Tier 1 (LanguageTool + textdescriptives) ──> [~11 features]
     │         ├── grammar_density, spelling_density, punct_errors
     │         ├── flesch_kincaid, smog, coleman_liau, ari
     │         └── avg_sentence_length, ttr, word_count, avg_word_length

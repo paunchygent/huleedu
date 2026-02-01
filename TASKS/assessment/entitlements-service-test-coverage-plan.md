@@ -1,16 +1,16 @@
 ---
-id: "entitlements-service-test-coverage-plan"
-title: "Entitlements Service — Test Coverage Plan (Final)"
-type: "task"
-status: "research"
-priority: "medium"
-domain: "assessment"
-service: ""
-owner_team: "agents"
-owner: ""
-program: ""
-created: "2025-09-08"
-last_updated: "2025-11-17"
+id: entitlements-service-test-coverage-plan
+title: Entitlements Service — Test Coverage Plan (Final)
+type: task
+status: proposed
+priority: medium
+domain: assessment
+service: ''
+owner_team: agents
+owner: ''
+program: ''
+created: '2025-09-08'
+last_updated: '2026-02-01'
 related: []
 labels: []
 ---

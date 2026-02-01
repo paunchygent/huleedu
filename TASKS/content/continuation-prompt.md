@@ -1,16 +1,16 @@
 ---
-id: "continuation-prompt"
-title: "HANDOFF: TUI Help Screen Completion"
-type: "task"
-status: "research"
-priority: "medium"
-domain: "content"
-service: ""
-owner_team: "agents"
-owner: ""
-program: ""
-created: "2025-11-02"
-last_updated: "2025-11-17"
+id: continuation-prompt
+title: 'HANDOFF: TUI Help Screen Completion'
+type: task
+status: proposed
+priority: medium
+domain: content
+service: ''
+owner_team: agents
+owner: ''
+program: ''
+created: '2025-11-02'
+last_updated: '2026-02-01'
 related: []
 labels: []
 ---

@@ -1,16 +1,16 @@
 ---
-id: 'improve-functional-test-harness-and-stack-ergonomics'
-title: 'Improve functional test harness and stack ergonomics'
-type: 'task'
-status: 'research'
-priority: 'medium'
-domain: 'infrastructure'
+id: improve-functional-test-harness-and-stack-ergonomics
+title: Improve functional test harness and stack ergonomics
+type: task
+status: proposed
+priority: medium
+domain: infrastructure
 service: ''
-owner_team: 'agents'
+owner_team: agents
 owner: ''
 program: ''
 created: '2025-11-26'
-last_updated: '2025-11-26'
+last_updated: '2026-02-01'
 related: []
 labels: []
 ---

@@ -30,7 +30,7 @@ Usage examples:
   python scripts/task_mgmt/filter_tasks.py --priority high --format paths  # just file paths
 
   # Exclude archived tasks (default: excluded)
-  python scripts/task_mgmt/filter_tasks.py --include-archive --status completed
+  python scripts/task_mgmt/filter_tasks.py --include-archive --status done
 
   # Sort results
   python scripts/task_mgmt/filter_tasks.py --sort priority --sort created
@@ -41,10 +41,11 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
-import re
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
+
+from scripts.utils.frontmatter_utils import read_front_matter
 
 ROOT = Path(__file__).resolve().parents[2]
 TASKS_DIR = ROOT / "TASKS"
@@ -57,7 +58,16 @@ EXCLUDED_FILES = {
 }
 
 ALLOWED_PRIORITIES = {"low", "medium", "high", "critical"}
-ALLOWED_STATUSES = {"research", "blocked", "in_progress", "completed", "paused", "archived"}
+ALLOWED_STATUSES = {
+    "proposed",
+    "in_review",
+    "approved",
+    "blocked",
+    "in_progress",
+    "paused",
+    "done",
+    "archived",
+}
 ALLOWED_DOMAINS = {
     "assessment",
     "content",
@@ -71,33 +81,6 @@ ALLOWED_DOMAINS = {
 }
 
 PRIORITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3}
-
-
-def read_front_matter(p: Path) -> Tuple[Dict[str, Any], str]:
-    """Parse YAML-like front matter from markdown file."""
-    text = p.read_text(encoding="utf-8")
-    if not text.startswith("---\n"):
-        return {}, text
-    parts = text.split("\n---\n", 1)
-    if len(parts) != 2:
-        return {}, text
-    header = parts[0][4:]
-    body = parts[1]
-    data: Dict[str, Any] = {}
-    for line in header.splitlines():
-        if not line.strip() or line.strip().startswith("#"):
-            continue
-        m = re.match(r"^([A-Za-z0-9_]+):\s*(.*)$", line)
-        if not m:
-            continue
-        k, v = m.group(1), m.group(2).strip()
-        if v.startswith("[") and v.endswith("]"):
-            # crude list parsing of comma-separated quoted items
-            items = [i.strip().strip("'\"") for i in v[1:-1].split(",") if i.strip()]
-            data[k] = items
-        else:
-            data[k] = v.strip("'\"")
-    return data, body
 
 
 def should_exclude_file(p: Path, include_archive: bool) -> bool:

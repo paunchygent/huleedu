@@ -1,18 +1,23 @@
 ---
-id: 'eng5-gpt-51-reasoning-effort-alignment-experiment'
-title: 'ENG5 GPT-5.1 Reasoning Effort Alignment Experiment'
-type: 'task'
-status: 'research'
-priority: 'medium'
-domain: 'programs'
-service: 'eng5_runner'
-owner_team: 'agents'
+id: eng5-gpt-51-reasoning-effort-alignment-experiment
+title: ENG5 GPT-5.1 Reasoning Effort Alignment Experiment
+type: task
+status: proposed
+priority: medium
+domain: programs
+service: eng5_runner
+owner_team: agents
 owner: ''
-program: 'eng5'
+program: eng5
 created: '2025-12-01'
-last_updated: '2025-12-04'
-related: ['EPIC-008', 'llm-provider-openai-gpt-5x-reasoning-controls']
-labels: ['eng5', 'alignment', 'gpt5']
+last_updated: '2026-02-01'
+related:
+- EPIC-008
+- llm-provider-openai-gpt-5x-reasoning-controls
+labels:
+- eng5
+- alignment
+- gpt5
 ---
 # ENG5 GPT-5.1 Reasoning Effort Alignment Experiment
 

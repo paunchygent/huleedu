@@ -25,6 +25,7 @@ Essay JA24 received **4 A ratings** and **2 B ratings** from teachers, yet the B
 ## JA24 Case Analysis
 
 ### Raw Ratings
+
 | Rater    | Grade Given   | Severity Score   |
 |:---------|:--------------|:-----------------|
 | Erik A   | A             | N/A              |
@@ -40,6 +41,7 @@ Essay JA24 received **4 A ratings** and **2 B ratings** from teachers, yet the B
 - **Number of A-raters labeled "generous"**: 3 out of 4
 
 ### Consensus Method Comparison
+
 | Method             | Consensus Grade   |   Confidence |
 |:-------------------|:------------------|-------------:|
 | Simple Majority    | A                 |        0.667 |

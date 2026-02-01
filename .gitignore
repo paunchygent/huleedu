@@ -12,6 +12,9 @@ __pycache__/
 .DS_Store
 .vscode/settings.json
 .md-to-html-converter/
+~$*.docx
+output/essay_scoring/
+output/essay_scoring/.cache/
 
 # temp_folders and temp_files used for testing or development
 cj_essay_assessment/

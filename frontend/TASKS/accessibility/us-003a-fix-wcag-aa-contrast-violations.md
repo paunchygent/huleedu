@@ -2,7 +2,7 @@
 id: us-003a-fix-wcag-aa-contrast-violations
 title: Fix WCAG AA Contrast Violations in Text Colors
 type: story
-status: research
+status: proposed
 priority: high
 domain: accessibility
 service: ''
@@ -10,9 +10,14 @@ owner_team: agents
 owner: ''
 program: ''
 created: 2025-12-08
-last_updated: 2025-12-08
-related: ["ADR-0023", "EPIC-010"]
-labels: ["accessibility", "design-system", "wcag"]
+last_updated: '2026-02-01'
+related:
+- ADR-0023
+- EPIC-010
+labels:
+- accessibility
+- design-system
+- wcag
 ---
 
 # US-003A: Fix WCAG AA Contrast Violations in Text Colors

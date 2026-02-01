@@ -1,16 +1,16 @@
 ---
-id: "smoketest-automation-design"
-title: "TASK: Comprehensive Smoketest Automation Design"
-type: "task"
-status: "research"
-priority: "medium"
-domain: "assessment"
-service: ""
-owner_team: "agents"
-owner: ""
-program: ""
-created: "2025-11-16"
-last_updated: "2025-11-17"
+id: smoketest-automation-design
+title: 'TASK: Comprehensive Smoketest Automation Design'
+type: task
+status: proposed
+priority: medium
+domain: assessment
+service: ''
+owner_team: agents
+owner: ''
+program: ''
+created: '2025-11-16'
+last_updated: '2026-02-01'
 related: []
 labels: []
 ---

@@ -71,6 +71,30 @@ monorepo-tools = [
     "pytailwindcss",
 ]
 
+# Research/ML dependencies for the whitebox essay scoring pipeline
+ml-research = [
+    "en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl",
+    "gensim",
+    "langdetect",
+    "language-tool-python",
+    "lexical-diversity",
+    "matplotlib",
+    "numpy",
+    "pandas",
+    "scikit-learn",
+    "sentence-transformers",
+    "sentencepiece",
+    "shap",
+    "spacy",
+    "sv-core-news-sm @ https://github.com/explosion/spacy-models/releases/download/sv_core_news_sm-3.8.0/sv_core_news_sm-3.8.0-py3-none-any.whl",
+    "textdescriptives",
+    "tiktoken",
+    "torch",
+    "transformers",
+    "wordfreq",
+    "xgboost",
+]
+
 # Install all services and common_core for unified development
 dev = [
     "coverage>=7.9.2",
@@ -112,6 +136,7 @@ exclude = [
     ".pdm-python",
     ".pdm-build",
     "common_core/.venv",
+    "output",
 ]
 
 [tool.ruff.lint]
@@ -234,6 +259,12 @@ module = [
     "lexical_diversity.*", # Lexical diversity metrics
     "gensim.*",     # Topic modeling and NLP library
     "textdescriptives.*", # Text complexity metrics
+    "language_tool_python.*", # LanguageTool client
+    "sentence_transformers.*", # Sentence-transformers embeddings
+    "shap.*",       # SHAP explainability
+    "torch.*",      # PyTorch
+    "transformers.*", # Hugging Face Transformers
+    "xgboost.*",    # XGBoost
     "fastapi.*",
     "starlette.*",
     "rich.*",       # Rich library for terminal formatting
@@ -458,10 +489,13 @@ new-task = {cmd = ["python", "-m", "scripts.task_mgmt.new_task"]}  # Create new 
 validate-tasks = "python -m scripts.task_mgmt.validate_front_matter --all --verbose"  # Validate TASKS/ and frontend/TASKS/
 tasks = {cmd = ["python", "-m", "scripts.task_mgmt.filter_tasks"]}  # Filter and query tasks by frontmatter
 tasks-now = "python -m scripts.task_mgmt.filter_tasks --priority high --status in_progress"  # High priority tasks in progress
-tasks-next = "python -m scripts.task_mgmt.filter_tasks --priority high --priority medium --status research --sort priority"  # Research tasks ready to start (high priority first)
+tasks-next = "python -m scripts.task_mgmt.filter_tasks --priority high --priority medium --status proposed --sort priority"  # Proposed tasks ready to start (high priority first)
+migrate-task-statuses-v2 = {cmd = ["python", "-m", "scripts.task_mgmt.migrate_task_statuses_v2"]}  # TASKS lifecycle v2 migration helper
+index-tasks = "python -m scripts.task_mgmt.index_tasks"  # Regenerate TASKS/INDEX.md (docs-as-code)
 
 # Documentation & Rules Management
-new-doc = {cmd = ["python", "-m", "scripts.docs_mgmt.new_doc"]}  # Create new doc (runbook, adr, epic)
+new-doc = {cmd = ["python", "-m", "scripts.docs_mgmt.new_doc"]}  # Create new doc (runbook, adr, epic, review, reference, research)
+validate-docs = "python -m scripts.docs_mgmt.validate_docs_structure --verbose"  # Validate docs/ taxonomy and frontmatter warnings
 new-rule = {cmd = ["python", "-m", "scripts.claude_mgmt.new_rule"]}  # Create new rule file
 
 # Observability Stack Management
@@ -477,6 +511,7 @@ cj-admin = "python -m services.cj_assessment_service.cli_admin"
 llm-check-models = "python -m services.llm_provider_service.cli_check_models"
 llm-admin = "python -m services.llm_provider_service.admin_cli"
 prompt-cache-benchmark = "python -m scripts.prompt_cache_benchmark.cli"
+essay-scoring-research = "python -m scripts.ml_training.essay_scoring.cli"
 
 # Frontend Development (Vue 3 + Vite + Tailwind 4)
 fe-install.cmd = "pnpm install"

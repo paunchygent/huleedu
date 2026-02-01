@@ -275,7 +275,7 @@ class MyNewEventV1(BaseEventData):
     # ...
 ```
 
-### 4. Add to __all__ Exports
+### 4. Add to **all** Exports
 
 ```python
 # In common_core/events/my_service_events.py

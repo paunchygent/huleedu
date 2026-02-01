@@ -1,18 +1,25 @@
 ---
-id: 'cj-resampling-mode-generalization-for-all-batch-sizes'
-title: 'CJ RESAMPLING mode generalization for all batch sizes'
-type: 'task'
-status: 'research'
-priority: 'medium'
-domain: 'assessment'
-service: 'cj_assessment_service'
-owner_team: 'agents'
+id: cj-resampling-mode-generalization-for-all-batch-sizes
+title: CJ RESAMPLING mode generalization for all batch sizes
+type: task
+status: proposed
+priority: medium
+domain: assessment
+service: cj_assessment_service
+owner_team: agents
 owner: ''
 program: ''
 created: '2025-12-06'
-last_updated: '2025-12-06'
-related: ['EPIC-005', 'pr-7-phase-2-resampling-and-convergence-harness']
-labels: ['cj', 'resampling', 'continuation', 'eng5', 'llm-provider']
+last_updated: '2026-02-01'
+related:
+- EPIC-005
+- pr-7-phase-2-resampling-and-convergence-harness
+labels:
+- cj
+- resampling
+- continuation
+- eng5
+- llm-provider
 ---
 # CJ RESAMPLING mode generalization for all batch sizes
 

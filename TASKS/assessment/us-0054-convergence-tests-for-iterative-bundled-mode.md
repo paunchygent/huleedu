@@ -1,16 +1,16 @@
 ---
-id: 'us-0054-convergence-tests-for-iterative-bundled-mode'
+id: us-0054-convergence-tests-for-iterative-bundled-mode
 title: 'US-005.4: Convergence tests for iterative bundled mode'
-type: 'task'
-status: 'research'
-priority: 'medium'
-domain: 'assessment'
-service: 'cj_assessment_service'
-owner_team: 'agents'
+type: task
+status: proposed
+priority: medium
+domain: assessment
+service: cj_assessment_service
+owner_team: agents
 owner: ''
 program: ''
 created: '2025-11-28'
-last_updated: '2025-11-28'
+last_updated: '2026-02-01'
 related: []
 labels: []
 ---

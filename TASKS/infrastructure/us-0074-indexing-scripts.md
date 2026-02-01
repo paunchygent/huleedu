@@ -1,18 +1,22 @@
 ---
-id: 'us-0074-indexing-scripts'
-title: 'US-007.4 Indexing Scripts'
-type: 'story'
-status: 'research'
-priority: 'medium'
-domain: 'infrastructure'
+id: us-0074-indexing-scripts
+title: US-007.4 Indexing Scripts
+type: story
+status: proposed
+priority: medium
+domain: infrastructure
 service: ''
-owner_team: 'agents'
+owner_team: agents
 owner: ''
 program: ''
 created: '2025-12-01'
-last_updated: '2025-12-01'
-related: ['EPIC-007', 'ADR-0019', 'us-0072-schema-consolidation']
-labels: ['dev-tooling']
+last_updated: '2026-02-01'
+related:
+- EPIC-007
+- ADR-0019
+- us-0072-schema-consolidation
+labels:
+- dev-tooling
 ---
 # US-007.4 Indexing Scripts
 

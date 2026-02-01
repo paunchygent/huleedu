@@ -1,16 +1,16 @@
 ---
-id: 'eng5-boundary-statistical-report-design'
-title: 'ENG5 Boundary Statistical Report Design'
-type: 'task'
-status: 'research'
-priority: 'medium'
-domain: 'assessment'
+id: eng5-boundary-statistical-report-design
+title: ENG5 Boundary Statistical Report Design
+type: task
+status: proposed
+priority: medium
+domain: assessment
 service: ''
-owner_team: 'agents'
+owner_team: agents
 owner: ''
-program: 'eng5'
+program: eng5
 created: '2025-11-30'
-last_updated: '2025-11-30'
+last_updated: '2026-02-01'
 related: []
 labels: []
 ---

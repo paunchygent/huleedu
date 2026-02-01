@@ -1,6 +1,9 @@
 ---
 type: research
-status: draft
+id: RES-bff-vue-3-frontend-integration-design
+title: "Designing a BFF Layer for Vue 3 Frontend Integration (Research)"
+status: active
+created: 2025-11-24
 source: TASKS/frontend/bff-vue-3-frontend-integration-design.md
 last_updated: 2025-11-24
 ---
