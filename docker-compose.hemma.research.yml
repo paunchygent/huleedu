@@ -1,0 +1,57 @@
+# Hemma-specific compose layer.
+#
+# Goals:
+# - Enforce "public surface = API/BFF/WS only" by binding research/support services to localhost.
+# - Provide an optional (profile-gated) DeBERTa embedding offload container for research use.
+#
+# Usage (Hemma):
+#   sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.hemma.research.yml up -d
+#
+# Enable the research offload container:
+#   sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.hemma.research.yml --profile research-offload up -d --build essay_embed_offload
+
+services:
+  # Keep LanguageTool service localhost-only on Hemma. Access from a dev machine via SSH tunnel:
+  #   ssh hemma -L 18085:127.0.0.1:8085 -N
+  language_tool_service:
+    # language_tool_service is stateless; on Hemma we run it standalone for research.
+    # (The main HuleEdu stack may still choose to run Kafka/Redis for other services.)
+    depends_on: []
+    ports:
+      - "127.0.0.1:8085:8085"
+
+  # Research-only DeBERTa embedding offload server (binary `.npy` response).
+  # Default is localhost-only on Hemma. Access from a dev machine via SSH tunnel:
+  #   ssh hemma -L 19000:127.0.0.1:9000 -N
+  essay_embed_offload:
+    profiles:
+      - research-offload
+    build:
+      context: .
+      dockerfile: scripts/ml_training/essay_scoring/offload/Dockerfile
+      args:
+        BASE_IMAGE: ${HULEEDU_OFFLOAD_BASE_IMAGE:-rocm/pytorch:latest}
+    image: ${HULEEDU_OFFLOAD_IMAGE_TAG:-huleedu-essay-embed-offload:dev}
+    container_name: huleedu_essay_embed_offload
+    restart: unless-stopped
+    networks:
+      - huleedu_internal_network
+    ports:
+      - "127.0.0.1:9000:9000"
+    environment:
+      - OFFLOAD_HTTP_HOST=0.0.0.0
+      - OFFLOAD_HTTP_PORT=9000
+      - OFFLOAD_TORCH_DEVICE=${OFFLOAD_TORCH_DEVICE:-cuda}
+      - HF_HOME=/cache/huggingface
+      - TRANSFORMERS_CACHE=/cache/huggingface
+    volumes:
+      # Prefer mounting from the Hemma data disk. If Docker is snap-installed and host mounts are
+      # restricted, set HULEEDU_HEMMA_HF_CACHE_PATH to a $HOME-backed bind mount path instead.
+      - ${HULEEDU_HEMMA_HF_CACHE_PATH:-/srv/scratch/huleedu/cache/huggingface}:/cache/huggingface
+    devices:
+      - /dev/kfd
+      - /dev/dri
+    group_add:
+      - video
+    ipc: host
+    shm_size: "8g"

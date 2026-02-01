@@ -107,6 +107,22 @@ Implementation progress (2026-02-01):
 - Updated runbooks:
   - `docs/operations/hemma-alpha-rollout-days-1-3.md`
   - `docs/operations/hemma-server-operations-huleedu.md`
+- Enforced “public surface = API/BFF/WS only” via config:
+  - `docker-compose.hemma.research.yml` binds `language_tool_service` to `127.0.0.1:8085`
+  - Optional compose profile `research-offload` adds `essay_embed_offload` bound to `127.0.0.1:9000`
+- Reduced Hemma image bloat for offload:
+  - `pyproject.toml` adds `offload-runtime` dependency group (no training deps)
+  - `scripts/ml_training/essay_scoring/offload/Dockerfile` exports only `offload-runtime` (`pdm export --no-default`)
+- Hemma deploy validation (2026-02-01):
+  - Copied `.env` to `~/apps/huleedu/.env` (prod DB password still missing; required for full prod deploy)
+  - Deployed `language_tool_service` with:
+    - `sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.hemma.research.yml up -d --build language_tool_service`
+  - Verified on Hemma:
+    - `curl -fsS http://127.0.0.1:8085/healthz` → `status=healthy`
+    - `curl -fsS http://127.0.0.1:9000/healthz` → `status=ok` (existing `huleedu-embed-offload` container)
+  - Verified from Mac via tunnels:
+    - `ssh -L 18085:127.0.0.1:8085 -N hemma` + `curl http://127.0.0.1:18085/healthz`
+    - `ssh -L 19000:127.0.0.1:9000 -N hemma` + `curl http://127.0.0.1:19000/healthz`
 
 ### TASKS Lifecycle v2 (Stories: review gate, status: done) — Implemented (2026-02-01)
 

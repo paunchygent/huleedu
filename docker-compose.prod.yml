@@ -352,15 +352,17 @@ services:
 
   kafka:
     networks:
-      - huleedu_internal_network
+      huleedu_internal_network:
+      hule-network:
+        aliases:
+          - shared-kafka
 
   redis:
     networks:
-      - huleedu_internal_network
-
-  zookeeper:
-    networks:
-      - huleedu_internal_network
+      huleedu_internal_network:
+      hule-network:
+        aliases:
+          - shared-redis
 
   llm_provider_service:
     networks:

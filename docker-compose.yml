@@ -11,6 +11,7 @@ volumes:
   batch_conductor_db_data:
   essay_lifecycle_db_data:
   cj_assessment_db_data:
+  kafka_data:
   redis_data:
   class_management_db_data:
   result_aggregator_db_data:

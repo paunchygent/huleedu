@@ -26,6 +26,16 @@ Prefer “prove current state” over assumptions.
 ssh hemma 'uptime'
 ```
 
+### Docker binary sanity (snap vs non-snap)
+
+For HuleEdu we prefer a non-snap Docker Engine install on Hemma for predictable host
+mount behavior from `/srv/scratch/...`.
+
+```bash
+ssh hemma 'command -v docker && ls -la "$(command -v docker)"'
+ssh hemma 'snap list docker || true'
+```
+
 ### Docker sanity
 
 ```bash
@@ -51,7 +61,7 @@ Current implementation note:
 ### Logs (container-level)
 
 ```bash
-ssh hemma 'sudo docker logs --tail=200 -f huledu_language_tool_service'
+ssh hemma 'sudo docker logs --tail=200 -f huleedu_language_tool_service'
 ```
 
 Embedding offload server logs (if deployed via `docker run`):
@@ -60,6 +70,22 @@ ssh hemma 'sudo docker logs --tail=200 -f huleedu_essay_embed_offload'
 ```
 
 ## Resolution
+
+### Hemma `.env` sanity (required for prod)
+
+On Hemma, keep secrets in `~/apps/huleedu/.env` (never committed). Required keys for
+the shared-infra production deploy:
+- `HULEEDU_ENVIRONMENT=production`
+- `ENVIRONMENT=production`
+- `HULEEDU_DB_USER=...`
+- `HULEEDU_PROD_DB_PASSWORD=...` (password for `shared-postgres`)
+- `HULEEDU_INTERNAL_API_KEY=...`
+- `JWT_SECRET_KEY=...` (and optionally `API_GATEWAY_JWT_SECRET_KEY`, matching it)
+
+Validate on Hemma (prints missing keys only):
+```bash
+ssh hemma 'cd ~/apps/huleedu && ./scripts/validate-production-config.sh'
+```
 
 ### SSH port-forward tunnels (default)
 
@@ -79,11 +105,30 @@ curl -fsS http://127.0.0.1:18085/healthz
 curl -fsS http://127.0.0.1:19000/healthz
 ```
 
+### Hemma compose layering (enforce localhost-only services)
+
+On Hemma, layer `docker-compose.hemma.research.yml` on top of the normal compose files.
+This binds research/support services (LanguageTool + embedding offload) to `127.0.0.1`
+so they are not part of the public surface area.
+
+```bash
+ssh hemma 'cd ~/apps/huleedu && sudo docker compose -f docker-compose.hemma.yml -f docker-compose.prod.yml -f docker-compose.hemma.research.yml up -d'
+```
+
+Note:
+- `language_tool_service` is intentionally deployable without Kafka/Redis for research
+  (it is stateless and runs a managed Java subprocess).
+
+Enable the embedding offload container (profile-gated):
+```bash
+ssh hemma 'cd ~/apps/huleedu && sudo docker compose -f docker-compose.hemma.yml -f docker-compose.prod.yml -f docker-compose.hemma.research.yml --profile research-offload up -d --build essay_embed_offload'
+```
+
 ### Restart a specific service
 
 If the service is already deployed via compose on Hemma:
 ```bash
-ssh hemma 'cd ~/apps/huleedu && sudo docker compose up -d --no-deps --force-recreate language_tool_service'
+ssh hemma 'cd ~/apps/huleedu && sudo docker compose -f docker-compose.hemma.yml -f docker-compose.prod.yml -f docker-compose.hemma.research.yml up -d --no-deps --force-recreate language_tool_service'
 ```
 
 Canonical checkout location: `~/apps/huleedu` (mirror Skriptoteket under `~/apps/`).
@@ -91,7 +136,7 @@ Canonical checkout location: `~/apps/huleedu` (mirror Skriptoteket under `~/apps
 ### Rebuild + restart (when Dockerfile or deps changed)
 
 ```bash
-ssh hemma 'cd ~/apps/huleedu && sudo docker compose up -d --build language_tool_service'
+ssh hemma 'cd ~/apps/huleedu && sudo docker compose -f docker-compose.hemma.yml -f docker-compose.prod.yml -f docker-compose.hemma.research.yml up -d --build language_tool_service'
 ```
 
 ### When Skriptoteket is also impacted

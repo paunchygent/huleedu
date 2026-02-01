@@ -41,8 +41,7 @@ graph TB
     end
 
     subgraph "Infrastructure Services"
-        KAFKA[Apache Kafka<br/>Port: 9092<br/>Event Bus]
-        ZOOKEEPER[Zookeeper<br/>Port: 2181<br/>Kafka Coordination]
+        KAFKA[Apache Kafka (KRaft)<br/>Port: 9092<br/>Event Bus]
         REDIS[Redis<br/>Port: 6379<br/>Cache & Dedup]
     end
 
@@ -106,8 +105,6 @@ graph TB
     LPS -->|API Calls| OPENAI
     LPS -->|API Calls| ANTHROPIC
     EMAIL -->|SMTP| SMTP
-
-    KAFKA --> ZOOKEEPER
 
     style KAFKA fill:#f9f,stroke:#333,stroke-width:3px
     style REDIS fill:#ff9,stroke:#333,stroke-width:2px

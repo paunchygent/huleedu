@@ -354,7 +354,12 @@ class PipelineTestHelper:
             # Get list of topics from Kafka
             result = self.compose.exec_in_container(
                 service_name="kafka",
-                command=["kafka-topics.sh", "--bootstrap-server", "localhost:9092", "--list"],
+                command=[
+                    "/opt/kafka/bin/kafka-topics.sh",
+                    "--bootstrap-server",
+                    "localhost:9092",
+                    "--list",
+                ],
             )
 
             existing_topics = set(result.output.decode("utf-8").strip().split("\\n"))
@@ -555,7 +560,12 @@ async def debug_kafka_state(
         # List all topics
         result = compose.exec_in_container(
             service_name="kafka",
-            command=["kafka-topics.sh", "--bootstrap-server", "localhost:9092", "--list"],
+            command=[
+                "/opt/kafka/bin/kafka-topics.sh",
+                "--bootstrap-server",
+                "localhost:9092",
+                "--list",
+            ],
         )
 
         if result.exit_code == 0:
@@ -569,7 +579,12 @@ async def debug_kafka_state(
         # Check consumer groups
         result = compose.exec_in_container(
             service_name="kafka",
-            command=["kafka-consumer-groups.sh", "--bootstrap-server", "localhost:9092", "--list"],
+            command=[
+                "/opt/kafka/bin/kafka-consumer-groups.sh",
+                "--bootstrap-server",
+                "localhost:9092",
+                "--list",
+            ],
         )
 
         if result.exit_code == 0:

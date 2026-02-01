@@ -102,7 +102,7 @@ pdm run dev-recreate <service_a> <service_b>
 
 ### 5.2. Dependency Order
 **MUST respect startup dependencies:**
-1. Infrastructure: `zookeeper`, `kafka`
+1. Infrastructure: `kafka`
 2. Topic Setup: `kafka_topic_setup`
 3. Core Services: `content_service`
 4. Dependent Services: All others

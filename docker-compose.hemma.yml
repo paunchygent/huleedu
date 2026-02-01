@@ -1,0 +1,39 @@
+# HuleEdu Platform Compose (Hemma)
+#
+# Intent:
+# - Align with Hemma's shared deployment model (Skriptoteket-style).
+# - Keep the public surface area limited to nginx-proxy routed services only.
+# - Avoid starting a competing HuleEdu observability stack on Hemma (use shared stack).
+#
+# Usage (Hemma):
+#   sudo docker compose -f docker-compose.hemma.yml -f docker-compose.prod.yml up -d
+#
+# Add localhost-only research services:
+#   sudo docker compose -f docker-compose.hemma.yml -f docker-compose.prod.yml -f docker-compose.hemma.research.yml up -d
+
+networks:
+  huleedu_internal_network:
+    driver: bridge
+
+volumes:
+  huleedu_content_store_data:
+  batch_orchestrator_db_data:
+  batch_conductor_db_data:
+  essay_lifecycle_db_data:
+  cj_assessment_db_data:
+  kafka_data:
+  redis_data:
+  class_management_db_data:
+  result_aggregator_db_data:
+  spellchecker_db_data:
+  file_service_db_data:
+  content_service_db_data:
+  nlp_db_data:
+  identity_db_data:
+  email_db_data:
+  entitlements_db_data:
+
+include:
+  - docker-compose.infrastructure.yml
+  - docker-compose.services.yml
+

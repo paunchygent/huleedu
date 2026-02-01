@@ -44,6 +44,23 @@ Interpretation:
 
 ## Resolution
 
+### Prefer non-snap Docker on Hemma (recommended)
+
+If `docker` is snap-installed on Hemma, host path mounts outside `$HOME` can be
+restricted (often breaking mounts from `/srv/*`). For HuleEdu we want predictable,
+data-disk-backed caches mounted directly from `/srv/scratch/...`, so a non-snap Docker
+Engine install is the most maintainable steady-state.
+
+Detect docker-snap:
+```bash
+ssh hemma 'command -v docker && ls -la "$(command -v docker)"'
+ssh hemma 'snap list docker || true'
+```
+
+If docker-snap is installed, migrate to Docker Engine using Docker’s official host
+install docs for your OS (Ubuntu is the common case). Verify mounts work by starting a
+container with a `/srv/scratch/...` bind mount and checking it reads/writes as expected.
+
 ### Standardize GPU workloads as Docker services
 
 Run Hemma workloads via Docker so they’re reproducible and easy to operate:

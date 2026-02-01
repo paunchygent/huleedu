@@ -38,6 +38,12 @@ curl -fsS http://127.0.0.1:19000/healthz
 
 ## Hemma: quick triage commands
 
+Docker install sanity (snap vs non-snap):
+```bash
+ssh hemma 'command -v docker && ls -la "$(command -v docker)"'
+ssh hemma 'snap list docker || true'
+```
+
 Containers:
 ```bash
 ssh hemma 'sudo docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"'
@@ -45,7 +51,7 @@ ssh hemma 'sudo docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"'
 
 LanguageTool logs:
 ```bash
-ssh hemma 'sudo docker logs --tail=200 -f huledu_language_tool_service'
+ssh hemma 'sudo docker logs --tail=200 -f huleedu_language_tool_service'
 ```
 
 ## GPU verification (ROCm)
@@ -69,7 +75,22 @@ Canonical Hemma checkout location (mirror Skriptoteket):
 Note: The local repo you are working from may still be named `huledu-reboot`, but Hemma
 should standardize on the future canonical repo name and path: `~/apps/huleedu`.
 
+Repo sync rule:
+- Use `git pull` on Hemma for tracked files.
+- Do **not** use `scp` to “sync” repo code (it creates drift). `scp` is only acceptable
+  for non-versioned secrets/artifacts (for example `.env`).
+
 Example (service rebuild/restart):
 ```bash
-ssh hemma 'cd ~/apps/huleedu && sudo docker compose up -d --build language_tool_service'
+ssh hemma 'cd ~/apps/huleedu && sudo docker compose -f docker-compose.hemma.yml -f docker-compose.prod.yml -f docker-compose.hemma.research.yml up -d --build language_tool_service'
+```
+
+Embedding offload deploy (ROCm/HIP, localhost-only, compose profile):
+```bash
+ssh hemma 'cd ~/apps/huleedu && sudo docker compose -f docker-compose.hemma.yml -f docker-compose.prod.yml -f docker-compose.hemma.research.yml --profile research-offload up -d --build essay_embed_offload'
+```
+
+Embedding offload deploy (script alternative; handles docker-snap mount workarounds):
+```bash
+ssh hemma 'cd ~/apps/huleedu && ./scripts/ml_training/essay_scoring/offload/hemma_offload_deploy.sh'
 ```

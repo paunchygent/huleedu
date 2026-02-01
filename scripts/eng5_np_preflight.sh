@@ -61,7 +61,7 @@ if [ -f .env ]; then
 fi
 
 # Try to list topics using kafka-topics.sh with --bootstrap-server
-if docker exec huleedu_kafka kafka-topics.sh --bootstrap-server localhost:9092 --list &>/dev/null; then
+if docker exec huleedu_kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list &>/dev/null; then
     print_pass "Kafka broker is reachable and responsive"
 else
     print_fail "Kafka broker not reachable. Check if Kafka container is running: docker compose -f docker-compose.yml -f docker-compose.dev.yml ps kafka"

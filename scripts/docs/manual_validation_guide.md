@@ -84,7 +84,7 @@ echo "Batch ID: $BATCH_ID"
 
 ```bash
 # List all Kafka topics
-docker-compose exec kafka kafka-topics.sh --bootstrap-server localhost:9092 --list | grep huleedu
+docker-compose exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list | grep huleedu
 
 # Expected topics should include:
 # huleedu.batch.essays.registered.v1
@@ -182,7 +182,7 @@ echo "Content Service Health: $(curl -s -w "%{http_code}" -o /dev/null http://lo
 docker-compose exec kafka kafka-broker-api-versions.sh --bootstrap-server localhost:9092
 
 # Check topic partitions
-docker-compose exec kafka kafka-topics.sh --bootstrap-server localhost:9092 --describe | grep huleedu
+docker-compose exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --describe | grep huleedu
 ```
 
 ## Phase 7: End-to-End Flow Validation

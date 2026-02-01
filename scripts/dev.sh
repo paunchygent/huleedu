@@ -61,10 +61,10 @@ expand_with_dependencies() {
     for svc in "${inputs[@]}"; do
         expanded+=("$svc")
         case "$svc" in
-            batch_orchestrator_service) expanded+=("batch_orchestrator_db" "kafka" "zookeeper") ;;
-            batch_conductor_service)    expanded+=("batch_conductor_db" "kafka" "zookeeper") ;;
-            essay_lifecycle_service)    expanded+=("essay_lifecycle_db" "kafka" "zookeeper") ;;
-            cj_assessment_service)      expanded+=("cj_assessment_db" "kafka" "zookeeper") ;;
+            batch_orchestrator_service) expanded+=("batch_orchestrator_db" "kafka") ;;
+            batch_conductor_service)    expanded+=("batch_conductor_db" "kafka") ;;
+            essay_lifecycle_service)    expanded+=("essay_lifecycle_db" "kafka") ;;
+            cj_assessment_service)      expanded+=("cj_assessment_db" "kafka") ;;
             class_management_service)   expanded+=("class_management_db") ;;
             file_service)               expanded+=("file_service_db") ;;
             content_service)            expanded+=("content_service_db") ;;

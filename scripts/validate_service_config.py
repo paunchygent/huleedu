@@ -167,7 +167,7 @@ class ConfigValidator:
             # This is a heuristic - services ending in _service often use Kafka
             if "service" in service_name and not has_kafka:
                 # Don't warn for services that clearly don't need Kafka
-                skip_kafka = ["db", "redis", "zookeeper", "jaeger", "topic_setup"]
+                skip_kafka = ["db", "redis", "jaeger", "topic_setup"]
                 if not any(skip in service_name for skip in skip_kafka):
                     self.info.append(
                         f"ℹ️  {service_name}: No Kafka configuration (may be intentional)"

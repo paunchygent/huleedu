@@ -55,8 +55,8 @@ services:
         condition: service_healthy
     networks:
       - huleedu_internal_network
-    ports:
-      - "8001:8000"
+    expose:
+      - "8000"
     volumes:
       - huleedu_content_store_data:/data/huleedu_content_store
     environment:
@@ -97,8 +97,8 @@ services:
         condition: service_healthy
     networks:
       - huleedu_internal_network
-    ports:
-      - "4003:4003"  # API port (metrics at /metrics)
+    expose:
+      - "4003"
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=${ENVIRONMENT:-production}
@@ -141,8 +141,8 @@ services:
         condition: service_healthy
     networks:
       - huleedu_internal_network
-    ports:
-      - "4002:4002"
+    expose:
+      - "4002"
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=${ENVIRONMENT:-production}
@@ -186,8 +186,8 @@ services:
         condition: service_healthy
     networks:
       - huleedu_internal_network
-    ports:
-      - "8002:8002"
+    expose:
+      - "8002"
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=${ENVIRONMENT:-production}
@@ -231,8 +231,8 @@ services:
         condition: service_healthy
     networks:
       - huleedu_internal_network
-    ports:
-      - "5001:5000"
+    expose:
+      - "5000"
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=${ENVIRONMENT:-production}
@@ -279,8 +279,8 @@ services:
         condition: service_healthy
     networks:
       - huleedu_internal_network
-    ports:
-      - "6001:6000"
+    expose:
+      - "6000"
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=${ENVIRONMENT:-production}
@@ -377,8 +377,8 @@ services:
         condition: service_healthy
     networks:
       - huleedu_internal_network
-    ports:
-      - "7001:7001"
+    expose:
+      - "7001"
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=${ENVIRONMENT:-production}
@@ -424,8 +424,8 @@ services:
         condition: service_healthy
     networks:
       - huleedu_internal_network
-    ports:
-      - "9095:9090"
+    expose:
+      - "9090"
     env_file:
       - .env
     environment:
@@ -482,8 +482,8 @@ services:
         condition: service_healthy
     networks:
       - huleedu_internal_network
-    ports:
-      - "8080:8080"
+    expose:
+      - "8080"
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=${ENVIRONMENT:-production}
@@ -529,8 +529,8 @@ services:
         condition: service_healthy
     networks:
       - huleedu_internal_network
-    ports:
-      - "5002:5002"
+    expose:
+      - "5002"
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=${ENVIRONMENT:-production}
@@ -575,8 +575,8 @@ services:
         condition: service_healthy
     networks:
       - huleedu_internal_network
-    ports:
-      - "8090:8080"
+    expose:
+      - "8080"
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=${ENVIRONMENT:-production}
@@ -642,8 +642,8 @@ services:
         condition: service_healthy
     networks:
       - huleedu_internal_network
-    ports:
-      - "8081:8080"
+    expose:
+      - "8080"
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=${ENVIRONMENT:-production}
@@ -727,8 +727,8 @@ services:
         condition: service_healthy
     networks:
       - huleedu_internal_network
-    ports:
-      - "7005:7005"  # HTTP API port
+    expose:
+      - "7005"
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=${ENVIRONMENT:-production}
@@ -785,8 +785,8 @@ services:
         condition: service_healthy
     networks:
       - huleedu_internal_network
-    ports:
-      - "8082:8080"  # HTTP API port (external 8082, internal 8080)
+    expose:
+      - "8080"
     environment:
       # Core environment
       - ENV_TYPE=docker
@@ -850,8 +850,8 @@ services:
         condition: service_healthy
     networks:
       - huleedu_internal_network
-    ports:
-      - "8083:8083"
+    expose:
+      - "8083"
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=${ENVIRONMENT:-production}
@@ -884,15 +884,10 @@ services:
       dockerfile: services/language_tool_service/Dockerfile
     container_name: huleedu_language_tool_service
     restart: unless-stopped
-    depends_on:
-      kafka_topic_setup:
-        condition: service_completed_successfully
-      redis:
-        condition: service_healthy
     networks:
       - huleedu_internal_network
-    ports:
-      - "8085:8085"
+    expose:
+      - "8085"
     environment:
       # Core environment
       - ENV_TYPE=docker
@@ -902,7 +897,6 @@ services:
       - LANGUAGE_TOOL_SERVICE_HTTP_PORT=8085
       - LANGUAGE_TOOL_SERVICE_HOST=0.0.0.0
       - LANGUAGE_TOOL_SERVICE_LOG_LEVEL=INFO
-      - LANGUAGE_TOOL_SERVICE_REDIS_URL=redis://redis:6379
       # LanguageTool configuration
       - LANGUAGE_TOOL_SERVICE_LANGUAGE_TOOL_PORT=8081
       - LANGUAGE_TOOL_SERVICE_LANGUAGE_TOOL_HEAP_SIZE=512m
@@ -934,8 +928,8 @@ services:
         condition: service_completed_successfully
     networks:
       - huleedu_internal_network
-    ports:
-      - "4101:4101"
+    expose:
+      - "4101"
     volumes:
       # Dev override: mount local frontend/dist for hot iteration
       # In CI/production, Dockerfile COPY provides the files

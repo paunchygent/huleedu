@@ -1,15 +1,15 @@
 # TASKS Index
 
-Generated: 2026-02-01T18:05:26
+Generated: 2026-02-01T22:25:26
 
 ## Summary
 
-- Total tasks indexed: 151
+- Total tasks indexed: 152
 - assessment: 69
 - content: 2
 - identity: 4
 - frontend: 2
-- infrastructure: 27
+- infrastructure: 28
 - security: 1
 - integrations: 14
 - architecture: 11
@@ -64,7 +64,7 @@ Generated: 2026-02-01T18:05:26
 - [Multi‑Tenancy Implementation (Weeks 5–8)](TASKS/assessment/multi-tenancy-implementation-plan.md) — `proposed`
 - [NLP LangTool whitebox essay scoring PR](TASKS/assessment/nlp_lang_tool/nlp-lang-tool-whitebox-essay-scoring-pr.md) — `proposed`
 - [NLP LangTool whitebox research build](TASKS/assessment/nlp_lang_tool/nlp-lang-tool-whitebox-research-build.md) — `in_progress`
-- [Offload DeBERTa + spaCy features to Hemma (binary embedding service)](TASKS/assessment/offload-deberta--spacy-features-to-hemma-binary-embedding-service.md) — `proposed`
+- [Offload DeBERTa + spaCy features to Hemma (binary embedding service)](TASKS/assessment/offload-deberta--spacy-features-to-hemma-binary-embedding-service.md) — `in_progress`
 - [PR-7 Phase-2 Resampling and Convergence Harness](TASKS/assessment/pr-7-phase-2-resampling-and-convergence-harness.md) — `in_progress`
 - [Propagate assignment_id from BOS to CJ request (Phase A)](TASKS/assessment/propagate-assignment-id-from-bos-to-cj-request-phase-a.md) — `done`
 - [Propagate assignment_id from CJ to RAS storage (Phase B)](TASKS/assessment/propagate-assignment-id-from-cj-to-ras-storage-phase-b.md) — `done`
@@ -102,7 +102,8 @@ Generated: 2026-02-01T18:05:26
 - [Vue 3 Teacher Dashboard Integration](TASKS/frontend/vue-3-teacher-dashboard-integration.md) — `in_progress`
 - [Implement semantic token architecture per ADR-0023](TASKS/frontend/implement-semantic-token-architecture-per-adr-0023.md) — `in_progress`
 
-### infrastructure (27)
+### infrastructure (28)
+- [Migrate Kafka infra to KRaft and align Hemma shared infra](TASKS/infrastructure/migrate-kafka-infra-to-kraft-and-align-hemma-shared-infra.md) — `in_progress`
 - [US-007.1 Shared Utilities Extraction](TASKS/infrastructure/us-0071-shared-utilities-extraction.md) — `done`
 - [US-007.2 Schema Consolidation](TASKS/infrastructure/us-0072-schema-consolidation.md) — `done`
 - [US-007.3 Creation Scripts](TASKS/infrastructure/us-0073-creation-scripts.md) — `done`
@@ -253,7 +254,7 @@ Generated: 2026-02-01T18:05:26
 - [US-007.2 Schema Consolidation](TASKS/infrastructure/us-0072-schema-consolidation.md) — `infrastructure`
 - [US-007.3 Creation Scripts](TASKS/infrastructure/us-0073-creation-scripts.md) — `infrastructure`
 
-### in_progress (33)
+### in_progress (35)
 - [Anchor Alignment Prompt Tuning Experiment](TASKS/assessment/anchor-alignment-prompt-tuning-experiment.md) — `assessment`
 - [BT SE batch quality indicators](TASKS/assessment/bt-se-batch-quality-indicators.md) — `assessment`
 - [BT SE Zero Anomaly and Anchor Inversions Investigation](TASKS/assessment/bt-se-zero-anomaly-and-anchor-inversions-investigation.md) — `assessment`
@@ -276,7 +277,9 @@ Generated: 2026-02-01T18:05:26
 - [LLM Provider Batch API Phase 2](TASKS/integrations/llm-provider-batch-api-phase-2.md) — `integrations`
 - [LLM Provider OpenAI GPT-5.x Reasoning Controls](TASKS/infrastructure/llm-provider-openai-gpt-5x-reasoning-controls.md) — `infrastructure`
 - [Lps Rate Limiting Implementation](TASKS/infrastructure/lps-rate-limiting-implementation.md) — `infrastructure`
+- [Migrate Kafka infra to KRaft and align Hemma shared infra](TASKS/infrastructure/migrate-kafka-infra-to-kraft-and-align-hemma-shared-infra.md) — `infrastructure`
 - [NLP LangTool whitebox research build](TASKS/assessment/nlp_lang_tool/nlp-lang-tool-whitebox-research-build.md) — `assessment`
+- [Offload DeBERTa + spaCy features to Hemma (binary embedding service)](TASKS/assessment/offload-deberta--spacy-features-to-hemma-binary-embedding-service.md) — `assessment`
 - [PDM pyproject.toml Migration to PEP 735](TASKS/infrastructure/pdm-pyproject-toml-migration-to-pep-735.md) — `infrastructure`
 - [Persist text_storage_id on file uploads and enable mock LLM for functional CJ](TASKS/infrastructure/persist-text-storage-id-on-file-uploads-and-enable-mock-llm-for-functional-cj.md) — `infrastructure`
 - [PR-7 Phase-2 Resampling and Convergence Harness](TASKS/assessment/pr-7-phase-2-resampling-and-convergence-harness.md) — `assessment`
@@ -292,7 +295,7 @@ Generated: 2026-02-01T18:05:26
 - [CJ Prompt Cache Benchmark & Warm-Up Validation](TASKS/assessment/cj-prompt-cache-benchmark.md) — `assessment`
 - [Refactor CJ Assessment Service for Compliance](TASKS/assessment/refactor-cj-assessment-service-for-compliance.md) — `assessment`
 
-### proposed (59)
+### proposed (58)
 - [90-Day Execution Roadmap (Alpha ➜ Beta)](TASKS/architecture/roadmap-90-day-execution.md) — `architecture`
 - [AI Feedback Service Implementation Task](TASKS/assessment/ai-feedback-service-implementation.md) — `assessment`
 - [API Productization & Docs (Weeks 8–10)](TASKS/assessment/api-productization-and-docs-plan.md) — `assessment`
@@ -326,7 +329,6 @@ Generated: 2026-02-01T18:05:26
 - [ML Training Pipeline for Essay Scoring Models](TASKS/infrastructure/ml-training-pipeline-for-essay-scoring-models.md) — `infrastructure`
 - [Multi‑Tenancy Implementation (Weeks 5–8)](TASKS/assessment/multi-tenancy-implementation-plan.md) — `assessment`
 - [NLP LangTool whitebox essay scoring PR](TASKS/assessment/nlp_lang_tool/nlp-lang-tool-whitebox-essay-scoring-pr.md) — `assessment`
-- [Offload DeBERTa + spaCy features to Hemma (binary embedding service)](TASKS/assessment/offload-deberta--spacy-features-to-hemma-binary-embedding-service.md) — `assessment`
 - [Phase 3 – CJ Confidence Programme Hub](TASKS/programs/cj_confidence/phase3-cj-confidence-hub.md) — `programs`
 - [PyInstaller Standalone Executables Plan](TASKS/assessment/pyinstaller-standalone-executables-plan.md) — `assessment`
 - [Redis Caching Solution for BCS Duplicate Calls - Updated Plan](TASKS/assessment/updated-plan.md) — `assessment`
@@ -370,8 +372,9 @@ Generated: 2026-02-01T18:05:26
 - [ENG5 Heavy CI Matrix and Healthcheck Tuning](TASKS/infrastructure/eng5-heavy-ci-matrix-and-healthcheck-tuning.md) — `infrastructure` · `proposed`
 - [LLM mock provider CJ behavioural parity tests](TASKS/infrastructure/llm-mock-provider-cj-behavioural-parity-tests.md) — `infrastructure` · `proposed`
 
-### huledu_alpha_launch (1)
+### huledu_alpha_launch (2)
 - [HuleEdu alpha launch programme hub](TASKS/programs/huledu_alpha_launch/hub.md) — `programs` · `in_progress`
+- [Migrate Kafka infra to KRaft and align Hemma shared infra](TASKS/infrastructure/migrate-kafka-infra-to-kraft-and-align-hemma-shared-infra.md) — `infrastructure` · `in_progress`
 
 ### maintenance (1)
 - [Refactor CJ Assessment Service for Compliance](TASKS/assessment/refactor-cj-assessment-service-for-compliance.md) — `assessment` · `paused`

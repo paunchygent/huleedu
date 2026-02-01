@@ -56,3 +56,11 @@ in this repo; for HuleEdu work we need runbooks that live under `docs/operations
 - `docs/decisions/0025-hemma-hosted-nlp-feature-offload-for-essay-scoring-research-binary-protocol.md`
 - `TASKS/infrastructure/huleedu-devops-codex-skill-for-hemma-server.md`
 - `TASKS/assessment/offload-deberta--spacy-features-to-hemma-binary-embedding-service.md`
+
+## Progress (2026-02-01)
+
+- Added docker sanity guidance for snap vs non-snap installs (mount restrictions from `/srv/*`).
+- Runbooks now recommend standardizing Hemma on a non-snap Docker Engine install for predictable
+  bind mounts from `/srv/scratch/...`.
+- Added a Hemma-specific compose layer `docker-compose.hemma.research.yml` to enforce localhost-only
+  binding for research/support services.

@@ -2,7 +2,7 @@
 id: offload-deberta--spacy-features-to-hemma-binary-embedding-service
 title: Offload DeBERTa + spaCy features to Hemma (binary embedding service)
 type: task
-status: proposed
+status: in_progress
 priority: high
 domain: assessment
 service: nlp_service
@@ -84,6 +84,18 @@ Implemented the first, embedding-focused slice end-to-end:
 Runbook updates:
 - `docs/operations/hemma-alpha-rollout-days-1-3.md`
 - `docs/operations/hemma-server-operations-huleedu.md`
+- `docs/operations/gpu-ai-workloads-on-hemma-huleedu.md`
+
+Dependency isolation (Hemma runtime images):
+- Added a dedicated `offload-runtime` dependency group (no training deps like XGBoost/SHAP).
+- Updated the offload Dockerfile to export only `offload-runtime` with `pdm export --no-default`.
+- Updated `hemma_offload_deploy.sh` to avoid hardcoding `/snap/bin/docker` and to adapt cache
+  mounts when docker-snap is detected.
+
+Hemma validation (2026-02-01):
+- `language_tool_service` is running and healthy on Hemma, bound to `127.0.0.1:8085`.
+- Embedding offload is running and healthy on Hemma, bound to `127.0.0.1:9000`.
+- Mac-side tunnels validated for both endpoints (ports `18085` and `19000`).
 
 Still TODO (next slices):
 - Add spaCy/TextDescriptives offload endpoints (Tier1/2/3) so the laptop can avoid spaCy RAM/CPU load.

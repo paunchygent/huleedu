@@ -91,8 +91,8 @@ ensure_infrastructure() {
 
     local needs_start=0
 
-    # Check kafka, zookeeper, redis
-    for service in kafka zookeeper redis; do
+    # Check kafka, redis
+    for service in kafka redis; do
         if is_service_running "$service"; then
             echo_info "$service is already running"
         else
@@ -103,7 +103,7 @@ ensure_infrastructure() {
 
     if [ $needs_start -eq 1 ]; then
         echo_runner "Starting infrastructure services..."
-        docker compose -f docker-compose.yml up -d kafka zookeeper redis
+        docker compose -f docker-compose.yml up -d kafka redis
 
         # Wait for kafka to be healthy
         if ! wait_for_healthy kafka 60; then

@@ -71,6 +71,21 @@ monorepo-tools = [
     "pytailwindcss",
 ]
 
+# Runtime dependencies for Hemma-hosted NLP offload containers.
+#
+# Intent:
+# - Keep Hemma runtime images slim (no training deps like XGBoost/SHAP).
+# - Allow Dockerfiles to export only this group (using `pdm export --no-default`).
+offload-runtime = [
+    "aiohttp",
+    "numpy",
+    "pydantic",
+    "pydantic-settings",
+    "protobuf",
+    "sentencepiece",
+    "transformers",
+]
+
 # Research/ML dependencies for the whitebox essay scoring pipeline
 ml-research = [
     "en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl",

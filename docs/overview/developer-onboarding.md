@@ -94,11 +94,11 @@ HULEEDU_SMTP_PORT=1025  # Use mailhog for local testing
 
 ### 4. Start Infrastructure Services
 
-Start Kafka, Zookeeper, Redis, and PostgreSQL containers:
+Start Kafka (KRaft), Redis, and PostgreSQL containers:
 
 ```bash
 # Start infrastructure only
-docker compose up -d kafka zookeeper redis
+docker compose up -d kafka redis
 
 # Verify infrastructure is running
 docker ps | grep huleedu

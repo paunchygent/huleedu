@@ -116,7 +116,7 @@ pdm run llm-mock-profile cj-generic-batch-api
 Use the automated wrapper script that handles infrastructure startup and health checks:
 
 ```bash
-# The script automatically ensures Kafka, Zookeeper, Redis, CJ, and LLM Provider are running
+# The script automatically ensures Kafka (KRaft), Redis, CJ, and LLM Provider are running
 pdm run eng5-runner \
   --mode execute \
   --batch-id eng5-execute-$(date +%Y%m%d-%H%M) \
@@ -133,7 +133,7 @@ pdm run eng5-runner --mode dry-run --batch-id eng5-dry --no-kafka
 ```
 
 The wrapper script (`scripts/run_eng5_np_runner.sh`) performs the following checks:
-1. Verifies Kafka, Zookeeper, and Redis are running (starts them if needed)
+1. Verifies Kafka and Redis are running (starts them if needed)
 2. Ensures Kafka topic setup has completed successfully
 3. Verifies CJ Assessment and LLM Provider services are healthy (starts them if needed)
 4. Runs the eng5_np_runner container with all arguments passed through

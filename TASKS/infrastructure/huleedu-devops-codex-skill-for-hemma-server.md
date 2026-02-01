@@ -56,3 +56,10 @@ For HuleEdu work we need a skill that:
 - `TASKS/infrastructure/hemma-operations-runbooks-huleedu--gpu.md`
 - `docs/operations/hemma-server-operations-huleedu.md`
 - `docs/operations/gpu-ai-workloads-on-hemma-huleedu.md`
+
+## Progress (2026-02-01)
+
+- Updated `scripts/codex_skills/huledu-devops-hemma/SKILL.md` with docker-snap detection commands
+  and the embedding offload deploy entrypoint.
+- Standardized Hemma deploy commands to layer `docker-compose.hemma.research.yml` so research/support
+  services remain localhost-only by default.

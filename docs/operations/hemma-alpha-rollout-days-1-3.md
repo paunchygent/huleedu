@@ -110,7 +110,7 @@ ssh hemma 'sudo docker exec -it shared-postgres psql -U postgres -c \"\\l\"'
 
 Use prod overrides on top of base compose:
 ```bash
-ssh hemma 'cd ~/apps/huleedu && sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build'
+ssh hemma 'cd ~/apps/huleedu && sudo docker compose -f docker-compose.hemma.yml -f docker-compose.prod.yml up -d --build'
 ```
 
 ### 6. Verify service health (container-level)
@@ -147,6 +147,11 @@ Hemma, then tunnel it to the dev machine.
 If the main HuleEdu stack is up, the service may already be running. Verify first:
 ```bash
 ssh hemma 'sudo docker ps --format \"table {{.Names}}\\t{{.Status}}\\t{{.Ports}}\" | rg \"language_tool\" || true'
+```
+
+Deploy with Hemma overrides to keep the service localhost-only on the host:
+```bash
+ssh hemma 'cd ~/apps/huleedu && sudo docker compose -f docker-compose.hemma.yml -f docker-compose.prod.yml -f docker-compose.hemma.research.yml up -d --build language_tool_service'
 ```
 
 ### 2. Health check on Hemma (localhost)
@@ -193,25 +198,38 @@ It returns embeddings as a binary `.npy` float32 matrix for throughput.
 
 ### 1. Build the image on Hemma
 
-CPU-only (works everywhere, but is not GPU accelerated):
+Recommended (compose profile; keeps it localhost-only by default):
 ```bash
-ssh hemma 'cd ~/apps/huleedu && sudo docker build -f scripts/ml_training/essay_scoring/offload/Dockerfile -t huleedu-essay-embed-offload:dev .'
+ssh hemma 'cd ~/apps/huleedu && sudo docker compose -f docker-compose.hemma.yml -f docker-compose.prod.yml -f docker-compose.hemma.research.yml --profile research-offload up -d --build essay_embed_offload'
 ```
 
-GPU (ROCm) build: override `BASE_IMAGE` to a ROCm-enabled PyTorch image available on Hemma.
+Recommended: use the repo script (handles ROCm base image + cache mounts):
+```bash
+ssh hemma 'cd ~/apps/huleedu && ./scripts/ml_training/essay_scoring/offload/hemma_offload_deploy.sh'
+```
+
+Manual alternative (keep for debugging):
+
+GPU (ROCm) build: use a ROCm-enabled PyTorch base image that already provides `torch`.
 ```bash
 ssh hemma 'cd ~/apps/huleedu && sudo docker build -f scripts/ml_training/essay_scoring/offload/Dockerfile --build-arg BASE_IMAGE=rocm/pytorch:latest -t huleedu-essay-embed-offload:dev .'
 ```
 
 ### 2. Run the container (localhost-only on Hemma)
 
+Recommended: the deploy script runs the container with `-p 127.0.0.1:9000:9000` and
+mounts a persistent Hugging Face cache.
+
+Manual alternative (keep for debugging):
 ```bash
 ssh hemma 'sudo docker rm -f huleedu_essay_embed_offload || true'
 ssh hemma 'sudo docker run -d --name huleedu_essay_embed_offload --restart unless-stopped \
   -p 127.0.0.1:9000:9000 \
   -e OFFLOAD_HTTP_PORT=9000 \
   -e OFFLOAD_TORCH_DEVICE=${OFFLOAD_TORCH_DEVICE:-cuda} \
-  -v huleedu_hf_cache:/root/.cache/huggingface \
+  -v /srv/scratch/huleedu/cache/huggingface:/cache/huggingface \
+  -e HF_HOME=/cache/huggingface \
+  -e TRANSFORMERS_CACHE=/cache/huggingface \
   huleedu-essay-embed-offload:dev'
 ```
 

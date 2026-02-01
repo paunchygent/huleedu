@@ -24,9 +24,24 @@ PORT="${PORT:-9000}"
 DATA_ROOT="${DATA_ROOT:-/srv/scratch/huleedu}"
 HF_CACHE_DATA_DISK="${HF_CACHE_DATA_DISK:-$DATA_ROOT/cache/huggingface}"
 
-# NOTE: On some Hemma setups Docker is snap-installed and cannot mount from /srv/*
-# directly. We bind-mount the data-disk directory into $HOME, then mount from there.
+DOCKER_BIN="${DOCKER_BIN:-$(command -v docker || true)}"
+if [ -z "$DOCKER_BIN" ] && [ -x /snap/bin/docker ]; then
+  DOCKER_BIN=/snap/bin/docker
+fi
+if [ -z "$DOCKER_BIN" ] || [ ! -x "$DOCKER_BIN" ]; then
+  echo "ERROR: docker binary not found. Set DOCKER_BIN explicitly." >&2
+  exit 1
+fi
+
+DOCKER_IS_SNAP=0
+case "$DOCKER_BIN" in
+  /snap/*) DOCKER_IS_SNAP=1 ;;
+esac
+
+# NOTE: If Docker is snap-installed, it may not be allowed to mount from /srv/*
+# directly. In that case we bind-mount the data-disk directory into $HOME first.
 HF_CACHE_HOME_MOUNT="${HF_CACHE_HOME_MOUNT:-$HOME/.data/huleedu/cache/huggingface}"
+HF_CACHE_HOST_FOR_DOCKER="$HF_CACHE_DATA_DISK"
 
 echo "== HuleEdu DeBERTa offload (ROCm/HIP) deploy =="
 echo "repo_root=$REPO_ROOT"
@@ -35,38 +50,41 @@ echo "container_name=$CONTAINER_NAME"
 echo "base_image=$BASE_IMAGE"
 echo "bind=$HOST_BIND:$PORT"
 echo "hf_cache_data_disk=$HF_CACHE_DATA_DISK"
-echo "hf_cache_home_mount=$HF_CACHE_HOME_MOUNT"
+echo "docker_bin=$DOCKER_BIN"
+echo "docker_is_snap=$DOCKER_IS_SNAP"
+echo "hf_cache_host_for_docker=$HF_CACHE_HOST_FOR_DOCKER"
 echo
 
 echo "== Stop any ROCm llama.cpp container (VRAM) =="
-if sudo /snap/bin/docker ps --format '{{.Names}}' | grep -qx "llama-server-rocm"; then
-  sudo /snap/bin/docker update --restart=no llama-server-rocm >/dev/null 2>&1 || true
-  sudo /snap/bin/docker stop llama-server-rocm
+if sudo "$DOCKER_BIN" ps --format '{{.Names}}' | grep -qx "llama-server-rocm"; then
+  sudo "$DOCKER_BIN" update --restart=no llama-server-rocm >/dev/null 2>&1 || true
+  sudo "$DOCKER_BIN" stop llama-server-rocm
 fi
 
-echo "== Update repo (ff-only) =="
 cd "$REPO_ROOT"
-git pull --ff-only
 
 echo "== Ensure HF cache dir on data disk =="
 sudo mkdir -p "$HF_CACHE_DATA_DISK"
 sudo chown -R "$(id -u):$(id -g)" "$DATA_ROOT" || true
 
-echo "== Bind-mount HF cache into home (for Docker volume mounts) =="
-mkdir -p "$HF_CACHE_HOME_MOUNT"
-sudo umount "$HF_CACHE_HOME_MOUNT" >/dev/null 2>&1 || true
-sudo mount --bind "$HF_CACHE_DATA_DISK" "$HF_CACHE_HOME_MOUNT"
+if [ "$DOCKER_IS_SNAP" -eq 1 ]; then
+  echo "== Bind-mount HF cache into home (docker-snap mount restrictions) =="
+  mkdir -p "$HF_CACHE_HOME_MOUNT"
+  sudo umount "$HF_CACHE_HOME_MOUNT" >/dev/null 2>&1 || true
+  sudo mount --bind "$HF_CACHE_DATA_DISK" "$HF_CACHE_HOME_MOUNT"
+  HF_CACHE_HOST_FOR_DOCKER="$HF_CACHE_HOME_MOUNT"
+fi
 
 echo "== Build image =="
-sudo /snap/bin/docker build \
+sudo "$DOCKER_BIN" build \
   -f scripts/ml_training/essay_scoring/offload/Dockerfile \
   --build-arg "BASE_IMAGE=$BASE_IMAGE" \
   -t "$IMAGE_TAG" \
   .
 
 echo "== Run container =="
-sudo /snap/bin/docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
-sudo /snap/bin/docker run -d \
+sudo "$DOCKER_BIN" rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
+sudo "$DOCKER_BIN" run -d \
   --name "$CONTAINER_NAME" \
   --restart unless-stopped \
   -p "$HOST_BIND:$PORT:$PORT" \
@@ -77,7 +95,7 @@ sudo /snap/bin/docker run -d \
   --shm-size 8g \
   -e HF_HOME=/cache/huggingface \
   -e TRANSFORMERS_CACHE=/cache/huggingface \
-  -v "$HF_CACHE_HOME_MOUNT:/cache/huggingface" \
+  -v "$HF_CACHE_HOST_FOR_DOCKER:/cache/huggingface" \
   "$IMAGE_TAG"
 
 echo "== Wait for healthz =="
@@ -91,7 +109,7 @@ curl -fsS "http://127.0.0.1:$PORT/healthz"
 echo
 
 echo "== GPU sanity (ROCm/HIP uses torch.cuda) =="
-sudo /snap/bin/docker exec "$CONTAINER_NAME" python - <<'PY'
+sudo "$DOCKER_BIN" exec "$CONTAINER_NAME" python - <<'PY'
 import torch
 
 print("torch", torch.__version__)

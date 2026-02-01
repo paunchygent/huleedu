@@ -212,7 +212,9 @@ Verify:
 1. Hemma canonical repo location for HuleEdu (to be chosen).
 2. Whether HuleEdu should share Skriptoteket’s nginx-proxy container and companion
    directly, or run its own proxy stack (default: share).
-3. Monorepo dependency build strategy:
+3. Whether Hemma should standardize on a non-snap Docker Engine install to avoid host
+   mount restrictions from `/srv/scratch/...` (recommended: yes).
+4. Monorepo dependency build strategy:
    - current deps-image approach vs splitting out ML dependencies into separate images
    - reducing “build everything all the time” behavior for server deploys
 

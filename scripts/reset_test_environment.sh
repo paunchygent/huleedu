@@ -13,15 +13,15 @@ docker compose exec redis redis-cli FLUSHALL
 
 # Delete all Kafka topics related to the test
 echo "🗑️ Deleting Kafka topics..."
-docker compose exec kafka kafka-topics.sh --bootstrap-server localhost:9092 --delete --topic huleedu.essay.spellcheck.completed.v1 || true
-docker compose exec kafka kafka-topics.sh --bootstrap-server localhost:9092 --delete --topic huleedu.essay.spellcheck.requested.v1 || true
-docker compose exec kafka kafka-topics.sh --bootstrap-server localhost:9092 --delete --topic huleedu.cj_assessment.completed.v1 || true
-docker compose exec kafka kafka-topics.sh --bootstrap-server localhost:9092 --delete --topic huleedu.batch.essays.registered.v1 || true
-docker compose exec kafka kafka-topics.sh --bootstrap-server localhost:9092 --delete --topic huleedu.file.essay.content.provisioned.v1 || true
-docker compose exec kafka kafka-topics.sh --bootstrap-server localhost:9092 --delete --topic huleedu.els.batch.essays.ready.v1 || true
-docker compose exec kafka kafka-topics.sh --bootstrap-server localhost:9092 --delete --topic huleedu.els.batch.phase.outcome.v1 || true
-docker compose exec kafka kafka-topics.sh --bootstrap-server localhost:9092 --delete --topic huleedu.els.spellcheck.initiate.command.v1 || true
-docker compose exec kafka kafka-topics.sh --bootstrap-server localhost:9092 --delete --topic huleedu.batch.cj_assessment.initiate.command.v1 || true
+docker compose exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --delete --topic huleedu.essay.spellcheck.completed.v1 || true
+docker compose exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --delete --topic huleedu.essay.spellcheck.requested.v1 || true
+docker compose exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --delete --topic huleedu.cj_assessment.completed.v1 || true
+docker compose exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --delete --topic huleedu.batch.essays.registered.v1 || true
+docker compose exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --delete --topic huleedu.file.essay.content.provisioned.v1 || true
+docker compose exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --delete --topic huleedu.els.batch.essays.ready.v1 || true
+docker compose exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --delete --topic huleedu.els.batch.phase.outcome.v1 || true
+docker compose exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --delete --topic huleedu.els.spellcheck.initiate.command.v1 || true
+docker compose exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --delete --topic huleedu.batch.cj_assessment.initiate.command.v1 || true
 
 # Wait for deletion to complete
 sleep 5

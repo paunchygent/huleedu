@@ -52,7 +52,14 @@ def delete_topic(topic: str) -> bool:
     """Delete a single Kafka topic."""
     print(f"Deleting topic: {topic}")
     success, output = run_kafka_command(
-        ["kafka-topics.sh", "--bootstrap-server", "localhost:9092", "--delete", "--topic", topic]
+        [
+            "/opt/kafka/bin/kafka-topics.sh",
+            "--bootstrap-server",
+            "localhost:9092",
+            "--delete",
+            "--topic",
+            topic,
+        ]
     )
     if success:
         print("  ✓ Deleted successfully")
@@ -66,7 +73,7 @@ def create_topic(topic: str, partitions: int = 3, replication_factor: int = 1) -
     print(f"Creating topic: {topic}")
     success, output = run_kafka_command(
         [
-            "kafka-topics.sh",
+            "/opt/kafka/bin/kafka-topics.sh",
             "--bootstrap-server",
             "localhost:9092",
             "--create",
@@ -93,7 +100,7 @@ def main():
 
     # Check if Kafka is running
     success, output = run_kafka_command(
-        ["kafka-topics.sh", "--bootstrap-server", "localhost:9092", "--list"]
+        ["/opt/kafka/bin/kafka-topics.sh", "--bootstrap-server", "localhost:9092", "--list"]
     )
 
     if not success:
@@ -130,7 +137,7 @@ def main():
     # Verify final state
     print("\n📋 Final topic list:")
     success, output = run_kafka_command(
-        ["kafka-topics.sh", "--bootstrap-server", "localhost:9092", "--list"]
+        ["/opt/kafka/bin/kafka-topics.sh", "--bootstrap-server", "localhost:9092", "--list"]
     )
     if success:
         topics = sorted([t for t in output.strip().split("\n") if t.startswith("huleedu.")])

@@ -51,6 +51,8 @@ services:
       - ./libs/common_core/src:/app/libs/common_core/src:cached
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/batch_orchestrator_service/__pycache__
+    ports:
+      - "5001:5000"
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=development
@@ -91,6 +93,8 @@ services:
       - ./libs/common_core/src:/app/libs/common_core/src:cached
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/essay_lifecycle_service/__pycache__
+    ports:
+      - "6001:6000"
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=development
@@ -111,6 +115,8 @@ services:
       - ./libs/common_core/src:/app/libs/common_core/src:cached
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/class_management_service/__pycache__
+    ports:
+      - "5002:5002"
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=development
@@ -131,6 +137,8 @@ services:
       - ./libs/common_core/src:/app/libs/common_core/src:cached
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/batch_conductor_service/__pycache__
+    ports:
+      - "4002:4002"
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=development
@@ -152,6 +160,8 @@ services:
       - ./libs/common_core/src:/app/libs/common_core/src:cached
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/llm_provider_service/__pycache__
+    ports:
+      - "8090:8080"
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=development
@@ -172,6 +182,8 @@ services:
       - ./libs/common_core/src:/app/libs/common_core/src:cached
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/api_gateway_service/__pycache__
+    ports:
+      - "8080:8080"
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=development
@@ -192,6 +204,8 @@ services:
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - ./frontend/dist:/app/static:ro
       - /app/services/bff_teacher_service/__pycache__
+    ports:
+      - "4101:4101"
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=development
@@ -212,6 +226,8 @@ services:
       - ./libs/common_core/src:/app/libs/common_core/src:cached
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/result_aggregator_service/__pycache__
+    ports:
+      - "4003:4003"  # API port (metrics at /metrics)
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=development
@@ -232,6 +248,8 @@ services:
       - ./libs/common_core/src:/app/libs/common_core/src:cached
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/websocket_service/__pycache__
+    ports:
+      - "8081:8080"
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=development
@@ -249,6 +267,8 @@ services:
       - ./libs/common_core/src:/app/libs/common_core/src:cached
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/cj_assessment_service/__pycache__
+    ports:
+      - "9095:9090"
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=development
@@ -271,6 +291,8 @@ services:
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - ./libs/huleedu_nlp_shared/src:/app/libs/huleedu_nlp_shared/src:cached
       - /app/services/spellchecker_service/__pycache__
+    ports:
+      - "8002:8002"
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=development
@@ -289,6 +311,8 @@ services:
       - ./libs/common_core/src:/app/libs/common_core/src:cached
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/file_service/__pycache__
+    ports:
+      - "7001:7001"
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=development
@@ -309,6 +333,8 @@ services:
       - ./libs/common_core/src:/app/libs/common_core/src:cached
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/content_service/__pycache__
+    ports:
+      - "8001:8000"
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=development
@@ -327,6 +353,8 @@ services:
       - ./libs/common_core/src:/app/libs/common_core/src:cached
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/identity_service/__pycache__
+    ports:
+      - "7005:7005"  # HTTP API port
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=development
@@ -350,6 +378,8 @@ services:
       - ./libs/common_core/src:/app/libs/common_core/src:cached
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/email_service/__pycache__
+    ports:
+      - "8082:8080"  # HTTP API port (external 8082, internal 8080)
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=development
@@ -381,6 +411,8 @@ services:
       - ./libs/common_core/src:/app/libs/common_core/src:cached
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/entitlements_service/__pycache__
+    ports:
+      - "8083:8083"
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=development
@@ -408,6 +440,8 @@ services:
       - ./libs/common_core/src:/app/libs/common_core/src:cached
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/language_tool_service/__pycache__
+    ports:
+      - "8085:8085"
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=development
