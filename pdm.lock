@@ -5,7 +5,7 @@
 groups = ["default", "dev", "ml-research", "monorepo-tools"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:08825de99b508ea0a313432675b0c8832eb9989736e34e61972b245c857c1625"
+content_hash = "sha256:4fc0341775856229f106eb70127e88a6e54e312603c793fe277ac43bd24195f7"
 
 [[metadata.targets]]
 requires_python = ">=3.11,<3.13"
@@ -3926,7 +3926,7 @@ name = "protobuf"
 version = "6.33.5"
 requires_python = ">=3.9"
 summary = ""
-groups = ["dev"]
+groups = ["dev", "ml-research"]
 files = [
     {file = "protobuf-6.33.5-cp310-abi3-win32.whl", hash = "sha256:d71b040839446bac0f4d162e758bea99c8251161dae9d0983a3b88dee345153b"},
     {file = "protobuf-6.33.5-cp310-abi3-win_amd64.whl", hash = "sha256:3093804752167bcab3998bec9f1048baae6e29505adaf1afd14a37bddede533c"},
