@@ -36,8 +36,8 @@ RUN pdm export -G ml-research -f requirements --without-hashes -o /tmp/requireme
     # PDM export may include environment markers; match package name prefix (not full line).
     grep -Ev '^(torch|torchvision|torchaudio)\b' /tmp/requirements.txt \
       | grep -Ev '^triton\b' \
-      | grep -Ev '^nvidia-' \
-      | grep -Ev '^cuda-' \
+      | grep -Ev '^nvidia[-_]' \
+      | grep -Ev '^cuda[-_]' \
       > /tmp/requirements.filtered.txt && \
     python -m pip install --no-cache-dir -r /tmp/requirements.filtered.txt
 
