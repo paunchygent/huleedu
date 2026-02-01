@@ -33,12 +33,17 @@ COPY scripts/ml_training/essay_scoring/ scripts/ml_training/essay_scoring/
 
 # Install locked deps from `ml-research`, but exclude torch* so the base image stays authoritative.
 RUN pdm export -G ml-research -f requirements --without-hashes -o /tmp/requirements.txt && \
-    grep -Ev '^(torch|torchvision|torchaudio)==.*$' /tmp/requirements.txt > /tmp/requirements.no-torch.txt && \
-    python -m pip install --no-cache-dir -r /tmp/requirements.no-torch.txt
+    # PDM export may include environment markers; match package name prefix (not full line).
+    grep -Ev '^(torch|torchvision|torchaudio)\b' /tmp/requirements.txt \
+      | grep -Ev '^(triton)\b' \
+      | grep -Ev '^(nvidia-)\b' \
+      | grep -Ev '^(cuda-)\b' \
+      > /tmp/requirements.filtered.txt && \
+    python -m pip install --no-cache-dir -r /tmp/requirements.filtered.txt
 
 # Quick sanity printout (helpful in build logs on Hemma).
 RUN python -c "import torch; print('torch', torch.__version__); print('hip', getattr(torch.version, 'hip', None)); print('cuda_is_available', torch.cuda.is_available())"
 
 EXPOSE 9000
 
-CMD ["pdm", "run", "-p", "/app", "python", "-m", "scripts.ml_training.essay_scoring.offload.server"]
+CMD ["python", "-m", "scripts.ml_training.essay_scoring.offload.server"]
