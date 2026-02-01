@@ -53,12 +53,12 @@ class TaskDomain(str, Enum):
 class TaskType(str, Enum):
     """Allowed task type categories for TASKS frontmatter.
 
-    Keep this list in sync with TASKS/_REORGANIZATION_PROPOSAL.md and TASKS/README.md.
+    Keep this list in sync with TASKS/_REORGANIZATION_PROPOSAL.md and
+    docs/reference/ref-tasks-overview.md.
     """
 
     task = "task"
     story = "story"
-    doc = "doc"
     programme = "programme"
 
 

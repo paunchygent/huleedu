@@ -1,18 +1,18 @@
 # TASKS Index
 
-Generated: 2026-02-01T17:38:18
+Generated: 2026-02-01T18:05:26
 
 ## Summary
 
-- Total tasks indexed: 153
+- Total tasks indexed: 151
 - assessment: 69
 - content: 2
 - identity: 4
 - frontend: 2
-- infrastructure: 28
+- infrastructure: 27
 - security: 1
 - integrations: 14
-- architecture: 12
+- architecture: 11
 - other: 21 (integration, programs)
 
 ## By Domain
@@ -102,7 +102,7 @@ Generated: 2026-02-01T17:38:18
 - [Vue 3 Teacher Dashboard Integration](TASKS/frontend/vue-3-teacher-dashboard-integration.md) — `in_progress`
 - [Implement semantic token architecture per ADR-0023](TASKS/frontend/implement-semantic-token-architecture-per-adr-0023.md) — `in_progress`
 
-### infrastructure (28)
+### infrastructure (27)
 - [US-007.1 Shared Utilities Extraction](TASKS/infrastructure/us-0071-shared-utilities-extraction.md) — `done`
 - [US-007.2 Schema Consolidation](TASKS/infrastructure/us-0072-schema-consolidation.md) — `done`
 - [US-007.3 Creation Scripts](TASKS/infrastructure/us-0073-creation-scripts.md) — `done`
@@ -130,7 +130,6 @@ Generated: 2026-02-01T17:38:18
 - [PDM pyproject.toml Migration to PEP 735](TASKS/infrastructure/pdm-pyproject-toml-migration-to-pep-735.md) — `in_progress`
 - [Persist text_storage_id on file uploads and enable mock LLM for functional CJ](TASKS/infrastructure/persist-text-storage-id-on-file-uploads-and-enable-mock-llm-for-functional-cj.md) — `in_progress`
 - [SLOs, Alerts, and Runbooks (Weeks 7–9)](TASKS/infrastructure/slo-alerts-and-runbooks-plan.md) — `proposed`
-- [Infrastructure & Orchestration Tasks README](TASKS/infrastructure/README.md) — `done`
 
 ### security (1)
 - [Compliance Operationalization: GDPR/FERPA (Weeks 3–7)](TASKS/security/compliance-gdpr-ferpa-operationalization-plan.md) — `proposed`
@@ -151,7 +150,7 @@ Generated: 2026-02-01T17:38:18
 - [TASKS Directory Inventory Analysis](TASKS/integrations/task-inventory-analysis.md) — `proposed`
 - [✅ COMPLETED (2025-11-12)](TASKS/integrations/cj-prompt-context-persistence-plan.md) — `proposed`
 
-### architecture (12)
+### architecture (11)
 - [90-Day Execution Roadmap (Alpha ➜ Beta)](TASKS/architecture/roadmap-90-day-execution.md) — `proposed`
 - [Align TASKS and docs lifecycle v2](TASKS/architecture/align-tasks-and-docs-lifecycle-v2.md) — `done`
 - [Backend-For-Frontend (BFF) Pattern — Adoption & Rollout Plan](TASKS/architecture/bff-pattern-adoption-and-rollout-plan.md) — `proposed`
@@ -163,7 +162,6 @@ Generated: 2026-02-01T17:38:18
 - [Research plan: richer mock LLM provider](TASKS/architecture/research-plan-richer-mock-llm-provider.md) — `proposed`
 - [Service Readme Standardization](TASKS/architecture/service-readme-standardization.md) — `archived`
 - [Unscoped Items](TASKS/architecture/unscoped-items.md) — `archived`
-- [TASKS README](TASKS/README.md) — `done`
 
 ### integration (1)
 - [BFF Dashboard Service Implementation](TASKS/integrations/bff-dashboard-service-implementation.md) — `done`
@@ -226,7 +224,7 @@ Generated: 2026-02-01T17:38:18
 - [Frontend Live Data Integration](TASKS/programs/teacher_dashboard_integration/frontend-live-data-integration.md) — `programs`
 - [WebSocket Batch Updates](TASKS/programs/teacher_dashboard_integration/websocket-batch-updates.md) — `programs`
 
-### done (29)
+### done (27)
 - [Add Database Metrics Instrumentation to Remaining Services](TASKS/infrastructure/add-database-metrics-instrumentation-to-remaining-services.md) — `infrastructure`
 - [Align TASKS and docs lifecycle v2](TASKS/architecture/align-tasks-and-docs-lifecycle-v2.md) — `architecture`
 - [API Gateway batch listing endpoint tests](TASKS/identity/api-gateway-batch-listing-endpoint-tests.md) — `identity`
@@ -243,14 +241,12 @@ Generated: 2026-02-01T17:38:18
 - [Fix Anchor Essay Infrastructure](TASKS/assessment/fix-anchor-essay-infrastructure.md) — `assessment`
 - [Fix Cj Anchor Finalization Monitoring](TASKS/assessment/fix-cj-anchor-finalization-monitoring.md) — `assessment`
 - [Fix Cj Llm Prompt Construction](TASKS/assessment/fix-cj-llm-prompt-construction.md) — `assessment`
-- [Infrastructure & Orchestration Tasks README](TASKS/infrastructure/README.md) — `infrastructure`
 - [Llm Batch Strategy Serial Bundle](TASKS/integrations/llm-batch-strategy-serial-bundle.md) — `integrations`
 - [LLM Provider Anthropic thinking controls](TASKS/infrastructure/llm-provider-anthropic-thinking-controls.md) — `infrastructure`
 - [MyPy Configuration Investigation and Consolidation](TASKS/infrastructure/mypy-configuration-investigation-and-consolidation.md) — `infrastructure`
 - [Propagate assignment_id from BOS to CJ request (Phase A)](TASKS/assessment/propagate-assignment-id-from-bos-to-cj-request-phase-a.md) — `assessment`
 - [Propagate assignment_id from CJ to RAS storage (Phase B)](TASKS/assessment/propagate-assignment-id-from-cj-to-ras-storage-phase-b.md) — `assessment`
 - [RAS Processing Phase Derivation](TASKS/programs/teacher_dashboard_integration/ras-processing-phase-derivation.md) — `programs`
-- [TASKS README](TASKS/README.md) — `architecture`
 - [US-005.1: Callback-driven continuation and safe completion gating](TASKS/assessment/us-0051-callback-driven-continuation-and-safe-completion-gating.md) — `assessment`
 - [US-005.6: BatchMonitor Separation of Concerns](TASKS/assessment/batchmonitor-separation-of-concerns.md) — `assessment`
 - [US-007.1 Shared Utilities Extraction](TASKS/infrastructure/us-0071-shared-utilities-extraction.md) — `infrastructure`

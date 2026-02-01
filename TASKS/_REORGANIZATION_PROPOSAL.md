@@ -1,8 +1,8 @@
 # HuleEdu TASKS Structure Specification
 
-> NOTE: The canonical human-facing overview for `TASKS/` lives in `TASKS/README.md`.
+> NOTE: The canonical human-facing overview for `TASKS/` lives in `docs/reference/ref-tasks-overview.md`.
 > This specification is the machine-oriented, detailed version of the same rules
-> and should not diverge from the README.
+> and should not diverge from the reference doc.
 
 ## 1. Purpose
 
@@ -99,7 +99,7 @@ Every task or programme-related file under `TASKS/` (excluding this spec and gen
 ---
 id: task-id-or-hub-id          # Globally unique identifier (kebab-case, matches filename)
 title: Short, factual title
-type: task                     # One of: task | story | doc | programme
+type: task                     # One of: task | story | programme
 status: proposed               # One of: proposed | in_review | approved | blocked | in_progress | done | paused | archived
 priority: medium               # One of: low | medium | high | critical
 domain: assessment             # One of: assessment | content | identity | frontend | infrastructure | security | integrations | architecture | programs

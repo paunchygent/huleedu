@@ -36,6 +36,8 @@ EXCLUDED_FILES = {
 def should_skip(path: Path) -> bool:
     if path.name in EXCLUDED_FILES:
         return True
+    if "archive" in path.parts:
+        return True
     return False
 
 

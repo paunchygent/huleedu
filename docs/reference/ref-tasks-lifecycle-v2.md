@@ -15,6 +15,8 @@ topic: task-lifecycle
 Define a lean, agent-first workflow for work items in `TASKS/`, and keep
 research/reviews as explicit documentation artifacts in `docs/`.
 
+Note: `type: doc` is intentionally not used in `TASKS/` (docs belong under `docs/`).
+
 ## Canonical statuses
 
 Work item `status` is a work-state enum (not a document category):

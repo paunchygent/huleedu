@@ -2,7 +2,7 @@
 id: tasks-readme
 title: TASKS README
 type: doc
-status: done
+status: archived
 priority: medium
 domain: architecture
 service: ''
@@ -16,7 +16,11 @@ labels: []
 ---
 # HuleEdu TASKS – Canonical Overview
 
-This README is the canonical entrypoint for the `TASKS/` tree. It aligns with
+**Archived copy (2026-02-01).** Canonical overview now lives in:
+
+- `docs/reference/ref-tasks-overview.md`
+
+This README was previously the canonical entrypoint for the `TASKS/` tree. It aligns with
 the formal structure spec in `_REORGANIZATION_PROPOSAL.md`, the task
 frontmatter schema, and the validation scripts under `scripts/task_mgmt/`.
 

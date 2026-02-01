@@ -2,7 +2,7 @@
 id: infrastructure-readme
 title: Infrastructure & Orchestration Tasks README
 type: doc
-status: done
+status: archived
 priority: medium
 domain: infrastructure
 service: ''
@@ -15,6 +15,10 @@ related: []
 labels: []
 ---
 # Infrastructure & Orchestration Tasks
+
+**Archived copy (2026-02-01).** Canonical reference now lives in:
+
+- `docs/reference/ref-infrastructure-tasks-how-we-track-platform-work.md`
 
 This directory contains task documents related to platform infrastructure, service orchestration, CI/CD, and cross-cutting operational concerns.
 

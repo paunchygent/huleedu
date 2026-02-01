@@ -102,6 +102,9 @@ Master navigation across all project documentation.
 
 | Document | Purpose |
 |----------|---------|
+| [reference/ref-tasks-overview.md](reference/ref-tasks-overview.md) | TASKS structure + frontmatter overview |
+| [reference/ref-tasks-lifecycle-v2.md](reference/ref-tasks-lifecycle-v2.md) | Story review gate + `done` status |
+| [reference/ref-infrastructure-tasks-how-we-track-platform-work.md](reference/ref-infrastructure-tasks-how-we-track-platform-work.md) | What belongs in TASKS/infrastructure + queries |
 | [reference/apis/API_REFERENCE.md](reference/apis/API_REFERENCE.md) | Complete API documentation |
 | [reference/apis/WEBSOCKET_API_DOCUMENTATION.md](reference/apis/WEBSOCKET_API_DOCUMENTATION.md) | WebSocket event schemas |
 | [reference/apis/api-gateway-openapi.json](reference/apis/api-gateway-openapi.json) | OpenAPI 3.0 specification |
@@ -152,6 +155,7 @@ All services have comprehensive README documentation:
 |----------|---------|
 | [TASKS/INDEX.md](../TASKS/INDEX.md) | Generated task index by domain/status |
 | [TASKS/programs/](../TASKS/programs/) | Programme hubs for multi-team initiatives |
+| [docs/reference/ref-tasks-overview.md](reference/ref-tasks-overview.md) | Human-facing TASKS overview (canonical) |
 | [.claude/work/session/handoff.md](../.claude/work/session/handoff.md) | Current session context and active work |
 
 ---

@@ -2,7 +2,7 @@
 id: bff-vue-3-frontend-integration-design
 title: Designing a BFF Layer for Vue 3 Frontend Integration
 type: doc
-status: proposed
+status: archived
 priority: high
 domain: integration
 service: ''
@@ -14,6 +14,10 @@ last_updated: '2026-02-01'
 related: []
 labels: []
 ---
+
+**Archived copy (2026-02-01).** Canonical research doc now lives in:
+
+- `docs/research/bff-vue-3-frontend-integration-design.md`
 
 Implementing a Backend-for-Frontend (BFF) layer will bridge the event-driven microservices backend with the Vue 3 frontend. Below we detail the optimal BFF architecture and patterns for our scenario, addressing five key design decisions. This design builds on our existing infrastructure (API Gateway, WebSocket service, OpenAPI specs, etc.) and defines how per-role BFF services will provide tailored APIs to the Vue app.
 
