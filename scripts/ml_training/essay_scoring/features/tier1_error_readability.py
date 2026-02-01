@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
+import logging
 import urllib.error
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
 
 import language_tool_python
 from spacy.language import Language
@@ -22,6 +27,11 @@ from scripts.ml_training.essay_scoring.features.utils import (
     tokenize_sentences,
     tokenize_words,
 )
+from scripts.ml_training.essay_scoring.logging_utils import ProgressLogger
+
+logger = logging.getLogger(__name__)
+
+_CACHE_SCHEMA_VERSION = 1
 
 
 @dataclass
@@ -33,6 +43,9 @@ class Tier1FeatureExtractor:
     nlp: Language | None = None
     language_tool_url: str | None = None
     request_timeout_s: float = 60.0
+    language_tool_cache_dir: Path | None = None
+    language_tool_max_concurrency: int = 10
+    language_tool_request_options: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
         self._tool = None
@@ -43,10 +56,84 @@ class Tier1FeatureExtractor:
         else:
             ensure_textdescriptives_readability(self.nlp)
 
+        if self.language_tool_url is not None and self.language_tool_cache_dir is None:
+            self.language_tool_cache_dir = Path("output/essay_scoring/.cache/offload_language_tool")
+
     def extract(self, text: str) -> Tier1Features:
         """Extract Tier 1 features from essay text."""
 
         cleaned = normalize_whitespace(text)
+        stats = self._compute_text_stats(cleaned)
+        grammar_count, spelling_count, punctuation_count = self._error_counts(cleaned)
+        return self._build_features(
+            stats=stats,
+            grammar_count=grammar_count,
+            spelling_count=spelling_count,
+            punctuation_count=punctuation_count,
+        )
+
+    def extract_batch(self, texts: list[str]) -> list[Tier1Features]:
+        """Extract Tier 1 features for a batch of texts.
+
+        If `language_tool_url` is configured, LanguageTool calls are executed in parallel
+        (bounded by `language_tool_max_concurrency`) while spaCy/readability stays
+        single-threaded.
+        """
+
+        if not texts:
+            return []
+
+        cleaned_texts = [normalize_whitespace(text) for text in texts]
+        progress = ProgressLogger(logger, "Tier1", len(cleaned_texts))
+
+        if self.language_tool_url is None:
+            features: list[Tier1Features] = []
+            for index, cleaned in enumerate(cleaned_texts):
+                logger.info(
+                    "Tier1 item %d/%d start (chars=%d)", index + 1, len(texts), len(cleaned)
+                )
+                stats = self._compute_text_stats(cleaned)
+                grammar_count, spelling_count, punctuation_count = self._error_counts(cleaned)
+                features.append(
+                    self._build_features(
+                        stats=stats,
+                        grammar_count=grammar_count,
+                        spelling_count=spelling_count,
+                        punctuation_count=punctuation_count,
+                    )
+                )
+                progress.update(index)
+            return features
+
+        max_workers = max(1, int(self.language_tool_max_concurrency))
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            futures = [pool.submit(self._remote_error_counts, cleaned) for cleaned in cleaned_texts]
+
+            stats_by_index: list[dict[str, float]] = []
+            for index, cleaned in enumerate(cleaned_texts):
+                logger.info(
+                    "Tier1 item %d/%d start (chars=%d)", index + 1, len(texts), len(cleaned)
+                )
+                stats_by_index.append(self._compute_text_stats(cleaned))
+                progress.update(index)
+
+            counts_by_index = [future.result() for future in futures]
+
+        features = []
+        for stats, (grammar_count, spelling_count, punctuation_count) in zip(
+            stats_by_index, counts_by_index, strict=True
+        ):
+            features.append(
+                self._build_features(
+                    stats=stats,
+                    grammar_count=grammar_count,
+                    spelling_count=spelling_count,
+                    punctuation_count=punctuation_count,
+                )
+            )
+        return features
+
+    def _compute_text_stats(self, cleaned: str) -> dict[str, float]:
         words = tokenize_words(cleaned, self.nlp)
         sentences = tokenize_sentences(cleaned, self.nlp)
         word_count = float(len(words))
@@ -56,26 +143,44 @@ class Tier1FeatureExtractor:
         ttr = safe_divide(len(set(token.lower() for token in words)), word_count)
         avg_word_length = safe_divide(sum(len(token) for token in words), word_count)
 
-        grammar_count, spelling_count, punctuation_count = self._error_counts(cleaned)
-
         if self.nlp is None:
             raise RuntimeError("spaCy pipeline not initialized for Tier 1 extractor.")
 
         doc = self.nlp(cleaned)
         readability = doc._.readability
 
+        return {
+            "word_count": float(word_count),
+            "avg_sentence_length": float(avg_sentence_length),
+            "ttr": float(ttr),
+            "avg_word_length": float(avg_word_length),
+            "flesch_kincaid": float(readability["flesch_kincaid_grade"]),
+            "smog": float(readability["smog"]),
+            "coleman_liau": float(readability["coleman_liau_index"]),
+            "ari": float(readability["automated_readability_index"]),
+        }
+
+    @staticmethod
+    def _build_features(
+        *,
+        stats: dict[str, float],
+        grammar_count: float,
+        spelling_count: float,
+        punctuation_count: float,
+    ) -> Tier1Features:
+        word_count = stats["word_count"]
         return Tier1Features(
             grammar_density=density_per_100_words(grammar_count, word_count),
             spelling_density=density_per_100_words(spelling_count, word_count),
             punctuation_density=density_per_100_words(punctuation_count, word_count),
-            flesch_kincaid=float(readability["flesch_kincaid_grade"]),
-            smog=float(readability["smog"]),
-            coleman_liau=float(readability["coleman_liau_index"]),
-            ari=float(readability["automated_readability_index"]),
-            avg_sentence_length=float(avg_sentence_length),
-            ttr=float(ttr),
-            word_count=float(word_count),
-            avg_word_length=float(avg_word_length),
+            flesch_kincaid=stats["flesch_kincaid"],
+            smog=stats["smog"],
+            coleman_liau=stats["coleman_liau"],
+            ari=stats["ari"],
+            avg_sentence_length=stats["avg_sentence_length"],
+            ttr=stats["ttr"],
+            word_count=word_count,
+            avg_word_length=stats["avg_word_length"],
         )
 
     def _error_counts(self, text: str) -> tuple[float, float, float]:
@@ -107,32 +212,10 @@ class Tier1FeatureExtractor:
         return grammar_count, spelling_count, punctuation_count
 
     def _remote_error_counts(self, text: str) -> tuple[float, float, float]:
-        url = self.language_tool_url.rstrip("/") + "/v1/check"
-        payload = {"text": text, "language": self.language}
-        data = json.dumps(payload).encode("utf-8")
-        request = urllib.request.Request(
-            url,
-            data=data,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
+        response, derived = self._remote_check_cached(text)
+        if derived is not None:
+            return derived
 
-        try:
-            with urllib.request.urlopen(request, timeout=self.request_timeout_s) as resp:
-                status = getattr(resp, "status", 200)
-                body = resp.read()
-        except urllib.error.HTTPError as exc:
-            detail = exc.read().decode("utf-8", errors="replace")
-            raise RuntimeError(
-                f"LanguageTool offload HTTP error status={exc.code} body={detail}"
-            ) from exc
-        except urllib.error.URLError as exc:
-            raise RuntimeError(f"LanguageTool offload connection error: {exc}") from exc
-
-        if status != 200:
-            raise RuntimeError(f"LanguageTool offload returned status={status} bytes={len(body)}")
-
-        response = json.loads(body.decode("utf-8"))
         errors = response.get("errors", [])
 
         grammar_count = 0.0
@@ -156,6 +239,156 @@ class Tier1FeatureExtractor:
                 grammar_count += 1
 
         return grammar_count, spelling_count, punctuation_count
+
+    def _remote_check_cached(
+        self, text: str
+    ) -> tuple[dict[str, Any], tuple[float, float, float] | None]:
+        if self.language_tool_url is None:
+            raise RuntimeError("LanguageTool URL not configured for remote checks.")
+
+        request_options = self.language_tool_request_options or {}
+        cache_path = self._cache_path(text=text, request_options=request_options)
+        if cache_path is not None and cache_path.exists():
+            try:
+                cached = json.loads(cache_path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                cached = None
+            if isinstance(cached, dict):
+                response = cached.get("response")
+                derived_counts = cached.get("derived_counts")
+                if isinstance(response, dict) and isinstance(derived_counts, dict):
+                    grammar = float(derived_counts.get("grammar", 0.0))
+                    spelling = float(derived_counts.get("spelling", 0.0))
+                    punctuation = float(derived_counts.get("punctuation", 0.0))
+                    return response, (grammar, spelling, punctuation)
+
+        response = self._fetch_remote_language_tool_response(
+            text=text, request_options=request_options
+        )
+        derived = self._derive_counts(response.get("errors", []))
+        if cache_path is not None:
+            self._write_cache(
+                cache_path=cache_path,
+                text=text,
+                request_options=request_options,
+                response=response,
+                derived_counts=derived,
+            )
+        return response, derived
+
+    def _fetch_remote_language_tool_response(
+        self, *, text: str, request_options: dict[str, Any]
+    ) -> dict[str, Any]:
+        url = self.language_tool_url.rstrip("/") + "/v1/check"
+        payload: dict[str, Any] = {"text": text, "language": self.language}
+        payload.update(request_options)
+        data = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+        request = urllib.request.Request(
+            url,
+            data=data,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+
+        try:
+            with urllib.request.urlopen(request, timeout=self.request_timeout_s) as resp:
+                status = getattr(resp, "status", 200)
+                body = resp.read()
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")
+            raise RuntimeError(
+                f"LanguageTool offload HTTP error status={exc.code} body={detail}"
+            ) from exc
+        except urllib.error.URLError as exc:
+            raise RuntimeError(f"LanguageTool offload connection error: {exc}") from exc
+
+        if status != 200:
+            raise RuntimeError(f"LanguageTool offload returned status={status} bytes={len(body)}")
+
+        response = json.loads(body.decode("utf-8"))
+        if not isinstance(response, dict):
+            raise RuntimeError(f"LanguageTool offload returned invalid JSON type={type(response)}")
+        return response
+
+    @staticmethod
+    def _derive_counts(errors: object) -> tuple[float, float, float]:
+        if not isinstance(errors, list):
+            return 0.0, 0.0, 0.0
+
+        grammar_count = 0.0
+        spelling_count = 0.0
+        punctuation_count = 0.0
+
+        for error in errors:
+            if not isinstance(error, dict):
+                continue
+            category_id = str(error.get("category_id") or error.get("category") or "").upper()
+            rule_id = str(error.get("rule_id") or "").upper()
+
+            if "PUNCT" in category_id or "PUNCT" in rule_id:
+                punctuation_count += 1
+            elif (
+                category_id in {"TYPOS", "SPELLING", "TYPOGRAPHY", "MISSPELLING"}
+                or "SPELL" in category_id
+            ):
+                spelling_count += 1
+            else:
+                grammar_count += 1
+
+        return grammar_count, spelling_count, punctuation_count
+
+    def _cache_path(self, *, text: str, request_options: dict[str, Any]) -> Path | None:
+        if self.language_tool_cache_dir is None:
+            return None
+
+        self.language_tool_cache_dir.mkdir(parents=True, exist_ok=True)
+
+        text_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
+        key_payload = {
+            "schema_version": _CACHE_SCHEMA_VERSION,
+            "language_tool_url": self.language_tool_url,
+            "language": self.language,
+            "request_timeout_s": self.request_timeout_s,
+            "request_options": request_options,
+            "text_sha256": text_hash,
+        }
+        key_bytes = json.dumps(
+            key_payload, separators=(",", ":"), ensure_ascii=False, sort_keys=True
+        ).encode("utf-8")
+        cache_key = hashlib.sha256(key_bytes).hexdigest()
+        return self.language_tool_cache_dir / f"{cache_key}.json"
+
+    def _write_cache(
+        self,
+        *,
+        cache_path: Path,
+        text: str,
+        request_options: dict[str, Any],
+        response: dict[str, Any],
+        derived_counts: tuple[float, float, float],
+    ) -> None:
+        grammar_count, spelling_count, punctuation_count = derived_counts
+        payload = {
+            "schema_version": _CACHE_SCHEMA_VERSION,
+            "language_tool_url": self.language_tool_url,
+            "language": self.language,
+            "request_timeout_s": self.request_timeout_s,
+            "request_options": request_options,
+            "text_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+            "text_chars": len(text),
+            "derived_counts": {
+                "grammar": grammar_count,
+                "spelling": spelling_count,
+                "punctuation": punctuation_count,
+            },
+            "response": response,
+        }
+        tmp_path = cache_path.with_suffix(".tmp")
+        tmp_path.write_text(
+            json.dumps(payload, ensure_ascii=False, separators=(",", ":")),
+            encoding="utf-8",
+        )
+        tmp_path.replace(cache_path)
 
     @staticmethod
     def _category_name(match: object) -> str:

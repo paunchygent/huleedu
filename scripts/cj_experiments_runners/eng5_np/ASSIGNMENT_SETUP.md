@@ -272,7 +272,6 @@ docker compose -f docker-compose.yml -f docker-compose.eng5-runner.yml run --rm 
   --mode execute \
   --assignment-id eng5-np-batch-20250110 \
   --course-id 22222222-2222-2222-2222-222222222222 \
-  --grade-scale eng5_np_legacy_9_step \
   --batch-id eng5-20250110-001 \
   --verbose
 ```
@@ -280,6 +279,10 @@ docker compose -f docker-compose.yml -f docker-compose.eng5-runner.yml run --rm 
 **Required Parameters:**
 - `--assignment-id`: Must match the `assignment_id` created in Step 1
 - `--course-id`: Course identifier for metadata
+
+**Grade scale**:
+- The runner resolves `grade_scale` from CJ `assessment_instructions` (source of truth).
+- Optional assertion: add `--expected-grade-scale eng5_np_legacy_9_step` to fail fast if CJ is configured differently.
 
 You may optionally supply a **batching mode hint** for observability-only via:
 

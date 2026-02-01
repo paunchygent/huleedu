@@ -90,6 +90,16 @@ class OffloadConfig(BaseModel):
         default=Path("output/essay_scoring/.cache/offload_embeddings"),
         description="Disk cache for per-text embedding vectors (Mac-side).",
     )
+    language_tool_cache_dir: Path = Field(
+        default=Path("output/essay_scoring/.cache/offload_language_tool"),
+        description="Disk cache for per-text LanguageTool responses (Mac-side).",
+    )
+    language_tool_max_concurrency: int = Field(
+        default=10,
+        ge=1,
+        le=64,
+        description="Max concurrent LanguageTool offload HTTP requests (Mac-side).",
+    )
 
 
 class ExperimentConfig(BaseModel):

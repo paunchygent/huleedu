@@ -177,6 +177,9 @@ cat > ~/bin/hemma-huleedu-tunnel <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
 
+# LaunchAgents default PATH does not include Homebrew.
+export PATH="/opt/homebrew/bin:/usr/local/bin:${PATH}"
+
 HOST=hemma
 PID_DIR="${HOME}/.cache/hemma-huleedu-tunnel"
 
@@ -211,6 +214,16 @@ start_tunnel() {
 
   echo $! > "$pid_file"
   echo "▶ Started ${name} tunnel (localhost:${local_port} -> hemma:${remote_port})"
+}
+
+start_launchd() {
+  exec autossh -M 0 -N \
+    -o "ServerAliveInterval=30" \
+    -o "ServerAliveCountMax=3" \
+    -o "ExitOnForwardFailure=yes" \
+    -L ${LT_LOCAL_PORT}:localhost:${LT_REMOTE_PORT} \
+    -L ${EMBED_LOCAL_PORT}:localhost:${EMBED_REMOTE_PORT} \
+    ${HOST}
 }
 
 stop_tunnel() {
@@ -253,6 +266,9 @@ case "${1:-start}" in
   start)
     start_tunnel $LT_LOCAL_PORT $LT_REMOTE_PORT "language-tool-service"
     start_tunnel $EMBED_LOCAL_PORT $EMBED_REMOTE_PORT "essay-embed-offload"
+    ;;
+  start-launchd)
+    start_launchd
     ;;
   start-language-tool)
     start_tunnel $LT_LOCAL_PORT $LT_REMOTE_PORT "language-tool-service"
@@ -305,10 +321,17 @@ cat > ~/Library/LaunchAgents/com.hemma.huleedu-tunnel.plist <<'XML'
     <key>ProgramArguments</key>
     <array>
         <string>/Users/YOUR_USERNAME/bin/hemma-huleedu-tunnel</string>
-        <string>start</string>
+        <string>start-launchd</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
     <key>StandardOutPath</key>
     <string>/tmp/hemma-huleedu-tunnel.log</string>
     <key>StandardErrorPath</key>
@@ -326,6 +349,7 @@ Note: replace `YOUR_USERNAME` with your macOS username (e.g. `/Users/olofs_mba/.
 Verify locally:
 ```bash
 curl -fsS http://127.0.0.1:18085/healthz
+curl -fsS http://127.0.0.1:19000/healthz
 ```
 
 Manual one-off alternative:

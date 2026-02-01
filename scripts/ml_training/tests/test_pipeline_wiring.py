@@ -33,6 +33,9 @@ class DummyTier1:
             avg_word_length=11.0,
         )
 
+    def extract_batch(self, texts: list[str]) -> list[Tier1Features]:
+        return [self.extract(text) for text in texts]
+
 
 class DummyTier2:
     def extract(self, text: str, prompt: str) -> Tier2Features:
@@ -47,6 +50,9 @@ class DummyTier2:
             intro_prompt_sim=8.0,
             min_para_relevance=9.0,
         )
+
+    def extract_batch(self, texts: list[str], prompts: list[str]) -> list[Tier2Features]:
+        return [self.extract(text, prompt) for text, prompt in zip(texts, prompts, strict=True)]
 
 
 class DummyTier3:

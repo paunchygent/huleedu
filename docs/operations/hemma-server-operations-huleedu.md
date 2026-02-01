@@ -123,11 +123,17 @@ setup from:
 - `docs/operations/hemma-alpha-rollout-days-1-3.md`
 
 ```bash
-# Start both tunnels (LanguageTool + embeddings)
+# Start both tunnels (manual; if you did not install the LaunchAgent)
 ~/bin/hemma-huleedu-tunnel start
 
 # Check status
 ~/bin/hemma-huleedu-tunnel status
+```
+
+If you installed the LaunchAgent, prefer managing it via `launchctl` (it runs
+`start-launchd` + `KeepAlive`):
+```bash
+launchctl print gui/$(id -u)/com.hemma.huleedu-tunnel | rg "state =|last exit code"
 ```
 
 Manual one-off alternative (dedicated terminal tab):

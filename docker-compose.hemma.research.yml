@@ -42,6 +42,7 @@ services:
       - OFFLOAD_HTTP_HOST=0.0.0.0
       - OFFLOAD_HTTP_PORT=9000
       - OFFLOAD_TORCH_DEVICE=${OFFLOAD_TORCH_DEVICE:-cuda}
+      - OFFLOAD_EMBEDDING_BATCH_SIZE=${OFFLOAD_EMBEDDING_BATCH_SIZE:-32}
       # Optional: Hugging Face auth token to avoid rate limiting during model downloads.
       # Set in Hemma prod `.env` as `HF_TOKEN=...` (do not commit).
       - HF_TOKEN=${HF_TOKEN:-}

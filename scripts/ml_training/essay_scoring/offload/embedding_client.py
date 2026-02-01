@@ -8,11 +8,14 @@ import json
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
+from typing import Iterable
 
 import numpy as np
 
 from scripts.ml_training.essay_scoring.config import EmbeddingConfig, OffloadConfig
 from scripts.ml_training.essay_scoring.features.protocols import EmbeddingExtractorProtocol
+
+_MAX_EMBEDDING_REQUEST_BYTES = 900_000
 
 
 @dataclass(frozen=True)
@@ -47,7 +50,7 @@ class RemoteEmbeddingClient(EmbeddingExtractorProtocol):
 
         fetched: np.ndarray | None = None
         if missing_texts:
-            fetched = self._fetch_embeddings(missing_texts)
+            fetched = self._fetch_embeddings_batched(missing_texts)
             if fetched.shape[0] != len(missing_texts):
                 raise RuntimeError(
                     "Offload embedding server returned unexpected row count "
@@ -65,15 +68,70 @@ class RemoteEmbeddingClient(EmbeddingExtractorProtocol):
             output[index] = cached_rows[index]
         return output
 
+    def _fetch_embeddings_batched(self, texts: list[str]) -> np.ndarray:
+        arrays: list[np.ndarray] = []
+        for chunk in self._iter_embedding_chunks(texts):
+            arrays.append(self._fetch_embeddings(chunk))
+
+        if not arrays:
+            return np.empty((0, 0), dtype=np.float32)
+
+        return np.vstack(arrays).astype(np.float32, copy=False)
+
+    def _iter_embedding_chunks(self, texts: list[str]) -> Iterable[list[str]]:
+        if not texts:
+            return
+
+        max_payload_bytes = _MAX_EMBEDDING_REQUEST_BYTES
+
+        base_payload = {
+            "texts": [],
+            "model_name": self.embedding_config.model_name,
+            "max_length": self.embedding_config.max_length,
+        }
+        base_bytes = len(
+            json.dumps(base_payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+        )
+
+        chunk: list[str] = []
+        chunk_interior_bytes = 0
+
+        for text in texts:
+            text_bytes = len(
+                json.dumps(text, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+            )
+
+            if base_bytes + text_bytes > max_payload_bytes:
+                raise RuntimeError(
+                    "Single text too large for embedding offload request "
+                    f"bytes={base_bytes + text_bytes} limit={max_payload_bytes}"
+                )
+
+            candidate_interior_bytes = chunk_interior_bytes
+            if chunk:
+                candidate_interior_bytes += 1  # comma separator
+            candidate_interior_bytes += text_bytes
+
+            if base_bytes + candidate_interior_bytes > max_payload_bytes and chunk:
+                yield chunk
+                chunk = [text]
+                chunk_interior_bytes = text_bytes
+                continue
+
+            chunk.append(text)
+            chunk_interior_bytes = candidate_interior_bytes
+
+        if chunk:
+            yield chunk
+
     def _fetch_embeddings(self, texts: list[str]) -> np.ndarray:
         url = self.base_url.rstrip("/") + "/v1/embed"
         payload = {
             "texts": texts,
             "model_name": self.embedding_config.model_name,
             "max_length": self.embedding_config.max_length,
-            "batch_size": self.embedding_config.batch_size,
         }
-        data = json.dumps(payload).encode("utf-8")
+        data = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
         request = urllib.request.Request(
             url,
             data=data,

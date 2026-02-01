@@ -26,12 +26,18 @@ class Tier1ExtractorProtocol(Protocol):
     def extract(self, text: str) -> Tier1Features:
         """Extract Tier 1 features from a single essay."""
 
+    def extract_batch(self, texts: list[str]) -> list[Tier1Features]:
+        """Extract Tier 1 features for a batch of essays."""
+
 
 class Tier2ExtractorProtocol(Protocol):
     """Protocol for Tier 2 feature extraction."""
 
     def extract(self, text: str, prompt: str) -> Tier2Features:
         """Extract Tier 2 features from a single essay and prompt."""
+
+    def extract_batch(self, texts: list[str], prompts: list[str]) -> list[Tier2Features]:
+        """Extract Tier 2 features for a batch of essays and prompts."""
 
 
 class Tier3ExtractorProtocol(Protocol):

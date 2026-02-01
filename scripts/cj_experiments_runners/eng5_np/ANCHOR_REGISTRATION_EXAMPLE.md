@@ -171,7 +171,7 @@ docker compose -f docker-compose.yml -f docker-compose.eng5-runner.yml run --rm 
   --mode execute \
   --assignment-id eng5-role-models-2025 \
   --course-id 33333333-3333-3333-3333-333333333333 \
-  --grade-scale eng5_np_legacy_9_step \
+  --expected-grade-scale eng5_np_legacy_9_step \
   --batch-id role-models-batch-001 \
   --max-comparisons 50 \
   --verbose
@@ -221,7 +221,7 @@ docker compose -f docker-compose.yml -f docker-compose.eng5-runner.yml run --rm 
   --mode execute \
   --assignment-id eng5-role-models-2025 \
   --course-id 33333333-3333-3333-3333-333333333333 \
-  --grade-scale eng5_np_legacy_9_step \
+  --expected-grade-scale eng5_np_legacy_9_step \
   --batch-id role-models-batch-002 \
   --verbose
 ```

@@ -16,7 +16,7 @@ class OffloadServerSettings(BaseSettings):
 
     OFFLOAD_EMBEDDING_MODEL_NAME: str = Field(default="microsoft/deberta-v3-base")
     OFFLOAD_EMBEDDING_MAX_LENGTH: int = Field(default=512, ge=8, le=4096)
-    OFFLOAD_EMBEDDING_BATCH_SIZE: int = Field(default=8, ge=1, le=256)
+    OFFLOAD_EMBEDDING_BATCH_SIZE: int = Field(default=32, ge=1, le=256)
     OFFLOAD_TORCH_DEVICE: str | None = Field(
         default=None,
         description="Optional torch device override (e.g. 'cuda', 'cpu').",

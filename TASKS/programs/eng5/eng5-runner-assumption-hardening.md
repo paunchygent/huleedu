@@ -7,7 +7,7 @@ priority: high
 domain: programs
 owner_team: agents
 created: '2025-11-21'
-last_updated: '2025-11-30'
+last_updated: '2026-02-01'
 service: ''
 owner: ''
 program: ''
@@ -27,7 +27,7 @@ labels: []
 
 ## Status
 
-**IN PROGRESS** – Awaiting ENG5 anchor verification + runner implementation kickoff
+**IN PROGRESS** – R3 grade-scale ownership + preflight implemented; R4/R5/R7 pending
 
 ## Context
 
@@ -52,11 +52,19 @@ Recent validation exposed several incorrect ENG5 runner assumptions that mask co
 
 ## Immediate Next Actions
 
-1. Implement Checkpoint 2 (R3) by wiring CJ assignment metadata lookups into `plan/execute/register-anchors`, surfacing slug + grade_scale, and hard-failing unknown assignments before Kafka publication.
-2. Implement Checkpoint 3 (R4/R5) to remove automatic anchor uploads, add a CJ anchor preflight, and introduce `--auto-extract-eng5-db` tied to `--await-completion`, including smoke coverage.
+1. Implement Checkpoint 3 (R4) to remove automatic anchor uploads and add a CJ anchor preflight (anchors as CJ-managed precondition).
+2. Implement Checkpoint 3 (R5) to introduce `--auto-extract-eng5-db` tied to `--await-completion`, including smoke coverage.
 3. Complete Checkpoint 4 (R6) by documenting grade-scale ownership in CJ, updating ENG5 examples accordingly, and filing any CJ-side follow-ups discovered during the research pass.
 4. Complete Checkpoint 5 (R7 Phase 1–2) by documenting the current essay-upload flow, then adding manifest-level caching with a `--force-reupload` override plus unit coverage.
 5. Run and analyse dedicated ENG5 anchor alignment experiments using `ANCHOR_ALIGN_TEST` with language-control prompts and Sonnet 4.5, feeding findings back into runner defaults and CJ prompt configuration.
+
+## Progress (2026-02-01) – Grade Scale Ownership (R3)
+
+- Runner now treats CJ `assessment_instructions.grade_scale` as source of truth:
+  - Removed `--grade-scale` and replaced it with `--expected-grade-scale` (assertion only).
+  - Added CJ admin preflight (`GET /admin/v1/assessment-instructions/assignment/{assignment_id}`) to resolve and echo `grade_scale` for `plan`/`dry-run`/`execute` when `--assignment-id` is provided.
+- Tests:
+  - `pdm run pytest-root scripts/tests/test_eng5_np_assignment_preflight.py` ✅
 
 ## Progress (2025-11-30) – ENG5 Anchor Alignment Experiment
 

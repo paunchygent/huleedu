@@ -5,12 +5,13 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import numpy as np
 import spacy
-from sentence_transformers import SentenceTransformer
 from spacy.language import Language
 
+from scripts.ml_training.essay_scoring.features.protocols import EmbeddingExtractorProtocol
 from scripts.ml_training.essay_scoring.features.schema import Tier2Features
 from scripts.ml_training.essay_scoring.features.utils import (
     cosine_similarity,
@@ -18,6 +19,9 @@ from scripts.ml_training.essay_scoring.features.utils import (
     split_paragraphs,
     variance,
 )
+
+if TYPE_CHECKING:
+    from sentence_transformers import SentenceTransformer
 
 CLAUSE_DEPS = {"ccomp", "xcomp", "advcl", "relcl", "csubj", "csubjpass"}
 CONNECTIVES = {
@@ -43,12 +47,13 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class Tier2FeatureExtractor:
-    """Extract Tier 2 features using spaCy and sentence-transformers."""
+    """Extract Tier 2 features using spaCy and sentence embeddings."""
 
     spacy_model: str = "en_core_web_sm"
-    sentence_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     nlp: Language | None = None
-    embedder: SentenceTransformer | None = None
+    embedding_extractor: EmbeddingExtractorProtocol | None = None
+    sentence_model: str = "sentence-transformers/all-MiniLM-L6-v2"
+    local_embedder: "SentenceTransformer | None" = None
 
     def __post_init__(self) -> None:
         if self.nlp is None:
@@ -59,50 +64,132 @@ class Tier2FeatureExtractor:
                     "spaCy model not available. Install with: python -m spacy download "
                     f"{self.spacy_model}"
                 ) from exc
-        if self.embedder is None:
-            self.embedder = SentenceTransformer(self.sentence_model)
+        if self.embedding_extractor is None and self.local_embedder is None:
+            from sentence_transformers import SentenceTransformer  # noqa: PLC0415
+
+            self.local_embedder = SentenceTransformer(self.sentence_model)
+
+    def extract_batch(self, texts: list[str], prompts: list[str]) -> list[Tier2Features]:
+        """Extract Tier 2 features for a batch of essays and prompts.
+
+        If `embedding_extractor` is provided, all sentence/prompt embedding operations are
+        executed via that extractor (e.g. Hemma offload) to avoid local torch instability.
+        """
+
+        if not texts:
+            return []
+        if len(texts) != len(prompts):
+            raise ValueError(
+                "Tier2 extract_batch requires texts and prompts to have the same length "
+                f"texts={len(texts)} prompts={len(prompts)}"
+            )
+        if self.nlp is None:
+            raise RuntimeError("spaCy pipeline not initialized for Tier 2 extractor.")
+
+        # Stage 1: parse + deterministic syntactic features.
+        syntactic_rows: list[dict[str, float]] = []
+        sentence_texts_by_index: list[list[str]] = []
+        paragraphs_by_index: list[list[str]] = []
+
+        for text, prompt, doc in zip(texts, prompts, self.nlp.pipe(texts), strict=True):
+            sentences = list(doc.sents)
+            sentence_texts = [sent.text.strip() for sent in sentences if sent.text.strip()]
+            sentence_texts_by_index.append(sentence_texts)
+
+            paragraphs = split_paragraphs(text)
+            paragraphs_by_index.append(paragraphs)
+
+            parse_depth = self._average_parse_depth(sentences)
+            clause_count = float(sum(1 for token in doc if token.dep_ in CLAUSE_DEPS))
+            passive_ratio = self._passive_ratio(doc)
+            dep_distance = self._dependency_distance(doc)
+            connective_diversity = self._connective_diversity(text)
+
+            syntactic_rows.append(
+                {
+                    "parse_tree_depth": parse_depth,
+                    "clause_count": clause_count,
+                    "passive_ratio": passive_ratio,
+                    "dep_distance": dep_distance,
+                    "connective_diversity": connective_diversity,
+                    "prompt_len": float(len(prompt)),
+                }
+            )
+
+        # Stage 2: embed in one (or a few) large batches to avoid thousands of small requests.
+        unique_texts: list[str] = []
+        index_by_text: dict[str, int] = {}
+
+        def _add(text: str) -> None:
+            if text in index_by_text:
+                return
+            index_by_text[text] = len(unique_texts)
+            unique_texts.append(text)
+
+        for text, prompt, sentence_texts, paragraphs in zip(
+            texts, prompts, sentence_texts_by_index, paragraphs_by_index, strict=True
+        ):
+            _add(text)
+            _add(prompt)
+            for sent in sentence_texts:
+                _add(sent)
+            for para in paragraphs:
+                _add(para)
+
+        logger.info("Tier2 embeddings start (unique_texts=%d)", len(unique_texts))
+        start = time.monotonic()
+        embedding_matrix = self._embed_texts(unique_texts, normalize_embeddings=False)
+        elapsed = time.monotonic() - start
+        logger.info(
+            "Tier2 embeddings complete (shape=%s) in %.2fs", embedding_matrix.shape, elapsed
+        )
+
+        # Stage 3: per-essay embedding-derived features.
+        features: list[Tier2Features] = []
+        for index, (text, prompt, sentence_texts, paragraphs, row) in enumerate(
+            zip(
+                texts,
+                prompts,
+                sentence_texts_by_index,
+                paragraphs_by_index,
+                syntactic_rows,
+                strict=True,
+            )
+        ):
+            sent_similarity_variance = self._sentence_similarity_variance_from_embeddings(
+                sentence_texts, embedding_matrix, index_by_text
+            )
+            prompt_similarity, intro_prompt_sim, min_para_relevance = (
+                self._prompt_relevance_from_embeddings(
+                    text=text,
+                    prompt=prompt,
+                    paragraphs=paragraphs,
+                    embedding_matrix=embedding_matrix,
+                    index_by_text=index_by_text,
+                )
+            )
+            features.append(
+                Tier2Features(
+                    parse_tree_depth=row["parse_tree_depth"],
+                    clause_count=row["clause_count"],
+                    passive_ratio=row["passive_ratio"],
+                    dep_distance=row["dep_distance"],
+                    connective_diversity=row["connective_diversity"],
+                    sent_similarity_variance=sent_similarity_variance,
+                    prompt_similarity=prompt_similarity,
+                    intro_prompt_sim=intro_prompt_sim,
+                    min_para_relevance=min_para_relevance,
+                )
+            )
+            if (index + 1) % 100 == 0 or index == len(texts) - 1:
+                logger.info("Tier2 progress %d/%d", index + 1, len(texts))
+
+        return features
 
     def extract(self, text: str, prompt: str) -> Tier2Features:
         """Extract Tier 2 features from essay text and prompt."""
 
-        logger.info("Tier2 spaCy parse start (chars=%d)", len(text))
-        start = time.monotonic()
-        doc = self.nlp(text)
-        sentences = list(doc.sents)
-        elapsed = time.monotonic() - start
-        logger.info("Tier2 spaCy parse complete (%.2fs, sentences=%d)", elapsed, len(sentences))
-        sentence_texts = [sent.text.strip() for sent in sentences if sent.text.strip()]
-
-        logger.info("Tier2 parse depth start (sentences=%d)", len(sentences))
-        start = time.monotonic()
-        parse_depth = self._average_parse_depth(sentences)
-        elapsed = time.monotonic() - start
-        logger.info("Tier2 parse depth complete (%.2fs)", elapsed)
-        clause_count = float(sum(1 for token in doc if token.dep_ in CLAUSE_DEPS))
-        passive_ratio = self._passive_ratio(doc)
-        logger.info("Tier2 dependency distance start (tokens=%d)", len(doc))
-        start = time.monotonic()
-        dep_distance = self._dependency_distance(doc)
-        elapsed = time.monotonic() - start
-        logger.info("Tier2 dependency distance complete (%.2fs)", elapsed)
-        connective_diversity = self._connective_diversity(text)
-        sent_similarity_variance = self._sentence_similarity_variance(sentence_texts)
-
-        prompt_similarity, intro_prompt_sim, min_para_relevance = self._prompt_relevance(
-            text, prompt
-        )
-
-        return Tier2Features(
-            parse_tree_depth=parse_depth,
-            clause_count=clause_count,
-            passive_ratio=passive_ratio,
-            dep_distance=dep_distance,
-            connective_diversity=connective_diversity,
-            sent_similarity_variance=sent_similarity_variance,
-            prompt_similarity=prompt_similarity,
-            intro_prompt_sim=intro_prompt_sim,
-            min_para_relevance=min_para_relevance,
-        )
+        return self.extract_batch([text], [prompt])[0]
 
     def _average_parse_depth(self, sentences: list[object]) -> float:
         """Compute average maximum dependency depth per sentence."""
@@ -161,60 +248,69 @@ class Tier2FeatureExtractor:
             return 0.0
         return safe_divide(float(len(set(found))), float(len(found)))
 
-    def _sentence_similarity_variance(self, sentences: list[str]) -> float:
-        """Compute variance of pairwise sentence similarities."""
+    def _embed_texts(self, texts: list[str], *, normalize_embeddings: bool) -> np.ndarray:
+        if not texts:
+            return np.empty((0, 0), dtype=np.float32)
 
+        embeddings: np.ndarray
+        if self.embedding_extractor is not None:
+            embeddings = self.embedding_extractor.embed(texts)
+        else:
+            if self.local_embedder is None:
+                raise RuntimeError("Tier2 local embedder not initialized.")
+            embeddings = self.local_embedder.encode(
+                texts,
+                convert_to_numpy=True,
+                normalize_embeddings=normalize_embeddings,
+                show_progress_bar=False,
+            )
+
+        embeddings = embeddings.astype(np.float32, copy=False)
+
+        if normalize_embeddings and self.embedding_extractor is not None:
+            norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+            norms = np.where(norms == 0.0, 1.0, norms)
+            embeddings = embeddings / norms
+
+        return embeddings
+
+    @staticmethod
+    def _sentence_similarity_variance_from_embeddings(
+        sentences: list[str], embedding_matrix: np.ndarray, index_by_text: dict[str, int]
+    ) -> float:
         if len(sentences) < 2:
             return 0.0
-        logger.info("Tier2 sentence similarity encode start (sentences=%d)", len(sentences))
-        start = time.monotonic()
-        embeddings = self.embedder.encode(
-            sentences,
-            convert_to_numpy=True,
-            normalize_embeddings=True,
-            show_progress_bar=False,
-        )
-        elapsed = time.monotonic() - start
-        logger.info("Tier2 sentence similarity encode complete (%.2fs)", elapsed)
+
+        indices = [index_by_text[sent] for sent in sentences]
+        embeddings = embedding_matrix[indices]
+        norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+        norms = np.where(norms == 0.0, 1.0, norms)
+        embeddings = embeddings / norms
+
         similarity_matrix = np.inner(embeddings, embeddings)
-        indices = np.triu_indices_from(similarity_matrix, k=1)
-        similarities = similarity_matrix[indices]
+        upper = np.triu_indices_from(similarity_matrix, k=1)
+        similarities = similarity_matrix[upper]
         return variance(similarities)
 
-    def _prompt_relevance(self, text: str, prompt: str) -> tuple[float, float, float]:
-        """Compute prompt relevance features using sentence embeddings."""
-
-        paragraphs = split_paragraphs(text)
-        logger.info("Tier2 prompt relevance encode start (essay+prompt)")
-        start = time.monotonic()
-        essay_embedding = self.embedder.encode(
-            [text], convert_to_numpy=True, show_progress_bar=False
-        )[0]
-        prompt_embedding = self.embedder.encode(
-            [prompt], convert_to_numpy=True, show_progress_bar=False
-        )[0]
-        elapsed = time.monotonic() - start
-        logger.info("Tier2 prompt relevance encode complete (essay+prompt) (%.2fs)", elapsed)
+    @staticmethod
+    def _prompt_relevance_from_embeddings(
+        *,
+        text: str,
+        prompt: str,
+        paragraphs: list[str],
+        embedding_matrix: np.ndarray,
+        index_by_text: dict[str, int],
+    ) -> tuple[float, float, float]:
+        essay_embedding = embedding_matrix[index_by_text[text]]
+        prompt_embedding = embedding_matrix[index_by_text[prompt]]
         prompt_similarity = cosine_similarity(essay_embedding, prompt_embedding)
 
         if paragraphs:
-            logger.info("Tier2 prompt relevance encode start (intro)")
-            start = time.monotonic()
-            intro_embedding = self.embedder.encode(
-                [paragraphs[0]], convert_to_numpy=True, show_progress_bar=False
-            )[0]
-            elapsed = time.monotonic() - start
-            logger.info("Tier2 prompt relevance encode complete (intro) (%.2fs)", elapsed)
+            intro_embedding = embedding_matrix[index_by_text[paragraphs[0]]]
             intro_prompt_sim = cosine_similarity(intro_embedding, prompt_embedding)
-            logger.info("Tier2 prompt relevance encode start (paragraphs=%d)", len(paragraphs))
-            start = time.monotonic()
-            para_embeddings = self.embedder.encode(
-                paragraphs, convert_to_numpy=True, show_progress_bar=False
-            )
-            elapsed = time.monotonic() - start
-            logger.info("Tier2 prompt relevance encode complete (paragraphs) (%.2fs)", elapsed)
             para_scores = [
-                cosine_similarity(embedding, prompt_embedding) for embedding in para_embeddings
+                cosine_similarity(embedding_matrix[index_by_text[para]], prompt_embedding)
+                for para in paragraphs
             ]
             min_para_relevance = float(min(para_scores)) if para_scores else 0.0
         else:

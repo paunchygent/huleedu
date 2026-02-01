@@ -18,6 +18,12 @@ from common_core.domain_enums import CourseCode, Language
 from common_core.events.cj_assessment_events import LLMConfigOverrides
 
 from scripts.cj_experiments_runners.eng5_np import __version__
+from scripts.cj_experiments_runners.eng5_np.assignment_preflight import (
+    AssignmentPreflightAuthError,
+    AssignmentPreflightConfigError,
+    AssignmentPreflightNotFoundError,
+    resolve_assignment_preflight,
+)
 from scripts.cj_experiments_runners.eng5_np.cj_client import (
     AnchorRegistrationError,
     register_anchor_essays,
@@ -55,6 +61,8 @@ HANDLER_MAP: dict[RunnerMode, type] = {
     RunnerMode.EXECUTE: ExecuteHandler,
 }
 
+_DEFAULT_GRADE_SCALE = "eng5_np_legacy_9_step"
+
 app = typer.Typer(
     help="ENG5 NP batch runner tooling (plan, dry-run, execute)\n\n"
     "AUTH: Development auto-generates admin tokens. "
@@ -69,6 +77,15 @@ def register_anchors_command(
         os.getenv("CJ_SERVICE_URL", "http://localhost:9095"),
         help="CJ Assessment Service base URL",
     ),
+    expected_grade_scale: str | None = typer.Option(
+        None,
+        "--expected-grade-scale",
+        help=(
+            "Optional assertion for CJ-owned grade scale. When provided, the runner "
+            "will resolve grade_scale from CJ assessment_instructions and fail fast "
+            "if it does not match."
+        ),
+    ),
     anchor_dir: Path | None = typer.Option(
         None,
         help="Optional override directory containing anchor essays",
@@ -78,6 +95,33 @@ def register_anchors_command(
 
     if not cj_service_url:
         typer.echo("CJ service URL is required for anchor registration", err=True)
+        raise typer.Exit(code=1)
+
+    try:
+        preflight = resolve_assignment_preflight(
+            assignment_id=assignment_id,
+            cj_service_url=cj_service_url,
+        )
+    except (
+        AssignmentPreflightAuthError,
+        AssignmentPreflightConfigError,
+        AssignmentPreflightNotFoundError,
+    ) as exc:
+        typer.echo(f"Assignment preflight failed: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    typer.echo(
+        "Resolved assignment context from CJ: "
+        f"assignment_id={preflight.assignment_id} grade_scale={preflight.grade_scale}",
+        err=True,
+    )
+    if expected_grade_scale is not None and expected_grade_scale != preflight.grade_scale:
+        typer.echo(
+            "Expected grade_scale mismatch. "
+            f"Expected '{expected_grade_scale}', but CJ has '{preflight.grade_scale}' "
+            f"for assignment_id={preflight.assignment_id}.",
+            err=True,
+        )
         raise typer.Exit(code=1)
 
     repo_root = repo_root_from_package()
@@ -322,9 +366,14 @@ def main(
         None,
         help="Course ID. Required for execute mode. Used for metadata and scope context.",
     ),
-    grade_scale: str = typer.Option(
-        "eng5_np_legacy_9_step",
-        help="Grade scale key registered in the CJ service",
+    expected_grade_scale: str | None = typer.Option(
+        None,
+        "--expected-grade-scale",
+        help=(
+            "Optional assertion for CJ-owned grade scale. When provided (and when "
+            "--assignment-id is provided), the runner resolves grade_scale from CJ "
+            "assessment_instructions and fails fast if it does not match."
+        ),
     ),
     batch_id: str = typer.Option(
         "eng5-np-local-batch",
@@ -489,6 +538,46 @@ def main(
 
     configure_cli_logging(verbose=verbose)
 
+    if expected_grade_scale is not None and assignment_id is None:
+        raise typer.BadParameter(
+            "--expected-grade-scale requires --assignment-id so the runner can "
+            "validate against CJ assessment_instructions.",
+            param_hint="'--expected-grade-scale'",
+        )
+
+    resolved_grade_scale = _DEFAULT_GRADE_SCALE
+    if assignment_id is not None:
+        try:
+            preflight = resolve_assignment_preflight(
+                assignment_id=assignment_id,
+                cj_service_url=cj_service_url,
+            )
+        except AssignmentPreflightConfigError as exc:
+            raise typer.BadParameter(str(exc), param_hint="'--cj-service-url'") from exc
+        except AssignmentPreflightNotFoundError as exc:
+            raise typer.BadParameter(str(exc), param_hint="'--assignment-id'") from exc
+        except AssignmentPreflightAuthError as exc:
+            raise typer.BadParameter(str(exc)) from exc
+
+        resolved_grade_scale = preflight.grade_scale
+        typer.echo(
+            "Resolved assignment context from CJ: "
+            f"assignment_id={preflight.assignment_id} grade_scale={preflight.grade_scale}",
+            err=True,
+        )
+
+        if (
+            expected_grade_scale is not None
+            and expected_grade_scale.strip() != ""
+            and expected_grade_scale != preflight.grade_scale
+        ):
+            raise typer.BadParameter(
+                "Expected grade_scale mismatch. "
+                f"Expected '{expected_grade_scale}', but CJ has '{preflight.grade_scale}' "
+                f"for assignment_id={preflight.assignment_id}.",
+                param_hint="'--expected-grade-scale'",
+            )
+
     if llm_batching_mode is not None:
         typer.echo(
             "⚠️  LLM batching mode hint set to "
@@ -547,7 +636,7 @@ def main(
     settings = RunnerSettings(
         assignment_id=assignment_id,
         course_id=course_id,
-        grade_scale=grade_scale,
+        grade_scale=resolved_grade_scale,
         mode=mode,
         use_kafka=not no_kafka,
         output_dir=output_dir or paths.artefact_output_dir,
