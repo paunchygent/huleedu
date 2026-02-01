@@ -59,10 +59,9 @@ See `docker-compose.prod.yml` in this repo for the authoritative hostnames.
 
 ### 0. Decide the Hemma checkout location
 
-There is no canonical path yet. Choose one and treat it as a constant once chosen.
-All commands below use:
+Canonical convention (mirror Skriptoteket):
 
-- `<HULEDU_REPO_ON_HEMMA>` (absolute path)
+- Repo checkout: `~/apps/huleedu`
 
 ### 1. Create external network (once)
 
@@ -76,13 +75,13 @@ ssh hemma 'sudo docker network ls | rg \"\\bhule-network\\b\"'
 
 First-time setup (example):
 ```bash
-ssh hemma 'mkdir -p <HULEDU_REPO_ON_HEMMA_PARENT>'
-ssh hemma 'cd <HULEDU_REPO_ON_HEMMA_PARENT> && git clone <YOUR_GIT_REMOTE> huledu-reboot'
+ssh hemma 'mkdir -p ~/apps'
+ssh hemma 'cd ~/apps && git clone <YOUR_GIT_REMOTE> huleedu'
 ```
 
 Subsequent updates:
 ```bash
-ssh hemma 'cd <HULEDU_REPO_ON_HEMMA> && git pull'
+ssh hemma 'cd ~/apps/huleedu && git pull'
 ```
 
 ### 3. Create Hemma `.env` for production
@@ -92,7 +91,7 @@ minimum you will need the production DB password, JWT secret, and internal API k
 
 Create/edit:
 ```bash
-ssh hemma 'cd <HULEDU_REPO_ON_HEMMA> && nano .env'
+ssh hemma 'cd ~/apps/huleedu && nano .env'
 ```
 
 ### 4. Shared DB prerequisites (if using shared-postgres)
@@ -111,13 +110,13 @@ ssh hemma 'sudo docker exec -it shared-postgres psql -U postgres -c \"\\l\"'
 
 Use prod overrides on top of base compose:
 ```bash
-ssh hemma 'cd <HULEDU_REPO_ON_HEMMA> && sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build'
+ssh hemma 'cd ~/apps/huleedu && sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build'
 ```
 
 ### 6. Verify service health (container-level)
 
 ```bash
-ssh hemma 'cd <HULEDU_REPO_ON_HEMMA> && sudo docker compose ps'
+ssh hemma 'cd ~/apps/huleedu && sudo docker compose ps'
 ```
 
 Health endpoints inside the stack (examples; adjust ports if configured differently):
@@ -196,12 +195,12 @@ It returns embeddings as a binary `.npy` float32 matrix for throughput.
 
 CPU-only (works everywhere, but is not GPU accelerated):
 ```bash
-ssh hemma 'cd <HULEDU_REPO_ON_HEMMA> && sudo docker build -f scripts/ml_training/essay_scoring/offload/Dockerfile -t huleedu-essay-embed-offload:dev .'
+ssh hemma 'cd ~/apps/huleedu && sudo docker build -f scripts/ml_training/essay_scoring/offload/Dockerfile -t huleedu-essay-embed-offload:dev .'
 ```
 
 GPU (ROCm) build: override `BASE_IMAGE` to a ROCm-enabled PyTorch image available on Hemma.
 ```bash
-ssh hemma 'cd <HULEDU_REPO_ON_HEMMA> && sudo docker build -f scripts/ml_training/essay_scoring/offload/Dockerfile --build-arg BASE_IMAGE=rocm/pytorch:latest -t huleedu-essay-embed-offload:dev .'
+ssh hemma 'cd ~/apps/huleedu && sudo docker build -f scripts/ml_training/essay_scoring/offload/Dockerfile --build-arg BASE_IMAGE=rocm/pytorch:latest -t huleedu-essay-embed-offload:dev .'
 ```
 
 ### 2. Run the container (localhost-only on Hemma)

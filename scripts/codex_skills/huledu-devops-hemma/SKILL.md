@@ -63,10 +63,13 @@ ssh hemma 'sudo docker exec -it <container_name> python -c "import torch; print(
 
 ## Deploy/redeploy pattern (template)
 
-This repo does not enforce a specific Hemma path yet. Use an explicit location in
-commands (for example `cd <HULEDU_REPO_ON_HEMMA>`) and standardize later.
+Canonical Hemma checkout location (mirror Skriptoteket):
+- `~/apps/huleedu`
+
+Note: The local repo you are working from may still be named `huledu-reboot`, but Hemma
+should standardize on the future canonical repo name and path: `~/apps/huleedu`.
 
 Example (service rebuild/restart):
 ```bash
-ssh hemma 'cd <HULEDU_REPO_ON_HEMMA> && sudo docker compose up -d --build language_tool_service'
+ssh hemma 'cd ~/apps/huleedu && sudo docker compose up -d --build language_tool_service'
 ```

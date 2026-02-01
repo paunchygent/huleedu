@@ -83,16 +83,15 @@ curl -fsS http://127.0.0.1:19000/healthz
 
 If the service is already deployed via compose on Hemma:
 ```bash
-ssh hemma 'cd <HULEDU_REPO_ON_HEMMA> && sudo docker compose up -d --no-deps --force-recreate language_tool_service'
+ssh hemma 'cd ~/apps/huleedu && sudo docker compose up -d --no-deps --force-recreate language_tool_service'
 ```
 
-If you don’t have a stable compose location yet (common during initial Hemma setup),
-use explicit absolute paths in commands and record the chosen location once it exists.
+Canonical checkout location: `~/apps/huleedu` (mirror Skriptoteket under `~/apps/`).
 
 ### Rebuild + restart (when Dockerfile or deps changed)
 
 ```bash
-ssh hemma 'cd <HULEDU_REPO_ON_HEMMA> && sudo docker compose up -d --build language_tool_service'
+ssh hemma 'cd ~/apps/huleedu && sudo docker compose up -d --build language_tool_service'
 ```
 
 ### When Skriptoteket is also impacted
