@@ -113,6 +113,24 @@ Implementation progress (2026-02-01):
 - Reduced Hemma image bloat for offload:
   - `pyproject.toml` adds `offload-runtime` dependency group (no training deps)
   - `scripts/ml_training/essay_scoring/offload/Dockerfile` exports only `offload-runtime` (`pdm export --no-default`)
+
+Hemma deploy verified (2026-02-01):
+- Git sync (canonical): `~/apps/huleedu` reset to `origin/main` at `2c3e4008` (no scp drift).
+- Shared infra confirmed present:
+  - external docker network: `hule-network`
+  - shared DB container: `shared-postgres`
+  - shared observability containers: `nginx-proxy`, `jaeger`, `loki`, `grafana`, `prometheus`
+- Production `.env` generated/updated on Hemma (no secrets committed):
+  - `HULEEDU_ENVIRONMENT=production`, `ENVIRONMENT=production`
+  - `HULEEDU_DB_USER=huleedu_user`, `HULEEDU_PROD_DB_HOST=shared-postgres`, `HULEEDU_PROD_DB_PASSWORD=<set>`
+  - DBs created for all services; `pg_trgm` enabled in `huleedu_spellchecker`
+- KRaft infra up and healthy:
+  - `huleedu_kafka` (`apache/kafka:3.8.0`) healthy, localhost-bound
+  - `huleedu_redis` healthy, localhost-bound
+  - `kafka_topic_setup` created 71 topics successfully
+- Research services (localhost-only) up:
+  - `huleedu_language_tool_service` healthy at `127.0.0.1:8085`
+  - `huleedu_essay_embed_offload` healthy at `127.0.0.1:9000`
 - Hemma deploy validation (2026-02-01):
   - Copied `.env` to `~/apps/huleedu/.env` (prod DB password still missing; required for full prod deploy)
   - Deployed `language_tool_service` with:

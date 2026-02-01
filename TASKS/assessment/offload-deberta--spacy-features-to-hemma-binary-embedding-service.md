@@ -96,6 +96,7 @@ Hemma validation (2026-02-01):
 - `language_tool_service` is running and healthy on Hemma, bound to `127.0.0.1:8085`.
 - Embedding offload is running and healthy on Hemma, bound to `127.0.0.1:9000`.
 - Mac-side tunnels validated for both endpoints (ports `18085` and `19000`).
+- Note: set `HF_TOKEN` in `~/apps/huleedu/.env` on Hemma to avoid Hugging Face Hub rate limiting.
 
 Still TODO (next slices):
 - Add spaCy/TextDescriptives offload endpoints (Tier1/2/3) so the laptop can avoid spaCy RAM/CPU load.

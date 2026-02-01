@@ -39,6 +39,15 @@ warn_if_set() {
   fi
 }
 
+warn_optional() {
+  local key="$1"
+  local note="$2"
+  local val="${!key-}"
+  if [ -z "${val}" ]; then
+    echo "ℹ️  Optional: ${key} is not set (${note})"
+  fi
+}
+
 require_equal_if_both_set() {
   local key_a="$1"
   local key_b="$2"
@@ -73,6 +82,9 @@ require_nonempty "HULEEDU_INTERNAL_API_KEY"
 require_nonempty "JWT_SECRET_KEY"
 require_equal_if_both_set "JWT_SECRET_KEY" "API_GATEWAY_JWT_SECRET_KEY"
 
+# Hugging Face Hub token is optional but recommended for DeBERTa offload images.
+warn_optional "HF_TOKEN" "used for Hugging Face Hub auth (rate limits) in offload containers"
+
 # Avoid COMPOSE_FILE drift (Hemma uses explicit -f layering)
 warn_if_set "COMPOSE_FILE"
 
@@ -93,4 +105,3 @@ if [ $fail -ne 0 ]; then
 fi
 
 echo "✅ Production .env looks sane"
-

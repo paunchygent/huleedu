@@ -20,6 +20,34 @@ Common signals that Hemma-hosted HuleEdu infra is unhealthy:
 
 Prefer “prove current state” over assumptions.
 
+## Command Hygiene (Hemma)
+
+When running commands over SSH, always include an explicit `cd` to the repo root in
+the same SSH invocation. Do not assume any working directory persists between
+commands.
+
+Canonical repo path on Hemma:
+- `/home/paunchygent/apps/huleedu`
+
+### SSH one-liner pattern (safe)
+
+```bash
+ssh hemma /bin/bash -c 'cd /home/paunchygent/apps/huleedu && ./scripts/validate-production-config.sh'
+```
+
+### SSH multi-line pattern (avoid quoting issues)
+
+Prefer this for any sequence that includes quotes, braces, pipes, or here-docs:
+
+```bash
+ssh hemma /bin/bash -s <<'EOF'
+set -euo pipefail
+cd /home/paunchygent/apps/huleedu
+./scripts/validate-production-config.sh
+sudo docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+EOF
+```
+
 ### SSH + host reachability
 
 ```bash
@@ -81,6 +109,7 @@ the shared-infra production deploy:
 - `HULEEDU_PROD_DB_PASSWORD=...` (password for `shared-postgres`)
 - `HULEEDU_INTERNAL_API_KEY=...`
 - `JWT_SECRET_KEY=...` (and optionally `API_GATEWAY_JWT_SECRET_KEY`, matching it)
+- `HF_TOKEN=...` (recommended for DeBERTa offload image pulls; avoids Hub rate limits)
 
 Validate on Hemma (prints missing keys only):
 ```bash

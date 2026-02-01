@@ -35,6 +35,7 @@ cross-service task context.
 5. **avoit user input** **NEVER** RUN GIT COMMANDS OR delete files you have not created WITHOUT ASKING FOR PERMISSION!
 6. **Repo alignment (Hemma and CI)**: Use `git pull` / `git fetch` as the canonical sync mechanism for tracked files. **Do not** use `scp` to “sync” repo code (it causes drift and missed files). `scp` is acceptable only for **non-versioned** artifacts (for example `.env` secrets) and even then prefer a documented, repeatable process.
 7. **Git safety**: It’s OK to run safe/read-only git commands (for example `git status`, `git diff`, `git log`, `git fetch`) after asking once. Always ask again before destructive commands (for example `git reset --hard`, `git clean`, rewriting history, or deleting branches).
+8. **Hemma SSH command hygiene**: Always run from the Hemma repo root (`/home/paunchygent/apps/huleedu`). Use a single SSH command that includes `cd` (don’t assume a working directory persists). For multi-line sequences, prefer `ssh hemma /bin/bash -s <<'EOF' ... EOF` to avoid quoting/globbing issues.
 ```
 
 ### 3. Error Resolution Protocol

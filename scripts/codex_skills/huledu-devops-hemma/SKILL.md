@@ -80,6 +80,26 @@ Repo sync rule:
 - Do **not** use `scp` to “sync” repo code (it creates drift). `scp` is only acceptable
   for non-versioned secrets/artifacts (for example `.env`).
 
+## SSH command pattern (avoid quoting issues)
+
+Canonical repo root on Hemma:
+- `/home/paunchygent/apps/huleedu`
+
+One-liner:
+```bash
+ssh hemma /bin/bash -c 'cd /home/paunchygent/apps/huleedu && ./scripts/validate-production-config.sh'
+```
+
+Multi-line (preferred when commands contain quotes/braces/pipes):
+```bash
+ssh hemma /bin/bash -s <<'EOF'
+set -euo pipefail
+cd /home/paunchygent/apps/huleedu
+./scripts/validate-production-config.sh
+sudo docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+EOF
+```
+
 Example (service rebuild/restart):
 ```bash
 ssh hemma 'cd ~/apps/huleedu && sudo docker compose -f docker-compose.hemma.yml -f docker-compose.prod.yml -f docker-compose.hemma.research.yml up -d --build language_tool_service'
