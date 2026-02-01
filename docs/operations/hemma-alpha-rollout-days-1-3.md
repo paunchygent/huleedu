@@ -160,25 +160,181 @@ ssh hemma 'cd ~/apps/huleedu && sudo docker compose -f docker-compose.hemma.yml 
 ssh hemma 'curl -fsS http://127.0.0.1:8085/healthz'
 ```
 
-### 3. Tunnel to local port (recommended: autossh)
+### 3. Persistent tunnels (recommended: `~/bin` + LaunchAgent)
+
+This mirrors the Skriptoteket llama.cpp tunnel pattern: a small `~/bin` wrapper around
+`autossh`, plus a LaunchAgent so it starts on login.
 
 Install autossh on macOS:
 ```bash
 brew install autossh
 ```
 
-Start tunnel:
+Create the tunnel helper script (local dev machine):
 ```bash
-autossh -M 0 -N \
-  -o \"ServerAliveInterval=30\" \
-  -o \"ServerAliveCountMax=3\" \
-  -o \"ExitOnForwardFailure=yes\" \
-  -L 18085:localhost:8085 hemma
+mkdir -p ~/bin
+cat > ~/bin/hemma-huleedu-tunnel <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+
+HOST=hemma
+PID_DIR="${HOME}/.cache/hemma-huleedu-tunnel"
+
+LT_LOCAL_PORT=18085
+LT_REMOTE_PORT=8085
+
+EMBED_LOCAL_PORT=19000
+EMBED_REMOTE_PORT=9000
+
+mkdir -p "$PID_DIR"
+
+start_tunnel() {
+  local local_port=$1
+  local remote_port=$2
+  local name=$3
+  local pid_file="${PID_DIR}/tunnel-${local_port}.pid"
+
+  if [[ -f "$pid_file" ]]; then
+    local pid
+    pid=$(cat "$pid_file" 2>/dev/null || true)
+    if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+      echo "✓ ${name} tunnel already running (localhost:${local_port} -> hemma:${remote_port})"
+      return
+    fi
+  fi
+
+  autossh -M 0 -N \
+    -o "ServerAliveInterval=30" \
+    -o "ServerAliveCountMax=3" \
+    -o "ExitOnForwardFailure=yes" \
+    -L ${local_port}:localhost:${remote_port} ${HOST} >/dev/null 2>&1 &
+
+  echo $! > "$pid_file"
+  echo "▶ Started ${name} tunnel (localhost:${local_port} -> hemma:${remote_port})"
+}
+
+stop_tunnel() {
+  local local_port=$1
+  local name=$2
+  local pid_file="${PID_DIR}/tunnel-${local_port}.pid"
+  local pid=""
+
+  if [[ -f "$pid_file" ]]; then
+    pid=$(cat "$pid_file" 2>/dev/null || true)
+  fi
+
+  if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+    kill "$pid" 2>/dev/null || true
+    rm -f "$pid_file"
+    echo "■ Stopped ${name} tunnel"
+    return
+  fi
+
+  rm -f "$pid_file"
+  echo "  ${name} tunnel not running"
+}
+
+status() {
+  echo "=== Hemma HuleEdu Tunnels ==="
+  for port in $LT_LOCAL_PORT $EMBED_LOCAL_PORT; do
+    if nc -z -w 1 localhost ${port} 2>/dev/null; then
+      if curl -fsS --connect-timeout 2 http://localhost:${port}/healthz >/dev/null 2>&1; then
+        echo "✓ Port ${port}: connected"
+      else
+        echo "? Port ${port}: port open, service unreachable"
+      fi
+    else
+      echo "✗ Port ${port}: not running"
+    fi
+  done
+}
+
+case "${1:-start}" in
+  start)
+    start_tunnel $LT_LOCAL_PORT $LT_REMOTE_PORT "language-tool-service"
+    start_tunnel $EMBED_LOCAL_PORT $EMBED_REMOTE_PORT "essay-embed-offload"
+    ;;
+  start-language-tool)
+    start_tunnel $LT_LOCAL_PORT $LT_REMOTE_PORT "language-tool-service"
+    ;;
+  start-embeddings)
+    start_tunnel $EMBED_LOCAL_PORT $EMBED_REMOTE_PORT "essay-embed-offload"
+    ;;
+  stop)
+    stop_tunnel $LT_LOCAL_PORT "language-tool-service"
+    stop_tunnel $EMBED_LOCAL_PORT "essay-embed-offload"
+    ;;
+  stop-language-tool)
+    stop_tunnel $LT_LOCAL_PORT "language-tool-service"
+    ;;
+  stop-embeddings)
+    stop_tunnel $EMBED_LOCAL_PORT "essay-embed-offload"
+    ;;
+  restart)
+    $0 stop
+    sleep 1
+    $0 start
+    ;;
+  status)
+    status
+    ;;
+  *)
+    echo "Usage: $(basename $0) {start|start-language-tool|start-embeddings|stop|stop-language-tool|stop-embeddings|restart|status}"
+    exit 1
+    ;;
+esac
+SH
+chmod +x ~/bin/hemma-huleedu-tunnel
 ```
+
+Start tunnels:
+```bash
+~/bin/hemma-huleedu-tunnel start
+```
+
+Auto-start on login (LaunchAgent):
+```bash
+mkdir -p ~/Library/LaunchAgents
+cat > ~/Library/LaunchAgents/com.hemma.huleedu-tunnel.plist <<'XML'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.hemma.huleedu-tunnel</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/YOUR_USERNAME/bin/hemma-huleedu-tunnel</string>
+        <string>start</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/tmp/hemma-huleedu-tunnel.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/hemma-huleedu-tunnel.log</string>
+</dict>
+</plist>
+XML
+
+launchctl unload ~/Library/LaunchAgents/com.hemma.huleedu-tunnel.plist >/dev/null 2>&1 || true
+launchctl load ~/Library/LaunchAgents/com.hemma.huleedu-tunnel.plist
+```
+
+Note: replace `YOUR_USERNAME` with your macOS username (e.g. `/Users/olofs_mba/...`).
 
 Verify locally:
 ```bash
 curl -fsS http://127.0.0.1:18085/healthz
+```
+
+Manual one-off alternative:
+```bash
+autossh -M 0 -N \
+  -o "ServerAliveInterval=30" \
+  -o "ServerAliveCountMax=3" \
+  -o "ExitOnForwardFailure=yes" \
+  -L 18085:localhost:8085 hemma
 ```
 
 ### 4. Smoke test `POST /v1/check`
@@ -241,12 +397,11 @@ ssh hemma 'curl -fsS http://127.0.0.1:9000/healthz'
 
 ### 4. Tunnel to local port
 
+If you created `~/bin/hemma-huleedu-tunnel` above, it already manages this tunnel.
+
+Start (embeddings only):
 ```bash
-autossh -M 0 -N \
-  -o \"ServerAliveInterval=30\" \
-  -o \"ServerAliveCountMax=3\" \
-  -o \"ExitOnForwardFailure=yes\" \
-  -L 19000:localhost:9000 hemma
+~/bin/hemma-huleedu-tunnel start-embeddings
 ```
 
 Verify locally:

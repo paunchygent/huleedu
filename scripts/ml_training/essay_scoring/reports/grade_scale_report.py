@@ -18,6 +18,7 @@ def generate_grade_scale_report(
     records: list[EssayRecord],
     y_true: np.ndarray,
     y_pred: np.ndarray,
+    dataset_path: Path,
     output_path: Path,
 ) -> None:
     """Generate the grade-scale behavior report as markdown.
@@ -26,6 +27,7 @@ def generate_grade_scale_report(
         records: Essay records in the evaluation split.
         y_true: Ground-truth band labels.
         y_pred: Model predictions.
+        dataset_path: Source dataset path (for report traceability).
         output_path: Path to write the markdown report.
     """
 
@@ -48,8 +50,8 @@ def generate_grade_scale_report(
     report = f"""# Grade-Scale Behavior Report
 
 ## Dataset & Context
-- Dataset version/source: {Path("data/cefr_ielts_datasets/ielts_writing_dataset.csv")}
-- Grade scale definition (labels + rubric reference): IELTS Overall band 5.0–7.5
+- Dataset version/source: {dataset_path}
+- Grade scale definition (labels + rubric reference): IELTS Overall band 1.0–9.0
 - Prompt/task coverage: {len(set(record.question for record in records))} unique prompts
 - Rater context (single vs multiple raters; moderation process): Not specified in dataset
 
@@ -67,7 +69,7 @@ def generate_grade_scale_report(
 - Length bias check (Spearman word count vs prediction): {length_pred_corr:.3f}
 
 ## Mapping Decision
-- Chosen mapping: model prediction rounded to nearest 0.5 band
+- Chosen mapping: model prediction rounded to nearest 0.5 band (clipped to 1.0–9.0)
 - Rationale: aligns with EPIC-010 guidance for ordinal regression outputs
 - Open questions / risks: validate mapping after Swedish dataset arrives
 

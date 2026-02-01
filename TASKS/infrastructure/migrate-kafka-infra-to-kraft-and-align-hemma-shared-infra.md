@@ -2,7 +2,7 @@
 id: 'migrate-kafka-infra-to-kraft-and-align-hemma-shared-infra'
 title: 'Migrate Kafka infra to KRaft and align Hemma shared infra'
 type: 'story'
-status: 'in_progress'
+status: 'done'
 priority: 'high'
 domain: 'infrastructure'
 service: ''
@@ -52,6 +52,13 @@ while keeping local dev as a staging environment with strong prod parity.
 - `kafka_topic_setup` completes successfully against the KRaft broker.
 - Docs + scripts no longer reference ZooKeeper for platform infra.
 - `pdm run validate-docs`, `pdm run validate-tasks`, `pdm run index-tasks` pass.
+
+## Status Update (2026-02-01)
+
+Completed:
+- KRaft Kafka in place (`apache/kafka:3.8.0`), no ZooKeeper dependency.
+- Hemma compose layering enforces localhost-only infra + research services.
+- Local + Hemma validation performed; docs + TASKS validators passing.
 
 ## Related
 

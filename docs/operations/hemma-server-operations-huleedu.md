@@ -118,13 +118,22 @@ ssh hemma 'cd ~/apps/huleedu && ./scripts/validate-production-config.sh'
 
 ### SSH port-forward tunnels (default)
 
-Run these from the Mac (keep them in a dedicated terminal tab):
+Preferred (mirrors Skriptoteket): use the persistent tunnel helper script + LaunchAgent
+setup from:
+- `docs/operations/hemma-alpha-rollout-days-1-3.md`
 
 ```bash
-# HuleEdu LanguageTool service HTTP API (NOT the Java port)
-ssh hemma -L 18085:127.0.0.1:8085
+# Start both tunnels (LanguageTool + embeddings)
+~/bin/hemma-huleedu-tunnel start
 
-# DeBERTa + spaCy feature offload service
+# Check status
+~/bin/hemma-huleedu-tunnel status
+```
+
+Manual one-off alternative (dedicated terminal tab):
+
+```bash
+ssh hemma -L 18085:127.0.0.1:8085
 ssh hemma -L 19000:127.0.0.1:9000
 ```
 

@@ -50,6 +50,18 @@ cd /home/paunchygent/apps/huleedu
 sudo docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 EOF
 ```
+
+Hemma tunnels (local workstation):
+```bash
+# Persistent tunnels (preferred): ~/bin wrapper + LaunchAgent (mirrors Skriptoteket)
+# Setup steps live in: docs/operations/hemma-alpha-rollout-days-1-3.md
+~/bin/hemma-huleedu-tunnel start
+~/bin/hemma-huleedu-tunnel status
+
+# Health checks (local ports)
+curl -fsS http://127.0.0.1:18085/healthz  # LanguageTool service (Hemma :8085)
+curl -fsS http://127.0.0.1:19000/healthz  # Embedding offload (Hemma :9000)
+```
 ```
 
 ### 3. Error Resolution Protocol

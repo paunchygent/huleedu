@@ -1,7 +1,7 @@
 ---
 type: decision
 id: ADR-0028
-status: proposed
+status: accepted
 created: '2026-02-01'
 last_updated: '2026-02-01'
 ---

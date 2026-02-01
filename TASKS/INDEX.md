@@ -1,6 +1,6 @@
 # TASKS Index
 
-Generated: 2026-02-01T22:25:26
+Generated: 2026-02-01T23:01:34
 
 ## Summary
 
@@ -103,7 +103,7 @@ Generated: 2026-02-01T22:25:26
 - [Implement semantic token architecture per ADR-0023](TASKS/frontend/implement-semantic-token-architecture-per-adr-0023.md) — `in_progress`
 
 ### infrastructure (28)
-- [Migrate Kafka infra to KRaft and align Hemma shared infra](TASKS/infrastructure/migrate-kafka-infra-to-kraft-and-align-hemma-shared-infra.md) — `in_progress`
+- [Migrate Kafka infra to KRaft and align Hemma shared infra](TASKS/infrastructure/migrate-kafka-infra-to-kraft-and-align-hemma-shared-infra.md) — `done`
 - [US-007.1 Shared Utilities Extraction](TASKS/infrastructure/us-0071-shared-utilities-extraction.md) — `done`
 - [US-007.2 Schema Consolidation](TASKS/infrastructure/us-0072-schema-consolidation.md) — `done`
 - [US-007.3 Creation Scripts](TASKS/infrastructure/us-0073-creation-scripts.md) — `done`
@@ -225,7 +225,7 @@ Generated: 2026-02-01T22:25:26
 - [Frontend Live Data Integration](TASKS/programs/teacher_dashboard_integration/frontend-live-data-integration.md) — `programs`
 - [WebSocket Batch Updates](TASKS/programs/teacher_dashboard_integration/websocket-batch-updates.md) — `programs`
 
-### done (27)
+### done (28)
 - [Add Database Metrics Instrumentation to Remaining Services](TASKS/infrastructure/add-database-metrics-instrumentation-to-remaining-services.md) — `infrastructure`
 - [Align TASKS and docs lifecycle v2](TASKS/architecture/align-tasks-and-docs-lifecycle-v2.md) — `architecture`
 - [API Gateway batch listing endpoint tests](TASKS/identity/api-gateway-batch-listing-endpoint-tests.md) — `identity`
@@ -244,6 +244,7 @@ Generated: 2026-02-01T22:25:26
 - [Fix Cj Llm Prompt Construction](TASKS/assessment/fix-cj-llm-prompt-construction.md) — `assessment`
 - [Llm Batch Strategy Serial Bundle](TASKS/integrations/llm-batch-strategy-serial-bundle.md) — `integrations`
 - [LLM Provider Anthropic thinking controls](TASKS/infrastructure/llm-provider-anthropic-thinking-controls.md) — `infrastructure`
+- [Migrate Kafka infra to KRaft and align Hemma shared infra](TASKS/infrastructure/migrate-kafka-infra-to-kraft-and-align-hemma-shared-infra.md) — `infrastructure`
 - [MyPy Configuration Investigation and Consolidation](TASKS/infrastructure/mypy-configuration-investigation-and-consolidation.md) — `infrastructure`
 - [Propagate assignment_id from BOS to CJ request (Phase A)](TASKS/assessment/propagate-assignment-id-from-bos-to-cj-request-phase-a.md) — `assessment`
 - [Propagate assignment_id from CJ to RAS storage (Phase B)](TASKS/assessment/propagate-assignment-id-from-cj-to-ras-storage-phase-b.md) — `assessment`
@@ -254,7 +255,7 @@ Generated: 2026-02-01T22:25:26
 - [US-007.2 Schema Consolidation](TASKS/infrastructure/us-0072-schema-consolidation.md) — `infrastructure`
 - [US-007.3 Creation Scripts](TASKS/infrastructure/us-0073-creation-scripts.md) — `infrastructure`
 
-### in_progress (35)
+### in_progress (34)
 - [Anchor Alignment Prompt Tuning Experiment](TASKS/assessment/anchor-alignment-prompt-tuning-experiment.md) — `assessment`
 - [BT SE batch quality indicators](TASKS/assessment/bt-se-batch-quality-indicators.md) — `assessment`
 - [BT SE Zero Anomaly and Anchor Inversions Investigation](TASKS/assessment/bt-se-zero-anomaly-and-anchor-inversions-investigation.md) — `assessment`
@@ -277,7 +278,6 @@ Generated: 2026-02-01T22:25:26
 - [LLM Provider Batch API Phase 2](TASKS/integrations/llm-provider-batch-api-phase-2.md) — `integrations`
 - [LLM Provider OpenAI GPT-5.x Reasoning Controls](TASKS/infrastructure/llm-provider-openai-gpt-5x-reasoning-controls.md) — `infrastructure`
 - [Lps Rate Limiting Implementation](TASKS/infrastructure/lps-rate-limiting-implementation.md) — `infrastructure`
-- [Migrate Kafka infra to KRaft and align Hemma shared infra](TASKS/infrastructure/migrate-kafka-infra-to-kraft-and-align-hemma-shared-infra.md) — `infrastructure`
 - [NLP LangTool whitebox research build](TASKS/assessment/nlp_lang_tool/nlp-lang-tool-whitebox-research-build.md) — `assessment`
 - [Offload DeBERTa + spaCy features to Hemma (binary embedding service)](TASKS/assessment/offload-deberta--spacy-features-to-hemma-binary-embedding-service.md) — `assessment`
 - [PDM pyproject.toml Migration to PEP 735](TASKS/infrastructure/pdm-pyproject-toml-migration-to-pep-735.md) — `infrastructure`
@@ -374,7 +374,7 @@ Generated: 2026-02-01T22:25:26
 
 ### huledu_alpha_launch (2)
 - [HuleEdu alpha launch programme hub](TASKS/programs/huledu_alpha_launch/hub.md) — `programs` · `in_progress`
-- [Migrate Kafka infra to KRaft and align Hemma shared infra](TASKS/infrastructure/migrate-kafka-infra-to-kraft-and-align-hemma-shared-infra.md) — `infrastructure` · `in_progress`
+- [Migrate Kafka infra to KRaft and align Hemma shared infra](TASKS/infrastructure/migrate-kafka-infra-to-kraft-and-align-hemma-shared-infra.md) — `infrastructure` · `done`
 
 ### maintenance (1)
 - [Refactor CJ Assessment Service for Compliance](TASKS/assessment/refactor-cj-assessment-service-for-compliance.md) — `assessment` · `paused`

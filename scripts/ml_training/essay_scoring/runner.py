@@ -129,6 +129,7 @@ def run_experiment(config: ExperimentConfig, feature_set: FeatureSet | None = No
             records=split.test,
             y_true=y_test,
             y_pred=test_pred,
+            dataset_path=config.dataset_path,
             output_path=run_paths.grade_scale_report_path,
         )
 

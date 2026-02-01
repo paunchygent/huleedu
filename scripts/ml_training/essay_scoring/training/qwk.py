@@ -13,7 +13,7 @@ def round_to_half_band(predictions: np.ndarray) -> np.ndarray:
     return np.round(predictions * 2.0) / 2.0
 
 
-def clip_bands(predictions: np.ndarray, min_band: float = 5.0, max_band: float = 7.5) -> np.ndarray:
+def clip_bands(predictions: np.ndarray, min_band: float = 1.0, max_band: float = 9.0) -> np.ndarray:
     """Clip predictions to the valid IELTS band range."""
 
     return np.clip(predictions, min_band, max_band)

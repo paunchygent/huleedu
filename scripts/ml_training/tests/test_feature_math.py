@@ -12,8 +12,8 @@ def test_density_per_100_words() -> None:
 
 
 def test_rounding_and_clipping() -> None:
-    predictions = np.array([4.9, 5.1, 7.8])
+    predictions = np.array([0.4, 1.1, 9.7])
     rounded = round_to_half_band(predictions)
     clipped = clip_bands(rounded)
-    assert np.allclose(rounded, np.array([5.0, 5.0, 8.0]))
-    assert np.allclose(clipped, np.array([5.0, 5.0, 7.5]))
+    assert np.allclose(rounded, np.array([0.5, 1.0, 9.5]))
+    assert np.allclose(clipped, np.array([1.0, 1.0, 9.0]))
