@@ -254,6 +254,7 @@ class TestEventComposition:
         system_prompt = build_cj_system_prompt()
         return RunnerSettings(
             assignment_id=uuid.UUID(int=1),
+            cj_assignment_id=uuid.UUID(int=1),
             course_id=uuid.UUID(int=2),
             grade_scale="eng5_np_legacy_9_step",
             mode=RunnerMode.DRY_RUN,
@@ -324,6 +325,7 @@ class TestEventComposition:
         """Verify composed event handles None llm_config_overrides gracefully."""
         settings_no_overrides = RunnerSettings(
             assignment_id=uuid.UUID(int=1),
+            cj_assignment_id=uuid.UUID(int=1),
             course_id=uuid.UUID(int=2),
             grade_scale="eng5_np_legacy_9_step",
             mode=RunnerMode.DRY_RUN,

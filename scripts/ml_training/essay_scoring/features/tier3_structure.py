@@ -6,13 +6,12 @@ from dataclasses import dataclass
 
 import spacy
 from spacy.language import Language
+from spacy.tokens import Doc
 
 from scripts.ml_training.essay_scoring.features.schema import Tier3Features
 from scripts.ml_training.essay_scoring.features.utils import (
     safe_divide,
     split_paragraphs,
-    tokenize_sentences,
-    tokenize_words,
 )
 
 CONCLUSION_MARKERS = {
@@ -44,12 +43,16 @@ class Tier3FeatureExtractor:
     def extract(self, text: str, prompt: str) -> Tier3Features:
         """Extract Tier 3 features from essay text."""
 
+        if self.nlp is None:
+            raise RuntimeError("spaCy pipeline not initialized for Tier 3 extractor.")
+
+        doc = self.nlp(text)
         paragraphs = split_paragraphs(text)
         paragraph_count = float(len(paragraphs))
         has_intro = 1.0 if self._has_intro(paragraphs, self.nlp) else 0.0
         has_conclusion = 1.0 if self._has_conclusion(paragraphs) else 0.0
-        lexical_overlap = self._lexical_overlap(text, self.nlp)
-        pronoun_noun_ratio = self._pronoun_noun_ratio(text)
+        lexical_overlap = self._lexical_overlap_from_doc(doc)
+        pronoun_noun_ratio = self._pronoun_noun_ratio_from_doc(doc)
 
         return Tier3Features(
             paragraph_count=paragraph_count,
@@ -63,8 +66,9 @@ class Tier3FeatureExtractor:
     def _has_intro(paragraphs: list[str], nlp: Language) -> bool:
         if not paragraphs:
             return False
-        first_words = tokenize_words(paragraphs[0], nlp)
-        return len(first_words) >= 30
+        # Tokenizer-only (no tagger/parser) is enough for word-count heuristics.
+        doc = nlp.make_doc(paragraphs[0])
+        return sum(1 for token in doc if not token.is_space) >= 30
 
     @staticmethod
     def _has_conclusion(paragraphs: list[str]) -> bool:
@@ -74,24 +78,24 @@ class Tier3FeatureExtractor:
         return any(marker in last_paragraph for marker in CONCLUSION_MARKERS)
 
     @staticmethod
-    def _lexical_overlap(text: str, nlp: Language) -> float:
-        sentences = tokenize_sentences(text, nlp)
+    def _lexical_overlap_from_doc(doc: Doc) -> float:
+        sentences = list(doc.sents)
         if len(sentences) < 2:
             return 0.0
-        overlaps = []
-        for idx in range(len(sentences) - 1):
-            tokens_a = set(token.lower() for token in tokenize_words(sentences[idx], nlp))
-            tokens_b = set(token.lower() for token in tokenize_words(sentences[idx + 1], nlp))
+        overlaps: list[float] = []
+        for sent_a, sent_b in zip(sentences, sentences[1:], strict=False):
+            tokens_a = {token.text.lower() for token in sent_a if not token.is_space}
+            tokens_b = {token.text.lower() for token in sent_b if not token.is_space}
             if not tokens_a or not tokens_b:
                 overlaps.append(0.0)
-            else:
-                intersection = tokens_a.intersection(tokens_b)
-                union = tokens_a.union(tokens_b)
-                overlaps.append(safe_divide(float(len(intersection)), float(len(union))))
+                continue
+            intersection = tokens_a.intersection(tokens_b)
+            union = tokens_a.union(tokens_b)
+            overlaps.append(safe_divide(float(len(intersection)), float(len(union))))
         return float(sum(overlaps) / len(overlaps))
 
-    def _pronoun_noun_ratio(self, text: str) -> float:
-        doc = self.nlp(text)
+    @staticmethod
+    def _pronoun_noun_ratio_from_doc(doc: Doc) -> float:
         pronouns = sum(1 for token in doc if token.pos_ == "PRON")
         nouns = sum(1 for token in doc if token.pos_ in {"NOUN", "PROPN"})
         return safe_divide(float(pronouns), float(nouns))

@@ -96,7 +96,7 @@ class TestDevAuthTokenGeneration:
     def test_creates_valid_jwt_token(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Token generation creates valid JWT with expected claims."""
         monkeypatch.setenv("ENVIRONMENT", "development")
-        monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-key")
+        monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-key-with-min-32-bytes")
 
         if "scripts.cj_experiments_runners.eng5_np.dev_auth" in sys.modules:
             del sys.modules["scripts.cj_experiments_runners.eng5_np.dev_auth"]
@@ -120,7 +120,7 @@ class TestDevAuthTokenGeneration:
         from datetime import timedelta
 
         monkeypatch.setenv("ENVIRONMENT", "development")
-        monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-key")
+        monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-key-with-min-32-bytes")
 
         if "scripts.cj_experiments_runners.eng5_np.dev_auth" in sys.modules:
             del sys.modules["scripts.cj_experiments_runners.eng5_np.dev_auth"]
@@ -141,7 +141,7 @@ class TestDevAuthTokenGeneration:
     def test_custom_subject_and_org_id(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Custom subject and org_id are included in token."""
         monkeypatch.setenv("ENVIRONMENT", "development")
-        monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-key")
+        monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-key-with-min-32-bytes")
 
         if "scripts.cj_experiments_runners.eng5_np.dev_auth" in sys.modules:
             del sys.modules["scripts.cj_experiments_runners.eng5_np.dev_auth"]
@@ -189,7 +189,7 @@ class TestBuildAdminHeaders:
         monkeypatch.delenv("HULEEDU_SERVICE_ACCOUNT_TOKEN", raising=False)
         monkeypatch.delenv("HULEEDU_ADMIN_TOKEN", raising=False)
         monkeypatch.setenv("ENVIRONMENT", "development")
-        monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-key")
+        monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-key-with-min-32-bytes")
 
         # Reload module to clear import cache
         if "scripts.cj_experiments_runners.eng5_np.dev_auth" in sys.modules:

@@ -15,9 +15,13 @@ def ensure_textdescriptives_readability(nlp: Language) -> None:
         nlp.add_pipe("textdescriptives/readability", last=True)
 
 
-def load_spacy_model(model_name: str) -> Language:
-    """Load a spaCy model and attach TextDescriptives readability."""
+def load_spacy_model(model_name: str, *, enable_readability: bool = True) -> Language:
+    """Load a spaCy model for the essay scoring pipeline.
+
+    Tier 1 requires TextDescriptives readability metrics; Tier 2 and Tier 3 do not.
+    """
 
     nlp = spacy.load(model_name)
-    ensure_textdescriptives_readability(nlp)
+    if enable_readability:
+        ensure_textdescriptives_readability(nlp)
     return nlp

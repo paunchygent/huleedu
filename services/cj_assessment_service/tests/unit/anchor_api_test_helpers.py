@@ -310,6 +310,7 @@ class MockCJRepository(
         course_id: str | None,
         instructions_text: str,
         grade_scale: str,
+        context_origin: str = "canonical_national",
         student_prompt_storage_id: str | None = None,
         judge_rubric_storage_id: str | None = None,
     ) -> AssessmentInstruction:
@@ -318,6 +319,7 @@ class MockCJRepository(
             course_id=course_id,
             instructions_text=instructions_text,
             grade_scale=grade_scale,
+            context_origin=context_origin,
             student_prompt_storage_id=student_prompt_storage_id,
             judge_rubric_storage_id=judge_rubric_storage_id,
         )
@@ -484,6 +486,7 @@ class FailingMockRepository(
         course_id: str | None,
         instructions_text: str,
         grade_scale: str,
+        context_origin: str = "canonical_national",
         student_prompt_storage_id: str | None = None,
         judge_rubric_storage_id: str | None = None,
     ) -> AssessmentInstruction:

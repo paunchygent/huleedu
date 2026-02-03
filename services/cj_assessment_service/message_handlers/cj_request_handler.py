@@ -28,7 +28,6 @@ from huleedu_service_libs.observability import inject_trace_context
 
 from services.cj_assessment_service.cj_core_logic.content_hydration import (
     extract_prompt_storage_id,
-    hydrate_judge_rubric_context,
     hydrate_prompt_text,
 )
 from services.cj_assessment_service.cj_core_logic.error_categorization import (
@@ -118,56 +117,48 @@ async def handle_cj_assessment_request(
             envelope.data
         )
 
-        # Extract and hydrate student prompt
-        prompt_storage_id = extract_prompt_storage_id(
-            request_event_data.student_prompt_ref,
-            correlation_id=envelope.correlation_id,
-            log_extra={
-                "event_id": str(envelope.event_id),
-                "bos_batch_id": str(request_event_data.entity_id),
-            },
-            prompt_failure_metric=prompt_failure_metric,
-        )
+        prompt_storage_id: str | None = None
+        prompt_text: str | None = None
+        judge_rubric_storage_id: str | None = None
+        judge_rubric_text: str | None = None
 
-        prompt_result = await hydrate_prompt_text(
-            storage_id=prompt_storage_id,
-            content_client=content_client,
-            correlation_id=envelope.correlation_id,
-            log_extra={
-                "event_id": str(envelope.event_id),
-                "bos_batch_id": str(request_event_data.entity_id),
-            },
-            prompt_failure_metric=prompt_failure_metric,
-        )
+        # Assignment-scoped requests must not accept event-level prompt/rubric inputs.
+        # Prompt/rubric hydration is handled downstream via assessment_instructions.
+        if request_event_data.assignment_id is None:
+            prompt_storage_id = extract_prompt_storage_id(
+                request_event_data.student_prompt_ref,
+                correlation_id=envelope.correlation_id,
+                log_extra={
+                    "event_id": str(envelope.event_id),
+                    "bos_batch_id": str(request_event_data.entity_id),
+                },
+                prompt_failure_metric=prompt_failure_metric,
+            )
 
-        # Unpack Result - default to None on errors or empty content
-        if prompt_result.is_ok:
-            hydrated_prompt = prompt_result.value
-            prompt_text = hydrated_prompt or None
-            if prompt_text and prompt_success_metric:
-                try:
-                    prompt_success_metric.inc()
-                except Exception:  # pragma: no cover - defensive
-                    logger.debug("Unable to increment prompt success metric", exc_info=True)
-        else:
-            prompt_text = None
+            prompt_result = await hydrate_prompt_text(
+                storage_id=prompt_storage_id,
+                content_client=content_client,
+                correlation_id=envelope.correlation_id,
+                log_extra={
+                    "event_id": str(envelope.event_id),
+                    "bos_batch_id": str(request_event_data.entity_id),
+                },
+                prompt_failure_metric=prompt_failure_metric,
+            )
 
-        # Hydrate judge rubric context
-        (
-            judge_rubric_storage_id,
-            judge_rubric_text,
-        ) = await hydrate_judge_rubric_context(
-            session_provider=session_provider,
-            instruction_repository=instruction_repository,
-            content_client=content_client,
-            assignment_id=request_event_data.assignment_id,
-            correlation_id=envelope.correlation_id,
-            log_extra={
-                "event_id": str(envelope.event_id),
-                "bos_batch_id": str(request_event_data.entity_id),
-            },
-            prompt_failure_metric=prompt_failure_metric,
-        )
+            if prompt_result.is_ok:
+                hydrated_prompt = prompt_result.value
+                prompt_text = hydrated_prompt or None
+                if prompt_text and prompt_success_metric:
+                    try:
+                        prompt_success_metric.inc()
+                    except Exception:  # pragma: no cover - defensive
+                        logger.debug("Unable to increment prompt success metric", exc_info=True)
+            else:
+                prompt_text = None
+
+            # Guest runs do not hydrate assignment-owned judge rubrics here; rely on overrides.
+            judge_rubric_storage_id, judge_rubric_text = None, None
 
         # Build log context
         log_extra: dict[str, Any] = {

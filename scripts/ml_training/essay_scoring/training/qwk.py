@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import numpy as np
 import xgboost as xgb
 from sklearn.metrics import cohen_kappa_score
@@ -19,10 +21,16 @@ def clip_bands(predictions: np.ndarray, min_band: float = 1.0, max_band: float =
     return np.clip(predictions, min_band, max_band)
 
 
-def qwk_score(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+def qwk_score(
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    *,
+    min_band: float = 1.0,
+    max_band: float = 9.0,
+) -> float:
     """Compute quadratic weighted kappa for predictions."""
 
-    rounded = clip_bands(round_to_half_band(y_pred))
+    rounded = clip_bands(round_to_half_band(y_pred), min_band=min_band, max_band=max_band)
     true_ids = _to_half_band_ids(y_true)
     pred_ids = _to_half_band_ids(rounded)
     return float(cohen_kappa_score(true_ids, pred_ids, weights="quadratic"))
@@ -33,6 +41,20 @@ def qwk_eval(preds: np.ndarray, dtrain: xgb.DMatrix) -> tuple[str, float]:
 
     labels = dtrain.get_label()
     return "qwk", qwk_score(labels, preds)
+
+
+def qwk_eval_factory(
+    *,
+    min_band: float,
+    max_band: float,
+) -> Callable[[np.ndarray, xgb.DMatrix], tuple[str, float]]:
+    """Create an XGBoost custom evaluation metric for a specific score scale."""
+
+    def qwk_eval_inner(preds: np.ndarray, dtrain: xgb.DMatrix) -> tuple[str, float]:
+        labels = dtrain.get_label()
+        return "qwk", qwk_score(labels, preds, min_band=min_band, max_band=max_band)
+
+    return qwk_eval_inner
 
 
 def _to_half_band_ids(values: np.ndarray) -> np.ndarray:

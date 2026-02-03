@@ -513,6 +513,9 @@ class AssessmentInstruction(Base):
     grade_scale: Mapped[str] = mapped_column(
         String(50), nullable=False, server_default="swedish_8_anchor", index=True
     )
+    context_origin: Mapped[str] = mapped_column(
+        String(64), nullable=False, server_default="research_experiment", index=True
+    )
     student_prompt_storage_id: Mapped[str | None] = mapped_column(
         String(255), nullable=True, index=True
     )

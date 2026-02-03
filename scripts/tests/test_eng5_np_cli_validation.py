@@ -137,6 +137,7 @@ class TestEng5CliValidation:
 
         settings = RunnerSettings(
             assignment_id=UUID(int=1),
+            cj_assignment_id=UUID(int=1),
             course_id=UUID(int=2),
             grade_scale="eng5_np_legacy_9_step",
             mode=RunnerMode.PLAN,

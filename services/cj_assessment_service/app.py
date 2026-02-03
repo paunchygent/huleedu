@@ -29,6 +29,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from services.cj_assessment_service.api import anchor_management
 from services.cj_assessment_service.api.admin import (
+    anchors_bp,
     instructions_bp,
     judge_rubrics_bp,
     student_prompts_bp,
@@ -117,6 +118,7 @@ def create_app(settings: Settings | None = None) -> HuleEduApp:
     app.register_blueprint(health_bp)
     app.register_blueprint(anchor_management.bp)
     if settings.ENABLE_ADMIN_ENDPOINTS:
+        app.register_blueprint(anchors_bp)
         app.register_blueprint(instructions_bp)
         app.register_blueprint(student_prompts_bp)
         app.register_blueprint(judge_rubrics_bp)

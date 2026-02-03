@@ -134,6 +134,7 @@ class TestCJRegularBatchProviderBatchApiDocker:
 
         runner_settings = RunnerSettings(
             assignment_id=uuid.uuid4(),
+            cj_assignment_id=None,
             course_id=uuid.uuid4(),
             grade_scale="eng5",
             mode=RunnerMode.EXECUTE,

@@ -23,6 +23,7 @@ class RunnerMode(str, Enum):
 @dataclass
 class RunnerSettings:
     assignment_id: uuid.UUID
+    cj_assignment_id: uuid.UUID | None
     course_id: uuid.UUID
     grade_scale: str
     mode: RunnerMode
@@ -41,9 +42,11 @@ class RunnerSettings:
     kafka_client_id: str
     content_service_url: str
     cj_service_url: str | None = None
+    cj_anchor_count: int | None = None
     llm_overrides: LLMConfigOverrides | None = None
     max_comparisons: int | None = None
     await_completion: bool = False
+    auto_extract_eng5_db: bool = False
     completion_timeout: float = 1800.0
     llm_batching_mode_hint: str | None = None
     # Anchor alignment test mode fields

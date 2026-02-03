@@ -116,6 +116,7 @@ async def upload_student_prompt(  # type: ignore[override]
                 course_id=existing.course_id,
                 instructions_text=existing.instructions_text,
                 grade_scale=existing.grade_scale,
+                context_origin=existing.context_origin,
                 student_prompt_storage_id=storage_id,
             )
 

@@ -131,6 +131,7 @@ class AssessmentEventCollector:
         self._stop = asyncio.Event()
         self._rich_observed = False
         self._completion_observed = False
+        self._completion_seen_at: float | None = None
         self._error: Exception | None = None
         self._started_at: float | None = None
         self._logger = _LOGGER.bind(
@@ -172,6 +173,7 @@ class AssessmentEventCollector:
         self._started_at = loop.time()
         self._ready.set()
         deadline = loop.time() + self.settings.completion_timeout
+        post_completion_grace = 10.0
         self._logger.info(
             "collector_started",
             topics=topics,
@@ -180,7 +182,14 @@ class AssessmentEventCollector:
 
         try:
             while not self._stop.is_set():
-                if self._rich_observed:
+                if self._completion_observed and self._rich_observed:
+                    break
+                if (
+                    self._completion_observed
+                    and self._completion_seen_at is not None
+                    and not self._rich_observed
+                    and loop.time() >= (self._completion_seen_at + post_completion_grace)
+                ):
                     break
                 remaining = deadline - loop.time()
                 if remaining <= 0:
@@ -196,6 +205,7 @@ class AssessmentEventCollector:
                     elapsed = self._elapsed_time()
                     if elapsed is not None:
                         self.hydrator.mark_timeout(elapsed)
+                        self.hydrator.persist_runner_status()
                     break
 
                 batches = await consumer.getmany(timeout_ms=1000, max_records=50)
@@ -219,6 +229,7 @@ class AssessmentEventCollector:
             )
             raise
         finally:
+            self.hydrator.persist_runner_status()
             await consumer.stop()
             self._done.set()
             self._logger.info(
@@ -293,6 +304,7 @@ class AssessmentEventCollector:
 
             write_completion_event(envelope=envelope, output_dir=self.settings.output_dir)
             self._completion_observed = True
+            self._completion_seen_at = asyncio.get_event_loop().time()
             self.hydrator.record_completion_seen()
             self._observed_counts["completions"] += 1
             log_event_processing(

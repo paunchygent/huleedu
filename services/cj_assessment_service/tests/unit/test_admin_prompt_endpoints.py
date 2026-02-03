@@ -57,6 +57,7 @@ class AdminRepositoryMock(AssessmentInstructionRepositoryProtocol, SessionProvid
         course_id: str | None,
         instructions_text: str,
         grade_scale: str,
+        context_origin: str = "canonical_national",
         student_prompt_storage_id: str | None = None,
         judge_rubric_storage_id: str | None = None,
     ) -> Any:
@@ -65,6 +66,7 @@ class AdminRepositoryMock(AssessmentInstructionRepositoryProtocol, SessionProvid
             course_id=course_id,
             instructions_text=instructions_text,
             grade_scale=grade_scale,
+            context_origin=context_origin,
             student_prompt_storage_id=student_prompt_storage_id,
             judge_rubric_storage_id=judge_rubric_storage_id,
         )
@@ -291,7 +293,7 @@ def correlation_context() -> CorrelationContext:
 def settings() -> Settings:
     cfg = Settings()
     cfg.ENABLE_ADMIN_ENDPOINTS = True
-    cfg.JWT_SECRET_KEY = SecretStr("unit-test-secret")
+    cfg.JWT_SECRET_KEY = SecretStr("unit-test-secret-key-with-min-32-bytes")
     return cfg
 
 
@@ -477,6 +479,10 @@ async def test_prompt_get_missing_storage_id(
     admin_repo: AdminRepositoryMock,
     admin_headers: dict[str, str],
 ) -> None:
+    # The in-memory instruction store follows the same semantics as the real repository:
+    # passing `student_prompt_storage_id=None` to upsert does NOT clear an existing value.
+    # To simulate "instruction exists but no prompt uploaded yet", we replace the record.
+    admin_repo._instruction_store.delete(assignment_id="assignment-1", course_id=None)
     admin_repo._instruction_store.upsert(
         assignment_id="assignment-1",
         course_id=None,

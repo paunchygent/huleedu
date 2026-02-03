@@ -7,7 +7,7 @@ priority: high
 domain: programs
 owner_team: agents
 created: '2025-11-21'
-last_updated: '2026-02-01'
+last_updated: '2026-02-02'
 service: ''
 owner: ''
 program: ''
@@ -27,7 +27,7 @@ labels: []
 
 ## Status
 
-**IN PROGRESS** – R3 grade-scale ownership + preflight implemented; R4/R5/R7 pending
+**IN PROGRESS** – R1–R5 implemented; R6/R7 pending
 
 ## Context
 
@@ -52,11 +52,9 @@ Recent validation exposed several incorrect ENG5 runner assumptions that mask co
 
 ## Immediate Next Actions
 
-1. Implement Checkpoint 3 (R4) to remove automatic anchor uploads and add a CJ anchor preflight (anchors as CJ-managed precondition).
-2. Implement Checkpoint 3 (R5) to introduce `--auto-extract-eng5-db` tied to `--await-completion`, including smoke coverage.
-3. Complete Checkpoint 4 (R6) by documenting grade-scale ownership in CJ, updating ENG5 examples accordingly, and filing any CJ-side follow-ups discovered during the research pass.
-4. Complete Checkpoint 5 (R7 Phase 1–2) by documenting the current essay-upload flow, then adding manifest-level caching with a `--force-reupload` override plus unit coverage.
-5. Run and analyse dedicated ENG5 anchor alignment experiments using `ANCHOR_ALIGN_TEST` with language-control prompts and Sonnet 4.5, feeding findings back into runner defaults and CJ prompt configuration.
+1. Complete Checkpoint 4 (R6) by documenting anchor grade metadata and CJ enforcement surfaces (grade-scale ownership is enforced in the runner via R3).
+2. Complete Checkpoint 5 (R7 Phase 1–2) by documenting the current essay-upload flow, then adding manifest-level caching with a `--force-reupload` override plus unit coverage.
+3. Run and analyse dedicated ENG5 anchor alignment experiments using `ANCHOR_ALIGN_TEST` with language-control prompts and Sonnet 4.5, feeding findings back into runner defaults and CJ prompt configuration.
 
 ## Progress (2026-02-01) – Grade Scale Ownership (R3)
 
@@ -65,6 +63,23 @@ Recent validation exposed several incorrect ENG5 runner assumptions that mask co
   - Added CJ admin preflight (`GET /admin/v1/assessment-instructions/assignment/{assignment_id}`) to resolve and echo `grade_scale` for `plan`/`dry-run`/`execute` when `--assignment-id` is provided.
 - Tests:
   - `pdm run pytest-root scripts/tests/test_eng5_np_assignment_preflight.py` ✅
+
+## Progress (2026-02-02) – Anchors as Preconditions (R4) + Optional DB Extraction (R5)
+
+- R4 (student-only execute; anchors are CJ-managed preconditions):
+  - Added CJ admin anchor summary endpoint used for runner preflight:
+    - `GET /admin/v1/anchors/assignment/<assignment_id>` (scoped to `assessment_instructions.grade_scale`).
+  - Runner `execute` no longer registers anchors; local anchor docs are optional for execute runs.
+  - `.agent/rules/020.19-eng5-np-runner-container.md` updated to remove the now-invalid execute-time anchor registration claim.
+- R5 (optional post-success DB extraction):
+  - Added `--auto-extract-eng5-db` (requires `--await-completion`; disallowed with `--no-kafka`).
+  - After a completion event is observed, the runner runs the existing CJ DB diagnostics extraction and captures output under `output_dir/db_extract/`.
+  - Failure semantics: batch completion is still reported, but extraction failure returns a non-zero exit code and is recorded in artefacts.
+- Tests:
+  - `pdm run pytest-root scripts/tests/test_eng5_np_anchors_preflight.py` ✅
+  - `pdm run pytest-root scripts/tests/test_eng5_np_execute_flow.py` ✅
+  - `pdm run pytest-root scripts/cj_experiments_runners/eng5_np/tests/unit/test_execute_handler.py` ✅
+  - `pdm run pytest-root services/cj_assessment_service/tests/unit/test_admin_anchor_endpoints.py` ✅
 
 ## Progress (2025-11-30) – ENG5 Anchor Alignment Experiment
 
@@ -156,8 +171,9 @@ This task hardens the ENG5 runner as a **strict validating orchestrator**: it va
   - Do not implement ENG5-local dedupe or grade-scale logic; rely on CJ’s unique constraint and upsert semantics from the anchor infrastructure task.
 - Explicitly depend on `TASK-FIX-ANCHOR-ESSAY-INFRASTRUCTURE.md` for:
   - Persistent Content Service storage.
-  - Unique constraint on `(assignment_id, grade, grade_scale)`.
+  - Unique constraint on `(assignment_id, anchor_label, grade_scale)`.
   - Upsert behaviour in CJ’s `anchor_management` API.
+  - Note: `.agent/rules/020.19-eng5-np-runner-container.md` currently describes execute-time anchor registration; R4 intentionally removes this and will require a rule update once implemented.
 
 ### R5. Optional automatic ENG5 DB extraction on successful completion
 
@@ -229,7 +245,7 @@ This task hardens the ENG5 runner as a **strict validating orchestrator**: it va
 
 ## Execution Plan & Checkpoints
 
-### Checkpoint 1 – CLI validation & batch UUID (R1, R2)
+### Checkpoint 1 – CLI validation & batch UUID (R1, R2) ✅ COMPLETED
 
 - **Objective**: Ensure ENG5 rejects obviously invalid comparison configurations and always uses a canonical UUID for cross-service identity.
 - **Implementation (high-level)**:
@@ -246,7 +262,7 @@ This task hardens the ENG5 runner as a **strict validating orchestrator**: it va
   - Run:
     - `pdm run pytest-root scripts/tests/test_eng5_np_manifest_integration.py -k comparisons`
 
-### Checkpoint 2 – Assignment metadata preflight (R3)
+### Checkpoint 2 – Assignment metadata preflight (R3) ✅ COMPLETED
 
 - **Objective**: Resolve assignment metadata from CJ via API before any ENG5 run and display it clearly to the operator.
 - **Implementation (high-level)**:
@@ -258,15 +274,10 @@ This task hardens the ENG5 runner as a **strict validating orchestrator**: it va
     - Auth/config problems (401/403, bad URL/token).
   - Echo slug-related information (from assignment_id), grade_scale, and prompt presence to the CLI while treating the CJ response as authoritative.
 - **Validation**:
-  - Unit tests for:
-    - Happy-path metadata resolution.
-    - 404 → user-facing guidance to use `cj-admin instructions upsert/list`.
-    - 401/403 → clear configuration/auth error messages.
-  - Integration smoke test using a real CJ instance (dev stack):
-    - `pdm run cj-admin instructions upsert ...` to seed data.
-    - `pdm run python -m scripts.cj_experiments_runners.eng5_np.cli --mode plan ...` and assert preflight output.
+  - `pdm run pytest-root scripts/tests/test_eng5_np_assignment_preflight.py` ✅
+  - `pdm run eng5-np-run --help` ✅ (flag surface: `--expected-grade-scale`, no `--grade-scale`)
 
-### Checkpoint 3 – Anchors as precondition & optional DB extraction (R4, R5)
+### Checkpoint 3 – Anchors as precondition & optional DB extraction (R4, R5) ✅ COMPLETED
 
 - **Objective**: Make ENG5 `execute` runs student-only with anchors treated as a CJ-managed precondition, and add optional post-success DB extraction.
 - **Implementation (high-level)**:

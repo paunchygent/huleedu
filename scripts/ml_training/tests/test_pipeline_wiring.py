@@ -69,6 +69,7 @@ class DummyTier3:
 def _records() -> list[EssayRecord]:
     return [
         EssayRecord(
+            record_id="record-1",
             task_type="1",
             question="Vad tycker du om skolan?",
             essay="Jag gillar skolan. Det är viktigt att lära sig om åäö.",
@@ -76,6 +77,7 @@ def _records() -> list[EssayRecord]:
             component_scores={},
         ),
         EssayRecord(
+            record_id="record-2",
             task_type="2",
             question="Describe your hometown.",
             essay="My hometown is small but vibrant.",

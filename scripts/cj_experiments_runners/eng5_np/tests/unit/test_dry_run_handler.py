@@ -25,6 +25,7 @@ def _make_settings(tmp_path: Path) -> RunnerSettings:
     """Create minimal RunnerSettings for DRY_RUN mode tests."""
     return RunnerSettings(
         assignment_id=uuid.UUID("00000000-0000-0000-0000-000000000011"),
+        cj_assignment_id=uuid.UUID("00000000-0000-0000-0000-000000000011"),
         course_id=uuid.UUID("00000000-0000-0000-0000-000000000012"),
         grade_scale="eng5_np_legacy_9_step",
         mode=RunnerMode.DRY_RUN,

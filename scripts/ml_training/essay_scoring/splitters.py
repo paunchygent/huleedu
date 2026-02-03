@@ -65,6 +65,19 @@ def stratified_split(dataset: EssayDataset, config: TrainingConfig) -> DatasetSp
     if not temp_records:
         return DatasetSplit(train=train_records, val=[], test=[])
 
+    if config.test_ratio == 0.0:
+        return DatasetSplit(
+            train=train_records,
+            val=list(temp_records),
+            test=[],
+        )
+    if config.val_ratio == 0.0:
+        return DatasetSplit(
+            train=train_records,
+            val=[],
+            test=list(temp_records),
+        )
+
     val_ratio = config.val_ratio / (config.val_ratio + config.test_ratio)
     val_records, test_records, _, _ = train_test_split(
         temp_records,

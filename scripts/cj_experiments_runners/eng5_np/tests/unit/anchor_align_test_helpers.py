@@ -22,6 +22,7 @@ def make_anchor_align_settings(tmp_path: Path) -> RunnerSettings:
     """Create RunnerSettings for ANCHOR_ALIGN_TEST mode tests."""
     return RunnerSettings(
         assignment_id=uuid.UUID("00000000-0000-0000-0000-000000000021"),
+        cj_assignment_id=None,
         course_id=uuid.UUID("00000000-0000-0000-0000-000000000022"),
         grade_scale="eng5_np_legacy_9_step",
         mode=RunnerMode.ANCHOR_ALIGN_TEST,

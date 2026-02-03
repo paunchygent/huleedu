@@ -18,6 +18,13 @@ from common_core.domain_enums import CourseCode, Language
 from common_core.events.cj_assessment_events import LLMConfigOverrides
 
 from scripts.cj_experiments_runners.eng5_np import __version__
+from scripts.cj_experiments_runners.eng5_np.anchors_preflight import (
+    AnchorPreflightAuthError,
+    AnchorPreflightConfigError,
+    AnchorPreflightMissingAnchorsError,
+    AnchorPreflightNotFoundError,
+    resolve_anchor_preflight,
+)
 from scripts.cj_experiments_runners.eng5_np.assignment_preflight import (
     AssignmentPreflightAuthError,
     AssignmentPreflightConfigError,
@@ -42,6 +49,7 @@ from scripts.cj_experiments_runners.eng5_np.inventory import (
     ComparisonValidationError,
     collect_inventory,
     ensure_comparison_capacity,
+    ensure_comparison_capacity_counts,
     snapshot_directory,
 )
 from scripts.cj_experiments_runners.eng5_np.logging_support import (
@@ -303,6 +311,7 @@ def _build_llm_overrides(
     temperature: float | None,
     max_tokens: int | None,
     system_prompt: str | None,
+    judge_rubric_override: str | None = None,
     reasoning_effort: str | None = None,
     output_verbosity: str | None = None,
 ) -> LLMConfigOverrides | None:
@@ -313,6 +322,7 @@ def _build_llm_overrides(
             temperature,
             max_tokens,
             system_prompt,
+            judge_rubric_override,
             reasoning_effort,
             output_verbosity,
         ]
@@ -343,9 +353,22 @@ def _build_llm_overrides(
         temperature_override=temperature,
         max_tokens_override=max_tokens,
         system_prompt_override=system_prompt,
+        judge_rubric_override=judge_rubric_override,
         reasoning_effort=reasoning_effort,
         output_verbosity=output_verbosity,
     )
+
+
+def _load_prompt_file(path: Path | None, label: str) -> str | None:
+    if path is None:
+        return None
+    if not path.exists():
+        raise typer.BadParameter(f"{label} file not found: {path}")
+    content = path.read_text(encoding="utf-8").strip()
+    if not content:
+        raise typer.BadParameter(f"{label} file is empty: {path}")
+    typer.echo(f"Loaded {label}: {path} ({len(content)} chars)", err=True)
+    return content
 
 
 @app.callback(invoke_without_command=True)
@@ -415,7 +438,7 @@ def main(
     ),
     cj_service_url: str | None = typer.Option(
         os.getenv("CJ_SERVICE_URL"),
-        help="CJ Assessment Service base URL for anchor registration",
+        help="CJ Assessment Service base URL (required for execute preflight and register-anchors)",
     ),
     content_service_url: str = typer.Option(
         os.getenv("CONTENT_SERVICE_URL", "http://localhost:8001/v1/content"),
@@ -453,6 +476,14 @@ def main(
     await_completion: bool = typer.Option(
         False,
         help="Wait for CJ completion event before exiting",
+    ),
+    auto_extract_eng5_db: bool = typer.Option(
+        False,
+        "--auto-extract-eng5-db",
+        help=(
+            "After a successful completion event (requires --await-completion), "
+            "run the CJ DB extraction helper and capture output under the run artefacts."
+        ),
     ),
     completion_timeout: float = typer.Option(
         1800.0,
@@ -497,12 +528,12 @@ def main(
     system_prompt_file: Path | None = typer.Option(
         None,
         "--system-prompt",
-        help="Path to custom system prompt file (anchor-align-test mode)",
+        help="Path to custom system prompt file (execute or anchor-align-test mode)",
     ),
     rubric_file: Path | None = typer.Option(
         None,
         "--rubric",
-        help="Path to custom judge rubric file (anchor-align-test mode)",
+        help="Path to custom judge rubric file (execute or anchor-align-test mode)",
     ),
 ) -> None:
     if ctx.invoked_subcommand is not None:
@@ -533,6 +564,13 @@ def main(
             "Anchor-align specific flags can only be used with --mode anchor-align-test"
         )
 
+    if mode not in {RunnerMode.ANCHOR_ALIGN_TEST, RunnerMode.EXECUTE} and any(
+        [system_prompt_file, rubric_file]
+    ):
+        raise typer.BadParameter(
+            "--system-prompt/--rubric can only be used with execute or anchor-align-test"
+        )
+
     repo_root = repo_root_from_package()
     paths = RunnerPaths.from_repo_root(repo_root)
 
@@ -545,7 +583,20 @@ def main(
             param_hint="'--expected-grade-scale'",
         )
 
+    if auto_extract_eng5_db and not await_completion:
+        raise typer.BadParameter(
+            "--auto-extract-eng5-db requires --await-completion.",
+            param_hint="'--auto-extract-eng5-db'",
+        )
+    if auto_extract_eng5_db and no_kafka:
+        raise typer.BadParameter(
+            "--auto-extract-eng5-db requires Kafka publishing (omit --no-kafka).",
+            param_hint="'--auto-extract-eng5-db'",
+        )
+
     resolved_grade_scale = _DEFAULT_GRADE_SCALE
+    cj_anchor_count: int | None = None
+    assignment_context_origin: str | None = None
     if assignment_id is not None:
         try:
             preflight = resolve_assignment_preflight(
@@ -560,11 +611,23 @@ def main(
             raise typer.BadParameter(str(exc)) from exc
 
         resolved_grade_scale = preflight.grade_scale
+        assignment_context_origin = preflight.context_origin
         typer.echo(
             "Resolved assignment context from CJ: "
-            f"assignment_id={preflight.assignment_id} grade_scale={preflight.grade_scale}",
+            f"assignment_id={preflight.assignment_id} "
+            f"grade_scale={preflight.grade_scale} "
+            f"context_origin={preflight.context_origin} "
+            f"student_prompt={'present' if preflight.student_prompt_storage_id else 'missing'}",
             err=True,
         )
+
+        if mode is RunnerMode.EXECUTE and preflight.student_prompt_storage_id is None:
+            raise typer.BadParameter(
+                "CJ assessment_instructions is missing a student prompt for this assignment. "
+                "Upload one via the CJ admin API/CLI before running execute, e.g. "
+                "`pdm run cj-admin prompts upload --assignment-id ... --prompt-file ...`.",
+                param_hint="'--assignment-id'",
+            )
 
         if (
             expected_grade_scale is not None
@@ -576,6 +639,39 @@ def main(
                 f"Expected '{expected_grade_scale}', but CJ has '{preflight.grade_scale}' "
                 f"for assignment_id={preflight.assignment_id}.",
                 param_hint="'--expected-grade-scale'",
+            )
+
+        if mode is RunnerMode.EXECUTE:
+            if assignment_context_origin == "canonical_national" and rubric_file is not None:
+                raise typer.BadParameter(
+                    "Rubric override is not allowed for canonical assignments. "
+                    "Update CJ assessment_instructions.context_origin to a non-canonical value "
+                    "(e.g. 'research_experiment') before running rubric A/B tests.",
+                    param_hint="'--rubric'",
+                )
+
+            try:
+                anchor_preflight = resolve_anchor_preflight(
+                    assignment_id=assignment_id,
+                    cj_service_url=cj_service_url,
+                )
+            except AnchorPreflightConfigError as exc:
+                raise typer.BadParameter(str(exc), param_hint="'--cj-service-url'") from exc
+            except AnchorPreflightNotFoundError as exc:
+                raise typer.BadParameter(str(exc), param_hint="'--assignment-id'") from exc
+            except AnchorPreflightAuthError as exc:
+                raise typer.BadParameter(str(exc)) from exc
+            except AnchorPreflightMissingAnchorsError as exc:
+                raise typer.BadParameter(str(exc), param_hint="'--assignment-id'") from exc
+
+            cj_anchor_count = anchor_preflight.anchor_count
+            typer.echo(
+                "Resolved CJ anchor precondition: "
+                f"assignment_id={anchor_preflight.assignment_id} "
+                f"grade_scale={anchor_preflight.grade_scale} "
+                f"anchors={anchor_preflight.anchor_count} "
+                f"(total={anchor_preflight.anchor_count_total})",
+                err=True,
             )
 
     if llm_batching_mode is not None:
@@ -631,12 +727,24 @@ def main(
     # Validate LLM model override against manifest before proceeding
     validate_llm_overrides(provider=effective_llm_provider, model=effective_llm_model)
 
-    system_prompt_override = build_cj_system_prompt() if cj_system_prompt else None
+    rubric_text_override = (
+        _load_prompt_file(rubric_file, "judge rubric") if mode is RunnerMode.EXECUTE else None
+    )
+
+    system_prompt_override = None
+    if mode is RunnerMode.EXECUTE:
+        system_prompt_override = _load_prompt_file(system_prompt_file, "system prompt")
+        if system_prompt_override is None and cj_system_prompt:
+            system_prompt_override = build_cj_system_prompt()
+    else:
+        system_prompt_override = build_cj_system_prompt() if cj_system_prompt else None
 
     settings = RunnerSettings(
         assignment_id=assignment_id,
+        cj_assignment_id=None if mode is RunnerMode.ANCHOR_ALIGN_TEST else assignment_id,
         course_id=course_id,
         grade_scale=resolved_grade_scale,
+        cj_anchor_count=cj_anchor_count,
         mode=mode,
         use_kafka=not no_kafka,
         output_dir=output_dir or paths.artefact_output_dir,
@@ -659,11 +767,13 @@ def main(
             temperature=llm_temperature,
             max_tokens=llm_max_tokens,
             system_prompt=system_prompt_override,
+            judge_rubric_override=rubric_text_override,
             reasoning_effort=anchor_align_reasoning_effort_value,
             output_verbosity=anchor_align_output_verbosity_value,
         ),
         max_comparisons=max_comparisons,
         await_completion=await_completion,
+        auto_extract_eng5_db=auto_extract_eng5_db,
         completion_timeout=completion_timeout,
         llm_batching_mode_hint=llm_batching_mode,
         system_prompt_file=system_prompt_file,
@@ -709,18 +819,30 @@ def main(
     inventory = collect_inventory(paths)
 
     try:
-        ensure_comparison_capacity(
-            anchors=inventory.anchor_docs,
-            students=inventory.student_docs,
-            max_comparisons=settings.max_comparisons,
-        )
+        if mode is RunnerMode.EXECUTE:
+            ensure_comparison_capacity_counts(
+                anchor_count=settings.cj_anchor_count or 0,
+                student_count=inventory.student_docs.count,
+                max_comparisons=settings.max_comparisons,
+                anchors_hint="CJ anchors (admin preflight)",
+                students_hint=str(inventory.student_docs.root),
+            )
+        else:
+            ensure_comparison_capacity(
+                anchors=inventory.anchor_docs,
+                students=inventory.student_docs,
+                max_comparisons=settings.max_comparisons,
+            )
     except ComparisonValidationError as exc:
         typer.echo("❌ Comparison validation failed:", err=True)
         typer.echo(f"   {exc}", err=True)
-        typer.echo(
-            f"   Anchors found: {inventory.anchor_docs.count} in {inventory.anchor_docs.root}",
-            err=True,
-        )
+        if mode is RunnerMode.EXECUTE:
+            typer.echo(f"   CJ anchors found: {settings.cj_anchor_count or 0}", err=True)
+        else:
+            typer.echo(
+                f"   Anchors found: {inventory.anchor_docs.count} in {inventory.anchor_docs.root}",
+                err=True,
+            )
         typer.echo(
             f"   Students found: {inventory.student_docs.count} in {inventory.student_docs.root}",
             err=True,

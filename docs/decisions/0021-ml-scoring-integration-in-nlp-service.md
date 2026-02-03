@@ -3,7 +3,7 @@ type: decision
 id: ADR-0021
 status: proposed
 created: '2025-12-05'
-last_updated: '2025-12-05'
+last_updated: '2026-02-02'
 ---
 # ADR-0021: ML Scoring Integration in NLP Service
 
@@ -23,9 +23,14 @@ We need a complementary **whitebox** assessment system that:
 
 ### Training Data
 
-IELTS Writing Dataset (`data/cefr_ielts_datasets/ielts_writing_dataset.csv`):
-- 5,432 essays with expert-assigned band scores (5.0-7.5)
-- Component scores: Task Response, Coherence/Cohesion, Lexical Resource, Grammar
+Current research baseline (canonical):
+- **ELLIPSE train/test** in `data/ELLIPSE_TRAIN_TEST/`
+  - Pre-split train/test CSVs with `full_text`, `prompt`, `Overall` (plus trait scores)
+  - Standard research filter: 200–1000 words + prompt-level exclusions for letter-dominated prompts
+  - Canonical workflow + logging: `docs/operations/ml-nlp-runbook.md`
+
+Blocked (do not use for claims):
+- **IELTS dataset** in `data/cefr_ielts_datasets/ielts_writing_dataset.csv` is blocked until source/licensing is validated.
 
 ### Feature Architecture
 
@@ -44,7 +49,7 @@ Based on research (Faseeh et al. 2024, Uto et al. 2020, MSSF), the model uses a 
 
 3. **XGBoost Ordinal Regressor** (not classifier):
    - Objective: `reg:squarederror` (regression captures ordinal structure)
-   - Predictions rounded to nearest 0.5 band, clipped to [5.0, 7.5]
+   - Predictions rounded to nearest 0.5 band, clipped to [1.0, 9.0]
    - Custom QWK evaluation metric for early stopping
    - Strong L2 regularization prevents embedding dominance over hand-rolled features
 
@@ -91,7 +96,7 @@ services/nlp_service/
 │       │   ├── tier3_structure.py         # Paragraph/intro/conclusion
 │       │   └── feature_combiner.py        # Merge embeddings + all tiers
 │       ├── training/
-│       │   ├── data_loader.py          # IELTS dataset loader
+│       │   ├── data_loader.py          # AES dataset loaders (ELLIPSE baseline; IELTS blocked)
 │       │   ├── trainer.py              # XGBoost ordinal regressor training
 │       │   ├── evaluation.py           # QWK, metrics, feature importance
 │       │   └── explainability.py       # SHAP integration
@@ -129,7 +134,7 @@ Essay Text + Prompt
     │
     └──> Concatenate ──> [~793-dim combined vector]
                               │
-                              └──> XGBoost Regressor ──> Round to 0.5 ──> Band Score (5.0-7.5)
+                              └──> XGBoost Regressor ──> Round to 0.5 ──> Band Score (1.0-9.0)
 ```
 
 ### Integration with CJ Assessment

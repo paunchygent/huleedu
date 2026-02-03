@@ -1,11 +1,12 @@
 """EXECUTE mode handler for ENG5 NP runner.
 
-Full execution: anchor registration, essay upload, Kafka publishing.
+Full execution: student essay upload, Kafka publishing, optional post-run extraction.
 """
 
 from __future__ import annotations
 
 import asyncio
+import time
 from typing import TYPE_CHECKING
 
 import aiohttp
@@ -14,14 +15,11 @@ import typer
 from common_core.event_enums import ProcessingEvent, topic_name
 
 from scripts.cj_experiments_runners.eng5_np.artefact_io import write_stub_artefact
-from scripts.cj_experiments_runners.eng5_np.cj_client import (
-    AnchorRegistrationError,
-    register_anchor_essays,
-)
 from scripts.cj_experiments_runners.eng5_np.content_upload import (
     upload_essay_content,
     upload_essays_parallel,
 )
+from scripts.cj_experiments_runners.eng5_np.eng5_db_extract import run_eng5_db_extraction
 from scripts.cj_experiments_runners.eng5_np.hydrator import AssessmentRunHydrator
 from scripts.cj_experiments_runners.eng5_np.inventory import (
     FileRecord,
@@ -58,10 +56,10 @@ class ExecuteHandler:
     """Handler for EXECUTE mode.
 
     Full execution mode that:
-    - Registers anchor essays with CJ service
     - Uploads student essays to Content Service
     - Composes and publishes CJ assessment request
     - Optionally waits for completion and captures results
+    - Optionally extracts CJ DB results after completion (R5)
     """
 
     def execute(
@@ -80,12 +78,18 @@ class ExecuteHandler:
         Returns:
             Exit code (0 for success)
         """
-        ensure_execute_requirements(inventory)
+        ensure_execute_requirements(
+            inventory,
+            require_prompt=settings.cj_assignment_id is None,
+        )
 
-        anchors_for_registration = list(inventory.anchor_docs.files)
         students_for_upload = list(inventory.student_docs.files)
 
-        self._validate_execute_requirements(settings, anchors_for_registration, students_for_upload)
+        if settings.cj_anchor_count is None:
+            raise RuntimeError(
+                "CJ anchor preflight missing (settings.cj_anchor_count is None). "
+                "Run execute via the CLI so preflight is performed."
+            )
 
         # Create stub artefact and hydrator
         schema = ensure_schema_available(paths.schema_path)
@@ -105,17 +109,6 @@ class ExecuteHandler:
                 batch_uuid=settings.batch_uuid,
             )
 
-        # Register anchors with CJ service
-        registration_results = self._register_anchors(
-            anchors=anchors_for_registration,
-            settings=settings,
-        )
-
-        logger.info(
-            "anchor_registration_succeeded",
-            registered=len(registration_results),
-        )
-
         # Upload student essays
         storage_id_map = self._upload_essays(
             students=students_for_upload,
@@ -133,11 +126,12 @@ class ExecuteHandler:
             storage_id_map=storage_id_map,
         )
 
-        # Upload prompt if exists
-        prompt_storage_id = self._upload_prompt(inventory, settings)
+        # Assignment-bound runs do not upload prompts; CJ hydrates from assessment_instructions.
+        prompt_ref = None
+        if settings.cj_assignment_id is None:
+            prompt_storage_id = self._upload_prompt(inventory, settings)
+            prompt_ref = build_prompt_reference(inventory.prompt, storage_id=prompt_storage_id)
 
-        # Compose and write request
-        prompt_ref = build_prompt_reference(inventory.prompt, storage_id=prompt_storage_id)
         envelope = compose_cj_assessment_request(
             settings=settings,
             essay_refs=essay_refs,
@@ -163,66 +157,77 @@ class ExecuteHandler:
             artefact_data=load_artefact_data(artefact_path),
         )
 
+        if settings.await_completion and settings.auto_extract_eng5_db:
+            exit_code = self._maybe_run_db_extraction(settings=settings, hydrator=hydrator)
+            if exit_code != 0:
+                return exit_code
+
         return 0
 
-    def _validate_execute_requirements(
+    def _maybe_run_db_extraction(
         self,
+        *,
         settings: RunnerSettings,
-        anchors: list,
-        students: list,
-    ) -> None:
-        """Validate all requirements for EXECUTE mode.
-
-        Raises:
-            RuntimeError: If requirements not met
-        """
-        if not anchors:
+        hydrator: AssessmentRunHydrator | None,
+    ) -> int:
+        if hydrator is None:
             raise RuntimeError(
-                "Anchor essays are required for ENG5 execute runs; populate anchors directory."
+                "--auto-extract-eng5-db requires --await-completion and Kafka publishing."
             )
-        if not settings.cj_service_url:
-            raise RuntimeError(
-                "CJ service URL is required to register anchors in EXECUTE mode. "
-                "Set --cj-service-url or CJ_SERVICE_URL env var."
+
+        runner_status = hydrator.runner_status()
+        completions = int(runner_status.get("observed_events", {}).get("completions", 0))
+        if completions <= 0:
+            hydrator.update_post_run(
+                key="eng5_db_extract",
+                payload={
+                    "status": "skipped",
+                    "reason": "no_completion_observed",
+                    "batch_uuid": str(settings.batch_uuid),
+                },
             )
-        if not students:
-            raise RuntimeError("No essays available for upload; ensure dataset is populated")
-
-    def _register_anchors(
-        self,
-        anchors: list,
-        settings: RunnerSettings,
-    ) -> list:
-        """Register anchor essays with CJ service.
-
-        Returns:
-            Registration results
-
-        Raises:
-            RuntimeError: If registration fails
-        """
-        try:
-            registration_results = asyncio.run(
-                register_anchor_essays(
-                    anchors=anchors,
-                    assignment_id=settings.assignment_id,
-                    cj_service_url=settings.cj_service_url,
-                )
+            typer.echo(
+                "⚠️  Auto-extract skipped: no completion event observed for this batch.",
+                err=True,
             )
-        except AnchorRegistrationError as exc:
-            logger.error("anchor_registration_failed", error=str(exc))
-            raise RuntimeError(
-                "Anchor registration failed; aborting EXECUTE run so CJ only uses DB-owned anchors."
-            ) from exc
+            return 1
 
-        if not registration_results:
-            raise RuntimeError("Anchor registration returned no results; aborting EXECUTE run.")
+        started = time.monotonic()
+        result = run_eng5_db_extraction(
+            batch_identifier=str(settings.batch_uuid),
+            output_dir=settings.output_dir / "db_extract",
+            output_format="text",
+        )
+        elapsed = round(time.monotonic() - started, 2)
+
+        status = "succeeded" if result.exit_code == 0 else "failed"
+        hydrator.update_post_run(
+            key="eng5_db_extract",
+            payload={
+                "status": status,
+                "batch_completed": True,
+                "batch_uuid": str(settings.batch_uuid),
+                "output_format": result.output_format,
+                "output_path": str(result.output_path),
+                "exit_code": result.exit_code,
+                "duration_seconds": elapsed,
+                "error": result.error,
+            },
+        )
+
+        if result.exit_code != 0:
+            typer.echo(
+                "❌ CJ batch completed, but ENG5 DB extraction failed "
+                f"(exit_code={result.exit_code}). Output captured at {result.output_path}",
+                err=True,
+            )
+            return 2
 
         typer.echo(
-            f"Registered {len(registration_results)} anchors via CJ service",
+            f"✅ ENG5 DB extraction captured at {result.output_path}",
             err=True,
         )
-        return registration_results
+        return 0
 
     def _upload_essays(
         self,

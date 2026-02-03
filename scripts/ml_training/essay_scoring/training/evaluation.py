@@ -26,11 +26,17 @@ class EvaluationResult:
     band_labels: list[float]
 
 
-def evaluate_predictions(y_true: np.ndarray, y_pred: np.ndarray) -> EvaluationResult:
+def evaluate_predictions(
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    *,
+    min_band: float,
+    max_band: float,
+) -> EvaluationResult:
     """Evaluate predictions with QWK and supporting diagnostics."""
 
-    rounded = clip_bands(round_to_half_band(y_pred))
-    qwk = qwk_score(y_true, y_pred)
+    rounded = clip_bands(round_to_half_band(y_pred), min_band=min_band, max_band=max_band)
+    qwk = qwk_score(y_true, y_pred, min_band=min_band, max_band=max_band)
     adjacent_accuracy = float(np.mean(np.abs(rounded - y_true) <= 0.5))
     mae = float(np.mean(np.abs(rounded - y_true)))
 

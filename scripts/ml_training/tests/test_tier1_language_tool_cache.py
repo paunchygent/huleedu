@@ -13,8 +13,12 @@ from scripts.ml_training.essay_scoring.features.tier1_error_readability import (
 def test_tier1_language_tool_cache_and_concurrency(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(tier1_module, "ensure_textdescriptives_readability", lambda _nlp: None)
 
+    class DummyNLP:
+        def pipe(self, texts):  # noqa: ANN001
+            return [object() for _ in texts]
+
     extractor = Tier1FeatureExtractor(
-        nlp=object(),
+        nlp=DummyNLP(),
         language_tool_url="http://127.0.0.1:18085",
         request_timeout_s=1.0,
         language_tool_cache_dir=tmp_path,
@@ -23,8 +27,8 @@ def test_tier1_language_tool_cache_and_concurrency(tmp_path, monkeypatch) -> Non
 
     monkeypatch.setattr(
         extractor,
-        "_compute_text_stats",
-        lambda _cleaned: {
+        "_compute_text_stats_from_doc",
+        lambda _doc: {
             "word_count": 100.0,
             "avg_sentence_length": 10.0,
             "ttr": 0.5,

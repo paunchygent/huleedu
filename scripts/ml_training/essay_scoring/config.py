@@ -17,6 +17,13 @@ class FeatureSet(str, Enum):
     COMBINED = "combined"
 
 
+class DatasetKind(str, Enum):
+    """Dataset source choices for the research pipeline."""
+
+    IELTS = "ielts"
+    ELLIPSE = "ellipse"
+
+
 class EmbeddingConfig(BaseModel):
     """Configuration for embedding extraction."""
 
@@ -107,7 +114,19 @@ class ExperimentConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    dataset_kind: DatasetKind = DatasetKind.IELTS
     dataset_path: Path = Path("data/cefr_ielts_datasets/ielts_writing_dataset.csv")
+    ellipse_train_path: Path = Path("data/ELLIPSE_TRAIN_TEST/ELLIPSE_Final_github_train.csv")
+    ellipse_test_path: Path = Path("data/ELLIPSE_TRAIN_TEST/ELLIPSE_Final_github_test.csv")
+    ellipse_excluded_prompts: list[str] = Field(
+        default_factory=lambda: [
+            "Community service",
+            "Grades for extracurricular activities",
+            "Cell phones at school",
+            "Letter to employer",
+        ],
+        description="Prompt names to drop entirely when dataset_kind=ellipse.",
+    )
     feature_set: FeatureSet = FeatureSet.COMBINED
     embedding: EmbeddingConfig = Field(default_factory=EmbeddingConfig)
     offload: OffloadConfig = Field(default_factory=OffloadConfig)

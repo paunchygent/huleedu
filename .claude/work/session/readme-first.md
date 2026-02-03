@@ -49,7 +49,25 @@ brew install libomp
 # Run the whitebox research pipeline CLI
 pdm run essay-scoring-research --help
 
+# Warm-cache iteration (skip feature extraction on subsequent runs)
+# NOTE: IELTS dataset in repo is blocked pending validation; use ELLIPSE by default.
+# Canonical dataset + experiment logging: docs/operations/ml-nlp-runbook.md
+pdm run essay-scoring-research featurize --dataset-kind ellipse --feature-set combined --run-name ellipse_features_combined
+pdm run essay-scoring-research run --dataset-kind ellipse --reuse-feature-store-dir output/essay_scoring/<RUN_DIR_OR_FEATURE_STORE_DIR> --skip-shap --skip-grade-scale-report
+
+# Gold-standard ELLIPSE workflow (Overall, 200–1000 words)
+pdm run essay-scoring-research prepare-dataset --dataset-kind ellipse --min-words 200 --max-words 1000 --run-name ellipse_prep_200_1000
+pdm run essay-scoring-research make-splits --dataset-kind ellipse --ellipse-train-path <PREP_TRAIN_CSV> --ellipse-test-path <PREP_TEST_CSV> --min-words 200 --max-words 1000 --n-splits 5 --run-name ellipse_splits_200_1000
+pdm run essay-scoring-research cv --dataset-kind ellipse --feature-set combined --splits-path <SPLITS_JSON> --scheme stratified_text --language-tool-service-url http://127.0.0.1:18085 --embedding-service-url http://127.0.0.1:19000 --run-name ellipse_cv_combined
+
+# Reuse extracted features for faster parameter sweeps
+pdm run essay-scoring-research cv --reuse-cv-feature-store-dir output/essay_scoring/<RUN_DIR_OR_CV_FEATURE_STORE_DIR> --splits-path <SPLITS_JSON> --scheme stratified_text --dataset-kind ellipse --feature-set combined
+
+# Drop-column importance (handcrafted feature selection; heavy but leak-safe)
+pdm run essay-scoring-research drop-column --dataset-kind ellipse --feature-set combined --splits-path <SPLITS_JSON> --scheme stratified_text --reuse-cv-feature-store-dir output/essay_scoring/<RUN_DIR_OR_CV_FEATURE_STORE_DIR> --run-name ellipse_drop_column_combined
+
 # Readability metrics use TextDescriptives via spaCy (Tier 1 extractor)
+# Note: feature store schema is versioned; if reuse fails with schema mismatch, re-run `featurize`.
 ```
 
 Note: DeBERTa embeddings require `sentencepiece` + `tiktoken` (included in `ml-research`)
@@ -149,6 +167,14 @@ pdm run pytest-root tests/eng5_profiles/test_eng5_mock_parity_lower5.py -m "dock
 - Use `tests/utils/metrics_helpers.py` to fetch `/metrics` and parse Prometheus text into a simple `metric_name -> list[(labels, value)]` structure when adding or extending Prometheus assertions in:
   - `tests/functional/cj_eng5/test_cj_*_docker.py`
   - `tests/eng5_profiles/test_*eng5_mock_parity*.py`
+
+### ENG5 NP Runner: Assignment-Owned Prompts
+
+- `--mode execute` with `--assignment-id` assumes CJ owns assignment context:
+  - Student prompt must be present in `assessment_instructions.student_prompt_storage_id` (runner
+    does not upload prompts at execute time).
+  - Rubric overrides via `--rubric` are allowed only when
+    `assessment_instructions.context_origin != canonical_national`.
 
 **CI staging for ENG5 heavy suites (separate from default CI):**
 - `ENG5 CJ Docker Semantics (regular + small-net)` (`eng5-cj-docker-regular-and-small-net` in `.github/workflows/eng5-heavy-suites.yml`)

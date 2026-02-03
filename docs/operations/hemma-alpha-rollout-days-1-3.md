@@ -435,13 +435,20 @@ curl -fsS http://127.0.0.1:19000/healthz
 
 ### 5. Run the research pipeline against Hemma
 
-Example:
+Example (smoke test, ELLIPSE dataset):
 ```bash
-pdm run essay-scoring-research ablation \
-  --dataset-path /tmp/ielts_small_ablation.csv \
+pdm run essay-scoring-research run \
+  --dataset-kind ellipse \
+  --feature-set combined \
   --language-tool-service-url http://127.0.0.1:18085 \
-  --embedding-service-url http://127.0.0.1:19000
+  --embedding-service-url http://127.0.0.1:19000 \
+  --run-name ellipse_smoke_combined_hemma
 ```
+
+Canonical experiment workflow (datasets + CV + logging):
+- `docs/operations/ml-nlp-runbook.md`
+
+Note: The repo IELTS dataset is blocked pending validation; do not report metrics from it.
 
 ## Notes
 

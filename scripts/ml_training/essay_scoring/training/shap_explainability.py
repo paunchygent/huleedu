@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol
 
 import matplotlib
 import numpy as np
@@ -11,7 +13,6 @@ import xgboost as xgb
 
 matplotlib.use("Agg")
 
-import shap
 from matplotlib import pyplot as plt
 
 
@@ -25,12 +26,54 @@ class ShapArtifacts:
     bar_plot_path: Path
 
 
+class TreeExplainerProtocol(Protocol):
+    expected_value: float | np.ndarray
+
+    def shap_values(self, features: np.ndarray) -> np.ndarray: ...
+
+
+class SummaryPlotProtocol(Protocol):
+    def __call__(
+        self,
+        shap_values: np.ndarray,
+        features: np.ndarray,
+        *,
+        feature_names: list[str],
+        show: bool,
+        plot_type: str | None = None,
+    ) -> None: ...
+
+
+def _default_explainer_factory(model: xgb.Booster) -> TreeExplainerProtocol:
+    import shap
+
+    return shap.TreeExplainer(model)
+
+
+def _default_summary_plot(
+    shap_values: np.ndarray,
+    features: np.ndarray,
+    *,
+    feature_names: list[str],
+    show: bool,
+    plot_type: str | None = None,
+) -> None:
+    import shap
+
+    kwargs: dict[str, object] = {"feature_names": feature_names, "show": show}
+    if plot_type is not None:
+        kwargs["plot_type"] = plot_type
+    shap.summary_plot(shap_values, features, **kwargs)
+
+
 def generate_shap_artifacts(
     model: xgb.Booster,
     features: np.ndarray,
     feature_names: list[str],
     output_dir: Path,
     max_samples: int = 500,
+    explainer_factory: Callable[[xgb.Booster], TreeExplainerProtocol] | None = None,
+    summary_plot_fn: SummaryPlotProtocol | None = None,
 ) -> ShapArtifacts:
     """Generate SHAP values and summary plots for a model.
 
@@ -48,7 +91,10 @@ def generate_shap_artifacts(
     output_dir.mkdir(parents=True, exist_ok=True)
     sample_features = _sample_features(features, max_samples=max_samples)
 
-    explainer = shap.TreeExplainer(model)
+    explainer_factory = explainer_factory or _default_explainer_factory
+    summary_plot_fn = summary_plot_fn or _default_summary_plot
+
+    explainer = explainer_factory(model)
     shap_values = explainer.shap_values(sample_features)
     base_values = explainer.expected_value
 
@@ -60,7 +106,7 @@ def generate_shap_artifacts(
     summary_plot_path = output_dir / "shap_summary.png"
     bar_plot_path = output_dir / "shap_summary_bar.png"
 
-    shap.summary_plot(
+    summary_plot_fn(
         shap_values,
         sample_features,
         feature_names=feature_names,
@@ -70,7 +116,7 @@ def generate_shap_artifacts(
     plt.savefig(summary_plot_path)
     plt.close()
 
-    shap.summary_plot(
+    summary_plot_fn(
         shap_values,
         sample_features,
         feature_names=feature_names,

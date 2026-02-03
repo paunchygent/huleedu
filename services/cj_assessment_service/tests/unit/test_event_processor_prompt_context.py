@@ -163,11 +163,10 @@ async def test_process_message_increments_prompt_success_metric(
 ) -> None:
     """Successful prompt hydration should increment success metric exactly once."""
 
-    # Arrange request data with explicit assignment and storage ID
     event_data = cj_assessment_request_data_with_overrides.model_copy(
         update={
-            "assignment_id": "assignment-909",
             "student_prompt_ref": cj_assessment_request_data_with_overrides.student_prompt_ref,
+            "assignment_id": None,
         }
     )
 
@@ -241,18 +240,18 @@ async def test_process_message_increments_prompt_success_metric(
     assert failure_counter.count == 0
 
     converted_request_data = workflow_mock.call_args.kwargs["request_data"]
-    assert converted_request_data.assignment_id == "assignment-909"
+    assert converted_request_data.assignment_id is None
     assert converted_request_data.student_prompt_text == "Prompt body"
     assert workflow_mock.call_args.kwargs["orientation_strategy"] is orientation_strategy
 
 
 @pytest.mark.asyncio
-async def test_process_message_hydrates_judge_rubric_text(
+async def test_process_message_does_not_hydrate_prompts_for_assignment_scoped_requests(
     cj_assessment_request_data_with_overrides: ELS_CJAssessmentRequestV1,
     monkeypatch: pytest.MonkeyPatch,
     mock_matching_strategy: MagicMock,
 ) -> None:
-    """Ensure judge rubric storage/text are hydrated and forwarded in request data."""
+    """Assignment-scoped requests defer prompt/rubric hydration to batch_preparation."""
 
     assignment_id = "assignment-judge-001"
     prompt_storage = "prompt-storage-with-overrides"
@@ -343,6 +342,9 @@ async def test_process_message_hydrates_judge_rubric_text(
     )
 
     converted_request_data = workflow_mock.call_args.kwargs["request_data"]
-    assert converted_request_data.student_prompt_storage_id == prompt_storage
-    assert converted_request_data.judge_rubric_storage_id == rubric_storage
-    assert converted_request_data.judge_rubric_text == "Judge rubric detailed guidance"
+    assert converted_request_data.assignment_id == assignment_id
+    assert converted_request_data.student_prompt_storage_id is None
+    assert converted_request_data.student_prompt_text is None
+    assert converted_request_data.judge_rubric_storage_id is None
+    assert converted_request_data.judge_rubric_text is None
+    content_client.fetch_content.assert_not_called()

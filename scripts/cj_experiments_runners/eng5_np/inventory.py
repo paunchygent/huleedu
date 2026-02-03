@@ -91,13 +91,13 @@ def collect_inventory(paths: RunnerPaths) -> RunnerInventory:
     )
 
 
-def ensure_execute_requirements(inventory: RunnerInventory) -> None:
+def ensure_execute_requirements(inventory: RunnerInventory, *, require_prompt: bool) -> None:
     """Raise if critical ENG5 artefacts are missing for execute mode."""
 
     missing: list[str] = []
     if not inventory.instructions.exists:
         missing.append(f"Missing instructions: {inventory.instructions.path}")
-    if not inventory.prompt.exists:
+    if require_prompt and not inventory.prompt.exists:
         missing.append(f"Missing prompt reference: {inventory.prompt.path}")
     if inventory.student_docs.count == 0:
         missing.append(
@@ -120,21 +120,41 @@ def ensure_comparison_capacity(
 ) -> None:
     """Validate that CLI arguments can yield at least one comparison."""
 
+    ensure_comparison_capacity_counts(
+        anchor_count=anchors.count,
+        student_count=students.count,
+        max_comparisons=max_comparisons,
+        anchors_hint=str(anchors.root),
+        students_hint=str(students.root),
+    )
+
+
+def ensure_comparison_capacity_counts(
+    *,
+    anchor_count: int,
+    student_count: int,
+    max_comparisons: int | None,
+    anchors_hint: str = "anchors",
+    students_hint: str = "students",
+) -> None:
+    """Validate comparison capacity using explicit counts.
+
+    Used by execute mode once anchors are treated as CJ-managed preconditions
+    (local anchor docs may be absent).
+    """
+
     if max_comparisons is not None and max_comparisons < 2:
         raise ComparisonValidationError(
-            "--max-comparisons must be at least 2 to produce anchor × student pairs."
-            " Set a higher value or omit the flag to use the full dataset."
+            "--max-comparisons must be at least 2 to produce anchor × student pairs. "
+            "Set a higher value or omit the flag to use the full dataset."
         )
 
-    anchor_count = anchors.count
-    student_count = students.count
     if anchor_count == 0 or student_count == 0:
         messages: list[str] = []
         if anchor_count == 0:
-            messages.append(f"No anchor essays found in {anchors.root}.")
+            messages.append(f"No anchors available ({anchors_hint}).")
         if student_count == 0:
-            messages.append(f"No student essays found in {students.root}.")
-        anchor_count * student_count
+            messages.append(f"No student essays available ({students_hint}).")
         messages.append(
             "Anchor × student comparisons currently total 0; add files or update the dataset "
             "before running ENG5 batch modes."

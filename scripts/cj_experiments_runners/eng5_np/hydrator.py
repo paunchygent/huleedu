@@ -85,6 +85,21 @@ class AssessmentRunHydrator:
 
         return self._runner_status
 
+    def persist_runner_status(self) -> None:
+        """Persist runner_status/manifest even when no new events arrive."""
+
+        artefact = self._load_artefact()
+        self._write_artefact(artefact)
+
+    def update_post_run(self, *, key: str, payload: dict[str, Any]) -> None:
+        """Persist a post-run step record under artefact.validation.post_run."""
+
+        artefact = self._load_artefact()
+        validation = artefact.setdefault("validation", {})
+        post_run = validation.setdefault("post_run", {})
+        post_run[key] = payload
+        self._write_artefact(artefact)
+
     def _increment_event(self, key: str) -> None:
         self._runner_status["observed_events"][key] += 1
 
@@ -201,6 +216,12 @@ class AssessmentRunHydrator:
             if not base.exists():
                 continue
             for path in base.rglob("*.json"):
+                targets.append(str(path.relative_to(self.output_dir)))
+        db_extract_dir = self.output_dir / "db_extract"
+        if db_extract_dir.exists():
+            for path in db_extract_dir.rglob("*"):
+                if not path.is_file():
+                    continue
                 targets.append(str(path.relative_to(self.output_dir)))
         return targets
 

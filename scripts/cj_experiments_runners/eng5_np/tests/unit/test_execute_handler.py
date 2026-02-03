@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from common_core.domain_enums import CourseCode, Language
 
-from scripts.cj_experiments_runners.eng5_np.cj_client import AnchorRegistrationError
+from scripts.cj_experiments_runners.eng5_np.eng5_db_extract import Eng5DbExtractionResult
 from scripts.cj_experiments_runners.eng5_np.handlers import ExecuteHandler
 from scripts.cj_experiments_runners.eng5_np.inventory import (
     DirectorySnapshot,
@@ -26,6 +26,7 @@ def _make_settings(tmp_path: Path) -> RunnerSettings:
     """Create RunnerSettings for EXECUTE mode tests."""
     return RunnerSettings(
         assignment_id=uuid.UUID("00000000-0000-0000-0000-000000000031"),
+        cj_assignment_id=uuid.UUID("00000000-0000-0000-0000-000000000031"),
         course_id=uuid.UUID("00000000-0000-0000-0000-000000000032"),
         grade_scale="eng5_np_legacy_9_step",
         mode=RunnerMode.EXECUTE,
@@ -44,6 +45,7 @@ def _make_settings(tmp_path: Path) -> RunnerSettings:
         kafka_client_id="test-client",
         content_service_url="http://localhost:8000",
         cj_service_url="http://localhost:9095",
+        cj_anchor_count=12,
     )
 
 
@@ -91,116 +93,6 @@ class TestExecuteHandlerProtocol:
         assert isinstance(handler, ModeHandlerProtocol)
 
 
-class TestValidateExecuteRequirements:
-    """Tests for _validate_execute_requirements guardrails."""
-
-    def test_raises_when_no_anchors(self, tmp_path: Path) -> None:
-        settings = _make_settings(tmp_path)
-        handler = ExecuteHandler()
-
-        anchors: list[FileRecord] = []
-        students = [FileRecord(path=tmp_path / "students" / "s1.docx", exists=True)]
-
-        with pytest.raises(RuntimeError) as exc:
-            handler._validate_execute_requirements(
-                settings=settings, anchors=anchors, students=students
-            )
-        assert "Anchor essays are required" in str(exc.value)
-
-    def test_raises_when_no_students(self, tmp_path: Path) -> None:
-        settings = _make_settings(tmp_path)
-        handler = ExecuteHandler()
-
-        anchors = [FileRecord(path=tmp_path / "anchors" / "a1.docx", exists=True)]
-        students: list[FileRecord] = []
-
-        with pytest.raises(RuntimeError) as exc:
-            handler._validate_execute_requirements(
-                settings=settings, anchors=anchors, students=students
-            )
-        assert "No essays available for upload" in str(exc.value)
-
-    def test_raises_when_missing_cj_service_url(self, tmp_path: Path) -> None:
-        settings = _make_settings(tmp_path)
-        settings.cj_service_url = None
-        handler = ExecuteHandler()
-
-        anchors = [FileRecord(path=tmp_path / "anchors" / "a1.docx", exists=True)]
-        students = [FileRecord(path=tmp_path / "students" / "s1.docx", exists=True)]
-
-        with pytest.raises(RuntimeError) as exc:
-            handler._validate_execute_requirements(
-                settings=settings, anchors=anchors, students=students
-            )
-        assert "CJ service URL is required" in str(exc.value)
-
-
-class TestRegisterAnchors:
-    """Tests for internal _register_anchors helper."""
-
-    def test_register_anchors_raises_on_anchor_registration_error(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        settings = _make_settings(tmp_path)
-        handler = ExecuteHandler()
-
-        async def failing_register_anchor_essays(*_args, **_kwargs):
-            raise AnchorRegistrationError("boom")
-
-        monkeypatch.setattr(
-            "scripts.cj_experiments_runners.eng5_np.handlers.execute_handler.register_anchor_essays",
-            failing_register_anchor_essays,
-        )
-
-        with pytest.raises(RuntimeError) as exc:
-            handler._register_anchors(
-                anchors=[FileRecord(path=tmp_path / "anchors" / "a1.docx", exists=True)],
-                settings=settings,
-            )
-        assert "Anchor registration failed" in str(exc.value)
-
-    def test_register_anchors_raises_on_empty_result(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        settings = _make_settings(tmp_path)
-        handler = ExecuteHandler()
-
-        async def register_anchor_essays_empty(*_args, **_kwargs):
-            return []
-
-        monkeypatch.setattr(
-            "scripts.cj_experiments_runners.eng5_np.handlers.execute_handler.register_anchor_essays",
-            register_anchor_essays_empty,
-        )
-
-        with pytest.raises(RuntimeError) as exc:
-            handler._register_anchors(
-                anchors=[FileRecord(path=tmp_path / "anchors" / "a1.docx", exists=True)],
-                settings=settings,
-            )
-        assert "Anchor registration returned no results" in str(exc.value)
-
-    def test_register_anchors_returns_results_on_success(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        settings = _make_settings(tmp_path)
-        handler = ExecuteHandler()
-
-        async def register_anchor_essays_ok(*_args, **_kwargs):
-            return [{"anchor_id": "anchor_001"}]
-
-        monkeypatch.setattr(
-            "scripts.cj_experiments_runners.eng5_np.handlers.execute_handler.register_anchor_essays",
-            register_anchor_essays_ok,
-        )
-
-        result = handler._register_anchors(
-            anchors=[FileRecord(path=tmp_path / "anchors" / "a1.docx", exists=True)],
-            settings=settings,
-        )
-        assert result == [{"anchor_id": "anchor_001"}]
-
-
 class TestExecuteHandlerExecute:
     """Behavioral tests for ExecuteHandler.execute."""
 
@@ -209,7 +101,7 @@ class TestExecuteHandlerExecute:
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """EXECUTE mode orchestrates anchors, uploads, request composition and publish."""
+        """EXECUTE mode orchestrates uploads, request composition and publish."""
         settings = _make_settings(tmp_path)
         settings.await_completion = True
         inventory = _make_inventory(tmp_path)
@@ -219,8 +111,9 @@ class TestExecuteHandlerExecute:
 
         calls: dict[str, object] = {}
 
-        def fake_ensure_execute_requirements(inv: RunnerInventory) -> None:
+        def fake_ensure_execute_requirements(inv: RunnerInventory, *, require_prompt: bool) -> None:
             calls["ensure_execute_requirements_inventory"] = inv
+            calls["ensure_execute_requirements_require_prompt"] = require_prompt
 
         def fake_ensure_schema_available(path: Path) -> dict:
             calls["schema_path"] = path
@@ -255,26 +148,16 @@ class TestExecuteHandlerExecute:
             calls["essay_refs_storage_map"] = storage_id_map
             return ["ref-1"]
 
-        def fake_register_anchors(
-            self,
-            anchors,
-            settings: RunnerSettings,
-        ):
-            calls["registered_anchors"] = anchors
-            calls["registered_settings_mode"] = settings.mode
-            return [{"anchor_id": "anchor_001"}]
-
         def fake_upload_prompt(
             self, inventory: RunnerInventory, settings: RunnerSettings
         ) -> str | None:  # noqa: D401
-            """Fake prompt upload."""
-            calls["upload_prompt_inventory"] = inventory
-            calls["upload_prompt_settings_mode"] = settings.mode
-            return "prompt-storage-id"
+            raise AssertionError(
+                "ExecuteHandler must not upload prompts when cj_assignment_id is set "
+                "(assignment-owned prompt/rubric)."
+            )
 
         def fake_build_prompt_reference(_prompt, storage_id: str | None):
-            calls["prompt_storage_id"] = storage_id
-            return {"storage_id": storage_id}
+            raise AssertionError("build_prompt_reference should not be invoked for assignment runs")
 
         def fake_compose_cj_assessment_request(
             *,
@@ -347,10 +230,6 @@ class TestExecuteHandlerExecute:
             fake_write_stub_artefact,
         )
         monkeypatch.setattr(
-            "scripts.cj_experiments_runners.eng5_np.handlers.execute_handler.ExecuteHandler._register_anchors",
-            fake_register_anchors,
-        )
-        monkeypatch.setattr(
             "scripts.cj_experiments_runners.eng5_np.handlers.execute_handler.upload_essays_parallel",
             fake_upload_essays_parallel,
         )
@@ -416,25 +295,249 @@ class TestExecuteHandlerExecute:
 
         # Preconditions and schema
         assert calls["ensure_execute_requirements_inventory"] is inventory
+        assert calls["ensure_execute_requirements_require_prompt"] is False
         assert calls["schema_path"] == schema_path
         assert calls["stub_settings_mode"] == RunnerMode.EXECUTE
-        assert calls["stub_schema"] == {"$id": "test-schema"}
 
-        # Uploads and refs
-        upload_records = calls["upload_records"]
-        assert len(upload_records) == 1
-        assert calls["upload_url"] == settings.content_service_url
+        # Execute is student-only: anchors list passed to build_essay_refs is empty.
         assert calls["essay_refs_anchors"] == []
-        assert len(calls["essay_refs_students"]) == 1
+        assert calls["compose_prompt_ref"] is None
 
-        # Prompt handling and request composition
-        assert calls["prompt_storage_id"] == "prompt-storage-id"
-        assert calls["compose_settings_mode"] == RunnerMode.EXECUTE
-        assert calls["compose_essay_refs"] == ["ref-1"]
-        assert calls["compose_prompt_ref"] == {"storage_id": "prompt-storage-id"}
+    def test_execute_runs_db_extraction_when_auto_flag_set(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        settings = _make_settings(tmp_path)
+        settings.await_completion = True
+        settings.auto_extract_eng5_db = True
+        inventory = _make_inventory(tmp_path)
 
-        # Publish & validation logging
-        assert calls["published_envelope"]["type"] == "ELS_CJAssessmentRequestV1"
-        assert calls["published_settings_mode"] == RunnerMode.EXECUTE
-        assert calls["logged_artefact_path"] == artefact_path
-        assert calls["loaded_artefact_path"] == artefact_path
+        artefact_path = tmp_path / "assessment_run.execute.json"
+        calls: dict[str, object] = {}
+
+        def fake_ensure_schema_available(_path: Path) -> dict:
+            return {"$id": "test-schema"}
+
+        def fake_write_stub_artefact(
+            *, settings: RunnerSettings, inventory: RunnerInventory, schema: dict
+        ) -> Path:  # noqa: E501
+            return artefact_path
+
+        async def fake_upload_essays_parallel(records, content_service_url: str):
+            return {r.checksum: "storage-1" for r in records}
+
+        def fake_build_essay_refs(
+            *, anchors, students, max_comparisons, storage_id_map, student_id_factory=None
+        ):  # noqa: E501
+            return ["ref-1"]
+
+        def fake_upload_prompt(
+            self, inventory: RunnerInventory, settings: RunnerSettings
+        ) -> str | None:  # noqa: D401,E501
+            raise AssertionError("ExecuteHandler must not upload prompts for assignment runs")
+
+        def fake_build_prompt_reference(_prompt, storage_id: str | None):
+            raise AssertionError("build_prompt_reference should not be invoked for assignment runs")
+
+        def fake_compose_cj_assessment_request(
+            *, settings: RunnerSettings, essay_refs, prompt_reference
+        ):  # noqa: E501
+            return {"type": "ELS_CJAssessmentRequestV1"}
+
+        def fake_write_cj_request_envelope(*, envelope, output_dir: Path) -> Path:
+            return tmp_path / "request.json"
+
+        async def fake_run_publish_and_capture(*, envelope, settings: RunnerSettings, hydrator):
+            return None
+
+        def fake_run_eng5_db_extraction(
+            *, batch_identifier: str, output_dir: Path, output_format: str = "text"
+        ):  # noqa: E501
+            calls["extraction_batch_identifier"] = batch_identifier
+            return Eng5DbExtractionResult(
+                batch_identifier=batch_identifier,
+                output_path=output_dir / "out.txt",
+                output_format=output_format,
+                exit_code=0,
+                error=None,
+            )
+
+        class DummyHydrator:
+            def __init__(self, *args, **kwargs) -> None:  # pragma: no cover - trivial
+                pass
+
+            def runner_status(self) -> dict:
+                return {"observed_events": {"completions": 1}}
+
+            def update_post_run(self, *, key: str, payload: dict) -> None:
+                calls["post_run_key"] = key
+                calls["post_run_payload"] = payload
+
+        class DummyPaths:
+            def __init__(self) -> None:
+                self.schema_path = tmp_path / "schema.json"
+
+        monkeypatch.setattr(
+            "scripts.cj_experiments_runners.eng5_np.handlers.execute_handler.ensure_execute_requirements",
+            lambda *_args, **_kwargs: None,
+        )
+        monkeypatch.setattr(
+            "scripts.cj_experiments_runners.eng5_np.handlers.execute_handler.ensure_schema_available",
+            fake_ensure_schema_available,
+        )
+        monkeypatch.setattr(
+            "scripts.cj_experiments_runners.eng5_np.handlers.execute_handler.write_stub_artefact",
+            fake_write_stub_artefact,
+        )
+        monkeypatch.setattr(
+            "scripts.cj_experiments_runners.eng5_np.handlers.execute_handler.upload_essays_parallel",
+            fake_upload_essays_parallel,
+        )
+        monkeypatch.setattr(
+            "scripts.cj_experiments_runners.eng5_np.handlers.execute_handler.build_essay_refs",
+            fake_build_essay_refs,
+        )
+        monkeypatch.setattr(
+            "scripts.cj_experiments_runners.eng5_np.handlers.execute_handler.ExecuteHandler._upload_prompt",
+            fake_upload_prompt,
+        )
+        monkeypatch.setattr(
+            "scripts.cj_experiments_runners.eng5_np.handlers.execute_handler.build_prompt_reference",
+            fake_build_prompt_reference,
+        )
+        monkeypatch.setattr(
+            "scripts.cj_experiments_runners.eng5_np.handlers.execute_handler.compose_cj_assessment_request",
+            fake_compose_cj_assessment_request,
+        )
+        monkeypatch.setattr(
+            "scripts.cj_experiments_runners.eng5_np.handlers.execute_handler.write_cj_request_envelope",
+            fake_write_cj_request_envelope,
+        )
+        monkeypatch.setattr(
+            "scripts.cj_experiments_runners.eng5_np.handlers.execute_handler.run_publish_and_capture",
+            fake_run_publish_and_capture,
+        )
+        monkeypatch.setattr(
+            "scripts.cj_experiments_runners.eng5_np.handlers.execute_handler.AssessmentRunHydrator",
+            DummyHydrator,
+        )
+        monkeypatch.setattr(
+            "scripts.cj_experiments_runners.eng5_np.handlers.execute_handler.run_eng5_db_extraction",
+            fake_run_eng5_db_extraction,
+        )
+        monkeypatch.setattr(
+            "scripts.cj_experiments_runners.eng5_np.handlers.execute_handler.load_artefact_data",
+            lambda _path: {"validation": {"ok": True}},
+        )
+
+        handler = ExecuteHandler()
+        exit_code = handler.execute(settings=settings, inventory=inventory, paths=DummyPaths())  # type: ignore[arg-type]  # noqa: E501
+        assert exit_code == 0
+        assert calls["post_run_key"] == "eng5_db_extract"
+        assert calls["extraction_batch_identifier"] == str(settings.batch_uuid)
+
+    def test_execute_returns_two_when_db_extraction_fails(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        settings = _make_settings(tmp_path)
+        settings.await_completion = True
+        settings.auto_extract_eng5_db = True
+        inventory = _make_inventory(tmp_path)
+
+        async def fake_upload_essays_parallel(*_args, **_kwargs):
+            return {}
+
+        async def fake_run_publish_and_capture(*_args, **_kwargs):
+            return None
+
+        def fake_run_eng5_db_extraction(
+            *,
+            batch_identifier: str,
+            output_dir: Path,
+            output_format: str = "text",
+        ) -> Eng5DbExtractionResult:
+            return Eng5DbExtractionResult(
+                batch_identifier=batch_identifier,
+                output_path=output_dir / "out.txt",
+                output_format=output_format,
+                exit_code=1,
+                error="boom",
+            )
+
+        class DummyHydrator:
+            def __init__(self, *args, **kwargs) -> None:  # pragma: no cover - trivial
+                pass
+
+            def runner_status(self) -> dict:
+                return {"observed_events": {"completions": 1}}
+
+            def update_post_run(self, *, key: str, payload: dict) -> None:
+                return None
+
+        monkeypatch.setattr(
+            "scripts.cj_experiments_runners.eng5_np.handlers.execute_handler.ensure_execute_requirements",
+            lambda *_args, **_kwargs: None,
+        )
+        monkeypatch.setattr(
+            "scripts.cj_experiments_runners.eng5_np.handlers.execute_handler.ensure_schema_available",
+            lambda _path: {"$id": "test-schema"},
+        )
+        monkeypatch.setattr(
+            "scripts.cj_experiments_runners.eng5_np.handlers.execute_handler.write_stub_artefact",
+            lambda **_kwargs: tmp_path / "assessment_run.execute.json",
+        )
+        monkeypatch.setattr(
+            "scripts.cj_experiments_runners.eng5_np.handlers.execute_handler.upload_essays_parallel",
+            fake_upload_essays_parallel,
+        )
+        monkeypatch.setattr(
+            "scripts.cj_experiments_runners.eng5_np.handlers.execute_handler.build_essay_refs",
+            lambda **_kwargs: ["ref-1"],
+        )
+        monkeypatch.setattr(
+            "scripts.cj_experiments_runners.eng5_np.handlers.execute_handler.ExecuteHandler._upload_prompt",
+            lambda *_args, **_kwargs: (_ for _ in ()).throw(
+                AssertionError("ExecuteHandler must not upload prompts for assignment runs")
+            ),
+        )
+        monkeypatch.setattr(
+            "scripts.cj_experiments_runners.eng5_np.handlers.execute_handler.build_prompt_reference",
+            lambda *_args, **_kwargs: (_ for _ in ()).throw(
+                AssertionError("build_prompt_reference should not be invoked for assignment runs")
+            ),
+        )
+        monkeypatch.setattr(
+            "scripts.cj_experiments_runners.eng5_np.handlers.execute_handler.compose_cj_assessment_request",
+            lambda **_kwargs: {"type": "ELS_CJAssessmentRequestV1"},
+        )
+        monkeypatch.setattr(
+            "scripts.cj_experiments_runners.eng5_np.handlers.execute_handler.write_cj_request_envelope",
+            lambda **_kwargs: tmp_path / "request.json",
+        )
+        monkeypatch.setattr(
+            "scripts.cj_experiments_runners.eng5_np.handlers.execute_handler.run_publish_and_capture",
+            fake_run_publish_and_capture,
+        )
+        monkeypatch.setattr(
+            "scripts.cj_experiments_runners.eng5_np.handlers.execute_handler.AssessmentRunHydrator",
+            DummyHydrator,
+        )
+        monkeypatch.setattr(
+            "scripts.cj_experiments_runners.eng5_np.handlers.execute_handler.run_eng5_db_extraction",
+            fake_run_eng5_db_extraction,
+        )
+        monkeypatch.setattr(
+            "scripts.cj_experiments_runners.eng5_np.handlers.execute_handler.load_artefact_data",
+            lambda _path: {"validation": {"ok": True}},
+        )
+
+        class DummyPaths:
+            def __init__(self) -> None:
+                self.schema_path = tmp_path / "schema.json"
+
+        handler = ExecuteHandler()
+        exit_code = handler.execute(settings=settings, inventory=inventory, paths=DummyPaths())  # type: ignore[arg-type]  # noqa: E501
+        assert exit_code == 2

@@ -173,6 +173,7 @@ def test_write_stub_creates_schema_compliant_file(tmp_path: Path) -> None:
     inventory = collect_inventory(paths)
     settings = RunnerSettings(
         assignment_id=uuid.UUID(int=1),
+        cj_assignment_id=uuid.UUID(int=1),
         course_id=uuid.UUID(int=2),
         grade_scale="eng5_np_legacy_9_step",
         mode=RunnerMode.DRY_RUN,
@@ -243,6 +244,7 @@ def test_compose_cj_request_generates_envelope(tmp_path: Path) -> None:
 
     settings = RunnerSettings(
         assignment_id=uuid.UUID(int=1),
+        cj_assignment_id=uuid.UUID(int=1),
         course_id=uuid.UUID(int=2),
         grade_scale="eng5_np_legacy_9_step",
         mode=RunnerMode.EXECUTE,
@@ -294,6 +296,7 @@ def test_compose_cj_request_passes_max_comparisons_metadata(tmp_path: Path) -> N
 
     settings = RunnerSettings(
         assignment_id=uuid.UUID(int=10),
+        cj_assignment_id=uuid.UUID(int=10),
         course_id=uuid.UUID(int=11),
         grade_scale="eng5_np_legacy_9_step",
         mode=RunnerMode.EXECUTE,
@@ -608,8 +611,10 @@ def test_stub_validates_against_schema(tmp_path: Path) -> None:
     )
 
     inventory = collect_inventory(paths)
+    assignment_id = uuid.uuid4()
     settings = RunnerSettings(
-        assignment_id=uuid.uuid4(),
+        assignment_id=assignment_id,
+        cj_assignment_id=assignment_id,
         course_id=uuid.uuid4(),
         grade_scale="eng5_np_legacy_9_step",
         mode=RunnerMode.DRY_RUN,

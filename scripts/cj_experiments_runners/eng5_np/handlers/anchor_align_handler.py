@@ -197,8 +197,8 @@ class AnchorAlignHandler:
         )
 
         # Compose request with assignment_id=None to trigger "GUEST" behavior
-        original_assignment_id = settings.assignment_id
-        settings.assignment_id = None  # type: ignore[assignment]
+        original_cj_assignment_id = settings.cj_assignment_id
+        settings.cj_assignment_id = None
 
         envelope = compose_cj_assessment_request(
             settings=settings,
@@ -207,7 +207,7 @@ class AnchorAlignHandler:
         )
 
         # Restore assignment_id for logging
-        settings.assignment_id = original_assignment_id
+        settings.cj_assignment_id = original_cj_assignment_id
 
         request_path = write_cj_request_envelope(
             envelope=envelope,

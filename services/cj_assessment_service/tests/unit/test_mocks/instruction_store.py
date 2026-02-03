@@ -29,6 +29,7 @@ class AssessmentInstructionStore:
         course_id: str | None,
         instructions_text: str,
         grade_scale: str,
+        context_origin: str = "canonical_national",
         student_prompt_storage_id: str | None = None,
         judge_rubric_storage_id: str | None = None,
         created_at: datetime | None = None,
@@ -40,6 +41,7 @@ class AssessmentInstructionStore:
         record.course_id = course_id
         record.instructions_text = instructions_text
         record.grade_scale = grade_scale
+        record.context_origin = context_origin
         record.student_prompt_storage_id = student_prompt_storage_id
         record.judge_rubric_storage_id = judge_rubric_storage_id
         record.created_at = created_at or datetime.now(UTC)
@@ -52,6 +54,7 @@ class AssessmentInstructionStore:
         course_id: str | None,
         instructions_text: str,
         grade_scale: str,
+        context_origin: str = "canonical_national",
         student_prompt_storage_id: str | None = None,
         judge_rubric_storage_id: str | None = None,
         created_at: datetime | None = None,
@@ -65,6 +68,7 @@ class AssessmentInstructionStore:
                 course_id=course_id,
                 instructions_text=instructions_text,
                 grade_scale=grade_scale,
+                context_origin=context_origin,
                 student_prompt_storage_id=student_prompt_storage_id,
                 judge_rubric_storage_id=judge_rubric_storage_id,
                 created_at=created_at,
@@ -72,10 +76,20 @@ class AssessmentInstructionStore:
             self._records[key] = record
             return record
 
+        if existing.grade_scale != grade_scale:
+            raise ValueError(
+                "grade_scale is immutable once assessment instructions exist for a scope"
+            )
+        if getattr(existing, "context_origin", None) != context_origin:
+            raise ValueError(
+                "context_origin is immutable once assessment instructions exist for a scope"
+            )
+
         existing.instructions_text = instructions_text
-        existing.grade_scale = grade_scale
-        existing.student_prompt_storage_id = student_prompt_storage_id
-        existing.judge_rubric_storage_id = judge_rubric_storage_id
+        if student_prompt_storage_id is not None:
+            existing.student_prompt_storage_id = student_prompt_storage_id
+        if judge_rubric_storage_id is not None:
+            existing.judge_rubric_storage_id = judge_rubric_storage_id
         return existing
 
     def get(

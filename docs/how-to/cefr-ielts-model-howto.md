@@ -1,5 +1,9 @@
 # How-To: Build the CEFR/IELTS Scoring Model
 
+> Status (2026-02-03): The repo IELTS dataset is **blocked** until the source and licensing are validated.
+> Do not use IELTS-based runs for reported metrics or decisions. For the canonical research workflow
+> (current dataset: ELLIPSE train/test), use `docs/operations/ml-nlp-runbook.md`.
+
 This guide walks you through every step of creating the scoring component that maps our NLP and LanguageTool features to CEFR/IELTS proficiency bands. It assumes you can run Python scripts but are **new to machine learning**—we explain every concept as we go.
 
 ---

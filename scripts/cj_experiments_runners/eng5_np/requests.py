@@ -61,11 +61,14 @@ def compose_cj_assessment_request(
         raise ValueError("batch_id cannot be empty - must be provided via --batch-id CLI argument")
 
     canonical_batch_id = str(settings.batch_uuid)
+    assignment_id_for_cj = (
+        str(settings.cj_assignment_id) if settings.cj_assignment_id is not None else None
+    )
 
     system_metadata = SystemProcessingMetadata(
         entity_id=canonical_batch_id,
         entity_type="batch",
-        parent_id=str(settings.assignment_id),
+        parent_id=assignment_id_for_cj,
         processing_stage=ProcessingStage.PENDING,
         event=ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED.value,
     )
@@ -74,14 +77,14 @@ def compose_cj_assessment_request(
         event_name=ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED,
         entity_id=canonical_batch_id,
         entity_type="batch",
-        parent_id=str(settings.assignment_id),
+        parent_id=assignment_id_for_cj,
         system_metadata=system_metadata,
         essays_for_cj=list(essay_refs),
         language=settings.language.value,
         course_code=settings.course_code,
         student_prompt_ref=prompt_reference,
         llm_config_overrides=settings.llm_overrides,
-        assignment_id=str(settings.assignment_id),
+        assignment_id=assignment_id_for_cj,
         user_id=settings.user_id,
         org_id=settings.org_id,
     )

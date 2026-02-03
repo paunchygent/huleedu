@@ -259,9 +259,9 @@ Expected output:
 
 ### Anchor Registration is Mandatory
 
-- Register anchors once via `register-anchors` or the ENG5 CLI `--mode execute` bootstrap.
+- Register anchors once via `register-anchors` (execute does not register anchors).
 - Anchors are stored in `anchor_essay_references` and automatically loaded for every batch referencing the assignment.
-- **EXECUTE runs now abort if anchor registration fails or if `--cj-service-url` is missing.** There is no longer a fallback path that uploads anchors with the batch payload.
+- **EXECUTE runs now fail fast if CJ reports missing anchors** for the assignment’s `assessment_instructions.grade_scale` (or if CJ admin auth/URL is misconfigured). There is no fallback that uploads anchors with the batch payload.
 
 ## Step 5: Run the ENG5 NP Runner
 
@@ -273,6 +273,8 @@ docker compose -f docker-compose.yml -f docker-compose.eng5-runner.yml run --rm 
   --assignment-id eng5-np-batch-20250110 \
   --course-id 22222222-2222-2222-2222-222222222222 \
   --batch-id eng5-20250110-001 \
+  --await-completion \
+  --auto-extract-eng5-db \
   --verbose
 ```
 

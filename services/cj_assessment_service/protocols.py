@@ -305,6 +305,7 @@ class AssessmentInstructionRepositoryProtocol(Protocol):
         course_id: str | None,
         instructions_text: str,
         grade_scale: str,
+        context_origin: str = "research_experiment",
         student_prompt_storage_id: str | None = None,
         judge_rubric_storage_id: str | None = None,
     ) -> "AssessmentInstruction": ...

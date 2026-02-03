@@ -24,8 +24,10 @@ from scripts.cj_experiments_runners.eng5_np.settings import RunnerMode, RunnerSe
 @pytest.fixture
 def test_settings() -> RunnerSettings:
     """Create test settings for execute mode logging."""
+    assignment_id = uuid.uuid4()
     return RunnerSettings(
-        assignment_id=uuid.uuid4(),
+        assignment_id=assignment_id,
+        cj_assignment_id=assignment_id,
         course_id=uuid.uuid4(),
         grade_scale="test_scale",
         mode=RunnerMode.EXECUTE,

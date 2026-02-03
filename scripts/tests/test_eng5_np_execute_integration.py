@@ -89,8 +89,10 @@ def _create_test_environment(tmp_path: Path) -> tuple[RunnerPaths, RunnerSetting
 
     # Create settings for execute mode
     batch_uuid = uuid.uuid4()
+    assignment_id = uuid.uuid4()
     settings = RunnerSettings(
-        assignment_id=uuid.uuid4(),
+        assignment_id=assignment_id,
+        cj_assignment_id=assignment_id,
         course_id=uuid.uuid4(),
         grade_scale="eng5_np_legacy_9_step",
         mode=RunnerMode.EXECUTE,

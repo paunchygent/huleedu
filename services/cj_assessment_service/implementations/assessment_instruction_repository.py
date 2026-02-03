@@ -63,8 +63,10 @@ class PostgreSQLAssessmentInstructionRepository(AssessmentInstructionRepositoryP
             "course_id": instruction.course_id,
             "instructions_text": instruction.instructions_text,
             "grade_scale": instruction.grade_scale,
+            "context_origin": instruction.context_origin,
             "instruction_id": instruction.id,
             "student_prompt_storage_id": instruction.student_prompt_storage_id,
+            "judge_rubric_storage_id": instruction.judge_rubric_storage_id,
         }
 
     async def upsert_assessment_instruction(
@@ -75,6 +77,7 @@ class PostgreSQLAssessmentInstructionRepository(AssessmentInstructionRepositoryP
         course_id: str | None,
         instructions_text: str,
         grade_scale: str,
+        context_origin: str = "research_experiment",
         student_prompt_storage_id: str | None = None,
         judge_rubric_storage_id: str | None = None,
     ) -> AssessmentInstruction:
@@ -94,16 +97,27 @@ class PostgreSQLAssessmentInstructionRepository(AssessmentInstructionRepositoryP
         instruction = result.scalars().first()
 
         if instruction:
+            if instruction.grade_scale != grade_scale:
+                raise ValueError(
+                    "grade_scale is immutable once assessment instructions exist for a scope"
+                )
+            if instruction.context_origin != context_origin:
+                raise ValueError(
+                    "context_origin is immutable once assessment instructions exist for a scope"
+                )
+
             instruction.instructions_text = instructions_text
-            instruction.grade_scale = grade_scale
-            instruction.student_prompt_storage_id = student_prompt_storage_id
-            instruction.judge_rubric_storage_id = judge_rubric_storage_id
+            if student_prompt_storage_id is not None:
+                instruction.student_prompt_storage_id = student_prompt_storage_id
+            if judge_rubric_storage_id is not None:
+                instruction.judge_rubric_storage_id = judge_rubric_storage_id
         else:
             instruction = AssessmentInstruction(
                 assignment_id=assignment_id,
                 course_id=course_id,
                 instructions_text=instructions_text,
                 grade_scale=grade_scale,
+                context_origin=context_origin,
                 student_prompt_storage_id=student_prompt_storage_id,
                 judge_rubric_storage_id=judge_rubric_storage_id,
             )

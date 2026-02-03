@@ -54,6 +54,7 @@ class AdminRepositoryMock(AssessmentInstructionRepositoryProtocol, SessionProvid
         course_id: str | None,
         instructions_text: str,
         grade_scale: str,
+        context_origin: str = "research_experiment",
         student_prompt_storage_id: str | None = None,
         judge_rubric_storage_id: str | None = None,
     ) -> AssessmentInstruction:
@@ -62,6 +63,7 @@ class AdminRepositoryMock(AssessmentInstructionRepositoryProtocol, SessionProvid
             course_id=course_id,
             instructions_text=instructions_text,
             grade_scale=grade_scale,
+            context_origin=context_origin,
             student_prompt_storage_id=student_prompt_storage_id,
             judge_rubric_storage_id=judge_rubric_storage_id,
         )
@@ -110,6 +112,7 @@ class AdminRepositoryMock(AssessmentInstructionRepositoryProtocol, SessionProvid
         course_id: str | None,
         instructions_text: str,
         grade_scale: str,
+        context_origin: str = "research_experiment",
         created_at: datetime | None = None,
     ) -> AssessmentInstruction:
         """Helper for tests to preload instructions."""
@@ -118,6 +121,7 @@ class AdminRepositoryMock(AssessmentInstructionRepositoryProtocol, SessionProvid
             course_id=course_id,
             instructions_text=instructions_text,
             grade_scale=grade_scale,
+            context_origin=context_origin,
             created_at=created_at,
         )
 
@@ -297,7 +301,7 @@ def admin_repo() -> AdminRepositoryMock:
 def settings() -> Settings:
     s = Settings()
     s.ENABLE_ADMIN_ENDPOINTS = True
-    s.JWT_SECRET_KEY = SecretStr("unit-test-secret")
+    s.JWT_SECRET_KEY = SecretStr("unit-test-secret-key-with-min-32-bytes")
     return s
 
 
@@ -408,6 +412,62 @@ async def test_upsert_and_get_instruction(
     assert resp_get.status_code == 200
     fetched = await resp_get.get_json()
     assert fetched["grade_scale"] == "swedish_8_anchor"
+
+
+@pytest.mark.asyncio
+async def test_upsert_does_not_clear_existing_judge_rubric_storage_id(
+    client: QuartTestClient,
+    admin_headers: dict[str, str],
+    admin_repo: AdminRepositoryMock,
+) -> None:
+    admin_repo._instruction_store.upsert(
+        assignment_id="assignment-preserve",
+        course_id=None,
+        instructions_text="Initial instructions",
+        grade_scale="swedish_8_anchor",
+        student_prompt_storage_id="prompt-1",
+        judge_rubric_storage_id="rubric-1",
+    )
+
+    resp = await client.post(
+        "/admin/v1/assessment-instructions",
+        headers=admin_headers,
+        json={
+            "assignment_id": "assignment-preserve",
+            "instructions_text": "Updated instructions",
+            "grade_scale": "swedish_8_anchor",
+        },
+    )
+    assert resp.status_code == 200
+
+    stored = admin_repo._instruction_store.get(assignment_id="assignment-preserve", course_id=None)
+    assert stored is not None
+    assert stored.judge_rubric_storage_id == "rubric-1"
+
+
+@pytest.mark.asyncio
+async def test_upsert_rejects_grade_scale_changes_for_existing_instructions(
+    client: QuartTestClient,
+    admin_headers: dict[str, str],
+    admin_repo: AdminRepositoryMock,
+) -> None:
+    admin_repo.seed_instruction(
+        assignment_id="assignment-scale-lock",
+        course_id=None,
+        instructions_text="Initial",
+        grade_scale="swedish_8_anchor",
+    )
+
+    resp = await client.post(
+        "/admin/v1/assessment-instructions",
+        headers=admin_headers,
+        json={
+            "assignment_id": "assignment-scale-lock",
+            "instructions_text": "Updated instructions text",
+            "grade_scale": "eng5_np_legacy_9_step",
+        },
+    )
+    assert resp.status_code == 400
 
 
 @pytest.mark.asyncio

@@ -171,7 +171,7 @@ class TestAnchorAlignHandlerExecute:
             prompt_reference,
         ):
             # Capture assignment_id at composition time (GUEST semantics)
-            calls["compose_assignment_id"] = settings.assignment_id
+            calls["compose_assignment_id"] = settings.cj_assignment_id
             calls["compose_essay_refs"] = essay_refs
             calls["compose_prompt_ref"] = prompt_reference
             calls["compose_llm_overrides"] = settings.llm_overrides

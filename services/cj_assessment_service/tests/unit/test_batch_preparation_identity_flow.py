@@ -174,7 +174,7 @@ class TestIdentityThreadingInBatchCreation:
                 {"els_essay_id": "essay1", "text_storage_id": "storage1"},
                 {"els_essay_id": "essay2", "text_storage_id": "storage2"},
             ],
-            "assignment_id": "assignment-456",
+            "assignment_id": None,
         }
 
     @pytest.mark.asyncio
@@ -710,6 +710,10 @@ class TestIdentityThreadingInBatchCreation:
     ) -> None:
         """Test assignment_id storage works alongside identity field processing."""
         # Arrange
+        mock_instruction_repository.get_assessment_instruction.return_value = SimpleNamespace(
+            student_prompt_storage_id=None,
+            judge_rubric_storage_id=None,
+        )
         request_data = CJAssessmentRequestData(
             bos_batch_id=base_request_data["bos_batch_id"],
             assignment_id="test-assignment-789",
@@ -766,6 +770,10 @@ class TestIdentityThreadingInBatchCreation:
     ) -> None:
         """Test complete identity threading workflow with comprehensive validation."""
         # Arrange
+        mock_instruction_repository.get_assessment_instruction.return_value = SimpleNamespace(
+            student_prompt_storage_id=None,
+            judge_rubric_storage_id=None,
+        )
         request_data = CJAssessmentRequestData(
             bos_batch_id=base_request_data["bos_batch_id"],
             assignment_id="comprehensive-assignment",
@@ -880,15 +888,13 @@ class TestIdentityFieldDefaultBehavior:
     ) -> None:
         """Test behavior when no identity fields are present in request_data."""
         # Arrange
-        mock_database.get_assessment_instruction.return_value = None
-
         request_data = CJAssessmentRequestData(
             bos_batch_id="no-identity-batch",
             language="sv",
             course_code="SV1",
             student_prompt_text="Jämför uppsatserna",
             essays_to_process=[EssayToProcess(els_essay_id="essay1", text_storage_id="storage1")],
-            assignment_id="no-identity-assignment",
+            assignment_id=None,
         )
 
         # Act
@@ -938,7 +944,7 @@ class TestIdentityFieldDefaultBehavior:
             course_code="ENG3",
             student_prompt_text="Compare these essays",
             essays_to_process=[EssayToProcess(els_essay_id="essay1", text_storage_id="storage1")],
-            assignment_id="partial-identity-assignment",
+            assignment_id=None,
             user_id=user_id,
             org_id=org_id,
         )

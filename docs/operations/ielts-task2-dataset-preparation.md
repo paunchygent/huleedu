@@ -2,10 +2,13 @@
 type: runbook
 service: global
 severity: low
-last_reviewed: 2025-11-21
+last_reviewed: '2026-02-03'
 ---
 
 # IELTS Task 2 Dataset Preparation
+
+> Status (2026-02-03): IELTS datasets are currently **blocked** for reported experiments until the
+> source and licensing are validated. This runbook is kept for historical reference only.
 
 ## Raw Dataset Snapshot
 

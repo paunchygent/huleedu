@@ -28,6 +28,7 @@ class TestAssignmentPreflight:
             "course_id": None,
             "instructions_text": "x" * 20,
             "grade_scale": "eng5_np_legacy_9_step",
+            "context_origin": "research_experiment",
             "student_prompt_storage_id": None,
             "created_at": "2025-01-01T00:00:00Z",
         }
@@ -42,6 +43,8 @@ class TestAssignmentPreflight:
 
         assert result.assignment_id == str(assignment_id)
         assert result.grade_scale == "eng5_np_legacy_9_step"
+        assert result.context_origin == "research_experiment"
+        assert result.student_prompt_storage_id is None
 
     def test_preflight_assignment_metadata_404_gives_user_guidance(self) -> None:
         """404 from CJ admin should guide user to cj-admin instructions commands."""

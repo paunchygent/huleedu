@@ -9,7 +9,7 @@ import xgboost as xgb
 
 from scripts.ml_training.essay_scoring.config import TrainingConfig
 from scripts.ml_training.essay_scoring.features.combiner import FeatureMatrix
-from scripts.ml_training.essay_scoring.training.qwk import qwk_eval
+from scripts.ml_training.essay_scoring.training.qwk import qwk_eval_factory
 
 
 @dataclass(frozen=True)
@@ -27,6 +27,9 @@ def train_model(
     y_train: np.ndarray,
     y_val: np.ndarray,
     config: TrainingConfig,
+    *,
+    min_band: float,
+    max_band: float,
 ) -> TrainingArtifacts:
     """Train an XGBoost regressor with QWK early stopping."""
 
@@ -49,7 +52,7 @@ def train_model(
         num_boost_round=config.num_boost_round,
         evals=[(dtrain, "train"), (dval, "val")],
         early_stopping_rounds=config.early_stopping_rounds,
-        custom_metric=qwk_eval,
+        custom_metric=qwk_eval_factory(min_band=min_band, max_band=max_band),
         maximize=True,
         evals_result=evals_result,
     )

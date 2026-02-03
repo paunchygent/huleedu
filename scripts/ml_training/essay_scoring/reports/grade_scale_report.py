@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 import numpy as np
@@ -9,8 +10,7 @@ import pandas as pd
 from scipy.stats import spearmanr
 
 from scripts.ml_training.essay_scoring.dataset import EssayRecord
-from scripts.ml_training.essay_scoring.features.spacy_pipeline import load_spacy_model
-from scripts.ml_training.essay_scoring.features.utils import tokenize_words
+from scripts.ml_training.essay_scoring.text_processing import count_words
 from scripts.ml_training.essay_scoring.training.qwk import clip_bands, round_to_half_band
 
 
@@ -18,8 +18,12 @@ def generate_grade_scale_report(
     records: list[EssayRecord],
     y_true: np.ndarray,
     y_pred: np.ndarray,
-    dataset_path: Path,
+    dataset_source: str,
+    *,
+    min_band: float,
+    max_band: float,
     output_path: Path,
+    word_count_fn: Callable[[str], int] | None = None,
 ) -> None:
     """Generate the grade-scale behavior report as markdown.
 
@@ -27,16 +31,16 @@ def generate_grade_scale_report(
         records: Essay records in the evaluation split.
         y_true: Ground-truth band labels.
         y_pred: Model predictions.
-        dataset_path: Source dataset path (for report traceability).
+        dataset_source: Dataset identifier for report traceability (file path(s), etc).
         output_path: Path to write the markdown report.
     """
 
     if len(records) != len(y_true) or len(records) != len(y_pred):
         raise ValueError("Report inputs must have matching lengths.")
 
-    rounded = clip_bands(round_to_half_band(y_pred))
-    nlp = load_spacy_model("en_core_web_sm")
-    word_counts = np.array([len(tokenize_words(record.essay, nlp)) for record in records])
+    rounded = clip_bands(round_to_half_band(y_pred), min_band=min_band, max_band=max_band)
+    word_count_fn = word_count_fn or count_words
+    word_counts = np.array([word_count_fn(record.essay) for record in records], dtype=float)
 
     distribution = _distribution_table(y_true)
     prompt_distribution = _prompt_distribution(records, y_true)
@@ -47,11 +51,11 @@ def generate_grade_scale_report(
 
     confusion = _confusion_matrix(y_true, rounded)
 
-    report = f"""# Grade-Scale Behavior Report
+    report = f"""# Score-Scale Behavior Report
 
 ## Dataset & Context
-- Dataset version/source: {dataset_path}
-- Grade scale definition (labels + rubric reference): IELTS Overall band 1.0–9.0
+- Dataset version/source: {dataset_source}
+- Score scale observed (min–max): {min_band:.1f}–{max_band:.1f}
 - Prompt/task coverage: {len(set(record.question for record in records))} unique prompts
 - Rater context (single vs multiple raters; moderation process): Not specified in dataset
 
@@ -69,7 +73,8 @@ def generate_grade_scale_report(
 - Length bias check (Spearman word count vs prediction): {length_pred_corr:.3f}
 
 ## Mapping Decision
-- Chosen mapping: model prediction rounded to nearest 0.5 band (clipped to 1.0–9.0)
+- Chosen mapping: model prediction rounded to nearest 0.5 step
+  (clipped to {min_band:.1f}–{max_band:.1f})
 - Rationale: aligns with EPIC-010 guidance for ordinal regression outputs
 - Open questions / risks: validate mapping after Swedish dataset arrives
 

@@ -7,6 +7,7 @@ from scripts.ml_training.essay_scoring.splitters import stratified_split
 
 def _record(idx: int, label: float) -> EssayRecord:
     return EssayRecord(
+        record_id=f"record-{idx}",
         task_type="1",
         question="Prompt?",
         essay=f"Essay {idx}",
@@ -34,3 +35,18 @@ def test_stratified_split_moves_rare_labels_to_train() -> None:
     assert 1.0 not in val_labels
     assert 1.0 not in test_labels
     assert len(split.train) + len(split.val) + len(split.test) == len(records)
+
+
+def test_stratified_split_allows_zero_test_ratio() -> None:
+    records = []
+    records += [_record(i, 5.0) for i in range(20)]
+    records += [_record(i + 100, 6.0) for i in range(20)]
+
+    dataset = EssayDataset(records=records)
+    config = TrainingConfig(train_ratio=0.8, val_ratio=0.2, test_ratio=0.0, random_seed=42)
+
+    split = stratified_split(dataset, config)
+
+    assert split.test == []
+    assert split.val
+    assert len(split.train) + len(split.val) == len(records)

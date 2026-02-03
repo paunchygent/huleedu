@@ -420,6 +420,10 @@ markers = [
 filterwarnings = [
     "ignore::DeprecationWarning:pydantic.*",
     "ignore::DeprecationWarning:pkg_resources",
+    # Suppress SWIG internals warnings (library issue, not our code)
+    "ignore:builtin type swigvarlink has no __module__ attribute:DeprecationWarning",
+    "ignore:builtin type SwigPyObject has no __module__ attribute:DeprecationWarning",
+    "ignore:builtin type SwigPyPacked has no __module__ attribute:DeprecationWarning",
     # Suppress spacy's internal click parser deprecation (library issue, not our code)
     "ignore:Importing 'parser.split_arg_string' is deprecated:DeprecationWarning:spacy.cli._util",
     "ignore:Importing 'parser.split_arg_string' is deprecated:DeprecationWarning:weasel.util.config",

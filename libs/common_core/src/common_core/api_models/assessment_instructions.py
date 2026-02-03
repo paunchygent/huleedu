@@ -32,6 +32,14 @@ class AssessmentInstructionBase(BaseModel):
         ..., min_length=10, description="Canonical instructions presented to assessors"
     )
     grade_scale: str = Field(..., description="Registered grade scale key")
+    context_origin: str = Field(
+        default="research_experiment",
+        description=(
+            "Controls assignment context ownership semantics. "
+            "Use 'research_experiment' during prompt/rubric iteration, and "
+            "'canonical_national' only after sign-off (locked invariants)."
+        ),
+    )
     student_prompt_storage_id: str | None = Field(
         default=None,
         max_length=255,

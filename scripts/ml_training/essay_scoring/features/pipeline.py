@@ -38,6 +38,7 @@ class FeaturePipeline:
     offload: OffloadConfig | None = None
     spacy_model: str = "en_core_web_sm"
     nlp: Language | None = None
+    nlp_fast: Language | None = None
     embedder: EmbeddingExtractorProtocol | None = None
     tier1_extractor: Tier1ExtractorProtocol | None = None
     tier2_extractor: Tier2ExtractorProtocol | None = None
@@ -91,8 +92,12 @@ class FeaturePipeline:
         tier2_features = None
         tier3_features = None
         if feature_set in {FeatureSet.HANDCRAFTED, FeatureSet.COMBINED}:
-            if self.nlp is None and (self.tier1_extractor is None or self.tier2_extractor is None):
-                self.nlp = load_spacy_model(self.spacy_model)
+            if self.nlp is None and self.tier1_extractor is None:
+                self.nlp = load_spacy_model(self.spacy_model, enable_readability=True)
+            if self.nlp_fast is None and (
+                self.tier2_extractor is None or self.tier3_extractor is None
+            ):
+                self.nlp_fast = load_spacy_model(self.spacy_model, enable_readability=False)
             if self.tier1_extractor is None:
                 self.tier1_extractor = Tier1FeatureExtractor(
                     spacy_model=self.spacy_model,
@@ -111,13 +116,13 @@ class FeaturePipeline:
             if self.tier2_extractor is None:
                 self.tier2_extractor = Tier2FeatureExtractor(
                     spacy_model=self.spacy_model,
-                    nlp=self.nlp,
+                    nlp=self.nlp_fast,
                     embedding_extractor=tier2_embedding_extractor,
                 )
             if self.tier3_extractor is None:
                 self.tier3_extractor = Tier3FeatureExtractor(
                     spacy_model=self.spacy_model,
-                    nlp=self.nlp,
+                    nlp=self.nlp_fast,
                 )
             tier1_features = self.tier1_extractor.extract_batch(texts)
             tier2_features = self.tier2_extractor.extract_batch(texts, prompts)

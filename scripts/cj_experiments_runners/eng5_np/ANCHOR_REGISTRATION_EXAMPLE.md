@@ -241,7 +241,7 @@ docker compose -f docker-compose.yml -f docker-compose.eng5-runner.yml run --rm 
 | **Purpose** | Grade calibration (known grades) | Assessment targets (unknown grades) |
 | **Lifecycle** | Persistent (per assignment) | Per-batch |
 | **Storage** | `anchor_essay_references` table | `cj_processed_essays` table |
-| **Registration** | One-time via `register-anchors` | Every batch via runner |
+| **Registration** | One-time via `register-anchors` | Not applicable (student-only execute) |
 | **Naming** | Grade-based (A1.docx, F+2.txt) | Student-based (student_001.docx) |
 | **Reuse** | Yes (all batches for assignment) | No (specific to batch) |
 | **Upload** | To Content Service once | To Content Service per batch |

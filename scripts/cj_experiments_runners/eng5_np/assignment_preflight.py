@@ -40,6 +40,8 @@ class AssignmentPreflightResult:
 
     assignment_id: str
     grade_scale: str
+    context_origin: str
+    student_prompt_storage_id: str | None
 
 
 def resolve_assignment_preflight(
@@ -91,6 +93,8 @@ def resolve_assignment_preflight(
                     return AssignmentPreflightResult(
                         assignment_id=model.assignment_id,
                         grade_scale=model.grade_scale,
+                        context_origin=model.context_origin,
+                        student_prompt_storage_id=model.student_prompt_storage_id,
                     )
 
                 body = await response.text()

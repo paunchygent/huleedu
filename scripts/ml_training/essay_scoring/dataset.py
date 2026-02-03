@@ -12,6 +12,7 @@ import pandas as pd
 class EssayRecord:
     """Single IELTS essay record."""
 
+    record_id: str
     task_type: str
     question: str
     essay: str
@@ -65,6 +66,15 @@ OPTIONAL_COMPONENTS = [
 ]
 
 
+@dataclass(frozen=True)
+class PreSplitDataset:
+    """Dataset loaded with a predefined train/test split."""
+
+    dataset: EssayDataset
+    train_records: list[EssayRecord]
+    test_records: list[EssayRecord]
+
+
 def load_ielts_dataset(path: Path) -> EssayDataset:
     """Load the IELTS dataset with validation.
 
@@ -98,12 +108,25 @@ def load_ielts_dataset(path: Path) -> EssayDataset:
             for name in OPTIONAL_COMPONENTS
             if name in frame.columns
         }
+        task_type = str(row.get("Task_Type", ""))
+        question = str(row.get("Question", ""))
+        essay = str(row.get("Essay", ""))
+        overall = float(row.get("Overall"))
+        record_id = _make_record_id(
+            source_key="ielts",
+            row_index=int(row.name),
+            task_type=task_type,
+            question=question,
+            essay=essay,
+            overall=overall,
+        )
         records.append(
             EssayRecord(
-                task_type=str(row.get("Task_Type", "")),
-                question=str(row.get("Question", "")),
-                essay=str(row.get("Essay", "")),
-                overall=float(row.get("Overall")),
+                record_id=record_id,
+                task_type=task_type,
+                question=question,
+                essay=essay,
+                overall=overall,
                 component_scores=component_scores,
             )
         )
@@ -127,3 +150,151 @@ def _coerce_float(value: object) -> float | None:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+ELLIPSE_REQUIRED_COLUMNS = {"full_text", "prompt", "Overall"}
+ELLIPSE_SCORE_COLUMNS = [
+    "Overall",
+    "Cohesion",
+    "Syntax",
+    "Vocabulary",
+    "Phraseology",
+    "Grammar",
+    "Conventions",
+]
+
+
+def load_ellipse_train_test_dataset(
+    train_path: Path,
+    test_path: Path,
+    *,
+    excluded_prompts: set[str] | None = None,
+) -> PreSplitDataset:
+    """Load the ELLIPSE dataset from pre-split train/test CSVs.
+
+    Args:
+        train_path: CSV file path for the train split.
+        test_path: CSV file path for the test split.
+        excluded_prompts: Optional set of prompt names to drop entirely from both splits.
+
+    Returns:
+        PreSplitDataset containing the combined dataset and split-specific record lists.
+
+    Raises:
+        FileNotFoundError: If either split path does not exist.
+        ValueError: If required columns are missing or split leakage is detected.
+    """
+
+    if not train_path.exists():
+        raise FileNotFoundError(f"Train dataset not found at {train_path}")
+    if not test_path.exists():
+        raise FileNotFoundError(f"Test dataset not found at {test_path}")
+
+    train_frame = pd.read_csv(train_path, dtype=str, keep_default_na=False)
+    test_frame = pd.read_csv(test_path, dtype=str, keep_default_na=False)
+
+    missing_train = ELLIPSE_REQUIRED_COLUMNS - set(train_frame.columns)
+    missing_test = ELLIPSE_REQUIRED_COLUMNS - set(test_frame.columns)
+    if missing_train:
+        raise ValueError(f"ELLIPSE train dataset missing required columns: {sorted(missing_train)}")
+    if missing_test:
+        raise ValueError(f"ELLIPSE test dataset missing required columns: {sorted(missing_test)}")
+
+    excluded_prompts = excluded_prompts or set()
+    if excluded_prompts:
+        train_frame = train_frame[~train_frame["prompt"].isin(excluded_prompts)]
+        test_frame = test_frame[~test_frame["prompt"].isin(excluded_prompts)]
+
+    train_records = _load_ellipse_records(train_frame, source_key="ellipse_train")
+    test_records = _load_ellipse_records(test_frame, source_key="ellipse_test")
+
+    train_essays = {record.essay for record in train_records}
+    overlap = [record for record in test_records if record.essay in train_essays]
+    if overlap:
+        raise ValueError(
+            "ELLIPSE train/test split leakage detected: "
+            f"{len(overlap)} test records share identical essay text with train."
+        )
+
+    dataset = EssayDataset(records=train_records + test_records)
+    return PreSplitDataset(
+        dataset=dataset,
+        train_records=train_records,
+        test_records=test_records,
+    )
+
+
+def _load_ellipse_records(frame: pd.DataFrame, *, source_key: str) -> list[EssayRecord]:
+    frame = frame.dropna(subset=["full_text", "Overall", "prompt"])
+    if frame.empty:
+        raise ValueError("ELLIPSE dataset contains no valid rows after filtering.")
+
+    records: list[EssayRecord] = []
+    for _, row in frame.iterrows():
+        component_scores: dict[str, float | None] = {}
+        for name in ELLIPSE_SCORE_COLUMNS:
+            if name not in frame.columns:
+                continue
+            component_scores[name] = _coerce_float(row.get(name))
+
+        overall_value = component_scores.get("Overall")
+        if overall_value is None:
+            raise ValueError("ELLIPSE dataset contains rows with missing Overall score.")
+
+        task_type = str(row.get("task", ""))
+        question = str(row.get("prompt", ""))
+        essay = str(row.get("full_text", ""))
+        overall = float(overall_value)
+        record_id = _make_record_id(
+            source_key=source_key,
+            row_index=int(row.name),
+            task_type=task_type,
+            question=question,
+            essay=essay,
+            overall=overall,
+        )
+        records.append(
+            EssayRecord(
+                record_id=record_id,
+                task_type=task_type,
+                question=question,
+                essay=essay,
+                overall=overall,
+                component_scores=component_scores,
+            )
+        )
+
+    return records
+
+
+def _make_record_id(
+    *,
+    source_key: str,
+    row_index: int,
+    task_type: str,
+    question: str,
+    essay: str,
+    overall: float,
+) -> str:
+    """Return a stable per-row record identifier.
+
+    Requirements:
+    - Must be unique even when content is duplicated (e.g., copied essays).
+    - Must be stable for the same dataset file (feature store reuse uses dataset SHA256).
+    """
+
+    import hashlib
+
+    hasher = hashlib.sha256()
+    hasher.update(source_key.encode("utf-8"))
+    hasher.update(b"\0")
+    hasher.update(str(row_index).encode("utf-8"))
+    hasher.update(b"\0")
+    hasher.update(task_type.encode("utf-8"))
+    hasher.update(b"\0")
+    hasher.update(question.encode("utf-8"))
+    hasher.update(b"\0")
+    hasher.update(essay.encode("utf-8"))
+    hasher.update(b"\0")
+    hasher.update(f"{overall:.3f}".encode("utf-8"))
+    return hasher.hexdigest()

@@ -39,6 +39,8 @@ from services.cj_assessment_service.protocols import (
 
 logger = create_service_logger("cj_assessment_service.batch_preparation")
 
+_CANONICAL_NATIONAL_CONTEXT_ORIGIN = "canonical_national"
+
 
 async def create_cj_batch(
     request_data: CJAssessmentRequestData,
@@ -107,34 +109,42 @@ async def create_cj_batch(
             org_id=org_id,
         )
 
-        if assignment_id and (not prompt_storage_id or not judge_rubric_storage_id):
+        if assignment_id:
             instruction = await instruction_repository.get_assessment_instruction(
                 session, assignment_id=assignment_id, course_id=None
             )
+            if instruction is None:
+                raise ValueError(
+                    f"Unknown assignment_id '{assignment_id}': missing assessment_instructions"
+                )
 
-        # Auto-hydrate student prompt from assessment instruction when missing
-        if instruction and not prompt_storage_id and instruction.student_prompt_storage_id:
+            context_origin = instruction.context_origin
+            rubric_override = (
+                request_data.llm_config_overrides.judge_rubric_override
+                if request_data.llm_config_overrides
+                else None
+            )
+
+            if rubric_override and context_origin == _CANONICAL_NATIONAL_CONTEXT_ORIGIN:
+                raise ValueError(
+                    "judge_rubric_override is not allowed for canonical assignments. "
+                    "Set assessment_instructions.context_origin to a non-canonical value (e.g. "
+                    "'research_experiment') before running rubric A/B tests for assignment_id="
+                    f"{assignment_id}."
+                )
+
             prompt_storage_id = instruction.student_prompt_storage_id
-            logger.info(
-                "Auto-hydrated student prompt from instruction",
-                extra={
-                    **log_extra,
-                    "assignment_id": assignment_id,
-                    "storage_id": prompt_storage_id,
-                },
-            )
-
-        # Auto-hydrate judge rubric reference from assessment instruction when missing
-        if instruction and not judge_rubric_storage_id and instruction.judge_rubric_storage_id:
+            prompt_text = None
             judge_rubric_storage_id = instruction.judge_rubric_storage_id
-            logger.info(
-                "Auto-hydrated judge rubric reference from instruction",
-                extra={
-                    **log_extra,
-                    "assignment_id": assignment_id,
-                    "storage_id": judge_rubric_storage_id,
-                },
-            )
+            judge_rubric_text = None
+
+            if rubric_override and context_origin != _CANONICAL_NATIONAL_CONTEXT_ORIGIN:
+                judge_rubric_text = rubric_override
+                judge_rubric_storage_id = None
+                logger.info(
+                    "Applied judge_rubric_override for non-canonical assignment",
+                    extra={**log_extra, "override_length": len(rubric_override)},
+                )
 
         # Hydration fallback if storage_id exists but text is missing
         if prompt_storage_id and not prompt_text:
@@ -195,12 +205,15 @@ async def create_cj_batch(
                             exc_info=True,
                         )
 
-        # Apply judge_rubric_override from llm_config_overrides if present
+        # Apply judge_rubric_override for guest runs (assignment_id=None).
+        # Assignment-bound override is handled above (context_origin gated).
         if (
-            request_data.llm_config_overrides
+            assignment_id is None
+            and request_data.llm_config_overrides
             and request_data.llm_config_overrides.judge_rubric_override
         ):
             judge_rubric_text = request_data.llm_config_overrides.judge_rubric_override
+            judge_rubric_storage_id = None
             logger.info(
                 "Applied judge_rubric_override from llm_config_overrides",
                 extra={

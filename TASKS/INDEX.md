@@ -1,15 +1,15 @@
 # TASKS Index
 
-Generated: 2026-02-01T23:01:34
+Generated: 2026-02-03T01:47:42
 
 ## Summary
 
-- Total tasks indexed: 152
-- assessment: 69
+- Total tasks indexed: 154
+- assessment: 70
 - content: 2
 - identity: 4
 - frontend: 2
-- infrastructure: 28
+- infrastructure: 29
 - security: 1
 - integrations: 14
 - architecture: 11
@@ -17,7 +17,7 @@ Generated: 2026-02-01T23:01:34
 
 ## By Domain
 
-### assessment (69)
+### assessment (70)
 - [Clean up unused code paths in comparison_processing.py](TASKS/assessment/us-00xy-cleanup-unused-comparison-processing-code-paths.md) — `in_progress`
 - [Remove COMPARISONS_PER_STABILITY_CHECK_ITERATION setting from CJ service](TASKS/assessment/us-00xx-remove-comparisons-per-stability-iteration-setting.md) — `in_progress`
 - [US-00XZ BatchFinalizer dual-event semantics and BT edge-case test isolation](TASKS/assessment/us-00xz-batchfinalizer-dual-event-semantics-and-bt-edge-case-test-isolation.md) — `in_progress`
@@ -52,6 +52,7 @@ Generated: 2026-02-01T23:01:34
 - [ENG5 reasoning controls & CJ plumbing](TASKS/assessment/eng5-reasoning-controls--cj-plumbing.md) — `in_progress`
 - [Entitlements Service — Final Implementation Reference](TASKS/assessment/entitlement-service-implementation-plan.md) — `proposed`
 - [Entitlements Service — Test Coverage Plan (Final)](TASKS/assessment/entitlements-service-test-coverage-plan.md) — `proposed`
+- [Essay scoring research: warm-cache feature store + 1.0-9.0 scale alignment](TASKS/assessment/essay-scoring-research-warm-cache-feature-store--10-90-scale-alignment.md) — `done`
 - [Event Publishing Infrastructure Improvements](TASKS/assessment/event-publishing-improvements.md) — `proposed`
 - [Event Schema Governance & CI Gate (Weeks 6–8)](TASKS/assessment/event-schema-governance-and-ci-plan.md) — `proposed`
 - [Existing](TASKS/assessment/task-054-suggested-improvements-to-bayesian-model.md) — `proposed`
@@ -102,7 +103,7 @@ Generated: 2026-02-01T23:01:34
 - [Vue 3 Teacher Dashboard Integration](TASKS/frontend/vue-3-teacher-dashboard-integration.md) — `in_progress`
 - [Implement semantic token architecture per ADR-0023](TASKS/frontend/implement-semantic-token-architecture-per-adr-0023.md) — `in_progress`
 
-### infrastructure (28)
+### infrastructure (29)
 - [Migrate Kafka infra to KRaft and align Hemma shared infra](TASKS/infrastructure/migrate-kafka-infra-to-kraft-and-align-hemma-shared-infra.md) — `done`
 - [US-007.1 Shared Utilities Extraction](TASKS/infrastructure/us-0071-shared-utilities-extraction.md) — `done`
 - [US-007.2 Schema Consolidation](TASKS/infrastructure/us-0072-schema-consolidation.md) — `done`
@@ -130,6 +131,7 @@ Generated: 2026-02-01T23:01:34
 - [MyPy Configuration Investigation and Consolidation](TASKS/infrastructure/mypy-configuration-investigation-and-consolidation.md) — `done`
 - [PDM pyproject.toml Migration to PEP 735](TASKS/infrastructure/pdm-pyproject-toml-migration-to-pep-735.md) — `in_progress`
 - [Persist text_storage_id on file uploads and enable mock LLM for functional CJ](TASKS/infrastructure/persist-text-storage-id-on-file-uploads-and-enable-mock-llm-for-functional-cj.md) — `in_progress`
+- [Remove Gemini GitHub Actions workflows](TASKS/infrastructure/remove-gemini-github-actions-workflows.md) — `done`
 - [SLOs, Alerts, and Runbooks (Weeks 7–9)](TASKS/infrastructure/slo-alerts-and-runbooks-plan.md) — `proposed`
 
 ### security (1)
@@ -225,7 +227,7 @@ Generated: 2026-02-01T23:01:34
 - [Frontend Live Data Integration](TASKS/programs/teacher_dashboard_integration/frontend-live-data-integration.md) — `programs`
 - [WebSocket Batch Updates](TASKS/programs/teacher_dashboard_integration/websocket-batch-updates.md) — `programs`
 
-### done (28)
+### done (30)
 - [Add Database Metrics Instrumentation to Remaining Services](TASKS/infrastructure/add-database-metrics-instrumentation-to-remaining-services.md) — `infrastructure`
 - [Align TASKS and docs lifecycle v2](TASKS/architecture/align-tasks-and-docs-lifecycle-v2.md) — `architecture`
 - [API Gateway batch listing endpoint tests](TASKS/identity/api-gateway-batch-listing-endpoint-tests.md) — `identity`
@@ -238,6 +240,7 @@ Generated: 2026-02-01T23:01:34
 - [CJ Prompt Cache Template Builder](TASKS/assessment/cj-prompt-cache-template-builder.md) — `assessment`
 - [CMS Batch Class Info Internal Endpoint](TASKS/programs/teacher_dashboard_integration/cms-batch-class-info-internal-endpoint.md) — `programs`
 - [ENG5 Provider Batch API Harness Coverage](TASKS/integrations/eng5-provider-batch-api-harness-coverage.md) — `integrations`
+- [Essay scoring research: warm-cache feature store + 1.0-9.0 scale alignment](TASKS/assessment/essay-scoring-research-warm-cache-feature-store--10-90-scale-alignment.md) — `assessment`
 - [Filename propagation from ELS to RAS for teacher result visibility](TASKS/assessment/filename-propagation-from-els-to-ras-for-teacher-result-visibility.md) — `assessment`
 - [Fix Anchor Essay Infrastructure](TASKS/assessment/fix-anchor-essay-infrastructure.md) — `assessment`
 - [Fix Cj Anchor Finalization Monitoring](TASKS/assessment/fix-cj-anchor-finalization-monitoring.md) — `assessment`
@@ -249,6 +252,7 @@ Generated: 2026-02-01T23:01:34
 - [Propagate assignment_id from BOS to CJ request (Phase A)](TASKS/assessment/propagate-assignment-id-from-bos-to-cj-request-phase-a.md) — `assessment`
 - [Propagate assignment_id from CJ to RAS storage (Phase B)](TASKS/assessment/propagate-assignment-id-from-cj-to-ras-storage-phase-b.md) — `assessment`
 - [RAS Processing Phase Derivation](TASKS/programs/teacher_dashboard_integration/ras-processing-phase-derivation.md) — `programs`
+- [Remove Gemini GitHub Actions workflows](TASKS/infrastructure/remove-gemini-github-actions-workflows.md) — `infrastructure`
 - [US-005.1: Callback-driven continuation and safe completion gating](TASKS/assessment/us-0051-callback-driven-continuation-and-safe-completion-gating.md) — `assessment`
 - [US-005.6: BatchMonitor Separation of Concerns](TASKS/assessment/batchmonitor-separation-of-concerns.md) — `assessment`
 - [US-007.1 Shared Utilities Extraction](TASKS/infrastructure/us-0071-shared-utilities-extraction.md) — `infrastructure`

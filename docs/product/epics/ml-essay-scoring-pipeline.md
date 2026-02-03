@@ -6,13 +6,13 @@ status: draft
 phase: 1
 sprint_target: null
 created: '2025-12-05'
-last_updated: '2026-01-31'
+last_updated: '2026-02-02'
 ---
 # EPIC-010: ML Essay Scoring Pipeline
 
 ## Summary
 
-Build a **whitebox** ML pipeline for automated essay scoring as a checks-and-balances system against CJ Assessment's **blackbox** LLM-based ranking. The model uses DeBERTa-v3-base embeddings (768-dim) combined with research-backed interpretable features (~25-30) and XGBoost ordinal regression to predict IELTS band scores (5.0-7.5).
+Build a **whitebox** ML pipeline for automated essay scoring as a checks-and-balances system against CJ Assessment's **blackbox** LLM-based ranking. The model uses DeBERTa-v3-base embeddings (768-dim) combined with research-backed interpretable features (~25-30) and XGBoost ordinal regression to predict a validated **Overall** target score (current research baseline: ELLIPSE).
 
 **Business Value**: Independent, explainable essay quality assessment that validates CJ rankings and provides interpretable quality signals for teachers and researchers via SHAP explanations.
 
@@ -25,7 +25,7 @@ Build a **whitebox** ML pipeline for automated essay scoring as a checks-and-bal
 ## Deliverables
 
 ### Phase 1: Feature Engineering & Data Pipeline
-- [ ] Data loader for IELTS Writing Dataset (`data/cefr_ielts_datasets/ielts_writing_dataset.csv`)
+- [ ] Data loader for canonical AES dataset (current: ELLIPSE train/test in `data/ELLIPSE_TRAIN_TEST/`; IELTS dataset is blocked pending source validation)
 - [ ] DeBERTa-v3-base embedding extractor (768-dim, [CLS] pooling, max_length=512)
 - [ ] Tier 1 feature extractors (highest predictive value):
   - [ ] Error density features (LanguageTool: grammar, spelling, punctuation density)
@@ -68,7 +68,7 @@ Build a **whitebox** ML pipeline for automated essay scoring as a checks-and-bal
 **Acceptance Criteria**:
 - [ ] DeBERTa-v3-base model loaded (`microsoft/deberta-v3-base`, 768-dim)
 - [ ] [CLS] token pooling for document-level representation
-- [ ] Max token length: 512 (covers 95%+ of IELTS essays without truncation)
+- [ ] Max token length: 512 (validate per dataset; adjust if truncation impacts performance)
 - [ ] Essays tokenized and embedded as 768-dim vectors
 - [ ] Batch inference supported for efficiency
 - [ ] Embeddings cacheable for repeated training runs
@@ -110,12 +110,12 @@ Build a **whitebox** ML pipeline for automated essay scoring as a checks-and-bal
 **So that** I can predict essay quality bands while respecting ordinal structure.
 
 **Acceptance Criteria**:
-- [ ] Load IELTS dataset (5,432 essays, band scores 5.0-7.5)
+- [ ] Load canonical dataset (current: ELLIPSE train/test; Overall target)
 - [ ] Feature pipeline: DeBERTa embeddings (768-dim) + hand-rolled (~25 features) = ~793 total
 - [ ] Stratified train/val/test split (70/15/15)
 - [ ] XGBoost with `reg:squarederror` objective (regression captures ordinality)
 - [ ] Custom QWK evaluation metric for early stopping
-- [ ] Predictions rounded to nearest 0.5 band, clipped to [5.0, 7.5]
+- [ ] Predictions post-processed to match the dataset label scale (rounding/clipping must be explicit)
 - [ ] 5-fold cross-validation with QWK scoring
 - [ ] Model achieves QWK > 0.60 on validation set
 
@@ -186,11 +186,18 @@ Build a **whitebox** ML pipeline for automated essay scoring as a checks-and-bal
 
 ### Data Source
 ```
-data/cefr_ielts_datasets/ielts_writing_dataset.csv
-├── 5,432 essays
-├── Columns: Task_Type, Question, Essay, Overall (band score)
-└── Component scores: Task_Response, Coherence_Cohesion, Lexical_Resource, Range_Accuracy
+data/ELLIPSE_TRAIN_TEST/
+├── ELLIPSE_Final_github_train.csv
+└── ELLIPSE_Final_github_test.csv
+
+Columns (subset):
+- full_text (essay text)
+- prompt (writing prompt)
+- Overall (target)
 ```
+
+Blocked:
+- `data/cefr_ielts_datasets/ielts_writing_dataset.csv` (do not use for claims until source/licensing is validated)
 
 ### Feature Architecture
 
@@ -226,7 +233,7 @@ services/nlp_service/
 │       │   ├── tier3_structure.py         # Paragraph/intro/conclusion
 │       │   └── feature_combiner.py        # Merge embeddings + all tiers
 │       ├── training/
-│       │   ├── data_loader.py          # Load IELTS CSV
+│       │   ├── data_loader.py          # Load canonical AES dataset (ELLIPSE baseline; IELTS blocked)
 │       │   ├── trainer.py              # XGBoost ordinal regressor training
 │       │   ├── evaluation.py           # QWK, metrics, feature importance
 │       │   └── explainability.py       # SHAP integration
@@ -246,12 +253,12 @@ services/nlp_service/
 **Embedding Model**:
 - Model: `microsoft/deberta-v3-base` (768-dim)
 - Pooling: [CLS] token (document-level representation)
-- Max length: 512 tokens (covers 95%+ IELTS essays)
+- Max length: 512 tokens (validate per dataset; adjust if truncation is material)
 - Rationale: Superior [CLS] quality via disentangled attention; relative position bias encodes essay structure
 
 **XGBoost Ordinal Regressor**:
 - Objective: `reg:squarederror` (regression captures ordinal structure better than classification)
-- Predictions: Rounded to nearest 0.5 band, clipped to [5.0, 7.5]
+- Predictions: Post-processed to match the dataset label scale (rounding/clipping must be explicit)
 - Early stopping: Custom QWK evaluation metric
 
 **Key Hyperparameters** (architect recommendations):
@@ -283,7 +290,7 @@ params = {
 
 ### Infrastructure
 - NLP Service operational
-- IELTS dataset available at `data/cefr_ielts_datasets/ielts_writing_dataset.csv`
+- Canonical dataset available: `data/ELLIPSE_TRAIN_TEST/` (IELTS dataset is blocked pending validation)
 
 ### Python Packages
 - **Embeddings**: transformers, torch (`microsoft/deberta-v3-base`)
@@ -337,6 +344,6 @@ Complete this report **before** any Swedish grade mapping work. Do not assume eq
 
 ## Notes
 - **Whitebox purpose**: Independent validation of CJ blackbox rankings
-- IELTS band scores map to CEFR: 5.0-5.5 → B1-B2, 6.0-6.5 → B2, 7.0+ → C1
+- IELTS↔CEFR mapping is not canonical; do not rely on it without a sourced reference and validated dataset.
 - Swedish grade mapping is future scope (requires labeled Swedish data)
 - Automated CJ validation pipeline is future scope (compare whitebox scores to CJ ranks)

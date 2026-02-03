@@ -55,6 +55,7 @@ class AdminRepositoryMock(AssessmentInstructionRepositoryProtocol, SessionProvid
         course_id: str | None,
         instructions_text: str,
         grade_scale: str,
+        context_origin: str = "canonical_national",
         student_prompt_storage_id: str | None = None,
         judge_rubric_storage_id: str | None = None,
     ) -> Any:
@@ -63,6 +64,7 @@ class AdminRepositoryMock(AssessmentInstructionRepositoryProtocol, SessionProvid
             course_id=course_id,
             instructions_text=instructions_text,
             grade_scale=grade_scale,
+            context_origin=context_origin,
             student_prompt_storage_id=student_prompt_storage_id,
             judge_rubric_storage_id=judge_rubric_storage_id,
         )
@@ -276,7 +278,7 @@ class TestProvider(Provider):
         return extract_correlation_context_from_request(quart_request)
 
 
-TEST_JWT_SECRET = "test-secret-key"
+TEST_JWT_SECRET = "test-secret-key-with-min-32-bytes"
 
 
 @pytest.fixture

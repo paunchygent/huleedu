@@ -42,6 +42,7 @@ def _serialize_instruction(model: AssessmentInstruction) -> AssessmentInstructio
         course_id=model.course_id,
         instructions_text=model.instructions_text,
         grade_scale=model.grade_scale,
+        context_origin=model.context_origin,
         student_prompt_storage_id=model.student_prompt_storage_id,
         created_at=model.created_at,
     )
@@ -100,15 +101,22 @@ async def upsert_assessment_instruction(  # type: ignore[override]
                 course_id=req.course_id,
                 instructions_text=req.instructions_text,
                 grade_scale=req.grade_scale,
+                context_origin=req.context_origin,
                 student_prompt_storage_id=req.student_prompt_storage_id,
             )
         except ValueError as exc:
             record_admin_metric("upsert", "failure")
+            message = str(exc)
+            field = "scope"
+            if "grade_scale" in message:
+                field = "grade_scale"
+            if "context_origin" in message:
+                field = "context_origin"
             raise_validation_error(
                 service="cj_assessment_service",
                 operation="upsert_assessment_instruction",
-                field="scope",
-                message=str(exc),
+                field=field,
+                message=message,
                 correlation_id=corr.uuid,
             )
         except Exception as exc:  # pragma: no cover - defensive

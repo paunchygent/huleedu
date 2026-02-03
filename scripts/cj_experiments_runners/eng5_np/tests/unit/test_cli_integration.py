@@ -149,6 +149,101 @@ class TestCliExecuteValidation:
         # Message may be wrapped with line breaks; use a stable substring.
         assert "--assignment-id is required for execute" in stderr_out
 
+    def test_execute_mode_rubric_file_wires_llm_override(
+        self,
+        tmp_path: Path,
+        monkeypatch,
+    ) -> None:
+        """EXECUTE mode uses --rubric to set LLMConfigOverrides.judge_rubric_override."""
+
+        rubric_path = tmp_path / "rubric.txt"
+        rubric_path.write_text("RUBRIC OVERRIDE TEXT", encoding="utf-8")
+
+        calls: dict[str, object] = {}
+        dummy_inventory = _make_dummy_inventory(tmp_path)
+
+        class DummyHandler:
+            def __init__(self) -> None:
+                calls["handler_constructed"] = True
+
+            def execute(self, settings, inventory, paths) -> int:  # noqa: ANN001
+                calls["settings"] = settings
+                calls["inventory"] = inventory
+                calls["paths"] = paths
+                return 0
+
+        def fake_collect_inventory(_paths: RunnerPaths) -> RunnerInventory:
+            return dummy_inventory
+
+        def fake_ensure_comparison_capacity_counts(*_args, **_kwargs) -> None:
+            return None
+
+        def fake_validate_llm_overrides(*, provider, model) -> None:  # noqa: ARG001
+            return None
+
+        def fake_configure_cli_logging(*_args, **_kwargs) -> None:
+            return None
+
+        def fake_setup_cli_logger(settings):  # noqa: ARG001
+            class DummyLogger:
+                def info(self, *_args, **_kwargs) -> None:
+                    return None
+
+            return DummyLogger()
+
+        def fake_gather_git_sha(_repo_root: Path) -> str:
+            return "test-git-sha"
+
+        class DummyPreflight:
+            assignment_id = "assignment-1"
+            grade_scale = "eng5_np_legacy_9_step"
+            context_origin = "research_experiment"
+            student_prompt_storage_id = "prompt-storage-id"
+
+        class DummyAnchorPreflight:
+            assignment_id = "assignment-1"
+            grade_scale = "eng5_np_legacy_9_step"
+            anchor_count = 10
+            anchor_count_total = 10
+
+        monkeypatch.setitem(cli.HANDLER_MAP, RunnerMode.EXECUTE, DummyHandler)
+        monkeypatch.setattr(cli, "collect_inventory", fake_collect_inventory)
+        monkeypatch.setattr(
+            cli, "ensure_comparison_capacity_counts", fake_ensure_comparison_capacity_counts
+        )
+        monkeypatch.setattr(cli, "validate_llm_overrides", fake_validate_llm_overrides)
+        monkeypatch.setattr(cli, "configure_cli_logging", fake_configure_cli_logging)
+        monkeypatch.setattr(cli, "setup_cli_logger", fake_setup_cli_logger)
+        monkeypatch.setattr(cli, "gather_git_sha", fake_gather_git_sha)
+        monkeypatch.setattr(cli, "configure_execute_logging", lambda *_, **__: None)
+        monkeypatch.setattr(cli, "resolve_assignment_preflight", lambda **_: DummyPreflight())
+        monkeypatch.setattr(cli, "resolve_anchor_preflight", lambda **_: DummyAnchorPreflight())
+
+        result = runner.invoke(
+            cli.app,
+            [
+                "--mode",
+                "execute",
+                "--assignment-id",
+                str(uuid.UUID("00000000-0000-0000-0000-000000000031")),
+                "--course-id",
+                str(uuid.UUID("00000000-0000-0000-0000-000000000032")),
+                "--batch-id",
+                "execute-test-batch",
+                "--kafka-bootstrap",
+                "localhost:9093",
+                "--cj-service-url",
+                "http://localhost:9095",
+                "--rubric",
+                str(rubric_path),
+            ],
+        )
+
+        assert result.exit_code == 0
+        settings = calls["settings"]
+        assert settings.llm_overrides is not None
+        assert settings.llm_overrides.judge_rubric_override == "RUBRIC OVERRIDE TEXT"
+
 
 class TestCliAnchorAlignMode:
     """Integration tests for anchor-align-test CLI behavior."""

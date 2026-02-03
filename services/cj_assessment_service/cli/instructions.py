@@ -27,6 +27,13 @@ def create_instruction(
         "", help="Inline instructions text when no file is given"
     ),
     grade_scale: str = typer.Option(..., help="Registered grade scale ID"),
+    context_origin: str = typer.Option(
+        "research_experiment",
+        help=(
+            "Assignment context intent: use 'research_experiment' during prompt/rubric iteration, "
+            "and 'canonical_national' only after sign-off (locked invariants)."
+        ),
+    ),
     prompt_file: Path | None = typer.Option(
         None, help="Optional path to file containing student prompt"
     ),
@@ -43,6 +50,16 @@ def create_instruction(
     if prompt_file and prompt_text:
         typer.secho(
             "Provide at most one of --prompt-file or --prompt-text",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(code=2)
+
+    valid_context_origins = {"research_experiment", "canonical_national"}
+    if context_origin not in valid_context_origins:
+        typer.secho(
+            "Invalid --context-origin. Valid values are: "
+            + ", ".join(sorted(valid_context_origins)),
             fg=typer.colors.RED,
             err=True,
         )
@@ -109,6 +126,7 @@ def create_instruction(
         "course_id": course_id or None,
         "instructions_text": instructions,
         "grade_scale": grade_scale,
+        "context_origin": context_origin,
     }
     if student_prompt_storage_id:
         payload["student_prompt_storage_id"] = student_prompt_storage_id

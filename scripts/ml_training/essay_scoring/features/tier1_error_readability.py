@@ -24,8 +24,6 @@ from scripts.ml_training.essay_scoring.features.utils import (
     density_per_100_words,
     normalize_whitespace,
     safe_divide,
-    tokenize_sentences,
-    tokenize_words,
 )
 from scripts.ml_training.essay_scoring.logging_utils import ProgressLogger
 
@@ -88,11 +86,15 @@ class Tier1FeatureExtractor:
 
         if self.language_tool_url is None:
             features: list[Tier1Features] = []
-            for index, cleaned in enumerate(cleaned_texts):
+            if self.nlp is None:
+                raise RuntimeError("spaCy pipeline not initialized for Tier 1 extractor.")
+            for index, (cleaned, doc) in enumerate(
+                zip(cleaned_texts, self.nlp.pipe(cleaned_texts), strict=True)
+            ):
                 logger.info(
                     "Tier1 item %d/%d start (chars=%d)", index + 1, len(texts), len(cleaned)
                 )
-                stats = self._compute_text_stats(cleaned)
+                stats = self._compute_text_stats_from_doc(doc)
                 grammar_count, spelling_count, punctuation_count = self._error_counts(cleaned)
                 features.append(
                     self._build_features(
@@ -110,11 +112,15 @@ class Tier1FeatureExtractor:
             futures = [pool.submit(self._remote_error_counts, cleaned) for cleaned in cleaned_texts]
 
             stats_by_index: list[dict[str, float]] = []
-            for index, cleaned in enumerate(cleaned_texts):
+            if self.nlp is None:
+                raise RuntimeError("spaCy pipeline not initialized for Tier 1 extractor.")
+            for index, (cleaned, doc) in enumerate(
+                zip(cleaned_texts, self.nlp.pipe(cleaned_texts), strict=True)
+            ):
                 logger.info(
                     "Tier1 item %d/%d start (chars=%d)", index + 1, len(texts), len(cleaned)
                 )
-                stats_by_index.append(self._compute_text_stats(cleaned))
+                stats_by_index.append(self._compute_text_stats_from_doc(doc))
                 progress.update(index)
 
             counts_by_index = [future.result() for future in futures]
@@ -134,8 +140,19 @@ class Tier1FeatureExtractor:
         return features
 
     def _compute_text_stats(self, cleaned: str) -> dict[str, float]:
-        words = tokenize_words(cleaned, self.nlp)
-        sentences = tokenize_sentences(cleaned, self.nlp)
+        if self.nlp is None:
+            raise RuntimeError("spaCy pipeline not initialized for Tier 1 extractor.")
+        doc = self.nlp(cleaned)
+        return self._compute_text_stats_from_doc(doc)
+
+    @staticmethod
+    def _compute_text_stats_from_doc(doc: object) -> dict[str, float]:
+        words = [
+            token.text
+            for token in doc
+            if not getattr(token, "is_space", False) and not getattr(token, "is_punct", False)
+        ]
+        sentences = [sent for sent in getattr(doc, "sents", [])]
         word_count = float(len(words))
         sentence_count = float(len(sentences))
         avg_sentence_length = safe_divide(word_count, sentence_count)
@@ -143,11 +160,7 @@ class Tier1FeatureExtractor:
         ttr = safe_divide(len(set(token.lower() for token in words)), word_count)
         avg_word_length = safe_divide(sum(len(token) for token in words), word_count)
 
-        if self.nlp is None:
-            raise RuntimeError("spaCy pipeline not initialized for Tier 1 extractor.")
-
-        doc = self.nlp(cleaned)
-        readability = doc._.readability
+        readability = getattr(getattr(doc, "_", None), "readability", {})
 
         return {
             "word_count": float(word_count),
