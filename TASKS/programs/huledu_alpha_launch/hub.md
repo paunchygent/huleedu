@@ -10,8 +10,8 @@ owner_team: 'agents'
 owner: ''
 program: 'huledu_alpha_launch'
 created: '2026-02-01'
-last_updated: '2026-02-01'
-related: ['docs/operations/hemma-server-operations-huleedu.md', 'docs/operations/gpu-ai-workloads-on-hemma-huleedu.md', 'docs/decisions/0025-hemma-hosted-nlp-feature-offload-for-essay-scoring-research-binary-protocol.md', 'docs/product/epics/ml-essay-scoring-pipeline.md', 'TASKS/assessment/nlp_lang_tool/nlp-lang-tool-whitebox-research-build.md', 'TASKS/assessment/offload-deberta--spacy-features-to-hemma-binary-embedding-service.md']
+last_updated: '2026-02-03'
+related: ['docs/operations/hemma-server-operations-huleedu.md', 'docs/operations/gpu-ai-workloads-on-hemma-huleedu.md', 'docs/decisions/0025-hemma-hosted-nlp-feature-offload-for-essay-scoring-research-binary-protocol.md', 'docs/product/epics/ml-essay-scoring-pipeline.md', 'TASKS/assessment/nlp_lang_tool/nlp-lang-tool-whitebox-research-build.md', 'TASKS/assessment/offload-deberta--spacy-features-to-hemma-binary-embedding-service.md', 'TASKS/assessment/hemma-offload-combined-extract-endpoint.md']
 labels: ['program', 'alpha', 'hemma', 'mvp']
 ---
 # HuleEdu alpha launch programme hub
@@ -81,6 +81,7 @@ Key deliverables:
 - Remote feature extraction + local caching
 - Binary protocol for embeddings
 - Reproducible run metadata (config + git SHA + dataset path)
+- Single combined extract endpoint (one tunnel, no local NLP fallbacks): `TASKS/assessment/hemma-offload-combined-extract-endpoint.md`
 
 ### Workstream C — CJ assessment + ENG5 full-scale
 

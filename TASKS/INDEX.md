@@ -1,11 +1,11 @@
 # TASKS Index
 
-Generated: 2026-02-03T01:47:42
+Generated: 2026-02-04T00:11:17
 
 ## Summary
 
-- Total tasks indexed: 154
-- assessment: 70
+- Total tasks indexed: 156
+- assessment: 72
 - content: 2
 - identity: 4
 - frontend: 2
@@ -17,7 +17,7 @@ Generated: 2026-02-03T01:47:42
 
 ## By Domain
 
-### assessment (70)
+### assessment (72)
 - [Clean up unused code paths in comparison_processing.py](TASKS/assessment/us-00xy-cleanup-unused-comparison-processing-code-paths.md) — `in_progress`
 - [Remove COMPARISONS_PER_STABILITY_CHECK_ITERATION setting from CJ service](TASKS/assessment/us-00xx-remove-comparisons-per-stability-iteration-setting.md) — `in_progress`
 - [US-00XZ BatchFinalizer dual-event semantics and BT edge-case test isolation](TASKS/assessment/us-00xz-batchfinalizer-dual-event-semantics-and-bt-edge-case-test-isolation.md) — `in_progress`
@@ -27,6 +27,7 @@ Generated: 2026-02-03T01:47:42
 - [Anchor Alignment Prompt Tuning Experiment](TASKS/assessment/anchor-alignment-prompt-tuning-experiment.md) — `in_progress`
 - [API Productization & Docs (Weeks 8–10)](TASKS/assessment/api-productization-and-docs-plan.md) — `proposed`
 - [Assessment Result Architecture with Anchor Essay Integration](TASKS/assessment/assessment-result-architecture-with-anchors.md) — `proposed`
+- [Assignment-owned prompt/rubric locking (context_origin)](TASKS/assessment/assignment-owned-prompt-rubric-locking-context-origin.md) — `done`
 - [BT SE batch quality indicators](TASKS/assessment/bt-se-batch-quality-indicators.md) — `in_progress`
 - [BT SE Zero Anomaly and Anchor Inversions Investigation](TASKS/assessment/bt-se-zero-anomaly-and-anchor-inversions-investigation.md) — `in_progress`
 - [Cj Assessment Code Hardening](TASKS/assessment/cj-assessment-code-hardening.md) — `in_progress`
@@ -62,6 +63,7 @@ Generated: 2026-02-03T01:47:42
 - [Fix Cj Anchor Finalization Checklist](TASKS/assessment/fix-cj-anchor-finalization-checklist.md) — `archived`
 - [Fix Cj Anchor Finalization Monitoring](TASKS/assessment/fix-cj-anchor-finalization-monitoring.md) — `done`
 - [Fix Cj Llm Prompt Construction](TASKS/assessment/fix-cj-llm-prompt-construction.md) — `done`
+- [Hemma offload: single extract endpoint (embeddings + spaCy + LanguageTool)](TASKS/assessment/hemma-offload-combined-extract-endpoint.md) — `proposed`
 - [Multi‑Tenancy Implementation (Weeks 5–8)](TASKS/assessment/multi-tenancy-implementation-plan.md) — `proposed`
 - [NLP LangTool whitebox essay scoring PR](TASKS/assessment/nlp_lang_tool/nlp-lang-tool-whitebox-essay-scoring-pr.md) — `proposed`
 - [NLP LangTool whitebox research build](TASKS/assessment/nlp_lang_tool/nlp-lang-tool-whitebox-research-build.md) — `in_progress`
@@ -227,10 +229,11 @@ Generated: 2026-02-03T01:47:42
 - [Frontend Live Data Integration](TASKS/programs/teacher_dashboard_integration/frontend-live-data-integration.md) — `programs`
 - [WebSocket Batch Updates](TASKS/programs/teacher_dashboard_integration/websocket-batch-updates.md) — `programs`
 
-### done (30)
+### done (31)
 - [Add Database Metrics Instrumentation to Remaining Services](TASKS/infrastructure/add-database-metrics-instrumentation-to-remaining-services.md) — `infrastructure`
 - [Align TASKS and docs lifecycle v2](TASKS/architecture/align-tasks-and-docs-lifecycle-v2.md) — `architecture`
 - [API Gateway batch listing endpoint tests](TASKS/identity/api-gateway-batch-listing-endpoint-tests.md) — `identity`
+- [Assignment-owned prompt/rubric locking (context_origin)](TASKS/assessment/assignment-owned-prompt-rubric-locking-context-origin.md) — `assessment`
 - [BFF Dashboard Service Implementation](TASKS/integrations/bff-dashboard-service-implementation.md) — `integration`
 - [BFF Teacher API Contract Validation](TASKS/programs/teacher_dashboard_integration/bff-teacher-api-contract-validation.md) — `programs`
 - [BFF Teacher Dashboard Endpoint](TASKS/programs/teacher_dashboard_integration/bff-teacher-dashboard-endpoint.md) — `programs`
@@ -299,7 +302,7 @@ Generated: 2026-02-03T01:47:42
 - [CJ Prompt Cache Benchmark & Warm-Up Validation](TASKS/assessment/cj-prompt-cache-benchmark.md) — `assessment`
 - [Refactor CJ Assessment Service for Compliance](TASKS/assessment/refactor-cj-assessment-service-for-compliance.md) — `assessment`
 
-### proposed (58)
+### proposed (59)
 - [90-Day Execution Roadmap (Alpha ➜ Beta)](TASKS/architecture/roadmap-90-day-execution.md) — `architecture`
 - [AI Feedback Service Implementation Task](TASKS/assessment/ai-feedback-service-implementation.md) — `assessment`
 - [API Productization & Docs (Weeks 8–10)](TASKS/assessment/api-productization-and-docs-plan.md) — `assessment`
@@ -326,6 +329,7 @@ Generated: 2026-02-03T01:47:42
 - [Event Schema Governance & CI Gate (Weeks 6–8)](TASKS/assessment/event-schema-governance-and-ci-plan.md) — `assessment`
 - [Existing](TASKS/assessment/task-054-suggested-improvements-to-bayesian-model.md) — `assessment`
 - [HANDOFF: TUI Help Screen Completion](TASKS/content/continuation-prompt.md) — `content`
+- [Hemma offload: single extract endpoint (embeddings + spaCy + LanguageTool)](TASKS/assessment/hemma-offload-combined-extract-endpoint.md) — `assessment`
 - [Identity: OIDC SSO + RBAC/ABAC (Weeks 1–3)](TASKS/identity/identity-sso-and-rbac-plan.md) — `identity`
 - [Improve functional test harness and stack ergonomics](TASKS/infrastructure/improve-functional-test-harness-and-stack-ergonomics.md) — `infrastructure`
 - [LLM mock provider CJ behavioural parity tests](TASKS/infrastructure/llm-mock-provider-cj-behavioural-parity-tests.md) — `infrastructure`
@@ -376,7 +380,8 @@ Generated: 2026-02-03T01:47:42
 - [ENG5 Heavy CI Matrix and Healthcheck Tuning](TASKS/infrastructure/eng5-heavy-ci-matrix-and-healthcheck-tuning.md) — `infrastructure` · `proposed`
 - [LLM mock provider CJ behavioural parity tests](TASKS/infrastructure/llm-mock-provider-cj-behavioural-parity-tests.md) — `infrastructure` · `proposed`
 
-### huledu_alpha_launch (2)
+### huledu_alpha_launch (3)
+- [Hemma offload: single extract endpoint (embeddings + spaCy + LanguageTool)](TASKS/assessment/hemma-offload-combined-extract-endpoint.md) — `assessment` · `proposed`
 - [HuleEdu alpha launch programme hub](TASKS/programs/huledu_alpha_launch/hub.md) — `programs` · `in_progress`
 - [Migrate Kafka infra to KRaft and align Hemma shared infra](TASKS/infrastructure/migrate-kafka-infra-to-kraft-and-align-hemma-shared-infra.md) — `infrastructure` · `done`
 

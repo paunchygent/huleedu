@@ -10,8 +10,9 @@ owner_team: agents
 owner: ''
 program: ''
 created: '2026-02-01'
-last_updated: '2026-02-01'
-related: []
+last_updated: '2026-02-03'
+related:
+- TASKS/assessment/hemma-offload-combined-extract-endpoint.md
 labels:
 - essay-scoring
 - whitebox
@@ -99,7 +100,9 @@ Hemma validation (2026-02-01):
 - Note: set `HF_TOKEN` in `~/apps/huleedu/.env` on Hemma to avoid Hugging Face Hub rate limiting.
 
 Still TODO (next slices):
-- Add spaCy/TextDescriptives offload endpoints (Tier1/2/3) so the laptop can avoid spaCy RAM/CPU load.
+- Implement a single combined `/v1/extract` endpoint that returns embeddings + Tier1/2/3 features
+  and calls `language_tool_service` internally (zero local fallbacks). See:
+  `TASKS/assessment/hemma-offload-combined-extract-endpoint.md`.
 - Canonical ROCm base image: `rocm/pytorch:latest` (avoid pip overwriting `torch` during build).
 
 ## Success Criteria

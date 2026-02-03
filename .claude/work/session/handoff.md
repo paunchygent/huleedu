@@ -379,3 +379,18 @@ Verification (2026-02-03 local time):
   - Anchor grades validated via `common_core.grade_scales` during CJ anchor registration.
   - Anchor grades persist in `anchor_essay_references` and propagate through
     `CJAnchorMetadata` into grade projection.
+
+---
+
+## UPDATE (2026-02-03)
+
+### Hemma offload: single combined feature endpoint (planned)
+
+- Tracking task: `TASKS/assessment/hemma-offload-combined-extract-endpoint.md`
+- Goal: collapse the research pipeline to a single Mac tunnel (`:19000`) by adding `POST /v1/extract`
+  that returns embeddings + spaCy/TextDescriptives handcrafted features + LanguageTool-derived
+  Tier1 densities in one zipped response.
+- Non-negotiable: when `backend=hemma`, there are zero local fallbacks (no local spaCy, no local
+  LanguageTool calls, no local torch/transformers embeddings).
+- Architecture intent: single endpoint for the client, SRP modular server internals (embedding
+  provider, spaCy runtime, LanguageTool client, zip bundle writer, fingerprinted metadata).
