@@ -7,7 +7,7 @@ priority: high
 domain: programs
 owner_team: agents
 created: '2025-11-21'
-last_updated: '2026-02-02'
+last_updated: '2026-02-03'
 service: ''
 owner: ''
 program: ''
@@ -80,6 +80,23 @@ Recent validation exposed several incorrect ENG5 runner assumptions that mask co
   - `pdm run pytest-root scripts/tests/test_eng5_np_execute_flow.py` ✅
   - `pdm run pytest-root scripts/cj_experiments_runners/eng5_np/tests/unit/test_execute_handler.py` ✅
   - `pdm run pytest-root services/cj_assessment_service/tests/unit/test_admin_anchor_endpoints.py` ✅
+
+## Progress (2026-02-03) – Documentation Alignment (R4/R5)
+
+- Updated ENG5 runbook and handler architecture docs to reflect:
+  - CJ admin preflight + anchor precondition semantics (no execute-time anchor registration).
+  - Assignment-owned prompt handling in execute mode.
+  - Required execute inputs (`assignment_id`, `course_id`) and optional post-run extraction flag.
+
+## Progress (2026-02-03) – R6 Anchor Grade Metadata Research
+
+- Research artefact captured under:
+  - `.claude/research/data/eng5_np_2016/eng5-anchor-grade-metadata-findings-2026-02-03.md`
+- Key findings (CJ-owned grade semantics):
+  - `assessment_instructions.grade_scale` is authoritative and immutable per assignment.
+  - Anchor registration validates grades against that scale via `common_core.grade_scales`.
+  - Anchor grade metadata persists in `anchor_essay_references` and propagates through
+    `CJAnchorMetadata` into grade projection resolution.
 
 ## Progress (2025-11-30) – ENG5 Anchor Alignment Experiment
 

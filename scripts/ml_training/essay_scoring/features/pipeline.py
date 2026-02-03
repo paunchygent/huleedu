@@ -26,6 +26,7 @@ from scripts.ml_training.essay_scoring.features.tier2_syntactic_cohesion import 
 )
 from scripts.ml_training.essay_scoring.features.tier3_structure import Tier3FeatureExtractor
 from scripts.ml_training.essay_scoring.logging_utils import ProgressLogger
+from scripts.ml_training.essay_scoring.offload.metrics import OffloadMetricsCollector
 
 logger = logging.getLogger(__name__)
 
@@ -43,12 +44,19 @@ class FeaturePipeline:
     tier1_extractor: Tier1ExtractorProtocol | None = None
     tier2_extractor: Tier2ExtractorProtocol | None = None
     tier3_extractor: Tier3ExtractorProtocol | None = None
+    offload_metrics: OffloadMetricsCollector | None = None
 
     def extract(self, records: list[EssayRecord], feature_set: FeatureSet) -> FeatureMatrix:
         """Extract features for a collection of records."""
 
         texts = [record.essay for record in records]
         prompts = [record.question for record in records]
+
+        if self.offload and (
+            self.offload.embedding_service_url or self.offload.language_tool_service_url
+        ):
+            if self.offload_metrics is None:
+                self.offload_metrics = OffloadMetricsCollector()
 
         # When offload is configured, prefer reusing the same embedding extractor for:
         # - the main embedding matrix (FeatureSet.EMBEDDINGS / COMBINED)
@@ -64,6 +72,7 @@ class FeaturePipeline:
                     base_url=self.offload.embedding_service_url,
                     embedding_config=self.embedding_config,
                     offload_config=self.offload,
+                    metrics=self.offload_metrics,
                 )
             tier2_embedding_extractor = self.embedder
 
@@ -112,6 +121,7 @@ class FeaturePipeline:
                     language_tool_max_concurrency=(
                         self.offload.language_tool_max_concurrency if self.offload else 10
                     ),
+                    metrics=self.offload_metrics,
                 )
             if self.tier2_extractor is None:
                 self.tier2_extractor = Tier2FeatureExtractor(

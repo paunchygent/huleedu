@@ -12,14 +12,23 @@ from pathlib import Path
 from rich.logging import RichHandler
 
 
-def configure_console_logging(level: int = logging.INFO) -> None:
-    """Configure Rich-backed console logging."""
+def configure_console_logging(level: int = logging.WARNING) -> None:
+    """Configure Rich-backed console logging.
 
+    Notes:
+    - Console logging defaults to WARNING to keep large research runs readable.
+    - File logging is handled separately via `run_file_logger` and should retain INFO.
+    """
+
+    handler = RichHandler(rich_tracebacks=True, markup=True)
+    handler.setLevel(level)
+
+    root_level = min(level, logging.INFO)
     logging.basicConfig(
-        level=level,
+        level=root_level,
         format="%(message)s",
         datefmt="[%X]",
-        handlers=[RichHandler(rich_tracebacks=True, markup=True)],
+        handlers=[handler],
     )
 
 

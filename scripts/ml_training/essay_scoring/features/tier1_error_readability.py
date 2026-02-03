@@ -5,6 +5,8 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import socket
+import time
 import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
@@ -26,6 +28,7 @@ from scripts.ml_training.essay_scoring.features.utils import (
     safe_divide,
 )
 from scripts.ml_training.essay_scoring.logging_utils import ProgressLogger
+from scripts.ml_training.essay_scoring.offload.metrics import OffloadMetricsCollector
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +47,7 @@ class Tier1FeatureExtractor:
     language_tool_cache_dir: Path | None = None
     language_tool_max_concurrency: int = 10
     language_tool_request_options: dict[str, Any] | None = None
+    metrics: OffloadMetricsCollector | None = None
 
     def __post_init__(self) -> None:
         self._tool = None
@@ -263,17 +267,31 @@ class Tier1FeatureExtractor:
         cache_path = self._cache_path(text=text, request_options=request_options)
         if cache_path is not None and cache_path.exists():
             try:
-                cached = json.loads(cache_path.read_text(encoding="utf-8"))
+                cached_text = cache_path.read_text(encoding="utf-8")
+            except OSError:
+                if self.metrics is not None:
+                    self.metrics.record_cache_read_error(kind="language_tool")
+                cached_text = ""
+            try:
+                cached = json.loads(cached_text)
             except json.JSONDecodeError:
+                if self.metrics is not None:
+                    self.metrics.record_cache_decode_error(kind="language_tool")
                 cached = None
             if isinstance(cached, dict):
                 response = cached.get("response")
                 derived_counts = cached.get("derived_counts")
                 if isinstance(response, dict) and isinstance(derived_counts, dict):
+                    if self.metrics is not None:
+                        self.metrics.record_cache_hit(kind="language_tool")
                     grammar = float(derived_counts.get("grammar", 0.0))
                     spelling = float(derived_counts.get("spelling", 0.0))
                     punctuation = float(derived_counts.get("punctuation", 0.0))
                     return response, (grammar, spelling, punctuation)
+            if self.metrics is not None:
+                self.metrics.record_cache_miss(kind="language_tool")
+        elif cache_path is not None and self.metrics is not None:
+            self.metrics.record_cache_miss(kind="language_tool")
 
         response = self._fetch_remote_language_tool_response(
             text=text, request_options=request_options
@@ -287,6 +305,8 @@ class Tier1FeatureExtractor:
                 response=response,
                 derived_counts=derived,
             )
+            if self.metrics is not None:
+                self.metrics.record_cache_write(kind="language_tool")
         return response, derived
 
     def _fetch_remote_language_tool_response(
@@ -303,20 +323,56 @@ class Tier1FeatureExtractor:
             method="POST",
         )
 
+        start = time.monotonic()
         try:
             with urllib.request.urlopen(request, timeout=self.request_timeout_s) as resp:
                 status = getattr(resp, "status", 200)
                 body = resp.read()
         except urllib.error.HTTPError as exc:
+            elapsed = time.monotonic() - start
+            if self.metrics is not None:
+                self.metrics.record_request_error(
+                    kind="language_tool", duration_s=elapsed, error_kind="http_error"
+                )
             detail = exc.read().decode("utf-8", errors="replace")
             raise RuntimeError(
                 f"LanguageTool offload HTTP error status={exc.code} body={detail}"
             ) from exc
         except urllib.error.URLError as exc:
+            elapsed = time.monotonic() - start
+            is_timeout = isinstance(exc.reason, (TimeoutError, socket.timeout))
+            if self.metrics is not None:
+                self.metrics.record_request_error(
+                    kind="language_tool",
+                    duration_s=elapsed,
+                    error_kind="timeout" if is_timeout else "connection_error",
+                )
             raise RuntimeError(f"LanguageTool offload connection error: {exc}") from exc
+        except socket.timeout as exc:
+            elapsed = time.monotonic() - start
+            if self.metrics is not None:
+                self.metrics.record_request_error(
+                    kind="language_tool", duration_s=elapsed, error_kind="timeout"
+                )
+            raise RuntimeError(f"LanguageTool offload timeout: {exc}") from exc
 
         if status != 200:
+            elapsed = time.monotonic() - start
+            if self.metrics is not None:
+                self.metrics.record_request_error(
+                    kind="language_tool", duration_s=elapsed, error_kind="http_error"
+                )
             raise RuntimeError(f"LanguageTool offload returned status={status} bytes={len(body)}")
+
+        elapsed = time.monotonic() - start
+        if self.metrics is not None:
+            self.metrics.record_request_ok(
+                kind="language_tool",
+                duration_s=elapsed,
+                request_bytes=len(data),
+                response_bytes=len(body),
+                texts_in_request=1,
+            )
 
         response = json.loads(body.decode("utf-8"))
         if not isinstance(response, dict):

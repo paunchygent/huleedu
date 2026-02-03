@@ -70,7 +70,10 @@ def _run_alembic_upgrade(
     alembic_ini = service_dir / "alembic.ini"
 
     container_url = container.get_connection_url()
-    match = re.match(r"postgresql(?:\\+\\w+)?://([^:]+):([^@]+)@([^:]+):(\\d+)/(.+)", container_url)
+    match = re.match(
+        r"postgresql(?:\+\w+)?://([^:]+):([^@]+)@([^:]+):(\d+)/(.+)",
+        container_url,
+    )
     if not match:
         raise ValueError(f"Could not parse container URL: {container_url}")
 

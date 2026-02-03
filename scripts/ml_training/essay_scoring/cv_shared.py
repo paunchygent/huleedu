@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import time
 from pathlib import Path
 from typing import Any, Literal
 
@@ -18,6 +19,10 @@ from scripts.ml_training.essay_scoring.cv_feature_store import (
 from scripts.ml_training.essay_scoring.dataset import EssayRecord
 from scripts.ml_training.essay_scoring.features.combiner import FeatureMatrix
 from scripts.ml_training.essay_scoring.features.pipeline import FeaturePipeline
+from scripts.ml_training.essay_scoring.offload.metrics import (
+    ExtractionBenchmark,
+    persist_offload_metrics,
+)
 from scripts.ml_training.essay_scoring.split_definitions import FoldDefinition, SplitDefinitions
 from scripts.ml_training.essay_scoring.text_processing import (
     count_words,
@@ -47,13 +52,53 @@ def prepare_cv_feature_store(
     if reuse_store_dir is not None:
         resolved = resolve_cv_feature_store_dir(reuse_store_dir)
         logger.info("Reusing CV feature store from %s", resolved)
+        persist_offload_metrics(
+            output_path=run_dir / "artifacts" / "offload_metrics.json",
+            metrics=None,
+            benchmarks=None,
+        )
         return resolved
 
     pipeline = FeaturePipeline(config.embedding, offload=config.offload)
     logger.info("Extracting train features (n=%d)", len(train_records))
+    benchmarks: list[ExtractionBenchmark] = []
+    start = time.monotonic()
     train_features = pipeline.extract(train_records, feature_set)
+    elapsed = time.monotonic() - start
+    benchmarks.append(
+        ExtractionBenchmark(
+            mode="cv_feature_store_train_extract",
+            records_processed=len(train_records),
+            elapsed_s=elapsed,
+        )
+    )
     logger.info("Extracting test features (n=%d)", len(test_records))
+    start = time.monotonic()
     test_features = pipeline.extract(test_records, feature_set)
+    elapsed = time.monotonic() - start
+    benchmarks.append(
+        ExtractionBenchmark(
+            mode="cv_feature_store_test_extract",
+            records_processed=len(test_records),
+            elapsed_s=elapsed,
+        )
+    )
+
+    total_records = len(train_records) + len(test_records)
+    total_elapsed = sum(benchmark.elapsed_s for benchmark in benchmarks)
+    benchmarks.append(
+        ExtractionBenchmark(
+            mode="cv_feature_store_total_extract",
+            records_processed=total_records,
+            elapsed_s=total_elapsed,
+        )
+    )
+
+    persist_offload_metrics(
+        output_path=run_dir / "artifacts" / "offload_metrics.json",
+        metrics=pipeline.offload_metrics,
+        benchmarks=benchmarks,
+    )
 
     y_train = np.array([record.overall for record in train_records], dtype=np.float32)
     y_test = np.array([record.overall for record in test_records], dtype=np.float32)

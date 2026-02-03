@@ -5,6 +5,8 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import socket
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -14,6 +16,7 @@ import numpy as np
 
 from scripts.ml_training.essay_scoring.config import EmbeddingConfig, OffloadConfig
 from scripts.ml_training.essay_scoring.features.protocols import EmbeddingExtractorProtocol
+from scripts.ml_training.essay_scoring.offload.metrics import OffloadMetricsCollector
 
 _MAX_EMBEDDING_REQUEST_BYTES = 900_000
 
@@ -28,6 +31,7 @@ class RemoteEmbeddingClient(EmbeddingExtractorProtocol):
     base_url: str
     embedding_config: EmbeddingConfig
     offload_config: OffloadConfig
+    metrics: OffloadMetricsCollector | None = None
 
     def embed(self, texts: list[str]) -> np.ndarray:
         if not texts:
@@ -43,8 +47,20 @@ class RemoteEmbeddingClient(EmbeddingExtractorProtocol):
         for index, text in enumerate(texts):
             cache_path = cache_dir / f"{self._cache_key(text)}.npy"
             if cache_path.exists():
-                cached_rows[index] = np.load(cache_path)
+                try:
+                    cached_rows[index] = np.load(cache_path)
+                except (OSError, ValueError):
+                    if self.metrics is not None:
+                        self.metrics.record_cache_read_error(kind="embedding")
+                        self.metrics.record_cache_miss(kind="embedding")
+                    missing_indices.append(index)
+                    missing_texts.append(text)
+                else:
+                    if self.metrics is not None:
+                        self.metrics.record_cache_hit(kind="embedding")
             else:
+                if self.metrics is not None:
+                    self.metrics.record_cache_miss(kind="embedding")
                 missing_indices.append(index)
                 missing_texts.append(text)
 
@@ -60,6 +76,8 @@ class RemoteEmbeddingClient(EmbeddingExtractorProtocol):
                 row = fetched[offset].astype(np.float32, copy=False)
                 cache_path = cache_dir / f"{self._cache_key(texts[original_index])}.npy"
                 np.save(cache_path, row, allow_pickle=False)
+                if self.metrics is not None:
+                    self.metrics.record_cache_write(kind="embedding")
                 cached_rows[original_index] = row
 
         dim = self._embedding_dim(cached_rows, fetched)
@@ -139,6 +157,7 @@ class RemoteEmbeddingClient(EmbeddingExtractorProtocol):
             method="POST",
         )
 
+        start = time.monotonic()
         try:
             with urllib.request.urlopen(
                 request, timeout=self.offload_config.request_timeout_s
@@ -146,15 +165,50 @@ class RemoteEmbeddingClient(EmbeddingExtractorProtocol):
                 status = getattr(resp, "status", 200)
                 body = resp.read()
         except urllib.error.HTTPError as exc:
+            elapsed = time.monotonic() - start
+            if self.metrics is not None:
+                self.metrics.record_request_error(
+                    kind="embedding", duration_s=elapsed, error_kind="http_error"
+                )
             detail = exc.read().decode("utf-8", errors="replace")
             raise RuntimeError(
                 f"Embedding offload HTTP error status={exc.code} body={detail}"
             ) from exc
         except urllib.error.URLError as exc:
+            elapsed = time.monotonic() - start
+            is_timeout = isinstance(exc.reason, (TimeoutError, socket.timeout))
+            if self.metrics is not None:
+                self.metrics.record_request_error(
+                    kind="embedding",
+                    duration_s=elapsed,
+                    error_kind="timeout" if is_timeout else "connection_error",
+                )
             raise RuntimeError(f"Embedding offload connection error: {exc}") from exc
+        except socket.timeout as exc:
+            elapsed = time.monotonic() - start
+            if self.metrics is not None:
+                self.metrics.record_request_error(
+                    kind="embedding", duration_s=elapsed, error_kind="timeout"
+                )
+            raise RuntimeError(f"Embedding offload timeout: {exc}") from exc
 
         if status != 200:
+            elapsed = time.monotonic() - start
+            if self.metrics is not None:
+                self.metrics.record_request_error(
+                    kind="embedding", duration_s=elapsed, error_kind="http_error"
+                )
             raise RuntimeError(f"Embedding offload returned status={status} bytes={len(body)}")
+
+        elapsed = time.monotonic() - start
+        if self.metrics is not None:
+            self.metrics.record_request_ok(
+                kind="embedding",
+                duration_s=elapsed,
+                request_bytes=len(data),
+                response_bytes=len(body),
+                texts_in_request=len(texts),
+            )
 
         array = np.load(io.BytesIO(body))
         return array.astype(np.float32, copy=False)

@@ -157,6 +157,23 @@ Decision heuristic (starting point; tune after you see results):
   - `OFFLOAD_EMBEDDING_BATCH_SIZE` in `docker-compose.hemma.research.yml`
     - default: `32`
 
+### Offload performance metrics (GPU + latency tuning)
+
+Each run that performs feature extraction writes:
+- `output/essay_scoring/<RUN>/artifacts/offload_metrics.json`
+
+This file is the canonical source for throughput + stability tuning:
+- `benchmarks[].essays_per_second` (headline metric)
+- per-service request latency: `offload.embedding.requests.latency_s` and
+  `offload.language_tool.requests.latency_s` (p50/p95/p99)
+- cache effectiveness: `offload.*.cache.hit_rate`
+- error budgets: `requests_timeout`, `requests_http_error`, `requests_connection_error`
+
+Best-practice tuning loop:
+- tune **one knob at a time** (batch size, payload chunking, concurrency)
+- run the same benchmark 3× and compare medians
+- stop when p95 latency or error rate rises faster than essays/sec improves
+
 ## Experiment log (append-only)
 
 Add a new entry for every run you care about comparing:

@@ -8,6 +8,7 @@ from aiohttp.test_utils import TestClient, TestServer
 
 from scripts.ml_training.essay_scoring.config import EmbeddingConfig, OffloadConfig
 from scripts.ml_training.essay_scoring.offload.embedding_client import RemoteEmbeddingClient
+from scripts.ml_training.essay_scoring.offload.metrics import OffloadMetricsCollector
 from scripts.ml_training.essay_scoring.offload.server import create_app
 from scripts.ml_training.essay_scoring.offload.settings import settings
 
@@ -41,8 +42,12 @@ async def test_remote_embedding_client_roundtrip_http_and_caches(tmp_path) -> No
             request_timeout_s=5.0,
             embedding_cache_dir=tmp_path,
         )
+        metrics = OffloadMetricsCollector()
         remote = RemoteEmbeddingClient(
-            base_url=base_url, embedding_config=embedding_config, offload_config=offload_config
+            base_url=base_url,
+            embedding_config=embedding_config,
+            offload_config=offload_config,
+            metrics=metrics,
         )
 
         first = await asyncio.to_thread(remote.embed, ["hi", "hello"])
@@ -52,6 +57,17 @@ async def test_remote_embedding_client_roundtrip_http_and_caches(tmp_path) -> No
         second = await asyncio.to_thread(remote.embed, ["hi", "hello"])
         assert np.allclose(first, second)
         assert embedder.calls == 1
+
+        snapshot = metrics.snapshot()
+        embed_cache = snapshot["embedding"]["cache"]
+        assert embed_cache["misses"] == 2
+        assert embed_cache["writes"] == 2
+        assert embed_cache["hits"] == 2
+
+        embed_requests = snapshot["embedding"]["requests"]
+        assert embed_requests["requests_total"] == 1
+        assert embed_requests["requests_ok"] == 1
+        assert embed_requests["texts_per_request"]["total"] == 2
 
         cache_files = list(tmp_path.glob("*.npy"))
         assert cache_files

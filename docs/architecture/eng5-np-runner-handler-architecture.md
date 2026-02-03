@@ -3,7 +3,7 @@ type: design
 id: eng5-np-runner-handler-architecture
 title: ENG5 NP Runner Handler Architecture & Alignment Harness
 created: 2025-11-29
-last_updated: 2025-11-29
+last_updated: 2026-02-03
 ---
 
 # ENG5 NP Runner Handler Architecture & Alignment Harness
@@ -96,19 +96,20 @@ Responsibilities:
 
 - Validate execute prerequisites:
   - Instructions file exists.
-  - Prompt file exists.
+  - Prompt file exists **only when** running without `assignment_id` (assignment-bound runs
+    use CJ-owned `student_prompt_storage_id`).
   - At least one student essay is present.
-  - At least one anchor essay is present.
   - `CJ_SERVICE_URL` is configured (flag or env).
+- Execute-time preflight is CJ-admin driven (performed in the CLI before handler dispatch):
+  - Resolve `assessment_instructions` to fetch `grade_scale`, `context_origin`, and prompt storage.
+  - Fail if the assignment lacks a `student_prompt_storage_id`.
+  - Resolve anchor summary to ensure anchors exist for the assignment grade_scale.
 - Create stub artefact and, if `await_completion` and `use_kafka` are set,
   instantiate an `AssessmentRunHydrator` to capture results.
-- Register anchors with CJ via `register_anchor_essays`:
-  - Abort the run if registration fails or returns an empty result set.
-  - The runner does not attempt ephemeral anchors; DB-owned anchors are the
-    single source of truth.
-- Upload essays to Content Service using `upload_essays_parallel`.
-- Upload the prompt (if present) via `upload_essay_content`.
-- Compose a CJ assessment request (DB-owned anchors, student essays only) and
+- Upload student essays to Content Service using `upload_essays_parallel`.
+- Upload the prompt only when `assignment_id` is **not** set; assignment-bound
+  runs rely on the CJ-owned prompt reference.
+- Compose a CJ assessment request (student essays only; anchors are DB-owned) and
   write the request envelope to disk.
 - Publish to Kafka:
   - If `await_completion=True` and `use_kafka=True`, run
@@ -182,8 +183,7 @@ are the executable spec for these semantics.
   - Alignment report functions and data classes.
   - Handler `execute` methods:
     - Happy-path behavior (exit code, logging hooks, stub artefact creation).
-    - Key error paths (missing anchors, missing prompt, missing CJ URL, failed
-      anchor registration).
+    - Key error paths (missing anchors preflight, missing prompt, missing CJ URL).
   - Protocol contract tests for handlers and core dependency protocols
     (ContentUploaderProtocol, AnchorRegistrarProtocol, KafkaPublisherProtocol,
     HydratorProtocol, ReportGeneratorProtocol) where applicable.

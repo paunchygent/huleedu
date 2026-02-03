@@ -224,9 +224,12 @@ def _build_folds(
         random_state=random_seed,
     )
     x_dummy = np.zeros((len(records), 1), dtype=float)
+    labels_for_split = _labels_for_stratification(labels)
 
     folds: list[FoldDefinition] = []
-    for fold_index, (train_idx, val_idx) in enumerate(splitter.split(x_dummy, labels, groups)):
+    for fold_index, (train_idx, val_idx) in enumerate(
+        splitter.split(x_dummy, labels_for_split, groups)
+    ):
         train_ids = [records[i].record_id for i in train_idx]
         val_ids = [records[i].record_id for i in val_idx]
         val_groups: list[str] = []
@@ -246,6 +249,17 @@ def _build_folds(
 def _label_counts(labels: np.ndarray) -> dict[float, int]:
     unique, counts = np.unique(labels, return_counts=True)
     return {float(k): int(v) for k, v in zip(unique.tolist(), counts.tolist(), strict=True)}
+
+
+def _labels_for_stratification(labels: np.ndarray) -> np.ndarray:
+    """Convert regression labels into stable stratification classes.
+
+    `StratifiedGroupKFold` requires classification targets. Our label scales are
+    half-step bands (e.g. 1.0, 1.5, 2.0...), so we bucket by the nearest 0.5.
+    """
+
+    half_steps = np.round(labels * 2.0).astype(int)
+    return half_steps.astype(str)
 
 
 def _sha256_file(path: Path) -> str:

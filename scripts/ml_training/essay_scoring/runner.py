@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -27,6 +28,10 @@ from scripts.ml_training.essay_scoring.features.combiner import FeatureMatrix
 from scripts.ml_training.essay_scoring.features.pipeline import FeaturePipeline
 from scripts.ml_training.essay_scoring.features.schema import build_feature_schema
 from scripts.ml_training.essay_scoring.logging_utils import run_file_logger
+from scripts.ml_training.essay_scoring.offload.metrics import (
+    ExtractionBenchmark,
+    persist_offload_metrics,
+)
 from scripts.ml_training.essay_scoring.paths import RunPaths, build_run_paths
 from scripts.ml_training.essay_scoring.reports.grade_scale_report import (
     generate_grade_scale_report,
@@ -70,6 +75,7 @@ def featurize_experiment(
     feature_set = feature_set or config.feature_set
     run_paths = build_run_paths(config.output)
     with run_file_logger(run_paths.log_path):
+        benchmarks: list[ExtractionBenchmark] = []
         logger.info(
             "Starting featurize feature_set=%s run_dir=%s",
             feature_set.value,
@@ -93,11 +99,55 @@ def featurize_experiment(
 
         pipeline = FeaturePipeline(config.embedding, offload=config.offload)
         logger.info("Extracting train features")
+        start = time.monotonic()
         train_features = pipeline.extract(split.train, feature_set)
+        elapsed = time.monotonic() - start
+        benchmarks.append(
+            ExtractionBenchmark(
+                mode="feature_extraction_train",
+                records_processed=len(split.train),
+                elapsed_s=elapsed,
+            )
+        )
         logger.info("Extracting validation features")
+        start = time.monotonic()
         val_features = pipeline.extract(split.val, feature_set)
+        elapsed = time.monotonic() - start
+        benchmarks.append(
+            ExtractionBenchmark(
+                mode="feature_extraction_val",
+                records_processed=len(split.val),
+                elapsed_s=elapsed,
+            )
+        )
         logger.info("Extracting test features")
+        start = time.monotonic()
         test_features = pipeline.extract(split.test, feature_set)
+        elapsed = time.monotonic() - start
+        benchmarks.append(
+            ExtractionBenchmark(
+                mode="feature_extraction_test",
+                records_processed=len(split.test),
+                elapsed_s=elapsed,
+            )
+        )
+
+        total_records = len(split.train) + len(split.val) + len(split.test)
+        total_elapsed = sum(benchmark.elapsed_s for benchmark in benchmarks)
+        benchmarks.append(
+            ExtractionBenchmark(
+                mode="feature_extraction_total",
+                records_processed=total_records,
+                elapsed_s=total_elapsed,
+            )
+        )
+
+        offload_metrics_path = run_paths.artifacts_dir / "offload_metrics.json"
+        persist_offload_metrics(
+            output_path=offload_metrics_path,
+            metrics=pipeline.offload_metrics,
+            benchmarks=benchmarks,
+        )
 
         feature_store_dir = persist_feature_store(
             run_dir=run_paths.run_dir,
@@ -142,6 +192,7 @@ def run_experiment(
     feature_set = feature_set or config.feature_set
     run_paths = build_run_paths(config.output)
     with run_file_logger(run_paths.log_path):
+        benchmarks: list[ExtractionBenchmark] = []
         logger.info(
             "Starting run feature_set=%s run_dir=%s",
             feature_set.value,
@@ -189,15 +240,67 @@ def run_experiment(
             )
             pipeline = FeaturePipeline(config.embedding, offload=config.offload)
             logger.info("Extracting train features")
+            start = time.monotonic()
             train_features = pipeline.extract(split.train, feature_set)
+            elapsed = time.monotonic() - start
+            benchmarks.append(
+                ExtractionBenchmark(
+                    mode="feature_extraction_train",
+                    records_processed=len(split.train),
+                    elapsed_s=elapsed,
+                )
+            )
             logger.info("Extracting validation features")
+            start = time.monotonic()
             val_features = pipeline.extract(split.val, feature_set)
+            elapsed = time.monotonic() - start
+            benchmarks.append(
+                ExtractionBenchmark(
+                    mode="feature_extraction_val",
+                    records_processed=len(split.val),
+                    elapsed_s=elapsed,
+                )
+            )
             logger.info("Extracting test features")
+            start = time.monotonic()
             test_features = pipeline.extract(split.test, feature_set)
+            elapsed = time.monotonic() - start
+            benchmarks.append(
+                ExtractionBenchmark(
+                    mode="feature_extraction_test",
+                    records_processed=len(split.test),
+                    elapsed_s=elapsed,
+                )
+            )
+
+            total_records = len(split.train) + len(split.val) + len(split.test)
+            total_elapsed = sum(benchmark.elapsed_s for benchmark in benchmarks)
+            benchmarks.append(
+                ExtractionBenchmark(
+                    mode="feature_extraction_total",
+                    records_processed=total_records,
+                    elapsed_s=total_elapsed,
+                )
+            )
+
+            offload_metrics_path = run_paths.artifacts_dir / "offload_metrics.json"
+            persist_offload_metrics(
+                output_path=offload_metrics_path,
+                metrics=pipeline.offload_metrics,
+                benchmarks=benchmarks,
+            )
 
             y_train = np.array([record.overall for record in split.train])
             y_val = np.array([record.overall for record in split.val])
             y_test = np.array([record.overall for record in split.test])
+
+        if reuse_feature_store_dir is not None:
+            offload_metrics_path = run_paths.artifacts_dir / "offload_metrics.json"
+            persist_offload_metrics(
+                output_path=offload_metrics_path,
+                metrics=None,
+                benchmarks=None,
+            )
 
         logger.info("Training XGBoost model")
         training_artifacts = train_model(

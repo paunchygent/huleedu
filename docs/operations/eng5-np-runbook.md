@@ -2,7 +2,7 @@
 type: runbook
 service: global
 severity: medium
-last_reviewed: 2025-12-12
+last_reviewed: 2026-02-03
 ---
 
 # ENG5 NP Runner – Execute & Alignment Runbook
@@ -27,28 +27,30 @@ publish, hydrator, etc.).
 
 1. **Repo setup**: `pdm install` with `monorepo-tools` extras.
 2. **Assets**: `test_uploads/ANCHOR ESSAYS/ROLE_MODELS_ENG5_NP_2016/**` present with instructions,
-   prompt, anchor essays, and student essays. Anchors must be registered with CJ; the CLI now performs registration automatically during EXECUTE and aborts if the CJ endpoint is unreachable.
+   prompt, anchor essays, and student essays. Anchors must already be registered with CJ; EXECUTE now performs a CJ admin preflight and fails fast if anchors are missing.
 3. **Docker stack**: `pdm run dev-build-start cj_assessment_service llm_provider_service`
    (or `pdm run dev-start ...`) so CJ + LLM Provider are reachable.
 4. **Environment**: `source .env` to fill Kafka/bootstrap credentials. Confirm
    `KAFKA_BOOTSTRAP_SERVERS` points to the dev cluster.
-5. **Pre-flight validation**: run `bash scripts/eng5_np_preflight.sh` to verify Docker services,
+5. **CJ admin auth**: ensure `HULEEDU_SERVICE_ACCOUNT_TOKEN` or `HULEEDU_ADMIN_TOKEN` is set, or use
+   dev auth (see `pdm run eng5-np-run verify-auth`) before EXECUTE.
+6. **Pre-flight validation**: run `bash scripts/eng5_np_preflight.sh` to verify Docker services,
    Kafka connectivity, CJ admin CLI availability, and artefact directories before launching execute mode.
 
-### Retrieve Assignment IDs (no auth required)
+### Retrieve Assignment IDs (admin auth required)
 
-List registered instructions and anchors directly from database:
+List registered assessment instructions via the CJ admin CLI:
 
 ```bash
 source .env
-pdm run python scripts/cj_assessment_service/diagnostics/list_cj_instructions.py
+pdm run cj-admin instructions list
 
-# List anchors for specific assignment:
-pdm run python scripts/cj_assessment_service/diagnostics/list_cj_instructions.py \
-    --anchors 00000000-0000-0000-0000-000000000001
+# Inspect a specific assignment (grade_scale, prompt storage, etc.)
+pdm run cj-admin instructions get 00000000-0000-0000-0000-000000000001
 ```
 
-Output includes copy-paste hints for `--assignment-id` and `--course-id` parameters.
+Dev-only diagnostics (bypass admin auth) still exist under
+`scripts/cj_assessment_service/diagnostics/`, but the runner itself relies on the admin API.
 
 ## Execution Steps (one batch – EXECUTE)
 
@@ -64,17 +66,21 @@ Output includes copy-paste hints for `--assignment-id` and `--course-id` paramet
    pdm run eng5-np-run --mode dry-run --batch-id dev-batch --no-kafka
    ```
 
-3. Execute with Kafka + await completion (ensure `CJ_SERVICE_URL` or `--cj-service-url` points at the active CJ instance; missing/invalid URLs now cause an immediate runner error).
+3. Execute with Kafka + await completion (ensure `CJ_SERVICE_URL` or `--cj-service-url` points at the active CJ instance; missing/invalid URLs now cause an immediate runner error). EXECUTE requires an assignment with CJ-owned instructions + anchors already registered.
 
 ```bash
 pdm run eng5-np-run \
   --mode execute \
+  --assignment-id 00000000-0000-0000-0000-000000000001 \
+  --course-id 00000000-0000-0000-0000-000000000052 \
   --batch-id dev-batch-$(date +%Y%m%d-%H%M) \
   --await-completion \
   --completion-timeout 1800
 ```
 
-> Optional: `--max-comparisons N` is now published as metadata for CJ to interpret (the runner no longer slices essays locally). Set it only when you need downstream observability/cost limits.
+> Optional: `--max-comparisons N` is published as metadata for CJ to interpret in EXECUTE (the runner does not slice essays locally in execute). In PLAN/DRY_RUN/ANCHOR_ALIGN_TEST the runner still slices local files to approximate the comparison cap.
+
+> Optional: `--auto-extract-eng5-db` runs the DB extraction helper after completion (requires `--await-completion`).
 
 > Advanced rollout control: `--llm-batching-mode per_request|serial_bundle|provider_batch_api` publishes `llm_batching_mode_hint` in the CJ request envelope metadata. This is a per-batch hint only; CJ and LLM Provider remain authoritative via their own env vars.
 
@@ -119,6 +125,8 @@ Use the automated wrapper script that handles infrastructure startup and health 
 # The script automatically ensures Kafka (KRaft), Redis, CJ, and LLM Provider are running
 pdm run eng5-runner \
   --mode execute \
+  --assignment-id 00000000-0000-0000-0000-000000000001 \
+  --course-id 00000000-0000-0000-0000-000000000052 \
   --batch-id eng5-execute-$(date +%Y%m%d-%H%M) \
   --await-completion \
   --completion-timeout 1800
@@ -150,6 +158,8 @@ pdm run dev-start cj_assessment_service llm_provider_service
 docker compose -f docker-compose.yml -f docker-compose.eng5-runner.yml run --rm \
   eng5_np_runner \
   --mode execute \
+  --assignment-id 00000000-0000-0000-0000-000000000001 \
+  --course-id 00000000-0000-0000-0000-000000000052 \
   --batch-id eng5-execute-$(date +%Y%m%d-%H%M) \
   --await-completion \
   --completion-timeout 1800

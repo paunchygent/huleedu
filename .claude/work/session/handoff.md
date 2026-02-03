@@ -360,5 +360,22 @@ Verification (2026-02-03 local time):
   - Missing instruction row for `assignment_id` is a hard fail in CJ.
   - Runner `execute` no longer uploads student prompt when `--assignment-id` is used; prompt must
     exist in CJ (`student_prompt_storage_id`).
-  - Rubric A/B: runner supports `--rubric` (forwarded as `LLMConfigOverrides.judge_rubric_override`)
-    only when `assessment_instructions.context_origin != canonical_national`.
+- Rubric A/B: runner supports `--rubric` (forwarded as `LLMConfigOverrides.judge_rubric_override`)
+  only when `assessment_instructions.context_origin != canonical_national`.
+
+### ENG5 NP runner docs alignment (runbook + architecture)
+
+- Updated docs to reflect current EXECUTE semantics:
+  - CJ admin preflight + anchor precondition (no execute-time anchor registration).
+  - Assignment-owned prompt handling (runner does not upload prompts in assignment runs).
+  - Execute examples now include `--assignment-id`/`--course-id` and optional `--auto-extract-eng5-db`.
+
+### ENG5 NP runner anchor grade metadata research (R6)
+
+- Research artefact captured at:
+  - `.claude/research/data/eng5_np_2016/eng5-anchor-grade-metadata-findings-2026-02-03.md`
+- Summary:
+  - `assessment_instructions.grade_scale` owns grade semantics and is immutable.
+  - Anchor grades validated via `common_core.grade_scales` during CJ anchor registration.
+  - Anchor grades persist in `anchor_essay_references` and propagate through
+    `CJAnchorMetadata` into grade projection.

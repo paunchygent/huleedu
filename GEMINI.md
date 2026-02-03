@@ -63,6 +63,8 @@ curl -fsS http://127.0.0.1:18085/healthz  # LanguageTool service (Hemma :8085)
 curl -fsS http://127.0.0.1:19000/healthz  # Embedding offload (Hemma :9000)
 ```
 ```
+**docker exec/run**
+if we exec/run inside a container, we’ll use pdm run <command> from the container root directory.
 
 ### 3. Error Resolution Protocol
 
