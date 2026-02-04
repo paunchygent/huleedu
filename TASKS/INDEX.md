@@ -1,11 +1,11 @@
 # TASKS Index
 
-Generated: 2026-02-04T01:53:29
+Generated: 2026-02-04T03:57:07
 
 ## Summary
 
-- Total tasks indexed: 156
-- assessment: 72
+- Total tasks indexed: 157
+- assessment: 73
 - content: 2
 - identity: 4
 - frontend: 2
@@ -17,7 +17,7 @@ Generated: 2026-02-04T01:53:29
 
 ## By Domain
 
-### assessment (72)
+### assessment (73)
 - [Clean up unused code paths in comparison_processing.py](TASKS/assessment/us-00xy-cleanup-unused-comparison-processing-code-paths.md) — `in_progress`
 - [Remove COMPARISONS_PER_STABILITY_CHECK_ITERATION setting from CJ service](TASKS/assessment/us-00xx-remove-comparisons-per-stability-iteration-setting.md) — `in_progress`
 - [US-00XZ BatchFinalizer dual-event semantics and BT edge-case test isolation](TASKS/assessment/us-00xz-batchfinalizer-dual-event-semantics-and-bt-edge-case-test-isolation.md) — `in_progress`
@@ -54,6 +54,7 @@ Generated: 2026-02-04T01:53:29
 - [Entitlements Service — Final Implementation Reference](TASKS/assessment/entitlement-service-implementation-plan.md) — `proposed`
 - [Entitlements Service — Test Coverage Plan (Final)](TASKS/assessment/entitlements-service-test-coverage-plan.md) — `proposed`
 - [Essay scoring research: warm-cache feature store + 1.0-9.0 scale alignment](TASKS/assessment/essay-scoring-research-warm-cache-feature-store--10-90-scale-alignment.md) — `done`
+- [Essay-scoring runner: mark status.json failed on SIGINT/SIGTERM](TASKS/assessment/essay-scoring-runner-mark-statusjson-failed-on-sigint-sigterm.md) — `proposed`
 - [Event Publishing Infrastructure Improvements](TASKS/assessment/event-publishing-improvements.md) — `proposed`
 - [Event Schema Governance & CI Gate (Weeks 6–8)](TASKS/assessment/event-schema-governance-and-ci-plan.md) — `proposed`
 - [Existing](TASKS/assessment/task-054-suggested-improvements-to-bayesian-model.md) — `proposed`
@@ -302,7 +303,7 @@ Generated: 2026-02-04T01:53:29
 - [CJ Prompt Cache Benchmark & Warm-Up Validation](TASKS/assessment/cj-prompt-cache-benchmark.md) — `assessment`
 - [Refactor CJ Assessment Service for Compliance](TASKS/assessment/refactor-cj-assessment-service-for-compliance.md) — `assessment`
 
-### proposed (59)
+### proposed (60)
 - [90-Day Execution Roadmap (Alpha ➜ Beta)](TASKS/architecture/roadmap-90-day-execution.md) — `architecture`
 - [AI Feedback Service Implementation Task](TASKS/assessment/ai-feedback-service-implementation.md) — `assessment`
 - [API Productization & Docs (Weeks 8–10)](TASKS/assessment/api-productization-and-docs-plan.md) — `assessment`
@@ -325,6 +326,7 @@ Generated: 2026-02-04T01:53:29
 - [Eng5 Runner Testing Plan](TASKS/programs/eng5/eng5-runner-testing-plan.md) — `programs`
 - [Entitlements Service — Final Implementation Reference](TASKS/assessment/entitlement-service-implementation-plan.md) — `assessment`
 - [Entitlements Service — Test Coverage Plan (Final)](TASKS/assessment/entitlements-service-test-coverage-plan.md) — `assessment`
+- [Essay-scoring runner: mark status.json failed on SIGINT/SIGTERM](TASKS/assessment/essay-scoring-runner-mark-statusjson-failed-on-sigint-sigterm.md) — `assessment`
 - [Event Publishing Infrastructure Improvements](TASKS/assessment/event-publishing-improvements.md) — `assessment`
 - [Event Schema Governance & CI Gate (Weeks 6–8)](TASKS/assessment/event-schema-governance-and-ci-plan.md) — `assessment`
 - [Existing](TASKS/assessment/task-054-suggested-improvements-to-bayesian-model.md) — `assessment`

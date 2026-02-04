@@ -50,6 +50,19 @@ def _read_current_stage(run_dir: Path) -> str:
     return str(stage)
 
 
+def _read_status_payload(run_dir: Path) -> dict[str, object] | None:
+    status_path = run_dir / "status.json"
+    if not status_path.exists():
+        return None
+    try:
+        payload = json.loads(status_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    return payload
+
+
 def mark_run_failed(
     run_dir: Path,
     *,
@@ -238,6 +251,21 @@ def stage_timer(run_dir: Path, logger: logging.Logger, stage: str, **extra: obje
             logger.warning("Stage interrupted: %s", stage)
         else:
             logger.exception("Stage failed: %s", stage)
+
+        existing = _read_status_payload(run_dir)
+        if (
+            existing is not None
+            and existing.get("state") == "failed"
+            and existing.get("failure_reason") == "signal"
+        ):
+            existing_stage = str(existing.get("stage") or stage)
+            preserved = {
+                k: v for k, v in existing.items() if k not in {"stage", "state", "timestamp"}
+            }
+            preserved.setdefault("elapsed_seconds", round(elapsed, 2))
+            update_status(run_dir, stage=existing_stage, state="failed", **preserved)
+            raise
+
         mark_run_failed(
             run_dir,
             stage=stage,

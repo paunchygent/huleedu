@@ -507,3 +507,11 @@ Verification (2026-02-03 local time):
   - Warm-cache check:
     - Second run: `output/essay_scoring/20260204_005206_hemma_extract_smoke_cached`
     - Offload `/metrics` counters for `/v1/extract` did not increase across the second run (cache hit).
+
+### Essay-scoring research runner: status.json on SIGINT/SIGTERM (2026-02-04)
+
+- Problem: long-running runs could be terminated mid-stage and leave `status.json` stuck at `state=running`, making it indistinguishable from a hang.
+- Fix:
+  - Install SIGINT/SIGTERM handlers in the run logger context to best-effort mark `status.json` as `state=failed` with `failure_reason=signal` and `signal=SIGINT|SIGTERM`.
+  - Ensure stage-level exception handling does not overwrite an existing signal failure marker (preserve `signal`, add `elapsed_seconds` if missing).
+- Tracking task: `TASKS/assessment/essay-scoring-runner-mark-statusjson-failed-on-sigint-sigterm.md`

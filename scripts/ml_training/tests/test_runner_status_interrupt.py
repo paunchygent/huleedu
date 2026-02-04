@@ -31,6 +31,21 @@ def test_stage_timer_marks_failed_on_keyboard_interrupt(tmp_path: Path) -> None:
     assert "elapsed_seconds" in payload
 
 
+def test_signal_marker_is_not_overwritten_by_stage_timer(tmp_path: Path) -> None:
+    logger = logging.getLogger("test_signal_marker_is_not_overwritten_by_stage_timer")
+    with pytest.raises(KeyboardInterrupt):
+        with stage_timer(tmp_path, logger, "feature_extraction_train", records=123):
+            mark_run_failed(tmp_path, reason="signal", signal_name="SIGINT")
+            raise KeyboardInterrupt
+
+    payload = _read_status(tmp_path)
+    assert payload["stage"] == "feature_extraction_train"
+    assert payload["state"] == "failed"
+    assert payload["failure_reason"] == "signal"
+    assert payload["signal"] == "SIGINT"
+    assert "elapsed_seconds" in payload
+
+
 def test_mark_run_failed_uses_existing_stage_when_present(tmp_path: Path) -> None:
     update_status(tmp_path, stage="feature_extraction_train", state="running")
     mark_run_failed(tmp_path, reason="signal", signal_name="SIGTERM")
