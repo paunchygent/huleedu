@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING
+from typing import AsyncContextManager
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
@@ -11,8 +13,9 @@ import pytest
 from common_core.status_enums import CJBatchStateEnum
 from sqlalchemy.ext.asyncio import AsyncSession
 
+import services.cj_assessment_service.batch_monitor as batch_monitor_module
 from services.cj_assessment_service.batch_monitor import BatchMonitor
-from services.cj_assessment_service.models_db import CJBatchState
+from services.cj_assessment_service.models_db import CJBatchState, CJBatchUpload
 from services.cj_assessment_service.protocols import (
     CJBatchRepositoryProtocol,
     CJComparisonRepositoryProtocol,
@@ -20,16 +23,29 @@ from services.cj_assessment_service.protocols import (
     SessionProviderProtocol,
 )
 
-if TYPE_CHECKING:
-    pass
+
+@pytest.fixture
+def mock_session_provider(mock_session: AsyncSession) -> SessionProviderProtocol:
+    """Create a mock session provider that yields a real async context manager."""
+
+    class FakeSessionProvider:
+        def session(self) -> AsyncContextManager[AsyncSession]:
+            @asynccontextmanager
+            async def _session() -> AsyncIterator[AsyncSession]:
+                yield mock_session
+
+            return _session()
+
+    return FakeSessionProvider()
 
 
 @pytest.fixture
-def mock_session_provider() -> AsyncMock:
-    """Create a mock session provider."""
-    provider = AsyncMock(spec=SessionProviderProtocol)
-    provider.session = MagicMock()
-    return provider
+def mock_session() -> AsyncSession:
+    """Create a mock AsyncSession used by session_provider.session()."""
+    session = AsyncMock(spec=AsyncSession)
+    session.commit = AsyncMock()
+    session.get = AsyncMock()
+    return session
 
 
 @pytest.fixture
@@ -55,7 +71,7 @@ def mock_settings() -> MagicMock:
 
 @pytest.fixture
 def batch_monitor(
-    mock_session_provider: AsyncMock,
+    mock_session_provider: SessionProviderProtocol,
     mock_batch_repository: AsyncMock,
     mock_event_publisher: AsyncMock,
     mock_settings: MagicMock,
@@ -81,6 +97,20 @@ def batch_monitor(
     )
 
 
+@pytest.fixture(autouse=True)
+def patch_batch_finalizer(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Avoid deep BatchFinalizer logic in BatchMonitor unit tests."""
+
+    class FakeBatchFinalizer:
+        def __init__(self, *_args: object, **_kwargs: object) -> None:
+            pass
+
+        async def finalize_scoring(self, *_args: object, **_kwargs: object) -> None:
+            return None
+
+    monkeypatch.setattr(batch_monitor_module, "BatchFinalizer", FakeBatchFinalizer)
+
+
 class TestBatchMonitor:
     """Test cases for BatchMonitor."""
 
@@ -93,8 +123,8 @@ class TestBatchMonitor:
     async def test_handle_stuck_batch_high_progress(
         self,
         batch_monitor: BatchMonitor,
-        mock_session_provider: AsyncMock,
         mock_batch_repository: AsyncMock,
+        mock_session: AsyncMock,
     ) -> None:
         """Test handling stuck batch with >= 80% progress forces to SCORING."""
         # Create mock batch state with 85% progress
@@ -108,11 +138,14 @@ class TestBatchMonitor:
         mock_batch_state.correlation_id = UUID("00000000-0000-0000-0000-000000000123")
         mock_batch_state.processing_metadata = None
         mock_batch_state.completion_denominator.return_value = 100
+        mock_batch_state.batch_upload = MagicMock(spec=CJBatchUpload)
+        mock_batch_state.batch_upload.bos_batch_id = "bos-batch-123"
+        mock_batch_state.batch_upload.event_correlation_id = str(
+            UUID("00000000-0000-0000-0000-000000000123")
+        )
+        mock_batch_state.batch_upload.created_at = datetime.now(UTC) - timedelta(hours=6)
 
-        # Mock database operations
-        mock_session = AsyncMock(spec=AsyncSession)
-        mock_session.__aenter__.return_value = mock_session
-        mock_session_provider.session.return_value = mock_session
+        mock_session.get.return_value = mock_batch_state.batch_upload
 
         # Mock batch repository to return the batch state for FOR UPDATE query
         mock_batch_repository.get_batch_state_for_update.return_value = mock_batch_state
@@ -128,8 +161,8 @@ class TestBatchMonitor:
     async def test_handle_stuck_batch_low_progress(
         self,
         batch_monitor: BatchMonitor,
-        mock_session_provider: AsyncMock,
         mock_batch_repository: AsyncMock,
+        mock_session: AsyncMock,
     ) -> None:
         """Test handling stuck batch with < 80% progress marks as FAILED."""
         # Create mock batch state with 50% progress
@@ -143,11 +176,14 @@ class TestBatchMonitor:
         mock_batch_state.correlation_id = UUID("00000000-0000-0000-0000-000000000456")
         mock_batch_state.processing_metadata = None
         mock_batch_state.completion_denominator.return_value = 100
+        mock_batch_state.batch_upload = MagicMock(spec=CJBatchUpload)
+        mock_batch_state.batch_upload.bos_batch_id = "bos-batch-456"
+        mock_batch_state.batch_upload.event_correlation_id = str(
+            UUID("00000000-0000-0000-0000-000000000456")
+        )
+        mock_batch_state.batch_upload.created_at = datetime.now(UTC) - timedelta(hours=6)
 
-        # Mock database operations
-        mock_session = AsyncMock(spec=AsyncSession)
-        mock_session.__aenter__.return_value = mock_session
-        mock_session_provider.session.return_value = mock_session
+        mock_session.get.return_value = mock_batch_state.batch_upload
 
         # Mock batch repository to return the batch state for FOR UPDATE query
         mock_batch_repository.get_batch_state_for_update.return_value = mock_batch_state

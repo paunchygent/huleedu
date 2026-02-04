@@ -7,7 +7,7 @@ priority: high
 domain: programs
 owner_team: agents
 created: '2025-11-21'
-last_updated: '2026-02-03'
+last_updated: '2026-02-04'
 service: ''
 owner: ''
 program: ''
@@ -80,6 +80,13 @@ Recent validation exposed several incorrect ENG5 runner assumptions that mask co
   - `pdm run pytest-root scripts/tests/test_eng5_np_execute_flow.py` ✅
   - `pdm run pytest-root scripts/cj_experiments_runners/eng5_np/tests/unit/test_execute_handler.py` ✅
   - `pdm run pytest-root services/cj_assessment_service/tests/unit/test_admin_anchor_endpoints.py` ✅
+
+## Update (2026-02-04) – context_origin default + migration guard
+
+- CJ `assessment_instructions.context_origin` now defaults to `research_experiment` (experiment-first workflow).
+- The existing ENG5 experiment row (`assignment_id=00000000-0000-0000-0000-000000000001`) is backfilled to `research_experiment` during the migration that introduces the column.
+- Added migration integration test (rule 085.4 regression guard):
+  - `pdm run pytest-root services/cj_assessment_service/tests/integration/test_context_origin_migration.py` ✅
 
 ## Progress (2026-02-03) – Documentation Alignment (R4/R5)
 

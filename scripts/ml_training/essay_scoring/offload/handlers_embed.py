@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import io
+import uuid
 
 import numpy as np
 from aiohttp import web
@@ -14,12 +15,16 @@ from scripts.ml_training.essay_scoring.offload.settings import settings
 
 
 async def embed(request: web.Request) -> web.Response:
+    corr_id = str(request.get("correlation_id") or "")
+    if not corr_id:
+        corr_id = str(uuid.uuid4())
+
     try:
         payload = await request.json()
         embed_request = EmbedRequest.model_validate(payload)
     except Exception as exc:
         return web.json_response(
-            {"error": "invalid_request", "detail": str(exc)},
+            {"error": "invalid_request", "detail": str(exc), "correlation_id": corr_id},
             status=400,
         )
 
@@ -35,6 +40,7 @@ async def embed(request: web.Request) -> web.Response:
                     f"requested={embed_request.model_name} "
                     f"configured={settings.OFFLOAD_EMBEDDING_MODEL_NAME}"
                 ),
+                "correlation_id": corr_id,
             },
             status=400,
         )
@@ -51,6 +57,7 @@ async def embed(request: web.Request) -> web.Response:
                     f"requested={embed_request.max_length} "
                     f"configured={settings.OFFLOAD_EMBEDDING_MAX_LENGTH}"
                 ),
+                "correlation_id": corr_id,
             },
             status=400,
         )
@@ -67,6 +74,7 @@ async def embed(request: web.Request) -> web.Response:
                     f"requested={embed_request.batch_size} "
                     f"configured={settings.OFFLOAD_EMBEDDING_BATCH_SIZE}"
                 ),
+                "correlation_id": corr_id,
             },
             status=400,
         )

@@ -189,17 +189,38 @@ Even though the client consumes a single endpoint, the server implementation mus
 ### Phase 6 — Runbooks + Hemma verification
 
 - [x] Update runbooks to make `:19000` the only required tunnel for Hemma backend runs
-- [ ] Redeploy on Hemma and verify:
-  - [ ] `/healthz` and readiness reflect dependency health
-  - [ ] `/v1/extract` works for `feature_set=combined`
-  - [ ] warm-cache run on Mac does not call Hemma for cached items
-- [ ] Record performance metrics and tuning notes using `offload_metrics.json`
+- [x] Redeploy on Hemma and verify:
+  - [x] `/healthz` and readiness reflect dependency health
+  - [x] `/v1/extract` works for `feature_set=combined`
+  - [x] warm-cache run on Mac does not call Hemma for cached items
+- [x] Record performance metrics and tuning notes using `offload_metrics.json`
 - Evidence:
   - Docs refs:
     - `docs/operations/hemma-server-operations-huleedu.md`
     - `.claude/work/session/readme-first.md`
   - Notes/decisions:
-    - Hemma redeploy + live verification pending (not executed in this session).
+    - Hemma `.env` requires `OFFLOAD_LANGUAGE_TOOL_JAR_VERSION` (cache safety; LT service does not expose jar version in its current API).
+  - Evidence:
+    - Hemma git:
+      - `git pull --ff-only` to `d9d26dae` (2026-02-04)
+    - Hemma env:
+      - `OFFLOAD_LANGUAGE_TOOL_JAR_VERSION=6.6`
+    - Hemma deploy:
+      - `sudo docker compose -f docker-compose.hemma.yml -f docker-compose.prod.yml -f docker-compose.hemma.research.yml --profile research-offload up -d --build essay_embed_offload`
+    - Hemma health checks:
+      - `curl -fsS http://127.0.0.1:9000/healthz` → includes `extract.max_items=64`, `extract.max_request_bytes=900000`, `extract.max_response_bytes=8000000`, `extract.language_tool_url=http://language_tool_service:8085`, `extract.language_tool_jar_version=6.6`
+      - `curl -fsS http://127.0.0.1:9000/v1/extract ...` smoke succeeded (zip bundle with `meta.json` + `embeddings.npy` + `handcrafted.npy`)
+    - Mac tunnel:
+      - single tunnel confirmed active: `ssh hemma -L 19000:127.0.0.1:9000 -N`
+    - Mac live CLI (Hemma backend):
+      - `source .env && pdm run essay-scoring-research run --dataset-kind ellipse --feature-set combined --ellipse-train-path /tmp/ellipse_train_smoke.csv --ellipse-test-path /tmp/ellipse_test_smoke.csv --backend hemma --offload-service-url http://127.0.0.1:19000 --skip-shap --skip-grade-scale-report --run-name hemma_extract_smoke`
+      - Output: `output/essay_scoring/20260204_005102_hemma_extract_smoke`
+      - Meta: `artifacts/offload_extract_meta.json` includes `schema_version=1`, `server_fingerprint=...`, `language_tool.jar_version=6.6`
+    - Warm-cache verification:
+      - Re-run with same inputs produced: `output/essay_scoring/20260204_005206_hemma_extract_smoke_cached`
+      - Offload server `/metrics` counters did **not** increase for `/v1/extract` across the second run (cache hit).
+    - Metrics artifacts:
+      - `output/essay_scoring/20260204_005102_hemma_extract_smoke/artifacts/offload_metrics.json`
 
 ## Implementation Phases (full plan)
 

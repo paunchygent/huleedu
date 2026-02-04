@@ -62,8 +62,10 @@ async def test_offload_extract_combined_returns_zip_with_meta_and_arrays(monkeyp
     client = TestClient(server)
     await client.start_server()
     try:
+        correlation_id = "00000000-0000-0000-0000-000000000999"
         response = await client.post(
             "/v1/extract",
+            headers={"X-Correlation-ID": correlation_id},
             json={
                 "texts": ["Hello world.", "This is a test."],
                 "prompts": ["Prompt A", "Prompt B"],
@@ -71,6 +73,7 @@ async def test_offload_extract_combined_returns_zip_with_meta_and_arrays(monkeyp
             },
         )
         assert response.status == 200
+        assert response.headers.get("X-Correlation-ID") == correlation_id
         body = await response.read()
 
         with zipfile.ZipFile(io.BytesIO(body), "r") as zf:
@@ -87,5 +90,32 @@ async def test_offload_extract_combined_returns_zip_with_meta_and_arrays(monkeyp
 
         # Tier2 embeds (unique texts) + embeddings.npy should reuse the request-scoped cache.
         assert embedder.calls == 1
+    finally:
+        await client.close()
+
+
+@pytest.mark.asyncio
+async def test_offload_extract_invalid_request_includes_correlation_id() -> None:
+    settings.OFFLOAD_LANGUAGE_TOOL_JAR_VERSION = "6.3"
+
+    embedder = _CountingEmbedder()
+    app = create_app(embedder=embedder)
+    server = TestServer(app)
+    client = TestClient(server)
+    await client.start_server()
+    try:
+        correlation_id = "00000000-0000-0000-0000-000000000998"
+        response = await client.post(
+            "/v1/extract",
+            headers={"X-Correlation-ID": correlation_id},
+            json={
+                "texts": ["Hello world."],
+                # Missing prompts and feature_set.
+            },
+        )
+        assert response.status == 400
+        assert response.headers.get("X-Correlation-ID") == correlation_id
+        payload = await response.json()
+        assert payload.get("correlation_id") == correlation_id
     finally:
         await client.close()

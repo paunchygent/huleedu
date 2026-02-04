@@ -116,10 +116,6 @@ def _executor(app: web.Application) -> ThreadPoolExecutor:
 
 async def extract(request: web.Request) -> web.Response:
     corr_id = str(request.get("correlation_id") or "")
-    if not corr_id:
-        import uuid  # noqa: PLC0415
-
-        corr_id = str(uuid.uuid4())
 
     try:
         payload = await request.json()
@@ -159,6 +155,13 @@ async def extract(request: web.Request) -> web.Response:
         return web.json_response(error.model_dump(mode="json"), status=413)
 
     request["offload_items"] = n_items
+    logger.info(
+        "Extract start correlation_id=%s items=%s feature_set=%s request_bytes=%s",
+        corr_id,
+        n_items,
+        extract_request.feature_set,
+        request_bytes,
+    )
 
     app = request.app
     embedder = app[EMBEDDER_KEY]
@@ -247,6 +250,13 @@ async def extract(request: web.Request) -> web.Response:
         )
         return web.json_response(error.model_dump(mode="json"), status=500)
 
+    logger.info(
+        "Extract ok correlation_id=%s items=%s response_bytes=%s server_fingerprint=%s",
+        corr_id,
+        n_items,
+        len(body),
+        meta.server_fingerprint,
+    )
     return web.Response(
         body=body,
         headers={

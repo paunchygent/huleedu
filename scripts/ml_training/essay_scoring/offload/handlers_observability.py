@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+import uuid
 from typing import Any
 
 from aiohttp import web
@@ -15,11 +16,18 @@ from scripts.ml_training.essay_scoring.offload.http_state import (
 from scripts.ml_training.essay_scoring.offload.observability import build_prometheus_metrics_text
 from scripts.ml_training.essay_scoring.offload.settings import settings
 
+_CORRELATION_HEADER = "X-Correlation-ID"
+
 
 @web.middleware
 async def observability_middleware(request: web.Request, handler: Any) -> web.StreamResponse:
     metrics = request.app[METRICS_KEY]
     endpoint_stats = metrics.get_endpoint(method=request.method, endpoint=request.path)
+
+    corr_id = request.headers.get(_CORRELATION_HEADER, "")
+    if not corr_id:
+        corr_id = str(uuid.uuid4())
+    request["correlation_id"] = corr_id
 
     start = time.monotonic()
     endpoint_stats.record_start()
@@ -28,9 +36,11 @@ async def observability_middleware(request: web.Request, handler: Any) -> web.St
     try:
         response = await handler(request)
         status = getattr(response, "status", 200)
+        response.headers[_CORRELATION_HEADER] = corr_id
         return response
     except web.HTTPException as exc:
         status = int(exc.status)
+        exc.headers[_CORRELATION_HEADER] = corr_id
         raise
     finally:
         items = request.get("offload_items")

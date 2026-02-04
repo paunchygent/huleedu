@@ -9,6 +9,7 @@ import socket
 import time
 import urllib.error
 import urllib.request
+import uuid
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -247,12 +248,12 @@ class RemoteExtractClient:
             if chunk_handcrafted is not None:
                 all_handcrafted.append(chunk_handcrafted)
 
-        embeddings = (
-            np.vstack(all_embeddings).astype(np.float32, copy=False) if all_embeddings else None
-        )
-        handcrafted = (
-            np.vstack(all_handcrafted).astype(np.float32, copy=False) if all_handcrafted else None
-        )
+        embeddings = None
+        if all_embeddings:
+            embeddings = np.vstack(all_embeddings).astype(np.float32, copy=False)
+        handcrafted = None
+        if all_handcrafted:
+            handcrafted = np.vstack(all_handcrafted).astype(np.float32, copy=False)
         return embeddings, handcrafted, meta
 
     def _iter_extract_chunks(
@@ -315,6 +316,7 @@ class RemoteExtractClient:
         self, texts: list[str], prompts: list[str], feature_set: FeatureSet
     ) -> tuple[np.ndarray | None, np.ndarray | None, ExtractMeta | None]:
         url = self.base_url.rstrip("/") + "/v1/extract"
+        correlation_id = str(uuid.uuid4())
         payload = {
             "texts": texts,
             "prompts": prompts,
@@ -324,7 +326,10 @@ class RemoteExtractClient:
         request = urllib.request.Request(
             url,
             data=data,
-            headers={"Content-Type": "application/json"},
+            headers={
+                "Content-Type": "application/json",
+                "X-Correlation-ID": correlation_id,
+            },
             method="POST",
         )
 
@@ -343,7 +348,8 @@ class RemoteExtractClient:
                 )
             detail = exc.read().decode("utf-8", errors="replace")
             raise RuntimeError(
-                f"Extract offload HTTP error status={exc.code} body={detail}"
+                "Extract offload HTTP error "
+                f"correlation_id={correlation_id} status={exc.code} body={detail}"
             ) from exc
         except urllib.error.URLError as exc:
             elapsed = time.monotonic() - start
@@ -354,14 +360,18 @@ class RemoteExtractClient:
                     duration_s=elapsed,
                     error_kind="timeout" if is_timeout else "connection_error",
                 )
-            raise RuntimeError(f"Extract offload connection error: {exc}") from exc
+            raise RuntimeError(
+                f"Extract offload connection error correlation_id={correlation_id}: {exc}"
+            ) from exc
         except socket.timeout as exc:
             elapsed = time.monotonic() - start
             if self.metrics is not None:
                 self.metrics.record_request_error(
                     kind="extract", duration_s=elapsed, error_kind="timeout"
                 )
-            raise RuntimeError(f"Extract offload timeout: {exc}") from exc
+            raise RuntimeError(
+                f"Extract offload timeout correlation_id={correlation_id}: {exc}"
+            ) from exc
 
         if status != 200:
             elapsed = time.monotonic() - start
@@ -369,7 +379,10 @@ class RemoteExtractClient:
                 self.metrics.record_request_error(
                     kind="extract", duration_s=elapsed, error_kind="http_error"
                 )
-            raise RuntimeError(f"Extract offload returned status={status} bytes={len(body)}")
+            raise RuntimeError(
+                "Extract offload returned non-200 response "
+                f"status={status} correlation_id={correlation_id} bytes={len(body)}"
+            )
 
         elapsed = time.monotonic() - start
         if self.metrics is not None:

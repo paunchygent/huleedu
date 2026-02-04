@@ -487,3 +487,23 @@ Verification (2026-02-03 local time):
 - Verification:
   - `pdm run pytest-root scripts/ml_training/tests -v` (49 passed)
   - `pdm run validate-docs`
+
+### Hemma offload: redeploy + live verification (single tunnel, /v1/extract)
+
+- Hemma:
+  - Repo synced to `d9d26dae` (fast-forward pull).
+  - `.env` set: `OFFLOAD_LANGUAGE_TOOL_JAR_VERSION=6.6` (required for `server_fingerprint` stability).
+  - Redeploy:
+    - `sudo docker compose -f docker-compose.hemma.yml -f docker-compose.prod.yml -f docker-compose.hemma.research.yml --profile research-offload up -d --build essay_embed_offload`
+  - Verified:
+    - `curl -fsS http://127.0.0.1:9000/healthz` returns `status=ok` and `extract` config (N=64, request/response limits, `language_tool_url=http://language_tool_service:8085`, `language_tool_jar_version=6.6`).
+    - `/v1/extract` smoke succeeds for `feature_set=combined` and returns zip with `meta.json`, `embeddings.npy`, `handcrafted.npy`.
+- Mac:
+  - Single tunnel confirmed active: `ssh hemma -L 19000:127.0.0.1:9000 -N`.
+  - Live run (Hemma backend; no fallbacks):
+    - `source .env && pdm run essay-scoring-research run --dataset-kind ellipse --feature-set combined --ellipse-train-path /tmp/ellipse_train_smoke.csv --ellipse-test-path /tmp/ellipse_test_smoke.csv --backend hemma --offload-service-url http://127.0.0.1:19000 --skip-shap --skip-grade-scale-report --run-name hemma_extract_smoke`
+    - Output: `output/essay_scoring/20260204_005102_hemma_extract_smoke`
+    - `artifacts/offload_extract_meta.json` includes `schema_version=1`, `server_fingerprint`, and `language_tool.jar_version=6.6`.
+  - Warm-cache check:
+    - Second run: `output/essay_scoring/20260204_005206_hemma_extract_smoke_cached`
+    - Offload `/metrics` counters for `/v1/extract` did not increase across the second run (cache hit).
