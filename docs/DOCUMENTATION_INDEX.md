@@ -60,6 +60,9 @@ Master navigation across all project documentation.
 | [eng5-np-runbook.md](operations/eng5-np-runbook.md) | ENG5 Runner | High |
 | [ielts-task2-dataset-preparation.md](operations/ielts-task2-dataset-preparation.md) | Assessment | Medium |
 | [llm-provider-configuration-hierarchy.md](operations/llm-provider-configuration-hierarchy.md) | LLM Provider | High |
+| [ml-nlp-runbook.md](operations/ml-nlp-runbook.md) | Global | Medium |
+| [hemma-server-operations-huleedu.md](operations/hemma-server-operations-huleedu.md) | Global | High |
+| [gpu-ai-workloads-on-hemma-huleedu.md](operations/gpu-ai-workloads-on-hemma-huleedu.md) | Global | High |
 
 ---
 
@@ -95,6 +98,7 @@ Master navigation across all project documentation.
 | [product/epics/teacher-dashboard-epic.md](product/epics/teacher-dashboard-epic.md) | EPIC-002: Teacher Dashboard |
 | [product/epics/ai-feedback-epic.md](product/epics/ai-feedback-epic.md) | EPIC-003: AI Feedback Service |
 | [product/epics/cj-assessment-epic.md](product/epics/cj-assessment-epic.md) | EPIC-004: CJ Assessment Feature Scope |
+| [product/epics/ml-essay-scoring-pipeline.md](product/epics/ml-essay-scoring-pipeline.md) | EPIC-010: ML Essay Scoring Pipeline |
 
 ---
 
@@ -105,6 +109,7 @@ Master navigation across all project documentation.
 | [reference/ref-tasks-overview.md](reference/ref-tasks-overview.md) | TASKS structure + frontmatter overview |
 | [reference/ref-tasks-lifecycle-v2.md](reference/ref-tasks-lifecycle-v2.md) | Story review gate + `done` status |
 | [reference/ref-infrastructure-tasks-how-we-track-platform-work.md](reference/ref-infrastructure-tasks-how-we-track-platform-work.md) | What belongs in TASKS/infrastructure + queries |
+| [reference/ref-essay-scoring-research-hub.md](reference/ref-essay-scoring-research-hub.md) | Essay scoring navigation hub (runbook → epic → stories → tasks → artifacts) |
 | [reference/apis/API_REFERENCE.md](reference/apis/API_REFERENCE.md) | Complete API documentation |
 | [reference/apis/WEBSOCKET_API_DOCUMENTATION.md](reference/apis/WEBSOCKET_API_DOCUMENTATION.md) | WebSocket event schemas |
 | [reference/apis/api-gateway-openapi.json](reference/apis/api-gateway-openapi.json) | OpenAPI 3.0 specification |
@@ -179,4 +184,4 @@ All services have comprehensive README documentation:
 
 ---
 
-*Last updated: 2025-11-27*
+*Last updated: 2026-02-04*

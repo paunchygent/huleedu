@@ -163,6 +163,18 @@ Local metrics (via tunnel):
 curl -fsS http://127.0.0.1:19000/metrics | head
 ```
 
+### Long-running research runs (Mac)
+
+If a run “stops without errors” and the offload containers are idle, the most common cause is the
+client-side process being terminated by session teardown (for example: closing the terminal tab,
+or running inside a tool runner that does not preserve background jobs).
+
+Recommended:
+- Run from a dedicated terminal tab.
+- For detached execution on macOS, use `/usr/bin/screen` (bundled) so the process survives:
+  - `/usr/bin/screen -S essay_scoring_run -dm /bin/bash -lc '<command>'`
+  - `/usr/bin/screen -r essay_scoring_run`
+
 ### Hemma compose layering (enforce localhost-only services)
 
 On Hemma, layer `docker-compose.hemma.research.yml` on top of the normal compose files.

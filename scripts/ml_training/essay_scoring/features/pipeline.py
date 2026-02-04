@@ -90,7 +90,22 @@ class FeaturePipeline:
                     metrics=self.offload_metrics,
                 )
 
+            logger.info(
+                "Offload extract start (backend=hemma, feature_set=%s, records=%d)",
+                feature_set.value,
+                len(texts),
+            )
+            start = time.monotonic()
             result = self.remote_extractor.extract(texts, prompts, feature_set)
+            elapsed = time.monotonic() - start
+            logger.info(
+                "Offload extract complete (backend=hemma, records=%d) in %.2fs (embeddings=%s, "
+                "handcrafted=%s)",
+                len(texts),
+                elapsed,
+                None if result.embeddings is None else result.embeddings.shape,
+                None if result.handcrafted is None else result.handcrafted.shape,
+            )
             self.last_offload_meta = result.meta
 
             if feature_set == FeatureSet.EMBEDDINGS:

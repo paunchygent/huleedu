@@ -7,7 +7,9 @@ import io
 import logging
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from dataclasses import dataclass
+from threading import Lock
 from typing import Any
 
 import numpy as np
@@ -27,11 +29,13 @@ from scripts.ml_training.essay_scoring.offload.extract_models import (
     ExtractRequest,
 )
 from scripts.ml_training.essay_scoring.offload.http_state import (
+    EMBED_LOCK_KEY,
     EMBEDDER_KEY,
     EXTRACT_EXECUTOR_KEY,
+    LANGUAGE_TOOL_SEMAPHORE_KEY,
 )
 from scripts.ml_training.essay_scoring.offload.settings import settings
-from scripts.ml_training.essay_scoring.offload.spacy_runtime import get_spacy_models
+from scripts.ml_training.essay_scoring.offload.spacy_runtime import acquire_spacy_models
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +44,18 @@ logger = logging.getLogger(__name__)
 class _RequestScopedEmbeddingCache(EmbeddingExtractorProtocol):
     embedder: EmbeddingExtractorProtocol
     cache: dict[str, np.ndarray]
+    lock: Lock | None = None
+
+    @contextmanager
+    def _maybe_lock(self) -> Any:
+        if self.lock is None:
+            yield
+            return
+        self.lock.acquire()
+        try:
+            yield
+        finally:
+            self.lock.release()
 
     def embed(self, texts: list[str]) -> np.ndarray:
         if not texts:
@@ -51,7 +67,8 @@ class _RequestScopedEmbeddingCache(EmbeddingExtractorProtocol):
                 missing.append(text)
 
         if missing:
-            vectors = self.embedder.embed(missing)
+            with self._maybe_lock():
+                vectors = self.embedder.embed(missing)
             if vectors.ndim != 2 or vectors.shape[0] != len(missing):
                 raise RuntimeError(
                     "Embedding extractor returned invalid shape "
@@ -165,50 +182,64 @@ async def extract(request: web.Request) -> web.Response:
 
     app = request.app
     embedder = app[EMBEDDER_KEY]
-    embed_cache = _RequestScopedEmbeddingCache(embedder=embedder, cache={})
+    embed_cache = _RequestScopedEmbeddingCache(
+        embedder=embedder,
+        cache={},
+        lock=app.get(EMBED_LOCK_KEY),
+    )
 
     try:
         loop = asyncio.get_running_loop()
 
         def _compute() -> tuple[ExtractMeta, bytes]:
-            nlp, nlp_fast = get_spacy_models(app)
-            tier1 = Tier1FeatureExtractor(
-                nlp=nlp,
-                language_tool_url=settings.OFFLOAD_LANGUAGE_TOOL_URL,
-                request_timeout_s=60.0,
-                language_tool_cache_dir=None,
-                language_tool_max_concurrency=int(settings.OFFLOAD_LANGUAGE_TOOL_MAX_CONCURRENCY),
-            )
-            tier2 = Tier2FeatureExtractor(
-                nlp=nlp_fast,
-                embedding_extractor=embed_cache,
-            )
-            tier3 = Tier3FeatureExtractor(
-                nlp=nlp_fast,
-            )
+            with acquire_spacy_models(app) as (nlp, nlp_fast):
+                tier1 = Tier1FeatureExtractor(
+                    nlp=nlp,
+                    language_tool_url=settings.OFFLOAD_LANGUAGE_TOOL_URL,
+                    request_timeout_s=60.0,
+                    language_tool_cache_dir=None,
+                    language_tool_max_concurrency=min(
+                        8, int(settings.OFFLOAD_LANGUAGE_TOOL_MAX_CONCURRENCY)
+                    ),
+                    language_tool_semaphore=app.get(LANGUAGE_TOOL_SEMAPHORE_KEY),
+                )
+                tier2 = Tier2FeatureExtractor(
+                    nlp=nlp_fast,
+                    spacy_n_process=int(settings.OFFLOAD_SPACY_N_PROCESS),
+                    spacy_pipe_batch_size=int(settings.OFFLOAD_SPACY_PIPE_BATCH_SIZE),
+                    embedding_extractor=embed_cache,
+                )
+                tier3 = Tier3FeatureExtractor(
+                    nlp=nlp_fast,
+                )
 
-            handcrafted = None
-            embeddings = None
+                handcrafted = None
+                embeddings = None
 
-            if extract_request.feature_set in {FeatureSet.HANDCRAFTED, FeatureSet.COMBINED}:
-                tier1_features = tier1.extract_batch(extract_request.texts)
-                tier2_features = tier2.extract_batch(extract_request.texts, extract_request.prompts)
-                tier3_features = [
-                    tier3.extract(t, p)
-                    for t, p in zip(extract_request.texts, extract_request.prompts, strict=True)
-                ]
-                handcrafted = _stack_handcrafted(tier1_features, tier2_features, tier3_features)
+                if extract_request.feature_set in {FeatureSet.HANDCRAFTED, FeatureSet.COMBINED}:
+                    tier1_features = tier1.extract_batch(extract_request.texts)
+                    tier2_result = tier2.extract_batch_with_artifacts(
+                        extract_request.texts, extract_request.prompts
+                    )
+                    tier2_features = tier2_result.features
+                    tier3_features = [
+                        tier3.extract_from_doc(doc=doc, paragraphs=paragraphs)
+                        for doc, paragraphs in zip(
+                            tier2_result.docs, tier2_result.paragraphs_by_index, strict=True
+                        )
+                    ]
+                    handcrafted = _stack_handcrafted(tier1_features, tier2_features, tier3_features)
 
-            if extract_request.feature_set in {FeatureSet.EMBEDDINGS, FeatureSet.COMBINED}:
-                embeddings = embed_cache.embed(extract_request.texts)
+                if extract_request.feature_set in {FeatureSet.EMBEDDINGS, FeatureSet.COMBINED}:
+                    embeddings = embed_cache.embed(extract_request.texts)
 
-            embedding_dim = embed_cache.embedding_dim()
-            if embedding_dim <= 0 and embeddings is not None and embeddings.ndim == 2:
-                embedding_dim = int(embeddings.shape[1])
+                embedding_dim = embed_cache.embedding_dim()
+                if embedding_dim <= 0 and embeddings is not None and embeddings.ndim == 2:
+                    embedding_dim = int(embeddings.shape[1])
 
-            meta = build_meta(embedding_dim=embedding_dim)
-            body = _zip_bundle(meta=meta, embeddings=embeddings, handcrafted=handcrafted)
-            return meta, body
+                meta = build_meta(embedding_dim=embedding_dim)
+                body = _zip_bundle(meta=meta, embeddings=embeddings, handcrafted=handcrafted)
+                return meta, body
 
         meta, body = await loop.run_in_executor(_executor(app), _compute)
     except RuntimeError as exc:

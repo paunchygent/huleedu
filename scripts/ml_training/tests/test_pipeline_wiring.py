@@ -20,9 +20,9 @@ class DummyEmbedder:
 class DummyTier1:
     def extract(self, text: str) -> Tier1Features:
         return Tier1Features(
-            grammar_density=1.0,
-            spelling_density=2.0,
-            punctuation_density=3.0,
+            grammar_errors_per_100_words=1.0,
+            spelling_errors_per_100_words=2.0,
+            punctuation_errors_per_100_words=3.0,
             flesch_kincaid=4.0,
             smog=5.0,
             coleman_liau=6.0,
@@ -113,7 +113,7 @@ def test_pipeline_handcrafted_wiring() -> None:
 
     features = pipeline.extract(_records(), FeatureSet.HANDCRAFTED)
     assert features.matrix.shape == (2, 11 + 9 + 5)
-    assert features.feature_names[0] == "grammar_density"
+    assert features.feature_names[0] == "grammar_errors_per_100_words"
 
 
 def test_pipeline_embeddings_wiring() -> None:

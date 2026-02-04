@@ -119,7 +119,7 @@ Essay Text + Prompt
     ├──> DeBERTa-v3-base [CLS] ──> [768-dim embedding]
     │
     ├──> Tier 1 (LanguageTool + textdescriptives) ──> [~11 features]
-    │         ├── grammar_density, spelling_density, punct_errors
+    │         ├── grammar_errors_per_100_words, spelling_errors_per_100_words, punctuation_errors_per_100_words
     │         ├── flesch_kincaid, smog, coleman_liau, ari
     │         └── avg_sentence_length, ttr, word_count, avg_word_length
     │
@@ -175,6 +175,8 @@ The whitebox score can be used to:
 ## Related
 
 - EPIC-010: ML Essay Scoring Pipeline (`docs/product/epics/ml-essay-scoring-pipeline.md`)
+- Essay scoring research hub (`docs/reference/ref-essay-scoring-research-hub.md`)
+- Research runbook (`docs/operations/ml-nlp-runbook.md`)
 - Source Traceability Matrix (`docs/research/epic-010-ml-essay-scoring-source-traceability.md`)
 - Rule 020.15: NLP Service Architecture
 - Rule 020.7: CJ Assessment Service Architecture

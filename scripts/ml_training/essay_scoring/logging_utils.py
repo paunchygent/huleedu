@@ -5,6 +5,7 @@ from __future__ import annotations
 import faulthandler
 import json
 import logging
+import os
 import signal
 import sys
 import time
@@ -16,22 +17,46 @@ from pathlib import Path
 from rich.logging import RichHandler
 
 
-def configure_console_logging(level: int = logging.WARNING) -> None:
+def configure_console_logging(level: int | None = None) -> None:
     """Configure Rich-backed console logging.
 
     Notes:
-    - Console logging defaults to WARNING to keep large research runs readable.
+    - Console logging defaults to WARNING for TTY sessions to keep large research runs readable.
+    - When stdout/stderr are redirected (nohup, CI), console logging defaults to INFO so the
+      driver log has useful progress output.
+    - When stderr is not a TTY, use a plain `StreamHandler` (no Rich formatting) to keep the
+      driver log greppable.
+    - You can override the default with `ESSAY_SCORING_CONSOLE_LOG_LEVEL` (e.g. INFO, DEBUG).
     - File logging is handled separately via `run_file_logger` and should retain INFO.
     """
 
-    handler = RichHandler(rich_tracebacks=True, markup=True)
+    if level is None:
+        env_level = os.getenv("ESSAY_SCORING_CONSOLE_LOG_LEVEL")
+        if env_level:
+            resolved = logging.getLevelName(env_level.upper())
+            if isinstance(resolved, int):
+                level = resolved
+            else:
+                level = logging.INFO
+        else:
+            level = logging.WARNING if sys.stderr.isatty() else logging.INFO
+
+    if sys.stderr.isatty():
+        handler: logging.Handler = RichHandler(rich_tracebacks=True, markup=True)
+        handler.setFormatter(logging.Formatter("%(message)s"))
+    else:
+        handler = logging.StreamHandler(sys.stderr)
+        handler.setFormatter(
+            logging.Formatter(
+                "%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+                datefmt="%Y-%m-%d %H:%M:%S",
+            )
+        )
     handler.setLevel(level)
 
     root_level = min(level, logging.INFO)
     logging.basicConfig(
         level=root_level,
-        format="%(message)s",
-        datefmt="[%X]",
         handlers=[handler],
     )
 

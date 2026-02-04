@@ -5,12 +5,14 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import logging
 import socket
 import time
 import urllib.error
 import urllib.request
 import uuid
 import zipfile
+from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -27,6 +29,9 @@ from scripts.ml_training.essay_scoring.offload.metrics import OffloadMetricsColl
 
 _MAX_EXTRACT_ITEMS = 64
 _MAX_EXTRACT_REQUEST_BYTES = 900_000
+_PROGRESS_LOG_EVERY_S = 15.0
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -48,6 +53,7 @@ class RemoteExtractClient:
     def extract(
         self, texts: list[str], prompts: list[str], feature_set: FeatureSet
     ) -> RemoteExtractResult:
+        extract_start = time.monotonic()
         if not texts:
             empty = np.empty((0, 0), dtype=np.float32)
             meta = self._load_expected_meta_or_fail()
@@ -80,11 +86,26 @@ class RemoteExtractClient:
         handcrafted_cache_root = self.offload_config.handcrafted_cache_dir
         handcrafted_cache_root.mkdir(parents=True, exist_ok=True)
 
+        logger.info(
+            "Hemma extract start (feature_set=%s, records=%d, need_embeddings=%s, "
+            "need_handcrafted=%s)",
+            feature_set.value,
+            len(texts),
+            need_embeddings,
+            need_handcrafted,
+        )
+
         cached_embeddings: dict[int, np.ndarray] = {}
         cached_handcrafted: dict[int, np.ndarray] = {}
         missing_indices: list[int] = []
         missing_texts: list[str] = []
         missing_prompts: list[str] = []
+        cache_hits_embedding = 0
+        cache_misses_embedding = 0
+        cache_hits_extract = 0
+        cache_misses_extract = 0
+
+        cache_scan_start = time.monotonic()
 
         for index, (text, prompt) in enumerate(zip(texts, prompts, strict=True)):
             embedding_ok = True
@@ -100,19 +121,23 @@ class RemoteExtractClient:
                         if self.metrics is not None:
                             self.metrics.record_cache_read_error(kind="embedding")
                             self.metrics.record_cache_miss(kind="embedding")
+                        cache_misses_embedding += 1
                     else:
                         if self.metrics is not None:
                             self.metrics.record_cache_hit(kind="embedding")
+                        cache_hits_embedding += 1
                 else:
                     embedding_ok = False
                     if self.metrics is not None:
                         self.metrics.record_cache_miss(kind="embedding")
+                    cache_misses_embedding += 1
 
             if need_handcrafted:
                 if expected_fingerprint is None or expected_schema_version is None:
                     handcrafted_ok = False
                     if self.metrics is not None:
                         self.metrics.record_cache_miss(kind="extract")
+                    cache_misses_extract += 1
                 else:
                     hand_path = self._handcrafted_cache_path(
                         cache_root=handcrafted_cache_root,
@@ -129,23 +154,51 @@ class RemoteExtractClient:
                             if self.metrics is not None:
                                 self.metrics.record_cache_read_error(kind="extract")
                                 self.metrics.record_cache_miss(kind="extract")
+                            cache_misses_extract += 1
                         else:
                             if self.metrics is not None:
                                 self.metrics.record_cache_hit(kind="extract")
+                            cache_hits_extract += 1
                     else:
                         handcrafted_ok = False
                         if self.metrics is not None:
                             self.metrics.record_cache_miss(kind="extract")
+                        cache_misses_extract += 1
 
             if not embedding_ok or not handcrafted_ok:
                 missing_indices.append(index)
                 missing_texts.append(text)
                 missing_prompts.append(prompt)
 
+        cache_scan_elapsed = time.monotonic() - cache_scan_start
+        ready_from_cache = len(texts) - len(missing_texts)
+        logger.info(
+            "Hemma extract cache scan complete (ready=%d/%d, missing=%d) in %.2fs "
+            "(cache_hits: embedding=%d extract=%d; cache_misses: embedding=%d extract=%d)",
+            ready_from_cache,
+            len(texts),
+            len(missing_texts),
+            cache_scan_elapsed,
+            cache_hits_embedding,
+            cache_hits_extract,
+            cache_misses_embedding,
+            cache_misses_extract,
+        )
+
         fetched_meta: ExtractMeta | None = None
         if missing_texts:
+            logger.info(
+                "Hemma extract fetching missing records from offload (missing=%d, "
+                "max_batch_items=%d)",
+                len(missing_texts),
+                _MAX_EXTRACT_ITEMS,
+            )
             fetched_embeddings, fetched_handcrafted, fetched_meta = self._fetch_batched(
-                missing_texts, missing_prompts, feature_set
+                missing_texts,
+                missing_prompts,
+                feature_set,
+                total_records=len(texts),
+                ready_from_cache=ready_from_cache,
             )
             if fetched_meta is None:
                 raise RuntimeError("Offload extract response missing meta.")
@@ -220,33 +273,185 @@ class RemoteExtractClient:
             for idx in range(len(texts)):
                 handcrafted[idx] = cached_handcrafted[idx]
 
+        logger.info(
+            "Hemma extract complete (feature_set=%s, records=%d, fetched=%d, cache_ready=%d) "
+            "in %.2fs",
+            feature_set.value,
+            len(texts),
+            len(missing_texts),
+            ready_from_cache,
+            time.monotonic() - extract_start,
+        )
+
         return RemoteExtractResult(embeddings=embeddings, handcrafted=handcrafted, meta=meta)
 
     def _fetch_batched(
-        self, texts: list[str], prompts: list[str], feature_set: FeatureSet
+        self,
+        texts: list[str],
+        prompts: list[str],
+        feature_set: FeatureSet,
+        *,
+        total_records: int,
+        ready_from_cache: int,
     ) -> tuple[np.ndarray | None, np.ndarray | None, ExtractMeta | None]:
         all_embeddings: list[np.ndarray] = []
         all_handcrafted: list[np.ndarray] = []
         meta: ExtractMeta | None = None
 
-        for chunk_texts, chunk_prompts in self._iter_extract_chunks(texts, prompts):
-            chunk_embeddings, chunk_handcrafted, chunk_meta = self._fetch_once(
-                chunk_texts, chunk_prompts, feature_set
-            )
-            if chunk_meta is None:
-                raise RuntimeError("Offload extract response missing meta.json")
-            if meta is None:
-                meta = chunk_meta
-            elif meta.server_fingerprint != chunk_meta.server_fingerprint:
-                raise RuntimeError(
-                    "Offload server fingerprint changed within a single client fetch "
-                    f"first={meta.server_fingerprint} next={chunk_meta.server_fingerprint}"
-                )
+        max_in_flight = max(1, int(self.offload_config.extract_max_in_flight_requests))
 
-            if chunk_embeddings is not None:
-                all_embeddings.append(chunk_embeddings)
-            if chunk_handcrafted is not None:
-                all_handcrafted.append(chunk_handcrafted)
+        fetch_start = time.monotonic()
+        last_progress_log = fetch_start
+        fetched_items = 0
+        batch_count = 0
+
+        chunk_iter = iter(self._iter_extract_chunks(texts, prompts))
+
+        def _submit(
+            pool: ThreadPoolExecutor, *, chunk_index: int
+        ) -> tuple[Future[tuple[np.ndarray | None, np.ndarray | None, ExtractMeta | None]], int]:
+            chunk_texts, chunk_prompts = next(chunk_iter)
+            fut = pool.submit(self._fetch_once, chunk_texts, chunk_prompts, feature_set)
+            return fut, len(chunk_texts)
+
+        if max_in_flight == 1:
+            for chunk_texts, chunk_prompts in self._iter_extract_chunks(texts, prompts):
+                batch_count += 1
+                chunk_start = time.monotonic()
+                chunk_embeddings, chunk_handcrafted, chunk_meta = self._fetch_once(
+                    chunk_texts, chunk_prompts, feature_set
+                )
+                chunk_elapsed = time.monotonic() - chunk_start
+                if chunk_meta is None:
+                    raise RuntimeError("Offload extract response missing meta.json")
+                if meta is None:
+                    meta = chunk_meta
+                elif meta.server_fingerprint != chunk_meta.server_fingerprint:
+                    raise RuntimeError(
+                        "Offload server fingerprint changed within a single client fetch "
+                        f"first={meta.server_fingerprint} next={chunk_meta.server_fingerprint}"
+                    )
+
+                if chunk_embeddings is not None:
+                    all_embeddings.append(chunk_embeddings)
+                if chunk_handcrafted is not None:
+                    all_handcrafted.append(chunk_handcrafted)
+
+                fetched_items += len(chunk_texts)
+                ready_total = ready_from_cache + fetched_items
+                now = time.monotonic()
+                if now - last_progress_log >= _PROGRESS_LOG_EVERY_S or ready_total >= total_records:
+                    elapsed = now - fetch_start
+                    rate = fetched_items / elapsed if elapsed > 0 else 0.0
+                    remaining = total_records - ready_total
+                    eta = remaining / rate if rate > 0 else 0.0
+                    logger.info(
+                        "Hemma extract progress (ready=%d/%d, fetched=%d/%d, batches=%d, "
+                        "last_batch=%d in %.2fs, %.2f items/s, ETA %.1fs)",
+                        ready_total,
+                        total_records,
+                        fetched_items,
+                        len(texts),
+                        batch_count,
+                        len(chunk_texts),
+                        chunk_elapsed,
+                        rate,
+                        eta,
+                    )
+                    last_progress_log = now
+        else:
+            logger.info("Hemma extract using in-flight concurrency=%d", max_in_flight)
+
+            in_flight: dict[
+                Future[tuple[np.ndarray | None, np.ndarray | None, ExtractMeta | None]],
+                tuple[int, int, float],
+            ] = {}
+            pending_by_index: dict[
+                int, tuple[int, float, np.ndarray | None, np.ndarray | None, ExtractMeta | None]
+            ] = {}
+
+            next_chunk_index = 0
+            next_to_flush = 0
+
+            with ThreadPoolExecutor(max_workers=max_in_flight) as pool:
+                while len(in_flight) < max_in_flight:
+                    try:
+                        fut, n_items = _submit(pool, chunk_index=next_chunk_index)
+                    except StopIteration:
+                        break
+                    in_flight[fut] = (next_chunk_index, n_items, time.monotonic())
+                    next_chunk_index += 1
+                    batch_count += 1
+
+                while in_flight:
+                    done, _ = wait(in_flight.keys(), return_when=FIRST_COMPLETED)
+                    for fut in done:
+                        chunk_index, n_items, submitted_at = in_flight.pop(fut)
+                        chunk_embeddings, chunk_handcrafted, chunk_meta = fut.result()
+                        pending_by_index[chunk_index] = (
+                            n_items,
+                            time.monotonic() - submitted_at,
+                            chunk_embeddings,
+                            chunk_handcrafted,
+                            chunk_meta,
+                        )
+
+                        try:
+                            next_fut, next_n = _submit(pool, chunk_index=next_chunk_index)
+                        except StopIteration:
+                            pass
+                        else:
+                            in_flight[next_fut] = (next_chunk_index, next_n, time.monotonic())
+                            next_chunk_index += 1
+                            batch_count += 1
+
+                    while next_to_flush in pending_by_index:
+                        n_items, chunk_elapsed, chunk_embeddings, chunk_handcrafted, chunk_meta = (
+                            pending_by_index.pop(next_to_flush)
+                        )
+                        if chunk_meta is None:
+                            raise RuntimeError("Offload extract response missing meta.json")
+                        if meta is None:
+                            meta = chunk_meta
+                        elif meta.server_fingerprint != chunk_meta.server_fingerprint:
+                            raise RuntimeError(
+                                "Offload server fingerprint changed within a single client fetch "
+                                f"first={meta.server_fingerprint} "
+                                f"next={chunk_meta.server_fingerprint}"
+                            )
+
+                        if chunk_embeddings is not None:
+                            all_embeddings.append(chunk_embeddings)
+                        if chunk_handcrafted is not None:
+                            all_handcrafted.append(chunk_handcrafted)
+
+                        fetched_items += n_items
+                        ready_total = ready_from_cache + fetched_items
+                        now = time.monotonic()
+                        if (
+                            now - last_progress_log >= _PROGRESS_LOG_EVERY_S
+                            or ready_total >= total_records
+                        ):
+                            elapsed = now - fetch_start
+                            rate = fetched_items / elapsed if elapsed > 0 else 0.0
+                            remaining = total_records - ready_total
+                            eta = remaining / rate if rate > 0 else 0.0
+                            logger.info(
+                                "Hemma extract progress (ready=%d/%d, fetched=%d/%d, batches=%d, "
+                                "last_batch=%d in %.2fs, %.2f items/s, ETA %.1fs)",
+                                ready_total,
+                                total_records,
+                                fetched_items,
+                                len(texts),
+                                batch_count,
+                                n_items,
+                                chunk_elapsed,
+                                rate,
+                                eta,
+                            )
+                            last_progress_log = now
+
+                        next_to_flush += 1
 
         embeddings = None
         if all_embeddings:

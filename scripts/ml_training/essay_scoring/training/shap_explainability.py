@@ -1,4 +1,15 @@
-"""SHAP explainability utilities for essay scoring models."""
+"""SHAP explainability utilities for essay scoring models.
+
+This module generates SHAP-based explainability artifacts for the essay-scoring research runner:
+- `scripts/ml_training/essay_scoring/runner.py` calls `generate_shap_artifacts()` after training.
+- Artifacts are written into the per-run `shap/` directory created by `paths.py`.
+
+Design notes:
+- We default to computing SHAP for the full evaluation set (the runner passes the test split),
+  because post-run analysis relies on SHAP being representative and not a subsample.
+- For local smoke tests and quick debugging, callers may pass an explicit `max_samples` to
+  downsample deterministically (seed=42).
+"""
 
 from __future__ import annotations
 
@@ -71,7 +82,7 @@ def generate_shap_artifacts(
     features: np.ndarray,
     feature_names: list[str],
     output_dir: Path,
-    max_samples: int = 500,
+    max_samples: int | None = None,
     explainer_factory: Callable[[xgb.Booster], TreeExplainerProtocol] | None = None,
     summary_plot_fn: SummaryPlotProtocol | None = None,
 ) -> ShapArtifacts:
@@ -82,7 +93,8 @@ def generate_shap_artifacts(
         features: Feature matrix.
         feature_names: Ordered feature names.
         output_dir: Output directory for artifacts.
-        max_samples: Maximum number of samples used for SHAP computation.
+        max_samples: Optional maximum number of rows to use for SHAP computation. If `None`,
+            uses the full `features` matrix.
 
     Returns:
         ShapArtifacts containing paths to SHAP outputs.
@@ -135,9 +147,16 @@ def generate_shap_artifacts(
     )
 
 
-def _sample_features(features: np.ndarray, max_samples: int) -> np.ndarray:
-    """Sample feature rows to keep SHAP computation manageable."""
+def _sample_features(features: np.ndarray, max_samples: int | None) -> np.ndarray:
+    """Sample feature rows to keep SHAP computation manageable.
 
+    Args:
+        features: Feature matrix.
+        max_samples: Optional cap on row count. If `None`, returns `features` unchanged.
+    """
+
+    if max_samples is None:
+        return features
     if features.shape[0] <= max_samples:
         return features
     rng = np.random.default_rng(seed=42)

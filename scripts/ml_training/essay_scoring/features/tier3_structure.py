@@ -1,4 +1,10 @@
-"""Tier 3 feature extraction: structure, lexical overlap, ratios."""
+"""Tier 3 feature extraction: structure, overlap, and POS ratios.
+
+Tier 3 depends on spaCy parsing (sentence boundaries + POS tags) and shares the
+same `Language` instance as Tier 2 in the Hemma offload server. The offload
+path uses `extract_from_doc()` to avoid re-parsing texts that Tier 2 already
+parsed.
+"""
 
 from __future__ import annotations
 
@@ -48,6 +54,14 @@ class Tier3FeatureExtractor:
 
         doc = self.nlp(text)
         paragraphs = split_paragraphs(text)
+        return self.extract_from_doc(doc=doc, paragraphs=paragraphs)
+
+    def extract_from_doc(self, *, doc: Doc, paragraphs: list[str]) -> Tier3Features:
+        """Extract Tier 3 features from a pre-parsed spaCy Doc.
+
+        This is used by the Hemma offload server to reuse Tier 2 parsing results.
+        """
+
         paragraph_count = float(len(paragraphs))
         has_intro = 1.0 if self._has_intro(paragraphs, self.nlp) else 0.0
         has_conclusion = 1.0 if self._has_conclusion(paragraphs) else 0.0

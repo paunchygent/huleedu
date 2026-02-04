@@ -22,6 +22,22 @@ Build a **whitebox** ML pipeline for automated essay scoring as a checks-and-bal
 - **In Scope**: DeBERTa-v3-base embedding extraction ([CLS] pooling), tiered hand-rolled feature pipeline, XGBoost ordinal regression with QWK early stopping, SHAP explainability, model serving in NLP Service
 - **Out of Scope**: Swedish grade mapping (future; requires grade-scale behavior report), automated CJ validation pipeline (future)
 
+**Research construct scope (PhD)**:
+- Target construct is **L2 English discourse essay writing ability** (argumentative/discussion essays).
+- Not in scope: “writing in general” across mixed genres (letters, narratives, creative writing).
+- Implication: dataset curation/filters are part of the evaluation contract; prompt-specific validation
+  becomes primary once the Swedish essay database exists.
+
+## Navigation (Start Here)
+
+Canonical chain for making decisions without drift:
+- Runbook (how to run experiments): `docs/operations/ml-nlp-runbook.md`
+- Research hub (navigation + spokes): `docs/reference/ref-essay-scoring-research-hub.md`
+- Current improvement hub (CV-first): `TASKS/assessment/improve-essay-scoring-prediction-power-ellipse-cv-first.md`
+
+“Latest evidence” report (reference run analysis):
+- `.claude/work/reports/essay-scoring/2026-02-04-ellipse-full-hemma-post-run-analysis.md`
+
 ## Deliverables
 
 ### Phase 1: Feature Engineering & Data Pipeline
@@ -86,7 +102,7 @@ Build a **whitebox** ML pipeline for automated essay scoring as a checks-and-bal
 **Acceptance Criteria**:
 
 **Tier 1 (Highest Predictive Value)**:
-- [ ] Error density: grammar_density, spelling_density, punct_errors (LanguageTool, normalized per 100 words)
+- [ ] Error rate (per 100 words): grammar_errors_per_100_words, spelling_errors_per_100_words, punctuation_errors_per_100_words (LanguageTool)
 - [ ] Readability ensemble: flesch_kincaid, smog, coleman_liau, ari (4 indices)
 - [ ] Core length: avg_sentence_length, ttr, word_count, avg_word_length
 
@@ -205,7 +221,7 @@ Blocked:
 |-------|----------|------------|------|
 | **DeBERTa-v3-base Embeddings** | [CLS] token pooling, max_length=512 | 768 | transformers |
 | **Tier 1 (Highest Signal)** | | | |
-| └── Error density | grammar_density, spelling_density, punct_errors | 3+ | LanguageTool |
+| └── Error rate (per 100 words) | grammar_errors_per_100_words, spelling_errors_per_100_words, punctuation_errors_per_100_words | 3+ | LanguageTool |
 | └── Readability | flesch_kincaid, smog, coleman_liau, ari | 4 | textdescriptives |
 | └── Core length | avg_sentence_length, ttr, word_count, avg_word_length | 4 | spaCy |
 | **Tier 2 (Strong Signal)** | | | |

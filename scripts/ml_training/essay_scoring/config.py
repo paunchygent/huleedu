@@ -112,6 +112,15 @@ class OffloadConfig(BaseModel):
         description="Base URL for LanguageTool service (e.g. http://127.0.0.1:18085).",
     )
     request_timeout_s: float = Field(default=60.0, ge=1.0, le=600.0)
+    extract_max_in_flight_requests: int = Field(
+        default=2,
+        ge=1,
+        le=16,
+        description=(
+            "Max concurrent Hemma /v1/extract requests the client will keep in flight. "
+            "Increases throughput when the offload server is configured with multiple workers."
+        ),
+    )
     embedding_cache_dir: Path = Field(
         default=Path("output/essay_scoring/.cache/offload_embeddings"),
         description="Disk cache for per-text embedding vectors (Mac-side).",

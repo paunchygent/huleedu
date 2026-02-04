@@ -53,6 +53,17 @@ All completed work, patterns, and decisions live in:
 - Added Rich logging for research runs (console + per-run `run.log`).
 - Ruff now excludes `output/` to avoid linting cached LanguageTool files.
 
+Update (2026-02-04):
+- Added CV-first follow-up tasks for prediction power improvements:
+  - `TASKS/assessment/essay-scoring-cv-ensembling-ellipse-cv-first.md`
+  - `TASKS/assessment/essay-scoring-ordinal-custom-objective-experiments-qwk.md`
+  - `TASKS/assessment/essay-scoring-construct-validity-audit--feature-candidates.md`
+- Prepared ELLIPSE (200–1000 words) artifacts + reusable CV splits for the CV-first story:
+  - Prepared dataset: `output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_train_prepared.csv`
+  - Prepared dataset: `output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_test_prepared.csv`
+  - Splits JSON: `output/essay_scoring/20260204_135554_ellipse_splits_200_1000/artifacts/splits.json`
+  - Next: run CV baselines (`scheme=stratified_text` + `scheme=prompt_holdout`) using this splits file.
+
 Local verification (2026-02-01):
 - `pdm lock -G ml-research`
 - `pdm install -G ml-research`
@@ -471,6 +482,23 @@ Verification (2026-02-03 local time):
   - `pdm run lint-fix --unsafe-fixes`
   - `pdm run typecheck-all`
 
+### Essay scoring research: sensible progress logs for Hemma extraction
+
+- Console logging defaults to INFO when stdout/stderr are redirected (nohup/CI), so `*.driver.log`
+  contains useful progress output. Override with `ESSAY_SCORING_CONSOLE_LOG_LEVEL=INFO|DEBUG|...`.
+- Hemma `/v1/extract` client now logs:
+  - cache scan summary (ready/missing, hit/miss counts)
+  - periodic progress (ready/total, fetched/missing, batches, throughput, ETA)
+- Implementation:
+  - `scripts/ml_training/essay_scoring/logging_utils.py` (`configure_console_logging`)
+  - `scripts/ml_training/essay_scoring/offload/extract_client.py`
+  - `scripts/ml_training/essay_scoring/features/pipeline.py`
+- Tracking task: `TASKS/assessment/essay-scoring-sensible-progress-logs-for-feature-extraction.md`
+- Verification:
+  - `pdm run pytest-root scripts/ml_training/tests/test_remote_extract_client_http.py -v`
+  - `pdm run format-all`
+  - `pdm run lint-fix --unsafe-fixes`
+
 ### Hemma offload observability: GPU + request metrics
 
 - Offload server now exposes:
@@ -515,3 +543,50 @@ Verification (2026-02-03 local time):
   - Install SIGINT/SIGTERM handlers in the run logger context to best-effort mark `status.json` as `state=failed` with `failure_reason=signal` and `signal=SIGINT|SIGTERM`.
   - Ensure stage-level exception handling does not overwrite an existing signal failure marker (preserve `signal`, add `elapsed_seconds` if missing).
 - Tracking task: `TASKS/assessment/essay-scoring-runner-mark-statusjson-failed-on-sigint-sigterm.md`
+
+### Hemma offload: throughput tuning under sustained load (2026-02-04)
+
+- Tracking task: `TASKS/assessment/optimize-hemma-offload-throughput.md`
+- Live full run started (ELLIPSE, Hemma offload, `feature_set=combined`):
+  - Driver log: `output/essay_scoring/ellipse_full_hemma_20260204_061926.driver.log`
+- Changes focused on stable throughput without increasing client request timeouts:
+  - Offload server supports multi-worker `/v1/extract` while avoiding unsafe cross-thread spaCy reuse.
+  - Client fetches missing records with bounded in-flight request concurrency (progress logs include rate/ETA).
+
+### Hemma offload: restart full run in detached screen (2026-02-04)
+
+- Previous full run stopped logging at `2026-02-04 06:23:13 CET` without emitting an exception.
+- Restarted full run in a detached `screen` session to avoid session teardown killing the process:
+  - Screen session: `essay_scoring_ellipse_full_hemma_20260204_071238`
+  - Driver log: `output/essay_scoring/ellipse_full_hemma_20260204_071238.driver.log`
+- Run completed successfully (ELLIPSE full, Hemma backend, `feature_set=combined`):
+  - output: `output/essay_scoring/20260204_061242_ellipse_full_hemma_20260204_071238/`
+  - status: `status.json` `state=completed`
+  - results (QWK): train `0.99295`, val `0.64241`, test `0.65552`
+  - throughput: `4.04` essays/s (feature extraction total; see `artifacts/offload_metrics.json`)
+  - docs updated with a concrete example entry: `docs/operations/ml-nlp-runbook.md`
+  - post-run analysis report: `.claude/work/reports/essay-scoring/2026-02-04-ellipse-full-hemma-post-run-analysis.md`
+  - SHAP follow-up run (reused feature store):
+    - output: `output/essay_scoring/20260204_072318_ellipse_full_hemma_with_shap_20260204_082316/`
+    - key artifacts:
+      - `output/essay_scoring/20260204_072318_ellipse_full_hemma_with_shap_20260204_082316/shap/shap_summary.png`
+      - `output/essay_scoring/20260204_072318_ellipse_full_hemma_with_shap_20260204_082316/shap/shap_summary_bar.png`
+      - `output/essay_scoring/20260204_072318_ellipse_full_hemma_with_shap_20260204_082316/reports/grade_scale_report.md`
+  - Full-test SHAP default (no sampling):
+    - decision: `docs/decisions/0029-essay-scoring-shap-uses-full-test-set-by-default.md`
+    - verified run output: `output/essay_scoring/20260204_072809_ellipse_full_hemma_with_shap_full_20260204_082806/`
+    - `shap_values.npy` shape: `2430 x 793` (full ELLIPSE test split)
+
+### Next: improve prediction power (CV-first) (2026-02-04)
+
+- Story: `TASKS/assessment/improve-essay-scoring-prediction-power-ellipse-cv-first.md`
+- Planned slices (tasks):
+  - `TASKS/assessment/essay-scoring-prepare-ellipse-dataset--cv-splits-2001000-words.md`
+  - `TASKS/assessment/essay-scoring-cv-baseline-stratified-text--prompt-holdout-on-ellipse.md`
+  - `TASKS/assessment/essay-scoring-ablation-handcrafted-vs-embeddings-vs-combined-on-ellipse.md`
+  - `TASKS/assessment/essay-scoring-drop-column-importance-for-handcrafted-features-cv.md`
+  - `TASKS/assessment/essay-scoring-xgboost-hyperparameter-sweep-cv-selected.md`
+  - `TASKS/assessment/essay-scoring-residual-diagnostics-by-prompt-and-grade-band.md`
+- Feature naming clarity: Tier1 error-rate features renamed to include units (per 100 words):
+  - task: `TASKS/assessment/essay-scoring-tier1-error-rates-per-100-words-naming.md`
+  - decision: `docs/decisions/0030-essay-scoring-tier1-error-rate-feature-names-include-units.md`

@@ -1,4 +1,13 @@
-"""Tier 2 feature extraction: syntactic complexity, cohesion, prompt relevance."""
+"""Tier 2 feature extraction: syntactic complexity, cohesion, prompt relevance.
+
+Tier 2 is the main CPU/GPU-heavy stage in the essay scoring research pipeline:
+
+- CPU: spaCy parsing for dependency features and sentence segmentation
+- GPU: DeBERTa embeddings for essay/prompt/sentence/paragraph similarity features
+
+In the Hemma offload server, Tier 2 parsing artifacts (Docs + paragraphs) are
+reused by Tier 3 to avoid duplicate spaCy parsing work.
+"""
 
 from __future__ import annotations
 
@@ -10,6 +19,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 import spacy
 from spacy.language import Language
+from spacy.tokens import Doc
 
 from scripts.ml_training.essay_scoring.features.protocols import EmbeddingExtractorProtocol
 from scripts.ml_training.essay_scoring.features.schema import Tier2Features
@@ -46,12 +56,23 @@ CONNECTIVES = {
 logger = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True)
+class Tier2BatchResult:
+    """Tier 2 batch output plus parse artifacts useful for downstream stages."""
+
+    features: list[Tier2Features]
+    docs: list[Doc]
+    paragraphs_by_index: list[list[str]]
+
+
 @dataclass
 class Tier2FeatureExtractor:
     """Extract Tier 2 features using spaCy and sentence embeddings."""
 
     spacy_model: str = "en_core_web_sm"
     nlp: Language | None = None
+    spacy_n_process: int = 1
+    spacy_pipe_batch_size: int = 32
     embedding_extractor: EmbeddingExtractorProtocol | None = None
     sentence_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     local_embedder: "SentenceTransformer | None" = None
@@ -77,8 +98,19 @@ class Tier2FeatureExtractor:
         executed via that extractor (e.g. Hemma offload) to avoid local torch instability.
         """
 
+        return self.extract_batch_with_artifacts(texts, prompts).features
+
+    def extract_batch_with_artifacts(
+        self, texts: list[str], prompts: list[str]
+    ) -> Tier2BatchResult:
+        """Extract Tier 2 features and return parse artifacts for reuse.
+
+        `docs` and `paragraphs_by_index` enable Tier 3 extraction without re-parsing
+        texts, which is important for throughput on Hemma.
+        """
+
         if not texts:
-            return []
+            return Tier2BatchResult(features=[], docs=[], paragraphs_by_index=[])
         if len(texts) != len(prompts):
             raise ValueError(
                 "Tier2 extract_batch requires texts and prompts to have the same length "
@@ -93,11 +125,26 @@ class Tier2FeatureExtractor:
         syntactic_rows: list[dict[str, float]] = []
         sentence_texts_by_index: list[list[str]] = []
         paragraphs_by_index: list[list[str]] = []
+        docs: list[Doc] = []
 
         logger.info("Tier2 stage1 parse start (n=%d)", len(texts))
+        if self.spacy_n_process < 1:
+            raise ValueError(f"spacy_n_process must be >= 1, got {self.spacy_n_process}")
+        if self.spacy_pipe_batch_size < 1:
+            raise ValueError(
+                f"spacy_pipe_batch_size must be >= 1, got {self.spacy_pipe_batch_size}"
+            )
         for index, (text, prompt, doc) in enumerate(
-            zip(texts, prompts, self.nlp.pipe(texts), strict=True)
+            zip(
+                texts,
+                prompts,
+                self.nlp.pipe(
+                    texts, n_process=self.spacy_n_process, batch_size=self.spacy_pipe_batch_size
+                ),
+                strict=True,
+            )
         ):
+            docs.append(doc)
             sentences = list(doc.sents)
             sentence_texts = [sent.text.strip() for sent in sentences if sent.text.strip()]
             sentence_texts_by_index.append(sentence_texts)
@@ -208,7 +255,11 @@ class Tier2FeatureExtractor:
             if (index + 1) % 100 == 0 or index == len(texts) - 1:
                 logger.info("Tier2 progress %d/%d", index + 1, len(texts))
 
-        return features
+        return Tier2BatchResult(
+            features=features,
+            docs=docs,
+            paragraphs_by_index=paragraphs_by_index,
+        )
 
     def extract(self, text: str, prompt: str) -> Tier2Features:
         """Extract Tier 2 features from essay text and prompt."""

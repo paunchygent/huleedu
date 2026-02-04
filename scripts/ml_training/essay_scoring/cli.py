@@ -64,6 +64,15 @@ def run_command(
         None,
         help="Combined offload service base URL (Hemma tunnel), e.g. http://127.0.0.1:19000.",
     ),
+    offload_request_timeout_s: float | None = typer.Option(
+        None,
+        help=(
+            "Offload request timeout in seconds (applies to Hemma /v1/extract calls). "
+            "If omitted, uses the config default (typically 60s)."
+        ),
+        min=1.0,
+        max=600.0,
+    ),
     embedding_service_url: str | None = typer.Option(
         None,
         help="Optional Hemma embedding offload base URL (e.g. http://127.0.0.1:19000).",
@@ -97,6 +106,7 @@ def run_command(
         run_name=run_name,
         backend=backend,
         offload_service_url=offload_service_url,
+        offload_request_timeout_s=offload_request_timeout_s,
         embedding_service_url=embedding_service_url,
         language_tool_service_url=language_tool_service_url,
     )
@@ -148,6 +158,15 @@ def featurize_command(
         None,
         help="Combined offload service base URL (Hemma tunnel), e.g. http://127.0.0.1:19000.",
     ),
+    offload_request_timeout_s: float | None = typer.Option(
+        None,
+        help=(
+            "Offload request timeout in seconds (applies to Hemma /v1/extract calls). "
+            "If omitted, uses the config default (typically 60s)."
+        ),
+        min=1.0,
+        max=600.0,
+    ),
     embedding_service_url: str | None = typer.Option(
         None,
         help="Optional Hemma embedding offload base URL (e.g. http://127.0.0.1:19000).",
@@ -169,6 +188,7 @@ def featurize_command(
         run_name=run_name,
         backend=backend,
         offload_service_url=offload_service_url,
+        offload_request_timeout_s=offload_request_timeout_s,
         embedding_service_url=embedding_service_url,
         language_tool_service_url=language_tool_service_url,
     )
@@ -206,6 +226,15 @@ def ablation_command(
         None,
         help="Combined offload service base URL (Hemma tunnel), e.g. http://127.0.0.1:19000.",
     ),
+    offload_request_timeout_s: float | None = typer.Option(
+        None,
+        help=(
+            "Offload request timeout in seconds (applies to Hemma /v1/extract calls). "
+            "If omitted, uses the config default (typically 60s)."
+        ),
+        min=1.0,
+        max=600.0,
+    ),
     embedding_service_url: str | None = typer.Option(
         None,
         help="Optional Hemma embedding offload base URL (e.g. http://127.0.0.1:19000).",
@@ -227,6 +256,7 @@ def ablation_command(
         run_name=None,
         backend=backend,
         offload_service_url=offload_service_url,
+        offload_request_timeout_s=offload_request_timeout_s,
         embedding_service_url=embedding_service_url,
         language_tool_service_url=language_tool_service_url,
     )
@@ -281,6 +311,7 @@ def prepare_dataset_command(
         run_name=run_name,
         backend=OffloadBackend.LOCAL,
         offload_service_url=None,
+        offload_request_timeout_s=None,
         embedding_service_url=None,
         language_tool_service_url=None,
     )
@@ -341,6 +372,7 @@ def make_splits_command(
         run_name=run_name,
         backend=OffloadBackend.LOCAL,
         offload_service_url=None,
+        offload_request_timeout_s=None,
         embedding_service_url=None,
         language_tool_service_url=None,
     )
@@ -394,6 +426,15 @@ def cv_command(
         None,
         help="Combined offload service base URL (Hemma tunnel), e.g. http://127.0.0.1:19000.",
     ),
+    offload_request_timeout_s: float | None = typer.Option(
+        None,
+        help=(
+            "Offload request timeout in seconds (applies to Hemma /v1/extract calls). "
+            "If omitted, uses the config default (typically 60s)."
+        ),
+        min=1.0,
+        max=600.0,
+    ),
     embedding_service_url: str | None = typer.Option(
         None,
         help="Optional Hemma embedding offload base URL (e.g. http://127.0.0.1:19000).",
@@ -429,6 +470,7 @@ def cv_command(
         run_name=run_name,
         backend=backend,
         offload_service_url=offload_service_url,
+        offload_request_timeout_s=offload_request_timeout_s,
         embedding_service_url=embedding_service_url,
         language_tool_service_url=language_tool_service_url,
     )
@@ -491,6 +533,15 @@ def drop_column_command(
         None,
         help="Combined offload service base URL (Hemma tunnel), e.g. http://127.0.0.1:19000.",
     ),
+    offload_request_timeout_s: float | None = typer.Option(
+        None,
+        help=(
+            "Offload request timeout in seconds (applies to Hemma /v1/extract calls). "
+            "If omitted, uses the config default (typically 60s)."
+        ),
+        min=1.0,
+        max=600.0,
+    ),
     embedding_service_url: str | None = typer.Option(
         None,
         help="Optional Hemma embedding offload base URL (e.g. http://127.0.0.1:19000).",
@@ -526,6 +577,7 @@ def drop_column_command(
         run_name=run_name,
         backend=backend,
         offload_service_url=offload_service_url,
+        offload_request_timeout_s=offload_request_timeout_s,
         embedding_service_url=embedding_service_url,
         language_tool_service_url=language_tool_service_url,
     )
@@ -560,6 +612,7 @@ def _apply_overrides(
     run_name: str | None,
     backend: OffloadBackend,
     offload_service_url: str | None,
+    offload_request_timeout_s: float | None,
     embedding_service_url: str | None,
     language_tool_service_url: str | None,
 ) -> ExperimentConfig:
@@ -581,9 +634,15 @@ def _apply_overrides(
             "Use --offload-service-url only (single-tunnel mode)."
         )
 
+    if offload_request_timeout_s is not None:
+        request_timeout_s = offload_request_timeout_s
+    else:
+        request_timeout_s = config.offload.request_timeout_s
+
     updated_offload = config.offload.model_copy(
         update={
             "backend": backend,
+            "request_timeout_s": request_timeout_s,
             "offload_service_url": offload_service_url or config.offload.offload_service_url,
             "embedding_service_url": (embedding_service_url or config.offload.embedding_service_url)
             if backend != OffloadBackend.HEMMA

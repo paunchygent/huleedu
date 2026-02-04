@@ -1,4 +1,14 @@
-"""Tier 1 feature extraction: error density, readability, and core length."""
+"""Tier 1 feature extraction: LanguageTool error rates + readability + length.
+
+Tier 1 is responsible for:
+- Calling LanguageTool (local library or remote service) and aggregating issue counts.
+- Normalizing issue counts into error rates per 100 words.
+- Computing readability metrics via TextDescriptives (spaCy extension).
+
+Outputs are serialized into `Tier1Features` (see
+`scripts/ml_training/essay_scoring/features/schema.py`)
+and are later combined with Tier 2/Tier 3 + embeddings by `FeaturePipeline`.
+"""
 
 from __future__ import annotations
 
@@ -10,8 +20,10 @@ import time
 import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from threading import Semaphore
 from typing import Any
 
 from spacy.language import Language
@@ -34,6 +46,18 @@ logger = logging.getLogger(__name__)
 _CACHE_SCHEMA_VERSION = 1
 
 
+@contextmanager
+def _maybe_acquire(semaphore: Semaphore | None) -> Any:
+    if semaphore is None:
+        yield
+        return
+    semaphore.acquire()
+    try:
+        yield
+    finally:
+        semaphore.release()
+
+
 @dataclass
 class Tier1FeatureExtractor:
     """Extract Tier 1 features using LanguageTool and TextDescriptives."""
@@ -45,6 +69,7 @@ class Tier1FeatureExtractor:
     request_timeout_s: float = 60.0
     language_tool_cache_dir: Path | None = None
     language_tool_max_concurrency: int = 10
+    language_tool_semaphore: Semaphore | None = None
     language_tool_request_options: dict[str, Any] | None = None
     metrics: OffloadMetricsCollector | None = None
 
@@ -203,9 +228,9 @@ class Tier1FeatureExtractor:
     ) -> Tier1Features:
         word_count = stats["word_count"]
         return Tier1Features(
-            grammar_density=density_per_100_words(grammar_count, word_count),
-            spelling_density=density_per_100_words(spelling_count, word_count),
-            punctuation_density=density_per_100_words(punctuation_count, word_count),
+            grammar_errors_per_100_words=density_per_100_words(grammar_count, word_count),
+            spelling_errors_per_100_words=density_per_100_words(spelling_count, word_count),
+            punctuation_errors_per_100_words=density_per_100_words(punctuation_count, word_count),
             flesch_kincaid=stats["flesch_kincaid"],
             smog=stats["smog"],
             coleman_liau=stats["coleman_liau"],
@@ -341,9 +366,10 @@ class Tier1FeatureExtractor:
 
         start = time.monotonic()
         try:
-            with urllib.request.urlopen(request, timeout=self.request_timeout_s) as resp:
-                status = getattr(resp, "status", 200)
-                body = resp.read()
+            with _maybe_acquire(self.language_tool_semaphore):
+                with urllib.request.urlopen(request, timeout=self.request_timeout_s) as resp:
+                    status = getattr(resp, "status", 200)
+                    body = resp.read()
         except urllib.error.HTTPError as exc:
             elapsed = time.monotonic() - start
             if self.metrics is not None:

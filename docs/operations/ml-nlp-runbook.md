@@ -14,6 +14,9 @@ Canonical reference for **whitebox essay scoring research** runs:
 - Hemma offload prerequisites
 - experiment logging conventions (reproducible, leak-safe)
 
+Start here for the full navigation chain (runbook → epic → story hubs → tasks → artifacts):
+- `docs/reference/ref-essay-scoring-research-hub.md`
+
 ## Canonical dataset policy
 
 ### Canonical (current)
@@ -23,6 +26,19 @@ Canonical reference for **whitebox essay scoring research** runs:
   - word window: **200–1000 words** (inclusive)
   - drop **letter-dominated prompts** (prompt-level exclusions; do not “detect letters” per essay)
     - configured by `ExperimentConfig.ellipse_excluded_prompts` in `scripts/ml_training/essay_scoring/config.py`
+
+### Construct scope (do not ignore)
+
+This research targets **L2 English discourse essay writing ability** (argumentative/discussion
+essays). Do not mix in other communication genres (letters, narratives, creative writing, etc.)
+unless you can explicitly filter/tag them and justify the scope change.
+
+For ELLIPSE we approximate this scope via:
+- prompt-level exclusions for letter-dominated prompts
+- the 200–1000 word window
+
+When the Swedish essay database becomes available, prompt-specific evaluation and explicit genre
+scope enforcement should become first-class (dataset-driven, not “best guess”).
 
 ### Blocked (do not use for claims)
 
@@ -43,6 +59,23 @@ If using Hemma offload (recommended on macOS to avoid local torch/transformers c
 ~/bin/hemma-huleedu-tunnel status
 curl -fsS http://127.0.0.1:18085/healthz
 curl -fsS http://127.0.0.1:19000/healthz
+```
+
+Long runs: run from a real terminal session (not inside an agent tool runner).
+
+If you need “detached” execution on macOS, prefer `screen` so the process survives terminal/tool
+session teardown:
+```bash
+RUN_NAME=ellipse_full_hemma_$(date +%Y%m%d_%H%M%S)
+LOG=output/essay_scoring/${RUN_NAME}.driver.log
+mkdir -p output/essay_scoring
+/usr/bin/screen -S "essay_scoring_${RUN_NAME}" -dm /bin/bash -lc \
+  "cd \"$(pwd)\" && set -a && source .env && set +a && PYTHONUNBUFFERED=1 \
+   pdm run essay-scoring-research run --dataset-kind ellipse --feature-set combined \
+     --backend hemma --offload-service-url http://127.0.0.1:19000 \
+     --skip-shap --skip-grade-scale-report --run-name \"${RUN_NAME}\" 2>&1 \
+   | tee -a \"${LOG}\""
+tail -f "$LOG"
 ```
 
 Persistent tunnel setup lives in:
@@ -144,6 +177,11 @@ Each run directory contains:
 - `stderr.log` (captured stderr for the run; includes Python tracebacks and tool warnings)
 - `fault.log` (faulthandler output: segfault traces + periodic hang stack dumps)
 
+Important:
+- `fault.log` is not “a crash file” by default: the research runner enables periodic
+  stack dumps (every 10 minutes). Lines like `Timeout (0:10:00)!` can be normal when
+  a stage is slow (it is a thread snapshot, not a failure).
+
 Tier logging notes:
 - Tier 1 logs per-item progress and whether it is running with local vs tunneled LanguageTool.
 - Tier 2 logs:
@@ -180,8 +218,11 @@ Each run that performs feature extraction writes:
 
 This file is the canonical source for throughput + stability tuning:
 - `benchmarks[].essays_per_second` (headline metric)
-- per-service request latency: `offload.embedding.requests.latency_s` and
-  `offload.language_tool.requests.latency_s` (p50/p95/p99)
+- per-service request latency:
+  - For Hemma `--backend hemma` runs (single-tunnel `/v1/extract`), use
+    `offload.extract.requests.latency_s` (p50/p95/p99).
+  - `offload.embedding.requests.*` and `offload.language_tool.requests.*` may be zero in this
+    mode because the client is not calling the legacy `/v1/embed` or LanguageTool directly.
 - cache effectiveness: `offload.*.cache.hit_rate`
 - error budgets: `requests_timeout`, `requests_http_error`, `requests_connection_error`
 
@@ -217,3 +258,35 @@ YYYY-MM-DD: <run-name>
   - QWK (CV mean±std):
   - notes:
 ```
+
+### Example (completed run, Hemma backend, ELLIPSE full)
+
+2026-02-04: `ellipse_full_hemma_20260204_071238`
+- output: `output/essay_scoring/20260204_061242_ellipse_full_hemma_20260204_071238/`
+- QWK:
+  - train: 0.99295
+  - val: 0.64241
+  - test: 0.65552
+- feature extraction throughput (from `artifacts/offload_metrics.json`):
+  - total: 4.04 essays/s (6168 essays in 1525.40s)
+- offload extract latency (97 requests, no timeouts):
+  - mean: 31.19s, p95: 34.05s, p99: 45.66s
+
+2026-02-04: `ellipse_prep_200_1000`
+- command: `pdm run essay-scoring-research prepare-dataset --dataset-kind ellipse --min-words 200 --max-words 1000 --run-name ellipse_prep_200_1000`
+- dataset: ELLIPSE (train/test), 200–1000 words, excluded prompts: (see `ExperimentConfig.ellipse_excluded_prompts`)
+- output: `output/essay_scoring/20260204_135541_ellipse_prep_200_1000/`
+- results:
+  - notes:
+    - Train CSV: `output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_train_prepared.csv`
+    - Test CSV: `output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_test_prepared.csv`
+    - Integrity report: `output/essay_scoring/20260204_135541_ellipse_prep_200_1000/reports/dataset_integrity_report.md`
+
+2026-02-04: `ellipse_splits_200_1000`
+- command: `pdm run essay-scoring-research make-splits --dataset-kind ellipse --ellipse-train-path output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_train_prepared.csv --ellipse-test-path output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_test_prepared.csv --min-words 200 --max-words 1000 --n-splits 5 --run-name ellipse_splits_200_1000`
+- dataset: ELLIPSE (train/test), 200–1000 words, excluded prompts: (see `ExperimentConfig.ellipse_excluded_prompts`)
+- splits: `output/essay_scoring/20260204_135554_ellipse_splits_200_1000/artifacts/splits.json` (scheme=stratified_text|prompt_holdout)
+- output: `output/essay_scoring/20260204_135554_ellipse_splits_200_1000/`
+- results:
+  - notes:
+    - Splits report: `output/essay_scoring/20260204_135554_ellipse_splits_200_1000/reports/splits_report.md`

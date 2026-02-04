@@ -1,11 +1,11 @@
 # TASKS Index
 
-Generated: 2026-02-04T03:57:07
+Generated: 2026-02-04T14:56:53
 
 ## Summary
 
-- Total tasks indexed: 157
-- assessment: 73
+- Total tasks indexed: 171
+- assessment: 87
 - content: 2
 - identity: 4
 - frontend: 2
@@ -17,8 +17,9 @@ Generated: 2026-02-04T03:57:07
 
 ## By Domain
 
-### assessment (73)
+### assessment (87)
 - [Clean up unused code paths in comparison_processing.py](TASKS/assessment/us-00xy-cleanup-unused-comparison-processing-code-paths.md) — `in_progress`
+- [improve essay-scoring prediction power (ELLIPSE, CV-first)](TASKS/assessment/improve-essay-scoring-prediction-power-ellipse-cv-first.md) — `in_review`
 - [Remove COMPARISONS_PER_STABILITY_CHECK_ITERATION setting from CJ service](TASKS/assessment/us-00xx-remove-comparisons-per-stability-iteration-setting.md) — `in_progress`
 - [US-00XZ BatchFinalizer dual-event semantics and BT edge-case test isolation](TASKS/assessment/us-00xz-batchfinalizer-dual-event-semantics-and-bt-edge-case-test-isolation.md) — `in_progress`
 - [US-00YA Workflow continuation refactor – Phase 6](TASKS/assessment/us-00ya-workflow-continuation-refactor--phase-6.md) — `in_progress`
@@ -54,7 +55,19 @@ Generated: 2026-02-04T03:57:07
 - [Entitlements Service — Final Implementation Reference](TASKS/assessment/entitlement-service-implementation-plan.md) — `proposed`
 - [Entitlements Service — Test Coverage Plan (Final)](TASKS/assessment/entitlements-service-test-coverage-plan.md) — `proposed`
 - [Essay scoring research: warm-cache feature store + 1.0-9.0 scale alignment](TASKS/assessment/essay-scoring-research-warm-cache-feature-store--10-90-scale-alignment.md) — `done`
+- [Essay scoring: sensible progress logs for feature extraction](TASKS/assessment/essay-scoring-sensible-progress-logs-for-feature-extraction.md) — `in_progress`
 - [Essay-scoring runner: mark status.json failed on SIGINT/SIGTERM](TASKS/assessment/essay-scoring-runner-mark-statusjson-failed-on-sigint-sigterm.md) — `proposed`
+- [essay-scoring shap default full test set](TASKS/assessment/essay-scoring-shap-default-full-test-set.md) — `done`
+- [essay-scoring tier1 error rates per 100 words naming](TASKS/assessment/essay-scoring-tier1-error-rates-per-100-words-naming.md) — `done`
+- [essay-scoring: ablation (handcrafted vs embeddings vs combined) on ELLIPSE](TASKS/assessment/essay-scoring-ablation-handcrafted-vs-embeddings-vs-combined-on-ellipse.md) — `proposed`
+- [essay-scoring: construct validity audit + feature candidates](TASKS/assessment/essay-scoring-construct-validity-audit--feature-candidates.md) — `proposed`
+- [essay-scoring: CV baseline (stratified_text + prompt_holdout) on ELLIPSE](TASKS/assessment/essay-scoring-cv-baseline-stratified-text--prompt-holdout-on-ellipse.md) — `proposed`
+- [essay-scoring: CV ensembling (ELLIPSE CV-first)](TASKS/assessment/essay-scoring-cv-ensembling-ellipse-cv-first.md) — `proposed`
+- [essay-scoring: drop-column importance for handcrafted features (CV)](TASKS/assessment/essay-scoring-drop-column-importance-for-handcrafted-features-cv.md) — `proposed`
+- [essay-scoring: ordinal/custom objective experiments (QWK)](TASKS/assessment/essay-scoring-ordinal-custom-objective-experiments-qwk.md) — `proposed`
+- [essay-scoring: prepare ELLIPSE dataset + CV splits (200–1000 words)](TASKS/assessment/essay-scoring-prepare-ellipse-dataset--cv-splits-2001000-words.md) — `proposed`
+- [essay-scoring: residual diagnostics by prompt and grade band](TASKS/assessment/essay-scoring-residual-diagnostics-by-prompt-and-grade-band.md) — `proposed`
+- [essay-scoring: XGBoost hyperparameter sweep (CV-selected)](TASKS/assessment/essay-scoring-xgboost-hyperparameter-sweep-cv-selected.md) — `proposed`
 - [Event Publishing Infrastructure Improvements](TASKS/assessment/event-publishing-improvements.md) — `proposed`
 - [Event Schema Governance & CI Gate (Weeks 6–8)](TASKS/assessment/event-schema-governance-and-ci-plan.md) — `proposed`
 - [Existing](TASKS/assessment/task-054-suggested-improvements-to-bayesian-model.md) — `proposed`
@@ -69,6 +82,7 @@ Generated: 2026-02-04T03:57:07
 - [NLP LangTool whitebox essay scoring PR](TASKS/assessment/nlp_lang_tool/nlp-lang-tool-whitebox-essay-scoring-pr.md) — `proposed`
 - [NLP LangTool whitebox research build](TASKS/assessment/nlp_lang_tool/nlp-lang-tool-whitebox-research-build.md) — `in_progress`
 - [Offload DeBERTa + spaCy features to Hemma (binary embedding service)](TASKS/assessment/offload-deberta--spacy-features-to-hemma-binary-embedding-service.md) — `in_progress`
+- [optimize hemma offload throughput](TASKS/assessment/optimize-hemma-offload-throughput.md) — `in_progress`
 - [PR-7 Phase-2 Resampling and Convergence Harness](TASKS/assessment/pr-7-phase-2-resampling-and-convergence-harness.md) — `in_progress`
 - [Propagate assignment_id from BOS to CJ request (Phase A)](TASKS/assessment/propagate-assignment-id-from-bos-to-cj-request-phase-a.md) — `done`
 - [Propagate assignment_id from CJ to RAS storage (Phase B)](TASKS/assessment/propagate-assignment-id-from-cj-to-ras-storage-phase-b.md) — `done`
@@ -230,7 +244,7 @@ Generated: 2026-02-04T03:57:07
 - [Frontend Live Data Integration](TASKS/programs/teacher_dashboard_integration/frontend-live-data-integration.md) — `programs`
 - [WebSocket Batch Updates](TASKS/programs/teacher_dashboard_integration/websocket-batch-updates.md) — `programs`
 
-### done (31)
+### done (33)
 - [Add Database Metrics Instrumentation to Remaining Services](TASKS/infrastructure/add-database-metrics-instrumentation-to-remaining-services.md) — `infrastructure`
 - [Align TASKS and docs lifecycle v2](TASKS/architecture/align-tasks-and-docs-lifecycle-v2.md) — `architecture`
 - [API Gateway batch listing endpoint tests](TASKS/identity/api-gateway-batch-listing-endpoint-tests.md) — `identity`
@@ -245,6 +259,8 @@ Generated: 2026-02-04T03:57:07
 - [CMS Batch Class Info Internal Endpoint](TASKS/programs/teacher_dashboard_integration/cms-batch-class-info-internal-endpoint.md) — `programs`
 - [ENG5 Provider Batch API Harness Coverage](TASKS/integrations/eng5-provider-batch-api-harness-coverage.md) — `integrations`
 - [Essay scoring research: warm-cache feature store + 1.0-9.0 scale alignment](TASKS/assessment/essay-scoring-research-warm-cache-feature-store--10-90-scale-alignment.md) — `assessment`
+- [essay-scoring shap default full test set](TASKS/assessment/essay-scoring-shap-default-full-test-set.md) — `assessment`
+- [essay-scoring tier1 error rates per 100 words naming](TASKS/assessment/essay-scoring-tier1-error-rates-per-100-words-naming.md) — `assessment`
 - [Filename propagation from ELS to RAS for teacher result visibility](TASKS/assessment/filename-propagation-from-els-to-ras-for-teacher-result-visibility.md) — `assessment`
 - [Fix Anchor Essay Infrastructure](TASKS/assessment/fix-anchor-essay-infrastructure.md) — `assessment`
 - [Fix Cj Anchor Finalization Monitoring](TASKS/assessment/fix-cj-anchor-finalization-monitoring.md) — `assessment`
@@ -263,7 +279,7 @@ Generated: 2026-02-04T03:57:07
 - [US-007.2 Schema Consolidation](TASKS/infrastructure/us-0072-schema-consolidation.md) — `infrastructure`
 - [US-007.3 Creation Scripts](TASKS/infrastructure/us-0073-creation-scripts.md) — `infrastructure`
 
-### in_progress (34)
+### in_progress (36)
 - [Anchor Alignment Prompt Tuning Experiment](TASKS/assessment/anchor-alignment-prompt-tuning-experiment.md) — `assessment`
 - [BT SE batch quality indicators](TASKS/assessment/bt-se-batch-quality-indicators.md) — `assessment`
 - [BT SE Zero Anomaly and Anchor Inversions Investigation](TASKS/assessment/bt-se-zero-anomaly-and-anchor-inversions-investigation.md) — `assessment`
@@ -277,6 +293,7 @@ Generated: 2026-02-04T03:57:07
 - [Clean up unused code paths in comparison_processing.py](TASKS/assessment/us-00xy-cleanup-unused-comparison-processing-code-paths.md) — `assessment`
 - [ENG5 reasoning controls & CJ plumbing](TASKS/assessment/eng5-reasoning-controls--cj-plumbing.md) — `assessment`
 - [Eng5 Runner Assumption Hardening](TASKS/programs/eng5/eng5-runner-assumption-hardening.md) — `programs`
+- [Essay scoring: sensible progress logs for feature extraction](TASKS/assessment/essay-scoring-sensible-progress-logs-for-feature-extraction.md) — `assessment`
 - [fix ci docker compose v2 in scripts](TASKS/infrastructure/fix-ci-docker-compose-v2-in-scripts.md) — `infrastructure`
 - [Fix Els Transaction Boundary Violations](TASKS/infrastructure/fix-els-transaction-boundary-violations.md) — `infrastructure`
 - [Hemma operations runbooks (HuleEdu + GPU)](TASKS/infrastructure/hemma-operations-runbooks-huleedu--gpu.md) — `infrastructure`
@@ -288,6 +305,7 @@ Generated: 2026-02-04T03:57:07
 - [Lps Rate Limiting Implementation](TASKS/infrastructure/lps-rate-limiting-implementation.md) — `infrastructure`
 - [NLP LangTool whitebox research build](TASKS/assessment/nlp_lang_tool/nlp-lang-tool-whitebox-research-build.md) — `assessment`
 - [Offload DeBERTa + spaCy features to Hemma (binary embedding service)](TASKS/assessment/offload-deberta--spacy-features-to-hemma-binary-embedding-service.md) — `assessment`
+- [optimize hemma offload throughput](TASKS/assessment/optimize-hemma-offload-throughput.md) — `assessment`
 - [PDM pyproject.toml Migration to PEP 735](TASKS/infrastructure/pdm-pyproject-toml-migration-to-pep-735.md) — `infrastructure`
 - [Persist text_storage_id on file uploads and enable mock LLM for functional CJ](TASKS/infrastructure/persist-text-storage-id-on-file-uploads-and-enable-mock-llm-for-functional-cj.md) — `infrastructure`
 - [PR-7 Phase-2 Resampling and Convergence Harness](TASKS/assessment/pr-7-phase-2-resampling-and-convergence-harness.md) — `assessment`
@@ -299,11 +317,14 @@ Generated: 2026-02-04T03:57:07
 - [US-00YA Workflow continuation refactor – Phase 6](TASKS/assessment/us-00ya-workflow-continuation-refactor--phase-6.md) — `assessment`
 - [Vue 3 Teacher Dashboard Integration](TASKS/frontend/vue-3-teacher-dashboard-integration.md) — `frontend`
 
+### in_review (1)
+- [improve essay-scoring prediction power (ELLIPSE, CV-first)](TASKS/assessment/improve-essay-scoring-prediction-power-ellipse-cv-first.md) — `assessment`
+
 ### paused (2)
 - [CJ Prompt Cache Benchmark & Warm-Up Validation](TASKS/assessment/cj-prompt-cache-benchmark.md) — `assessment`
 - [Refactor CJ Assessment Service for Compliance](TASKS/assessment/refactor-cj-assessment-service-for-compliance.md) — `assessment`
 
-### proposed (60)
+### proposed (69)
 - [90-Day Execution Roadmap (Alpha ➜ Beta)](TASKS/architecture/roadmap-90-day-execution.md) — `architecture`
 - [AI Feedback Service Implementation Task](TASKS/assessment/ai-feedback-service-implementation.md) — `assessment`
 - [API Productization & Docs (Weeks 8–10)](TASKS/assessment/api-productization-and-docs-plan.md) — `assessment`
@@ -327,6 +348,15 @@ Generated: 2026-02-04T03:57:07
 - [Entitlements Service — Final Implementation Reference](TASKS/assessment/entitlement-service-implementation-plan.md) — `assessment`
 - [Entitlements Service — Test Coverage Plan (Final)](TASKS/assessment/entitlements-service-test-coverage-plan.md) — `assessment`
 - [Essay-scoring runner: mark status.json failed on SIGINT/SIGTERM](TASKS/assessment/essay-scoring-runner-mark-statusjson-failed-on-sigint-sigterm.md) — `assessment`
+- [essay-scoring: ablation (handcrafted vs embeddings vs combined) on ELLIPSE](TASKS/assessment/essay-scoring-ablation-handcrafted-vs-embeddings-vs-combined-on-ellipse.md) — `assessment`
+- [essay-scoring: construct validity audit + feature candidates](TASKS/assessment/essay-scoring-construct-validity-audit--feature-candidates.md) — `assessment`
+- [essay-scoring: CV baseline (stratified_text + prompt_holdout) on ELLIPSE](TASKS/assessment/essay-scoring-cv-baseline-stratified-text--prompt-holdout-on-ellipse.md) — `assessment`
+- [essay-scoring: CV ensembling (ELLIPSE CV-first)](TASKS/assessment/essay-scoring-cv-ensembling-ellipse-cv-first.md) — `assessment`
+- [essay-scoring: drop-column importance for handcrafted features (CV)](TASKS/assessment/essay-scoring-drop-column-importance-for-handcrafted-features-cv.md) — `assessment`
+- [essay-scoring: ordinal/custom objective experiments (QWK)](TASKS/assessment/essay-scoring-ordinal-custom-objective-experiments-qwk.md) — `assessment`
+- [essay-scoring: prepare ELLIPSE dataset + CV splits (200–1000 words)](TASKS/assessment/essay-scoring-prepare-ellipse-dataset--cv-splits-2001000-words.md) — `assessment`
+- [essay-scoring: residual diagnostics by prompt and grade band](TASKS/assessment/essay-scoring-residual-diagnostics-by-prompt-and-grade-band.md) — `assessment`
+- [essay-scoring: XGBoost hyperparameter sweep (CV-selected)](TASKS/assessment/essay-scoring-xgboost-hyperparameter-sweep-cv-selected.md) — `assessment`
 - [Event Publishing Infrastructure Improvements](TASKS/assessment/event-publishing-improvements.md) — `assessment`
 - [Event Schema Governance & CI Gate (Weeks 6–8)](TASKS/assessment/event-schema-governance-and-ci-plan.md) — `assessment`
 - [Existing](TASKS/assessment/task-054-suggested-improvements-to-bayesian-model.md) — `assessment`

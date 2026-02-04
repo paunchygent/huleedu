@@ -446,6 +446,13 @@ pdm run essay-scoring-research run \
   --run-name ellipse_smoke_combined_hemma
 ```
 
+Long runs:
+- Prefer running from a real terminal session (not inside an agent tool runner).
+- If you need “detached” execution on macOS, use `screen` so the process survives session teardown:
+  - Start: `/usr/bin/screen -S essay_scoring_run -dm /bin/bash -lc '<command>'`
+  - Attach: `/usr/bin/screen -r essay_scoring_run`
+  - Stop: `/usr/bin/screen -S essay_scoring_run -X quit`
+
 Canonical experiment workflow (datasets + CV + logging):
 - `docs/operations/ml-nlp-runbook.md`
 

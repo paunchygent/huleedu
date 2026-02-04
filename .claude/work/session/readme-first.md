@@ -79,6 +79,11 @@ Current workflow (one tunnel):
 - Combined offload service on Hemma: `http://127.0.0.1:19000` (tunnel to `127.0.0.1:9000` on Hemma)
 - Optional: LanguageTool direct tunnel (debug only): `http://127.0.0.1:18085` (tunnel to `127.0.0.1:8085`)
 
+Performance + stability reference:
+- Run-level throughput + latency metrics live in `output/essay_scoring/<RUN>/artifacts/offload_metrics.json`.
+- See `docs/operations/ml-nlp-runbook.md` for an example completed ELLIPSE Hemma backend run entry
+  with QWK + throughput.
+
 Implemented (2026-02-04):
 - Combined offload endpoint: `POST /v1/extract` in `scripts/ml_training/essay_scoring/offload/server.py`
 - Dockerfile: `scripts/ml_training/essay_scoring/offload/Dockerfile`

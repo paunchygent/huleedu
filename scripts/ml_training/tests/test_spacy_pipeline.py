@@ -21,7 +21,7 @@ def test_ensure_textdescriptives_readability_is_idempotent() -> None:
 
 
 def test_load_spacy_model_calls_spacy_load_and_optionally_enables_readability(monkeypatch) -> None:
-    def _fake_load(_name: str):  # noqa: ANN001
+    def _fake_load(_name: str, **_kwargs):  # noqa: ANN001
         return spacy.blank("en")
 
     monkeypatch.setattr(spacy_pipeline_module.spacy, "load", _fake_load)

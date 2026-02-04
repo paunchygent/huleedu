@@ -84,7 +84,7 @@ def test_drop_column_importance_runs_with_reused_cv_store(tmp_path) -> None:
     test_records = dataset.test_records
 
     feature_names = [
-        "grammar_density",
+        "grammar_errors_per_100_words",
         "word_count",
         "prompt_similarity",
     ]
@@ -125,4 +125,4 @@ def test_drop_column_importance_runs_with_reused_cv_store(tmp_path) -> None:
     payload = json.loads(summary.metrics_path.read_text(encoding="utf-8"))
     assert payload["feature_set"] == "handcrafted"
     features = [entry["feature"] for entry in payload.get("handcrafted_features", [])]
-    assert set(features) == {"grammar_density", "word_count", "prompt_similarity"}
+    assert set(features) == {"grammar_errors_per_100_words", "word_count", "prompt_similarity"}

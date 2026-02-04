@@ -19,7 +19,7 @@ from scripts.ml_training.essay_scoring.config import DatasetKind, ExperimentConf
 from scripts.ml_training.essay_scoring.environment import gather_git_sha, repo_root_from_package
 from scripts.ml_training.essay_scoring.features.combiner import FeatureMatrix
 
-_CV_STORE_SCHEMA_VERSION = 2
+_CV_STORE_SCHEMA_VERSION = 3
 
 
 class CVFeatureStoreManifest(BaseModel):

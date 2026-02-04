@@ -60,3 +60,9 @@ def test_sample_features_noop_when_small() -> None:
     features = np.zeros((3, 2), dtype=np.float32)
     sampled = shap_module._sample_features(features, max_samples=10)
     assert sampled is features
+
+
+def test_sample_features_noop_when_max_samples_none() -> None:
+    features = np.zeros((25, 3), dtype=np.float32)
+    sampled = shap_module._sample_features(features, max_samples=None)
+    assert sampled is features

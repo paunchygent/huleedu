@@ -306,6 +306,21 @@ curl -fsS http://127.0.0.1:18085/healthz
 curl -fsS http://127.0.0.1:19000/healthz
 ```
 
+### Long-running ML research runs (Mac)
+
+When running `pdm run essay-scoring-research ...` jobs that take 10–60+ minutes, avoid relying on
+background jobs started from an agent tool runner session (they may be terminated when the session
+ends).
+
+Preferred:
+- Run from a dedicated terminal tab started via `./scripts/dev-shell.sh` (loads `.env`).
+- For detached execution, use `/usr/bin/screen` (bundled on macOS):
+  - Start: `/usr/bin/screen -S essay_scoring_run -dm /bin/bash -lc '<command>'`
+  - Attach: `/usr/bin/screen -r essay_scoring_run`
+  - Stop: `/usr/bin/screen -S essay_scoring_run -X quit`
+- Interpret `fault.log` correctly: periodic “Timeout (0:10:00)!” entries are faulthandler thread
+  snapshots (not necessarily a crash).
+
 ### Persistent tunnels (recommended)
 
 Use `autossh` to keep tunnels alive (matches the approach used for Hemma GPU services

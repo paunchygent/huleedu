@@ -1,4 +1,14 @@
-"""Pydantic feature schemas for the essay scoring pipeline."""
+"""Pydantic feature schemas for the essay scoring pipeline.
+
+This module defines the canonical ordering and naming of features used by:
+- `scripts/ml_training/essay_scoring/features/combiner.py` (feature matrices + names)
+- `scripts/ml_training/essay_scoring/feature_store.py` (persisted feature stores)
+- `scripts/ml_training/essay_scoring/runner.py` (training artifacts + feature_schema.json)
+
+Naming conventions:
+- Tier 1 LanguageTool-derived error rates are encoded with their units (per 100 words) to avoid
+  ambiguity during analysis.
+"""
 
 from __future__ import annotations
 
@@ -7,9 +17,9 @@ from pydantic import BaseModel, ConfigDict
 from scripts.ml_training.essay_scoring.config import FeatureSet
 
 TIER1_FEATURE_NAMES = [
-    "grammar_density",
-    "spelling_density",
-    "punctuation_density",
+    "grammar_errors_per_100_words",
+    "spelling_errors_per_100_words",
+    "punctuation_errors_per_100_words",
     "flesch_kincaid",
     "smog",
     "coleman_liau",
@@ -46,9 +56,9 @@ class Tier1Features(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    grammar_density: float
-    spelling_density: float
-    punctuation_density: float
+    grammar_errors_per_100_words: float
+    spelling_errors_per_100_words: float
+    punctuation_errors_per_100_words: float
     flesch_kincaid: float
     smog: float
     coleman_liau: float
@@ -62,9 +72,9 @@ class Tier1Features(BaseModel):
         """Return features as a list in canonical order."""
 
         return [
-            self.grammar_density,
-            self.spelling_density,
-            self.punctuation_density,
+            self.grammar_errors_per_100_words,
+            self.spelling_errors_per_100_words,
+            self.punctuation_errors_per_100_words,
             self.flesch_kincaid,
             self.smog,
             self.coleman_liau,

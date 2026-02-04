@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from concurrent.futures import ThreadPoolExecutor
+from threading import BoundedSemaphore, Lock
 
 from aiohttp import web
 
@@ -17,10 +18,12 @@ from scripts.ml_training.essay_scoring.offload.handlers_observability import (
     observability_middleware,
 )
 from scripts.ml_training.essay_scoring.offload.http_state import (
+    EMBED_LOCK_KEY,
     EMBEDDER_KEY,
     EXTRACT_EXECUTOR_KEY,
     GPU_PROBE_KEY,
     LABELS_KEY,
+    LANGUAGE_TOOL_SEMAPHORE_KEY,
     METRICS_KEY,
 )
 from scripts.ml_training.essay_scoring.offload.observability import (
@@ -42,7 +45,13 @@ def create_app(*, embedder: EmbeddingExtractorProtocol | None = None) -> web.App
     app.router.add_post("/v1/embed", embed)
 
     app[EMBEDDER_KEY] = embedder or build_embedder()
-    app[EXTRACT_EXECUTOR_KEY] = ThreadPoolExecutor(max_workers=1)
+    app[EXTRACT_EXECUTOR_KEY] = ThreadPoolExecutor(
+        max_workers=max(1, int(settings.OFFLOAD_HTTP_MAX_WORKERS))
+    )
+    app[EMBED_LOCK_KEY] = Lock()
+    app[LANGUAGE_TOOL_SEMAPHORE_KEY] = BoundedSemaphore(
+        value=max(1, int(settings.OFFLOAD_LANGUAGE_TOOL_MAX_CONCURRENCY))
+    )
     app[METRICS_KEY] = OffloadServerMetrics()
     app[GPU_PROBE_KEY] = GpuProbe()
     app[LABELS_KEY] = ServiceLabels.from_env(
@@ -57,8 +66,9 @@ def create_app(*, embedder: EmbeddingExtractorProtocol | None = None) -> web.App
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
     logger.info(
-        "Starting offload server host=%s port=%s",
+        "Starting offload server host=%s port=%s max_workers=%s",
         settings.OFFLOAD_HTTP_HOST,
         settings.OFFLOAD_HTTP_PORT,
+        settings.OFFLOAD_HTTP_MAX_WORKERS,
     )
     web.run_app(create_app(), host=settings.OFFLOAD_HTTP_HOST, port=settings.OFFLOAD_HTTP_PORT)

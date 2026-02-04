@@ -36,6 +36,17 @@ ssh hemma -L 19000:127.0.0.1:9000 -N
 curl -fsS http://127.0.0.1:19000/healthz
 ```
 
+## Long-running research runs (Mac)
+
+If a run “stops without errors” and Hemma containers are idle, the most common cause is the Mac-side
+client process being terminated by session teardown (closing the terminal tab, tool runner cleanup).
+
+Preferred:
+- Run from a dedicated terminal session started via `./scripts/dev-shell.sh`.
+- For detached runs on macOS, use `/usr/bin/screen`:
+  - Start: `/usr/bin/screen -S essay_scoring_run -dm /bin/bash -lc '<command>'`
+  - Attach: `/usr/bin/screen -r essay_scoring_run`
+
 ## Hemma: quick triage commands
 
 Docker install sanity (snap vs non-snap):
@@ -53,6 +64,24 @@ LanguageTool logs:
 ```bash
 ssh hemma 'sudo docker logs --tail=200 -f huleedu_language_tool_service'
 ```
+
+## Throughput + bottlenecks (Hemma offload)
+
+Canonical per-run client metrics:
+- `output/essay_scoring/<RUN>/artifacts/offload_metrics.json`
+  - headline: `benchmarks[].essays_per_second`
+  - Hemma backend mode (`/v1/extract`): focus on `offload.extract.requests.latency_s` + request counts
+
+Primary Hemma-side tuning knobs (no quality reduction):
+- LanguageTool service:
+  - `LANGUAGE_TOOL_SERVICE_LANGUAGE_TOOL_MAX_CONCURRENT_REQUESTS`
+  - `LANGUAGE_TOOL_SERVICE_LANGUAGE_TOOL_HEAP_SIZE`
+  - `WEB_CONCURRENCY` (Hypercorn workers; increases RAM)
+- Offload server:
+  - `OFFLOAD_HTTP_MAX_WORKERS`
+  - `OFFLOAD_LANGUAGE_TOOL_MAX_CONCURRENCY`
+  - `OFFLOAD_EMBEDDING_BATCH_SIZE`
+  - `OFFLOAD_SPACY_N_PROCESS`, `OFFLOAD_SPACY_PIPE_BATCH_SIZE`
 
 ## GPU verification (ROCm)
 

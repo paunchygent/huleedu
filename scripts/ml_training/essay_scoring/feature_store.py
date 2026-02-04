@@ -20,7 +20,7 @@ from scripts.ml_training.essay_scoring.environment import gather_git_sha, repo_r
 from scripts.ml_training.essay_scoring.features.combiner import FeatureMatrix
 from scripts.ml_training.essay_scoring.splitters import DatasetSplit
 
-_FEATURE_STORE_SCHEMA_VERSION = 4
+_FEATURE_STORE_SCHEMA_VERSION = 5
 
 
 class FeatureStoreManifest(BaseModel):

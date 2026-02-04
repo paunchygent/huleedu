@@ -13,6 +13,12 @@ class OffloadServerSettings(BaseSettings):
 
     OFFLOAD_HTTP_HOST: str = Field(default="0.0.0.0")
     OFFLOAD_HTTP_PORT: int = Field(default=9000, ge=1, le=65535)
+    OFFLOAD_HTTP_MAX_WORKERS: int = Field(
+        default=1,
+        ge=1,
+        le=64,
+        description="Max concurrent extract computations (ThreadPoolExecutor worker count).",
+    )
 
     OFFLOAD_EMBEDDING_MODEL_NAME: str = Field(default="microsoft/deberta-v3-base")
     OFFLOAD_EMBEDDING_MAX_LENGTH: int = Field(default=512, ge=8, le=4096)
@@ -20,6 +26,21 @@ class OffloadServerSettings(BaseSettings):
     OFFLOAD_TORCH_DEVICE: str | None = Field(
         default=None,
         description="Optional torch device override (e.g. 'cuda', 'cpu').",
+    )
+
+    OFFLOAD_SPACY_N_PROCESS: int = Field(
+        default=1,
+        ge=1,
+        le=32,
+        description=(
+            "spaCy n_process for nlp.pipe. Increase to utilize more CPU cores for parsing."
+        ),
+    )
+    OFFLOAD_SPACY_PIPE_BATCH_SIZE: int = Field(
+        default=32,
+        ge=1,
+        le=512,
+        description="spaCy pipe batch_size for parsing throughput tuning.",
     )
 
     OFFLOAD_LANGUAGE_TOOL_URL: str = Field(
