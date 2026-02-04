@@ -15,6 +15,7 @@ from scripts.cj_experiments_runners.eng5_np.inventory import (
     FileRecord,
     RunnerInventory,
 )
+from scripts.cj_experiments_runners.eng5_np.paths import RunnerPaths
 from scripts.cj_experiments_runners.eng5_np.protocols import ModeHandlerProtocol
 from scripts.cj_experiments_runners.eng5_np.settings import (
     RunnerMode,
@@ -81,6 +82,21 @@ def _make_inventory(tmp_path: Path) -> RunnerInventory:
         anchors_xlsx=anchors_xlsx,
         anchor_docs=anchor_docs,
         student_docs=student_docs,
+    )
+
+
+def _make_paths(tmp_path: Path) -> RunnerPaths:
+    return RunnerPaths(
+        repo_root=tmp_path,
+        role_models_root=tmp_path,
+        instructions_path=tmp_path / "instructions.md",
+        prompt_path=tmp_path / "prompt.md",
+        anchors_csv=tmp_path / "anchors.csv",
+        anchors_xlsx=tmp_path / "anchors.xlsx",
+        anchor_docs_dir=tmp_path / "anchors",
+        student_docs_dir=tmp_path / "students",
+        schema_path=tmp_path / "schema.json",
+        artefact_output_dir=tmp_path,
     )
 
 
@@ -278,17 +294,11 @@ class TestExecuteHandlerExecute:
             DummyHydrator,
         )
 
-        class DummyPaths:
-            """Minimal paths object exposing schema_path."""
-
-            def __init__(self, schema: Path) -> None:
-                self.schema_path = schema
-
         handler = ExecuteHandler()
         exit_code = handler.execute(
             settings=settings,
             inventory=inventory,
-            paths=DummyPaths(schema_path),  # type: ignore[arg-type]
+            paths=_make_paths(tmp_path),
         )
 
         assert exit_code == 0
@@ -374,10 +384,6 @@ class TestExecuteHandlerExecute:
                 calls["post_run_key"] = key
                 calls["post_run_payload"] = payload
 
-        class DummyPaths:
-            def __init__(self) -> None:
-                self.schema_path = tmp_path / "schema.json"
-
         monkeypatch.setattr(
             "scripts.cj_experiments_runners.eng5_np.handlers.execute_handler.ensure_execute_requirements",
             lambda *_args, **_kwargs: None,
@@ -432,7 +438,9 @@ class TestExecuteHandlerExecute:
         )
 
         handler = ExecuteHandler()
-        exit_code = handler.execute(settings=settings, inventory=inventory, paths=DummyPaths())  # type: ignore[arg-type]  # noqa: E501
+        exit_code = handler.execute(
+            settings=settings, inventory=inventory, paths=_make_paths(tmp_path)
+        )
         assert exit_code == 0
         assert calls["post_run_key"] == "eng5_db_extract"
         assert calls["extraction_batch_identifier"] == str(settings.batch_uuid)
@@ -447,8 +455,8 @@ class TestExecuteHandlerExecute:
         settings.auto_extract_eng5_db = True
         inventory = _make_inventory(tmp_path)
 
-        async def fake_upload_essays_parallel(*_args, **_kwargs):
-            return {}
+        async def fake_upload_essays_parallel(*, records, content_service_url: str):  # noqa: ARG001
+            return {r.checksum: "storage-1" for r in records}
 
         async def fake_run_publish_and_capture(*_args, **_kwargs):
             return None
@@ -534,10 +542,8 @@ class TestExecuteHandlerExecute:
             lambda _path: {"validation": {"ok": True}},
         )
 
-        class DummyPaths:
-            def __init__(self) -> None:
-                self.schema_path = tmp_path / "schema.json"
-
         handler = ExecuteHandler()
-        exit_code = handler.execute(settings=settings, inventory=inventory, paths=DummyPaths())  # type: ignore[arg-type]  # noqa: E501
+        exit_code = handler.execute(
+            settings=settings, inventory=inventory, paths=_make_paths(tmp_path)
+        )
         assert exit_code == 2

@@ -186,6 +186,9 @@ pdm run pytest-root tests/eng5_profiles/test_eng5_mock_parity_lower5.py -m "dock
   - Anchors must already exist in CJ; the runner preflights via CJ admin and fails fast if missing.
   - Use `pdm run eng5-np-run register-anchors ...` or CJ admin workflows for one-time anchor seeding.
 - Anchor grade metadata research: `.claude/research/data/eng5_np_2016/eng5-anchor-grade-metadata-findings-2026-02-03.md`
+- Content upload caching:
+  - Cache file: `.claude/research/data/eng5_np_2016/content_upload_cache.json` (or `--output-dir` override)
+  - Use `--force-reupload` to refresh storage IDs (e.g. after Content Service resets); cache is ignored if `--content-service-url` changes.
 
 **CI staging for ENG5 heavy suites (separate from default CI):**
 - `ENG5 CJ Docker Semantics (regular + small-net)` (`eng5-cj-docker-regular-and-small-net` in `.github/workflows/eng5-heavy-suites.yml`)

@@ -63,6 +63,10 @@ Update (2026-02-04):
   - Prepared dataset: `output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_test_prepared.csv`
   - Splits JSON: `output/essay_scoring/20260204_135554_ellipse_splits_200_1000/artifacts/splits.json`
   - Next: run CV baselines (`scheme=stratified_text` + `scheme=prompt_holdout`) using this splits file.
+- Added machine-readable progress monitoring for long runs:
+  - New file per run dir: `progress.json` (substage processed/total + ETA).
+  - Tracking task: `TASKS/assessment/essay-scoring-progressjson-counters-for-long-runs.md`
+  - Runbook note: `docs/operations/ml-nlp-runbook.md`
 
 Local verification (2026-02-01):
 - `pdm lock -G ml-research`
@@ -198,6 +202,17 @@ Update (2026-02-01):
 - Health checks (Mac, via tunnels):
   - `curl -fsS http://127.0.0.1:18085/healthz`
   - `curl -fsS http://127.0.0.1:19000/healthz`
+
+---
+
+## UPDATE (2026-02-04)
+
+### ENG5 NP Runner: R7 content upload caching
+
+- Added disk-backed Content Service upload cache at `.claude/research/data/eng5_np_2016/content_upload_cache.json` plus `--force-reupload` to refresh storage IDs.
+- Cache is ignored (and rewritten) when `--content-service-url` changes.
+- Focused validation:
+  - `pdm run pytest-root scripts/tests/test_eng5_np_manifest_caching.py scripts/cj_experiments_runners/eng5_np/tests/unit/test_execute_handler.py scripts/cj_experiments_runners/eng5_np/tests/unit/test_anchor_align_handler.py -v` ✅
 - Command:
   - `pdm run essay-scoring-research run --feature-set combined --dataset-path data/cefr_ielts_datasets/ielts_writing_dataset.csv --language-tool-service-url http://127.0.0.1:18085 --embedding-service-url http://127.0.0.1:19000 --run-name ielts_full_combined_hemma_tier2offload`
 - Output dir:

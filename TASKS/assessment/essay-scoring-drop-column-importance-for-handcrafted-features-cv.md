@@ -39,11 +39,20 @@ Prereqs:
 - a reusable CV feature store from a baseline `cv` run (so this doesn’t re-extract features)
 
 Run:
-- `pdm run essay-scoring-research drop-column --dataset-kind ellipse --feature-set combined --splits-path <SPLITS_JSON> --scheme stratified_text --backend hemma --offload-service-url http://127.0.0.1:19000 --reuse-cv-feature-store-dir <CV_RUN>/cv_feature_store --run-name ellipse_drop_column_combined_stratified_text`
+- Define canonical inputs (from the prep/splits task):
+  - `PREP_TRAIN_CSV=output/essay_scoring/<PREP_RUN>/artifacts/datasets/ellipse_train_prepared.csv`
+  - `PREP_TEST_CSV=output/essay_scoring/<PREP_RUN>/artifacts/datasets/ellipse_test_prepared.csv`
+  - `SPLITS_JSON=output/essay_scoring/<SPLITS_RUN>/artifacts/splits.json`
+
+- Run drop-column reusing the baseline CV feature store:
+  - `pdm run essay-scoring-research drop-column --dataset-kind ellipse --ellipse-train-path "$PREP_TRAIN_CSV" --ellipse-test-path "$PREP_TEST_CSV" --feature-set combined --splits-path "$SPLITS_JSON" --scheme stratified_text --language-tool-service-url http://127.0.0.1:18085 --embedding-service-url http://127.0.0.1:19000 --reuse-cv-feature-store-dir output/essay_scoring/<BASELINE_CV_RUN>/cv_feature_store --run-name ellipse_drop_column_combined_stratified_text`
 
 Interpretation rubric (starting point; adjust after seeing results):
 - keep if mean ΔQWK > 0 and stability ≥ 0.8 (helps in ≥80% of folds)
 - drop if mean ΔQWK ≤ 0 or stability low
+
+Operational:
+- Monitor by script via `output/essay_scoring/<RUN>/progress.json`.
 
 ## Success Criteria
 

@@ -1,4 +1,16 @@
-"""Logging helpers for the essay scoring research pipeline."""
+"""Logging helpers for the essay scoring research pipeline.
+
+This module provides:
+- Console + file logging setup for long-running research jobs (`configure_console_logging`,
+  `run_file_logger`).
+- Run-level stage markers (`status.json`) via `stage_timer` / `update_status`.
+- Lightweight progress/ETA reporting:
+  - human-readable log lines via `ProgressLogger`
+  - machine-readable counters via `ProgressWriter` (`progress.json`)
+
+`progress.json` is intended for external monitoring (tailing a single JSON file) without relying
+on parsing `run.log`.
+"""
 
 from __future__ import annotations
 
@@ -259,6 +271,85 @@ def update_status(run_dir: Path, stage: str, state: str, **extra: object) -> Non
     if extra:
         payload.update(extra)
     (run_dir / "status.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+class ProgressWriter:
+    """Write a throttled, atomic progress counter file (`progress.json`) for monitoring.
+
+    This is intentionally small and low-risk:
+    - writes are throttled (default: 0.5s) to avoid IO overhead during tight loops
+    - writes are atomic (write temp file, then replace)
+    - payload is stable JSON intended for shell tooling (`jq`, file watchers, dashboards)
+
+    The file is updated with *substage* counters (processed/total) and optionally includes a
+    derived ETA from the first update time for that substage.
+    """
+
+    def __init__(
+        self,
+        run_dir: Path,
+        *,
+        filename: str = "progress.json",
+        throttle_s: float = 0.5,
+    ) -> None:
+        self._run_dir = run_dir
+        self._path = run_dir / filename
+        self._tmp_path = run_dir / f"{filename}.tmp"
+        self._throttle_s = max(0.0, float(throttle_s))
+        self._last_write_monotonic: float | None = None
+        self._substage_start_monotonic: dict[str, float] = {}
+
+    def update(
+        self,
+        *,
+        substage: str,
+        processed: int,
+        total: int,
+        unit: str = "items",
+        details: dict[str, object] | None = None,
+        force: bool = False,
+    ) -> None:
+        if total < 0 or processed < 0:
+            raise ValueError("processed/total must be non-negative")
+        if processed > total:
+            processed = total
+
+        now = time.monotonic()
+        if not force and self._last_write_monotonic is not None:
+            if now - self._last_write_monotonic < self._throttle_s:
+                return
+
+        if substage not in self._substage_start_monotonic:
+            self._substage_start_monotonic[substage] = now
+
+        stage = _read_current_stage(self._run_dir)
+        started = self._substage_start_monotonic[substage]
+        elapsed = now - started
+        rate = processed / elapsed if elapsed > 0 and processed > 0 else 0.0
+        remaining = total - processed
+        eta = remaining / rate if rate > 0 else 0.0
+        percent = (processed / total) * 100.0 if total > 0 else 0.0
+
+        payload: dict[str, object] = {
+            "schema_version": 1,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "stage": stage,
+            "substage": substage,
+            "state": "completed" if processed >= total and total > 0 else "running",
+            "processed": int(processed),
+            "total": int(total),
+            "unit": unit,
+            "percent": round(percent, 2),
+            "rate_per_s": round(rate, 4),
+            "eta_seconds": round(eta, 2),
+        }
+        if details:
+            payload["details"] = details
+
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        self._tmp_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        self._tmp_path.replace(self._path)
+        self._last_write_monotonic = now
 
 
 @contextmanager

@@ -1,4 +1,14 @@
-"""Cross-validation runner for the essay scoring research pipeline."""
+"""Cross-validation runner for the essay scoring research pipeline.
+
+Purpose:
+    Execute K-fold cross-validation (CV) for ELLIPSE using precomputed split definitions, while
+    producing machine-readable metrics artifacts plus a human-readable Markdown report.
+
+Relationships:
+    - Uses split definitions from `scripts.ml_training.essay_scoring.split_definitions`.
+    - Trains/evaluates folds via helpers in `scripts.ml_training.essay_scoring.cv_shared`.
+    - Persists metrics under the run directory managed by `scripts.ml_training.essay_scoring.paths`.
+"""
 
 from __future__ import annotations
 
@@ -8,7 +18,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import TypedDict
 
 import numpy as np
 import xgboost as xgb
@@ -18,6 +28,7 @@ from scripts.ml_training.essay_scoring.cv_feature_store import (
     load_cv_feature_store,
 )
 from scripts.ml_training.essay_scoring.cv_shared import (
+    FoldResult,
     SplitScheme,
     filter_by_word_count,
     indices_for_ids,
@@ -34,7 +45,11 @@ from scripts.ml_training.essay_scoring.dataset import (
     load_ellipse_train_test_dataset,
 )
 from scripts.ml_training.essay_scoring.features.combiner import FeatureMatrix
-from scripts.ml_training.essay_scoring.logging_utils import run_file_logger
+from scripts.ml_training.essay_scoring.logging_utils import (
+    ProgressWriter,
+    run_file_logger,
+    stage_timer,
+)
 from scripts.ml_training.essay_scoring.paths import RunPaths, build_run_paths
 from scripts.ml_training.essay_scoring.split_definitions import (
     load_splits,
@@ -44,6 +59,61 @@ from scripts.ml_training.essay_scoring.training.evaluation import evaluate_predi
 from scripts.ml_training.essay_scoring.training.trainer import train_model
 
 logger = logging.getLogger(__name__)
+
+
+class WordCountWindow(TypedDict):
+    min: int
+    max: int
+
+
+class RecordCounts(TypedDict):
+    train: int
+    test: int
+
+
+class CrossValidationValSummary(TypedDict):
+    val_qwk_mean: float
+    val_qwk_std: float
+    val_mae_mean: float
+    val_mae_std: float
+    val_adjacent_accuracy_mean: float
+    val_adjacent_accuracy_std: float
+    elapsed_s: float
+
+
+class TrainValSplitSizes(TypedDict):
+    train: int
+    val: int
+    test: int
+
+
+class SplitEval(TypedDict):
+    qwk: float
+    adjacent_accuracy: float
+    mean_absolute_error: float
+
+
+class FinalTrainValTestEval(TypedDict):
+    train_val_split: TrainValSplitSizes
+    val: SplitEval
+    test: SplitEval
+    test_record_count: int
+    best_iteration: int
+
+
+class CrossValidationMetricsPayload(TypedDict):
+    schema_version: int
+    created_at: str
+    dataset_kind: str
+    feature_set: str
+    scheme: SplitScheme
+    n_splits: int
+    word_count_window: WordCountWindow
+    record_counts: RecordCounts
+    cv_feature_store_dir: str
+    folds: list[FoldResult]
+    summary: CrossValidationValSummary
+    final_train_val_test: FinalTrainValTestEval
 
 
 @dataclass(frozen=True)
@@ -76,13 +146,14 @@ def run_cross_validation(
 
     min_words = int(splits.word_count_window["min"])
     max_words = int(splits.word_count_window["max"])
-    word_window = {"min": min_words, "max": max_words}
+    word_window: WordCountWindow = {"min": min_words, "max": max_words}
 
     run_paths = build_run_paths(config.output)
     metrics_path = run_paths.artifacts_dir / "cv_metrics.json"
     report_path = run_paths.reports_dir / "cv_report.md"
 
     with run_file_logger(run_paths.log_path):
+        progress = ProgressWriter(run_paths.run_dir)
         dataset = load_ellipse_train_test_dataset(
             config.ellipse_train_path,
             config.ellipse_test_path,
@@ -125,30 +196,44 @@ def run_cross_validation(
         min_band = float(np.min(store.y_train))
         max_band = float(np.max(store.y_train))
 
-        fold_results: list[dict[str, Any]] = []
+        fold_results: list[FoldResult] = []
         fold_val_qwk: list[float] = []
         fold_val_mae: list[float] = []
         fold_val_adj: list[float] = []
 
-        start = time.monotonic()
-        for fold in folds:
-            fold_result = run_fold(
-                fold=fold,
-                train_id_to_idx=train_id_to_idx,
-                features=store.train_features,
-                y=store.y_train,
-                config=config,
-                min_band=min_band,
-                max_band=max_band,
-                keep_feature_indices=None,
-            )
-            fold_results.append(fold_result)
-            fold_val_qwk.append(float(fold_result["val"]["qwk"]))
-            fold_val_mae.append(float(fold_result["val"]["mean_absolute_error"]))
-            fold_val_adj.append(float(fold_result["val"]["adjacent_accuracy"]))
+        with stage_timer(
+            run_paths.run_dir,
+            logger,
+            "cv_folds_train_eval",
+            scheme=scheme,
+            n_splits=int(splits.n_splits),
+            feature_set=feature_set.value,
+        ):
+            start = time.monotonic()
+            for index, fold in enumerate(folds):
+                fold_result = run_fold(
+                    fold=fold,
+                    train_id_to_idx=train_id_to_idx,
+                    features=store.train_features,
+                    y=store.y_train,
+                    config=config,
+                    min_band=min_band,
+                    max_band=max_band,
+                    keep_feature_indices=None,
+                )
+                fold_results.append(fold_result)
+                fold_val_qwk.append(float(fold_result["val"]["qwk"]))
+                fold_val_mae.append(float(fold_result["val"]["mean_absolute_error"]))
+                fold_val_adj.append(float(fold_result["val"]["adjacent_accuracy"]))
+                progress.update(
+                    substage="cv.folds",
+                    processed=index + 1,
+                    total=len(folds),
+                    unit="folds",
+                )
 
-        elapsed = time.monotonic() - start
-        summary = {
+            elapsed = time.monotonic() - start
+        summary: CrossValidationValSummary = {
             "val_qwk_mean": float(np.mean(fold_val_qwk)) if fold_val_qwk else 0.0,
             "val_qwk_std": float(np.std(fold_val_qwk)) if fold_val_qwk else 0.0,
             "val_mae_mean": float(np.mean(fold_val_mae)) if fold_val_mae else 0.0,
@@ -158,20 +243,27 @@ def run_cross_validation(
             "elapsed_s": float(elapsed),
         }
 
-        final_eval = _run_final_train_and_test_eval(
-            train_records=train_records,
-            test_records=test_records,
-            train_id_to_idx=train_id_to_idx,
-            train_features=store.train_features,
-            y_train=store.y_train,
-            test_features=store.test_features,
-            y_test=store.y_test,
-            config=config,
-            min_band=min_band,
-            max_band=max_band,
-        )
+        with stage_timer(
+            run_paths.run_dir,
+            logger,
+            "cv_final_train_test_eval",
+            scheme=scheme,
+            feature_set=feature_set.value,
+        ):
+            final_eval = _run_final_train_and_test_eval(
+                train_records=train_records,
+                test_records=test_records,
+                train_id_to_idx=train_id_to_idx,
+                train_features=store.train_features,
+                y_train=store.y_train,
+                test_features=store.test_features,
+                y_test=store.y_test,
+                config=config,
+                min_band=min_band,
+                max_band=max_band,
+            )
 
-        payload: dict[str, Any] = {
+        payload: CrossValidationMetricsPayload = {
             "schema_version": 1,
             "created_at": datetime.now(tz=timezone.utc).isoformat(),
             "dataset_kind": config.dataset_kind.value,
@@ -212,7 +304,7 @@ def _run_final_train_and_test_eval(
     config: ExperimentConfig,
     min_band: float,
     max_band: float,
-) -> dict[str, Any]:
+) -> FinalTrainValTestEval:
     split = _train_val_split(train_records, config=config)
     train_ids = [record.record_id for record in split.train]
     val_ids = [record.record_id for record in split.val]
@@ -284,30 +376,30 @@ def _train_val_split(records: list[EssayRecord], *, config: ExperimentConfig) ->
     return stratified_split(EssayDataset(records=list(records)), split_config)
 
 
-def _build_cv_report(payload: dict[str, Any]) -> str:
-    summary = payload.get("summary", {})
-    folds = payload.get("folds", [])
-    final_eval = payload.get("final_train_val_test", {})
+def _build_cv_report(payload: CrossValidationMetricsPayload) -> str:
+    summary = payload["summary"]
+    folds = payload["folds"]
+    final_eval = payload["final_train_val_test"]
 
-    qwk_mean = float(summary.get("val_qwk_mean", 0.0))
-    qwk_std = float(summary.get("val_qwk_std", 0.0))
-    mae_mean = float(summary.get("val_mae_mean", 0.0))
-    mae_std = float(summary.get("val_mae_std", 0.0))
-    adj_mean = float(summary.get("val_adjacent_accuracy_mean", 0.0))
-    adj_std = float(summary.get("val_adjacent_accuracy_std", 0.0))
-    elapsed_s = float(summary.get("elapsed_s", 0.0))
+    qwk_mean = summary["val_qwk_mean"]
+    qwk_std = summary["val_qwk_std"]
+    mae_mean = summary["val_mae_mean"]
+    mae_std = summary["val_mae_std"]
+    adj_mean = summary["val_adjacent_accuracy_mean"]
+    adj_std = summary["val_adjacent_accuracy_std"]
+    elapsed_s = summary["elapsed_s"]
 
     lines = [
         "# Cross-Validation Report",
         "",
         "## Summary",
         "",
-        f"- dataset_kind: `{payload.get('dataset_kind')}`",
-        f"- feature_set: `{payload.get('feature_set')}`",
-        f"- scheme: `{payload.get('scheme')}`",
-        f"- n_splits: `{payload.get('n_splits')}`",
-        f"- word_count_window: `{payload.get('word_count_window')}`",
-        f"- records: `{payload.get('record_counts')}`",
+        f"- dataset_kind: `{payload['dataset_kind']}`",
+        f"- feature_set: `{payload['feature_set']}`",
+        f"- scheme: `{payload['scheme']}`",
+        f"- n_splits: `{payload['n_splits']}`",
+        f"- word_count_window: `{payload['word_count_window']}`",
+        f"- records: `{payload['record_counts']}`",
         "",
         "## CV Metrics (val)",
         "",
@@ -328,36 +420,36 @@ def _build_cv_report(payload: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def _fold_table(folds: list[dict[str, Any]]) -> str:
+def _fold_table(folds: list[FoldResult]) -> str:
     rows: list[tuple[str, ...]] = [("fold", "train", "val", "val_qwk", "val_mae", "best_iter")]
     for fold in folds:
         rows.append(
             (
-                str(fold.get("fold")),
-                str((fold.get("sizes") or {}).get("train")),
-                str((fold.get("sizes") or {}).get("val")),
-                f"{(fold.get('val') or {}).get('qwk', 0.0):.4f}",
-                f"{(fold.get('val') or {}).get('mean_absolute_error', 0.0):.4f}",
-                str(fold.get("best_iteration")),
+                str(fold["fold"]),
+                str(fold["sizes"]["train"]),
+                str(fold["sizes"]["val"]),
+                f"{fold['val']['qwk']:.4f}",
+                f"{fold['val']['mean_absolute_error']:.4f}",
+                str(fold["best_iteration"]),
             )
         )
     return _markdown_table(rows)
 
 
-def _final_table(final_eval: dict[str, Any]) -> str:
+def _final_table(final_eval: FinalTrainValTestEval) -> str:
     rows: list[tuple[str, ...]] = [
         ("split", "qwk", "mae", "adjacent_acc"),
         (
             "val",
-            f"{(final_eval.get('val') or {}).get('qwk', 0.0):.4f}",
-            f"{(final_eval.get('val') or {}).get('mean_absolute_error', 0.0):.4f}",
-            f"{(final_eval.get('val') or {}).get('adjacent_accuracy', 0.0):.4f}",
+            f"{final_eval['val']['qwk']:.4f}",
+            f"{final_eval['val']['mean_absolute_error']:.4f}",
+            f"{final_eval['val']['adjacent_accuracy']:.4f}",
         ),
         (
             "test",
-            f"{(final_eval.get('test') or {}).get('qwk', 0.0):.4f}",
-            f"{(final_eval.get('test') or {}).get('mean_absolute_error', 0.0):.4f}",
-            f"{(final_eval.get('test') or {}).get('adjacent_accuracy', 0.0):.4f}",
+            f"{final_eval['test']['qwk']:.4f}",
+            f"{final_eval['test']['mean_absolute_error']:.4f}",
+            f"{final_eval['test']['adjacent_accuracy']:.4f}",
         ),
     ]
     return _markdown_table(rows)

@@ -16,7 +16,7 @@ class _DummyEmbedder:
 
 
 @pytest.mark.asyncio
-async def test_embed_returns_npy_payload() -> None:
+async def test_embed_returns_npy_payload(requires_localhost_socket: None) -> None:
     app = create_app(embedder=_DummyEmbedder())
     server = TestServer(app)
     client = TestClient(server)
@@ -36,7 +36,7 @@ async def test_embed_returns_npy_payload() -> None:
 
 
 @pytest.mark.asyncio
-async def test_embed_rejects_missing_texts() -> None:
+async def test_embed_rejects_missing_texts(requires_localhost_socket: None) -> None:
     app = create_app(embedder=_DummyEmbedder())
     server = TestServer(app)
     client = TestClient(server)

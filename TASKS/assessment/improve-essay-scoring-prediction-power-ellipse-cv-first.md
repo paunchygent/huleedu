@@ -106,6 +106,21 @@ Created 2026-02-04 (ELLIPSE Overall, 200–1000 words, excluded prompts unchange
   - Splits JSON: `output/essay_scoring/20260204_135554_ellipse_splits_200_1000/artifacts/splits.json`
   - Splits report: `output/essay_scoring/20260204_135554_ellipse_splits_200_1000/reports/splits_report.md`
 
+Baseline CV runs (feature_set=combined):
+
+- `scheme=stratified_text` run dir: `output/essay_scoring/20260204_140326_ellipse_cv_combined_stratified_text_20260204_150321/`
+  - Metrics: `output/essay_scoring/20260204_140326_ellipse_cv_combined_stratified_text_20260204_150321/artifacts/cv_metrics.json`
+  - Report: `output/essay_scoring/20260204_140326_ellipse_cv_combined_stratified_text_20260204_150321/reports/cv_report.md`
+  - Val QWK (mean±std): **0.62623 ± 0.01793**
+- `scheme=prompt_holdout` run dir: `output/essay_scoring/20260204_144831_ellipse_cv_combined_prompt_holdout_20260204_150321/`
+  - Metrics: `output/essay_scoring/20260204_144831_ellipse_cv_combined_prompt_holdout_20260204_150321/artifacts/cv_metrics.json`
+  - Report: `output/essay_scoring/20260204_144831_ellipse_cv_combined_prompt_holdout_20260204_150321/reports/cv_report.md`
+  - Val QWK (mean±std): **0.61832 ± 0.02396** (PRIMARY yardstick)
+
+Notes:
+- The `final_train_val_test.test.qwk` value is the same across schemes because it is not fold-based;
+  do not treat it as “prompt-holdout test performance”. Use CV val mean±std for selection.
+
 ## Success Criteria
 
 - Baseline CV metrics exist (mean±std QWK) for `combined` under both schemes.
@@ -116,6 +131,45 @@ Created 2026-02-04 (ELLIPSE Overall, 200–1000 words, excluded prompts unchange
   - ablation deltas (what feature sets matter)
   - drop-column results (what handcrafted features matter)
   - prompt/band residual diagnostics (where the model fails)
+
+## Acceptance Criteria (XAI + Construct Validity)
+
+Non-negotiable: regardless of whether the CV-best *predictor* ends up being `embeddings`, `handcrafted`,
+or `combined`, the workflow MUST preserve an explicit **construct-validity audit** surface and a
+teacher-meaningful XAI surface.
+
+### A. Construct audit artifacts must exist for every “best current” candidate
+
+For any configuration we intend to treat as “best current” (i.e. a candidate we would ship as the
+current scorer in research demos), we MUST produce and store:
+
+- Prompt/band/slice residual diagnostics (see task `essay-scoring-residual-diagnostics-by-prompt-and-grade-band`).
+- A construct-focused audit report that explicitly checks for shortcut signals (length-only, mechanics-only proxies)
+  and documents failure slices and mitigations.
+
+If `embeddings` wins under prompt-holdout CV, the above artifacts remain REQUIRED; in that case, the
+handcrafted feature pack becomes an **auditor/explainer** surface (may be computed but not fed into
+the predictor).
+
+### B. Interpretation standards (teacher-facing)
+
+- Do **not** treat “embedding dimension importance” as teacher-facing XAI.
+- Teacher-facing explanations MUST be grounded in construct-relevant signals (mechanics, readability,
+  discourse structure, cohesion/syntax, etc.) and/or example-based/counterfactual analyses that are
+  intelligible in classroom terms.
+
+### C. Handcrafted feature set is versioned; “hybrid doesn’t help” conclusions are scoped
+
+The current LanguageTool + spaCy feature set is a **v1 iteration**, not an exhaustive representation
+of “handcrafted features”.
+
+Therefore:
+- Ablation conclusions are scoped to the exact handcrafted set and feature definitions used in that run.
+- If we change handcrafted features materially (add/remove/rename/normalize), we MUST treat this as a
+  new feature-set version and re-run the ablation under `scheme=prompt_holdout` before concluding
+  anything about hybrid uplift.
+- Any changes to exclusions or the word-window policy (200–1000) remain guarded: do not change them
+  without a new task/decision and a new set of prepared artifacts + splits.
 
 ## Related
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import numpy as np
 import pytest
 from aiohttp.test_utils import TestClient, TestServer
 
@@ -7,14 +8,14 @@ from scripts.ml_training.essay_scoring.offload.server import create_app
 
 
 class _DummyEmbedder:
-    def embed(self, texts: list[str]):  # type: ignore[no-untyped-def]
-        import numpy as np
-
+    def embed(self, texts: list[str]) -> np.ndarray:
         return np.zeros((len(texts), 2), dtype=np.float32)
 
 
 @pytest.mark.asyncio
-async def test_offload_server_exposes_healthz_gpu_and_metrics() -> None:
+async def test_offload_server_exposes_healthz_gpu_and_metrics(
+    requires_localhost_socket: None,
+) -> None:
     app = create_app(embedder=_DummyEmbedder())
     server = TestServer(app)
     client = TestClient(server)
@@ -33,7 +34,7 @@ async def test_offload_server_exposes_healthz_gpu_and_metrics() -> None:
 
 
 @pytest.mark.asyncio
-async def test_offload_server_exposes_prometheus_metrics() -> None:
+async def test_offload_server_exposes_prometheus_metrics(requires_localhost_socket: None) -> None:
     app = create_app(embedder=_DummyEmbedder())
     server = TestServer(app)
     client = TestClient(server)

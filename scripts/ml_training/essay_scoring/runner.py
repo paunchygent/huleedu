@@ -1,4 +1,16 @@
-"""Experiment runner for the essay scoring research pipeline."""
+"""Experiment runner for the essay scoring research pipeline.
+
+Purpose:
+    Execute end-to-end research experiments (featurize + train + evaluate) for supported datasets,
+    persisting artifacts (feature stores, metrics JSON, trained models, SHAP plots, grade reports).
+
+Relationships:
+    - Extracts features via `scripts.ml_training.essay_scoring.features.pipeline.FeaturePipeline`.
+    - Trains models using `scripts.ml_training.essay_scoring.training.trainer`.
+    - Evaluates predictions using `scripts.ml_training.essay_scoring.training.evaluation`.
+    - Optional explainability outputs via
+      `scripts.ml_training.essay_scoring.training.shap_explainability`.
+"""
 
 from __future__ import annotations
 
@@ -27,7 +39,12 @@ from scripts.ml_training.essay_scoring.feature_store import (
 from scripts.ml_training.essay_scoring.features.combiner import FeatureMatrix
 from scripts.ml_training.essay_scoring.features.pipeline import FeaturePipeline
 from scripts.ml_training.essay_scoring.features.schema import build_feature_schema
-from scripts.ml_training.essay_scoring.logging_utils import run_file_logger, stage_timer
+from scripts.ml_training.essay_scoring.logging_utils import (
+    ProgressWriter,
+    run_file_logger,
+    stage_timer,
+)
+from scripts.ml_training.essay_scoring.offload.extract_models import ExtractMeta
 from scripts.ml_training.essay_scoring.offload.metrics import (
     ExtractionBenchmark,
     persist_offload_metrics,
@@ -98,6 +115,7 @@ def featurize_experiment(
         )
 
         pipeline = FeaturePipeline(config.embedding, offload=config.offload)
+        progress = ProgressWriter(run_paths.run_dir)
         logger.info("Extracting train features")
         with stage_timer(
             run_paths.run_dir,
@@ -107,7 +125,7 @@ def featurize_experiment(
             feature_set=feature_set.value,
         ):
             start = time.monotonic()
-            train_features = pipeline.extract(split.train, feature_set)
+            train_features = pipeline.extract(split.train, feature_set, progress=progress)
             elapsed = time.monotonic() - start
         benchmarks.append(
             ExtractionBenchmark(
@@ -125,7 +143,7 @@ def featurize_experiment(
             feature_set=feature_set.value,
         ):
             start = time.monotonic()
-            val_features = pipeline.extract(split.val, feature_set)
+            val_features = pipeline.extract(split.val, feature_set, progress=progress)
             elapsed = time.monotonic() - start
         benchmarks.append(
             ExtractionBenchmark(
@@ -143,7 +161,7 @@ def featurize_experiment(
             feature_set=feature_set.value,
         ):
             start = time.monotonic()
-            test_features = pipeline.extract(split.test, feature_set)
+            test_features = pipeline.extract(split.test, feature_set, progress=progress)
             elapsed = time.monotonic() - start
         benchmarks.append(
             ExtractionBenchmark(
@@ -261,6 +279,7 @@ def run_experiment(
                 len(split.test),
             )
             pipeline = FeaturePipeline(config.embedding, offload=config.offload)
+            progress = ProgressWriter(run_paths.run_dir)
             logger.info("Extracting train features")
             with stage_timer(
                 run_paths.run_dir,
@@ -270,7 +289,7 @@ def run_experiment(
                 feature_set=feature_set.value,
             ):
                 start = time.monotonic()
-                train_features = pipeline.extract(split.train, feature_set)
+                train_features = pipeline.extract(split.train, feature_set, progress=progress)
                 elapsed = time.monotonic() - start
             benchmarks.append(
                 ExtractionBenchmark(
@@ -288,7 +307,7 @@ def run_experiment(
                 feature_set=feature_set.value,
             ):
                 start = time.monotonic()
-                val_features = pipeline.extract(split.val, feature_set)
+                val_features = pipeline.extract(split.val, feature_set, progress=progress)
                 elapsed = time.monotonic() - start
             benchmarks.append(
                 ExtractionBenchmark(
@@ -306,7 +325,7 @@ def run_experiment(
                 feature_set=feature_set.value,
             ):
                 start = time.monotonic()
-                test_features = pipeline.extract(split.test, feature_set)
+                test_features = pipeline.extract(split.test, feature_set, progress=progress)
                 elapsed = time.monotonic() - start
             benchmarks.append(
                 ExtractionBenchmark(
@@ -511,11 +530,11 @@ def _persist_feature_schema(run_paths: RunPaths, embedding_dim: int) -> None:
     run_paths.feature_schema_path.write_text(schema.model_dump_json(indent=2), encoding="utf-8")
 
 
-def _persist_offload_extract_meta(artifacts_dir: Path, meta: object | None) -> None:
+def _persist_offload_extract_meta(artifacts_dir: Path, meta: ExtractMeta | None) -> None:
     if meta is None:
         return
     try:
-        json_text = meta.model_dump_json(indent=2)  # type: ignore[attr-defined]
+        json_text = meta.model_dump_json(indent=2)
     except Exception:
         return
     (artifacts_dir / "offload_extract_meta.json").write_text(json_text, encoding="utf-8")

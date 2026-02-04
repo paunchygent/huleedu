@@ -16,6 +16,15 @@ Before using pdm run, start an env-aware shell:
 ./scripts/dev-shell.sh  Use semantics for running docker tests in shell by always loading .env before `pdm run pytest-root...`
 ```
 
+### ML / Research Runs (Essay Scoring) — mandatory defaults
+
+- **Detached execution required**: long ML runs MUST be started in detached mode (prefer `/usr/bin/screen`) and MUST write a driver log under `output/essay_scoring/` (see `docs/operations/ml-nlp-runbook.md`).
+- **Feature store required**: after the first successful run creates a feature store, all follow-up runs MUST reuse it:
+  - `run`: always pass `--reuse-feature-store-dir output/essay_scoring/<RUN>/feature_store`
+  - `cv` / sweeps: always pass `--reuse-cv-feature-store-dir output/essay_scoring/<CV_RUN>/cv_feature_store`
+- **Do not ignore canonical flags** (ELLIPSE CV-first): always use `--ellipse-train-path` + `--ellipse-test-path` (prepared CSVs) and `--splits-path` (matching `splits.json`) when running `cv`/`drop-column`/ablations on ELLIPSE.
+- **Machine-readable progress required**: monitor long stages via `output/essay_scoring/<RUN>/progress.json` (updated continuously; suitable for scripts) rather than log parsing.
+
 ```markdown
 - FIRST ACTION: Load `.agent/rules/000-rule-index.md` first. The index contains onboard instructions for all services and project rules and standards. If the prompt contains a task description, use it to read and review all rule files related to the task at hand.
 - SECOND ACTION Use the user's task description to read and review all rule files related to the task at hand.

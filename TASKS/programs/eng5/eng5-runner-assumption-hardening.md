@@ -2,7 +2,7 @@
 id: eng5-runner-assumption-hardening
 title: Eng5 Runner Assumption Hardening
 type: task
-status: in_progress
+status: done
 priority: high
 domain: programs
 owner_team: agents
@@ -27,7 +27,7 @@ labels: []
 
 ## Status
 
-**IN PROGRESS** – R1–R5 implemented; R6/R7 pending
+**DONE** – R1–R7 implemented (R7 disk cache + `--force-reupload` shipped)
 
 ## Context
 
@@ -104,6 +104,21 @@ Recent validation exposed several incorrect ENG5 runner assumptions that mask co
   - Anchor registration validates grades against that scale via `common_core.grade_scales`.
   - Anchor grade metadata persists in `anchor_essay_references` and propagates through
     `CJAnchorMetadata` into grade projection resolution.
+
+## Progress (2026-02-04) – R7 Essay upload caching + force reupload
+
+- Added disk-backed Content Service upload cache:
+  - Cache file: `output_dir/content_upload_cache.json` (default output_dir: `.claude/research/data/eng5_np_2016/`)
+  - Key: local file checksum (`sha256`) → `storage_id`
+  - Cache safety: if `--content-service-url` changes, the cache is ignored and rewritten.
+- Added `--force-reupload`:
+  - Bypasses cache reuse and refreshes `storage_id`s for the current run’s essays.
+  - Useful after Content Service resets/seed changes.
+- Applies to both:
+  - `execute` (student essays)
+  - `anchor-align-test` (anchor essays treated as students)
+- Tests (focused, meaningful):
+  - `pdm run pytest-root scripts/tests/test_eng5_np_manifest_caching.py scripts/cj_experiments_runners/eng5_np/tests/unit/test_execute_handler.py scripts/cj_experiments_runners/eng5_np/tests/unit/test_anchor_align_handler.py -v` ✅
 
 ## Progress (2025-11-30) – ENG5 Anchor Alignment Experiment
 

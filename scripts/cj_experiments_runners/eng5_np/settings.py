@@ -1,4 +1,14 @@
-"""Runner configuration objects for ENG5 NP CLI."""
+"""Runner configuration objects for the ENG5 NP CLI.
+
+Purpose:
+    Centralize typed configuration derived from CLI flags/env so mode handlers can remain small
+    and testable.
+
+Relationships:
+    - Built by `scripts.cj_experiments_runners.eng5_np.cli`.
+    - Consumed by mode handlers under `scripts.cj_experiments_runners.eng5_np.handlers`.
+    - Serialized into artefacts via `scripts.cj_experiments_runners.eng5_np.artefact_io`.
+"""
 
 from __future__ import annotations
 
@@ -41,6 +51,7 @@ class RunnerSettings:
     kafka_bootstrap: str
     kafka_client_id: str
     content_service_url: str
+    force_reupload: bool = False
     cj_service_url: str | None = None
     cj_anchor_count: int | None = None
     llm_overrides: LLMConfigOverrides | None = None

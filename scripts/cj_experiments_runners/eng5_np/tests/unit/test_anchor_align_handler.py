@@ -14,12 +14,28 @@ from scripts.cj_experiments_runners.eng5_np.handlers.anchor_align_handler import
 from scripts.cj_experiments_runners.eng5_np.inventory import (
     RunnerInventory,
 )
+from scripts.cj_experiments_runners.eng5_np.paths import RunnerPaths
 from scripts.cj_experiments_runners.eng5_np.protocols import ModeHandlerProtocol
 from scripts.cj_experiments_runners.eng5_np.settings import RunnerMode
 from scripts.cj_experiments_runners.eng5_np.tests.unit.anchor_align_test_helpers import (
     make_anchor_align_settings,
     make_inventory_with_anchors,
 )
+
+
+def _make_paths(tmp_path: Path) -> RunnerPaths:
+    return RunnerPaths(
+        repo_root=tmp_path,
+        role_models_root=tmp_path,
+        instructions_path=tmp_path / "instructions.md",
+        prompt_path=tmp_path / "prompt.md",
+        anchors_csv=tmp_path / "anchors.csv",
+        anchors_xlsx=tmp_path / "anchors.xlsx",
+        anchor_docs_dir=tmp_path / "anchors",
+        student_docs_dir=tmp_path / "students",
+        schema_path=tmp_path / "schema.json",
+        artefact_output_dir=tmp_path,
+    )
 
 
 class TestAnchorAlignHandlerProtocol:
@@ -84,18 +100,12 @@ class TestAnchorAlignHandlerExecute:
         # Inventory with zero anchors
         inventory = make_inventory_with_anchors(tmp_path, anchor_count=0)
 
-        class DummyPaths:
-            """Minimal paths object exposing schema_path."""
-
-            def __init__(self, schema: Path) -> None:
-                self.schema_path = schema
-
         handler = AnchorAlignHandler()
         with pytest.raises(RuntimeError) as exc:
             handler.execute(
                 settings=settings,
                 inventory=inventory,
-                paths=DummyPaths(tmp_path / "schema.json"),  # type: ignore[arg-type]
+                paths=_make_paths(tmp_path),
             )
 
         assert "Anchor essays are required for anchor-align-test mode" in str(exc.value)
@@ -284,17 +294,11 @@ class TestAnchorAlignHandlerExecute:
             DummyHydrator,
         )
 
-        class DummyPaths:
-            """Minimal paths object exposing schema_path."""
-
-            def __init__(self, schema: Path) -> None:
-                self.schema_path = schema
-
         handler = AnchorAlignHandler()
         exit_code = handler.execute(
             settings=settings,
             inventory=inventory,
-            paths=DummyPaths(schema_path),  # type: ignore[arg-type]
+            paths=_make_paths(tmp_path),
         )
 
         assert exit_code == 0

@@ -16,6 +16,7 @@ import numpy as np
 
 from scripts.ml_training.essay_scoring.config import EmbeddingConfig, OffloadConfig
 from scripts.ml_training.essay_scoring.features.protocols import EmbeddingExtractorProtocol
+from scripts.ml_training.essay_scoring.logging_utils import ProgressWriter
 from scripts.ml_training.essay_scoring.offload.metrics import OffloadMetricsCollector
 
 _MAX_EMBEDDING_REQUEST_BYTES = 900_000
@@ -32,6 +33,7 @@ class RemoteEmbeddingClient(EmbeddingExtractorProtocol):
     embedding_config: EmbeddingConfig
     offload_config: OffloadConfig
     metrics: OffloadMetricsCollector | None = None
+    progress: ProgressWriter | None = None
 
     def embed(self, texts: list[str]) -> np.ndarray:
         if not texts:
@@ -43,6 +45,8 @@ class RemoteEmbeddingClient(EmbeddingExtractorProtocol):
         cached_rows: dict[int, np.ndarray] = {}
         missing_indices: list[int] = []
         missing_texts: list[str] = []
+        cache_hits = 0
+        cache_misses = 0
 
         for index, text in enumerate(texts):
             cache_path = cache_dir / f"{self._cache_key(text)}.npy"
@@ -53,16 +57,33 @@ class RemoteEmbeddingClient(EmbeddingExtractorProtocol):
                     if self.metrics is not None:
                         self.metrics.record_cache_read_error(kind="embedding")
                         self.metrics.record_cache_miss(kind="embedding")
+                    cache_misses += 1
                     missing_indices.append(index)
                     missing_texts.append(text)
                 else:
                     if self.metrics is not None:
                         self.metrics.record_cache_hit(kind="embedding")
+                    cache_hits += 1
             else:
                 if self.metrics is not None:
                     self.metrics.record_cache_miss(kind="embedding")
+                cache_misses += 1
                 missing_indices.append(index)
                 missing_texts.append(text)
+
+        if self.progress is not None:
+            self.progress.update(
+                substage="embedding.cache_scan",
+                processed=len(texts),
+                total=len(texts),
+                unit="texts",
+                details={
+                    "cache_hits": int(cache_hits),
+                    "cache_misses": int(cache_misses),
+                    "missing": int(len(missing_texts)),
+                },
+                force=True,
+            )
 
         fetched: np.ndarray | None = None
         if missing_texts:
@@ -88,8 +109,18 @@ class RemoteEmbeddingClient(EmbeddingExtractorProtocol):
 
     def _fetch_embeddings_batched(self, texts: list[str]) -> np.ndarray:
         arrays: list[np.ndarray] = []
+        fetched = 0
         for chunk in self._iter_embedding_chunks(texts):
             arrays.append(self._fetch_embeddings(chunk))
+            fetched += len(chunk)
+            if self.progress is not None:
+                self.progress.update(
+                    substage="embedding.fetch_missing",
+                    processed=fetched,
+                    total=len(texts),
+                    unit="texts",
+                    force=fetched >= len(texts),
+                )
 
         if not arrays:
             return np.empty((0, 0), dtype=np.float32)

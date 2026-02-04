@@ -23,7 +23,10 @@ class _CountingEmbedder:
 
 
 @pytest.mark.asyncio
-async def test_remote_embedding_client_roundtrip_http_and_caches(tmp_path) -> None:
+async def test_remote_embedding_client_roundtrip_http_and_caches(
+    requires_localhost_socket: None,
+    tmp_path,
+) -> None:
     embedder = _CountingEmbedder()
     app = create_app(embedder=embedder)
     server = TestServer(app)
@@ -76,7 +79,10 @@ async def test_remote_embedding_client_roundtrip_http_and_caches(tmp_path) -> No
 
 
 @pytest.mark.asyncio
-async def test_remote_embedding_client_raises_on_unsupported_max_length(tmp_path) -> None:
+async def test_remote_embedding_client_raises_on_unsupported_max_length(
+    requires_localhost_socket: None,
+    tmp_path,
+) -> None:
     embedder = _CountingEmbedder()
     app = create_app(embedder=embedder)
     server = TestServer(app)

@@ -1,11 +1,25 @@
-"""Feature extraction pipeline orchestration."""
+"""Feature extraction pipeline orchestration.
+
+Purpose:
+    Provide a single high-level entrypoint (`FeaturePipeline.extract`) for producing model-ready
+    feature matrices from essay records. The pipeline coordinates:
+    - Optional Hemma offload (`/v1/extract`) for embeddings + handcrafted tiers.
+    - Local extraction for embeddings + tiered handcrafted features (Tier 1–3).
+
+Relationships:
+    - Builds tiered handcrafted features via `tier1_error_readability`, `tier2_syntactic_cohesion`,
+      and `tier3_structure`.
+    - Optionally delegates remote work to
+      `scripts.ml_training.essay_scoring.offload.extract_client`.
+    - Outputs `FeatureMatrix` that is later consumed by training/cross-validation runners.
+"""
 
 from __future__ import annotations
 
 import logging
 import time
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING
 
 import numpy as np
 from spacy.language import Language
@@ -33,10 +47,14 @@ from scripts.ml_training.essay_scoring.features.tier2_syntactic_cohesion import 
     Tier2FeatureExtractor,
 )
 from scripts.ml_training.essay_scoring.features.tier3_structure import Tier3FeatureExtractor
-from scripts.ml_training.essay_scoring.logging_utils import ProgressLogger
+from scripts.ml_training.essay_scoring.logging_utils import ProgressLogger, ProgressWriter
 from scripts.ml_training.essay_scoring.offload.metrics import OffloadMetricsCollector
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from scripts.ml_training.essay_scoring.offload.extract_client import RemoteExtractClient
+    from scripts.ml_training.essay_scoring.offload.extract_models import ExtractMeta
 
 
 @dataclass
@@ -49,14 +67,20 @@ class FeaturePipeline:
     nlp: Language | None = None
     nlp_fast: Language | None = None
     embedder: EmbeddingExtractorProtocol | None = None
-    remote_extractor: Any | None = None
+    remote_extractor: RemoteExtractClient | None = None
     tier1_extractor: Tier1ExtractorProtocol | None = None
     tier2_extractor: Tier2ExtractorProtocol | None = None
     tier3_extractor: Tier3ExtractorProtocol | None = None
     offload_metrics: OffloadMetricsCollector | None = None
-    last_offload_meta: Any | None = None
+    last_offload_meta: ExtractMeta | None = None
 
-    def extract(self, records: list[EssayRecord], feature_set: FeatureSet) -> FeatureMatrix:
+    def extract(
+        self,
+        records: list[EssayRecord],
+        feature_set: FeatureSet,
+        *,
+        progress: ProgressWriter | None = None,
+    ) -> FeatureMatrix:
         """Extract features for a collection of records."""
 
         texts = [record.essay for record in records]
@@ -76,19 +100,51 @@ class FeaturePipeline:
             if self.offload_metrics is None:
                 self.offload_metrics = OffloadMetricsCollector()
 
+            if feature_set == FeatureSet.EMBEDDINGS:
+                from scripts.ml_training.essay_scoring.offload.embedding_client import (  # noqa: PLC0415
+                    RemoteEmbeddingClient,
+                )
+
+                if self.embedder is None or not isinstance(self.embedder, RemoteEmbeddingClient):
+                    self.embedder = RemoteEmbeddingClient(
+                        base_url=self.offload.offload_service_url,
+                        embedding_config=self.embedding_config,
+                        offload_config=self.offload,
+                        metrics=self.offload_metrics,
+                        progress=progress,
+                    )
+
+                logger.info(
+                    "Offload embed start (backend=hemma, records=%d)",
+                    len(texts),
+                )
+                start = time.monotonic()
+                embeddings = self.embedder.embed(texts)
+                elapsed = time.monotonic() - start
+                logger.info(
+                    "Offload embed complete (backend=hemma, shape=%s) in %.2fs",
+                    embeddings.shape,
+                    elapsed,
+                )
+                return FeatureMatrix(
+                    matrix=embeddings,
+                    feature_names=feature_names_for(feature_set, embeddings.shape[1]),
+                )
+
             from scripts.ml_training.essay_scoring.offload.extract_client import (  # noqa: PLC0415
                 RemoteExtractClient,
             )
 
-            if self.remote_extractor is None or not isinstance(
-                self.remote_extractor, RemoteExtractClient
-            ):
-                self.remote_extractor = RemoteExtractClient(
+            remote_extractor = self.remote_extractor
+            if remote_extractor is None or not isinstance(remote_extractor, RemoteExtractClient):
+                remote_extractor = RemoteExtractClient(
                     base_url=self.offload.offload_service_url,
                     embedding_config=self.embedding_config,
                     offload_config=self.offload,
                     metrics=self.offload_metrics,
+                    progress=progress,
                 )
+                self.remote_extractor = remote_extractor
 
             logger.info(
                 "Offload extract start (backend=hemma, feature_set=%s, records=%d)",
@@ -96,7 +152,7 @@ class FeaturePipeline:
                 len(texts),
             )
             start = time.monotonic()
-            result = self.remote_extractor.extract(texts, prompts, feature_set)
+            result = remote_extractor.extract(texts, prompts, feature_set)
             elapsed = time.monotonic() - start
             logger.info(
                 "Offload extract complete (backend=hemma, records=%d) in %.2fs (embeddings=%s, "
@@ -157,6 +213,7 @@ class FeaturePipeline:
                     embedding_config=self.embedding_config,
                     offload_config=self.offload,
                     metrics=self.offload_metrics,
+                    progress=progress,
                 )
             tier2_embedding_extractor = self.embedder
 
@@ -206,12 +263,14 @@ class FeaturePipeline:
                         self.offload.language_tool_max_concurrency if self.offload else 10
                     ),
                     metrics=self.offload_metrics,
+                    progress=progress,
                 )
             if self.tier2_extractor is None:
                 self.tier2_extractor = Tier2FeatureExtractor(
                     spacy_model=self.spacy_model,
                     nlp=self.nlp_fast,
                     embedding_extractor=tier2_embedding_extractor,
+                    progress=progress,
                 )
             if self.tier3_extractor is None:
                 self.tier3_extractor = Tier3FeatureExtractor(
@@ -243,6 +302,13 @@ class FeaturePipeline:
                 )
                 tier3_features.append(self.tier3_extractor.extract(text, prompt))
                 tier3_progress.update(index)
+                if progress is not None:
+                    progress.update(
+                        substage="tier3",
+                        processed=index + 1,
+                        total=len(texts),
+                        unit="records",
+                    )
             logger.info("Tier3 extraction complete in %.2fs", time.monotonic() - tier3_start)
 
         return combine_features(

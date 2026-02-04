@@ -2,7 +2,7 @@
 id: 'essay-scoring-prepare-ellipse-dataset--cv-splits-2001000-words'
 title: 'essay-scoring: prepare ELLIPSE dataset + CV splits (200–1000 words)'
 type: 'task'
-status: 'proposed'
+status: 'done'
 priority: 'high'
 domain: 'assessment'
 service: ''

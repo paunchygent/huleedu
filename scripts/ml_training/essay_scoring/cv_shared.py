@@ -1,4 +1,13 @@
-"""Shared helpers for CV-style essay scoring workflows."""
+"""Shared helpers for CV-style essay scoring workflows.
+
+Purpose:
+    Centralize utilities that are shared across CV-style experiment runners (feature store
+    preparation/reuse, fold training/evaluation, split validation, and leakage guards).
+
+Relationships:
+    - Used by `scripts.ml_training.essay_scoring.cross_validation`.
+    - Produces fold-level results that are later persisted as metrics artifacts.
+"""
 
 from __future__ import annotations
 
@@ -6,7 +15,7 @@ import hashlib
 import logging
 import time
 from pathlib import Path
-from typing import Any, Literal
+from typing import Literal, TypedDict
 
 import numpy as np
 import xgboost as xgb
@@ -19,7 +28,8 @@ from scripts.ml_training.essay_scoring.cv_feature_store import (
 from scripts.ml_training.essay_scoring.dataset import EssayRecord
 from scripts.ml_training.essay_scoring.features.combiner import FeatureMatrix
 from scripts.ml_training.essay_scoring.features.pipeline import FeaturePipeline
-from scripts.ml_training.essay_scoring.logging_utils import stage_timer
+from scripts.ml_training.essay_scoring.logging_utils import ProgressWriter, stage_timer
+from scripts.ml_training.essay_scoring.offload.extract_models import ExtractMeta
 from scripts.ml_training.essay_scoring.offload.metrics import (
     ExtractionBenchmark,
     persist_offload_metrics,
@@ -36,6 +46,31 @@ from scripts.ml_training.essay_scoring.training.trainer import train_model
 logger = logging.getLogger(__name__)
 
 SplitScheme = Literal["stratified_text", "prompt_holdout"]
+
+
+class FoldSizes(TypedDict):
+    """Train/validation record counts for a CV fold."""
+
+    train: int
+    val: int
+
+
+class FoldEval(TypedDict):
+    """Evaluation metrics for a single split (train/val)."""
+
+    qwk: float
+    adjacent_accuracy: float
+    mean_absolute_error: float
+
+
+class FoldResult(TypedDict):
+    """Fold-level training and evaluation summary."""
+
+    fold: int
+    sizes: FoldSizes
+    best_iteration: int
+    train: FoldEval
+    val: FoldEval
 
 
 def prepare_cv_feature_store(
@@ -61,6 +96,7 @@ def prepare_cv_feature_store(
         return resolved
 
     pipeline = FeaturePipeline(config.embedding, offload=config.offload)
+    progress = ProgressWriter(run_dir)
     benchmarks: list[ExtractionBenchmark] = []
     logger.info("Extracting train features (n=%d)", len(train_records))
     with stage_timer(
@@ -71,7 +107,7 @@ def prepare_cv_feature_store(
         feature_set=feature_set.value,
     ):
         start = time.monotonic()
-        train_features = pipeline.extract(train_records, feature_set)
+        train_features = pipeline.extract(train_records, feature_set, progress=progress)
         elapsed = time.monotonic() - start
     benchmarks.append(
         ExtractionBenchmark(
@@ -89,7 +125,7 @@ def prepare_cv_feature_store(
         feature_set=feature_set.value,
     ):
         start = time.monotonic()
-        test_features = pipeline.extract(test_records, feature_set)
+        test_features = pipeline.extract(test_records, feature_set, progress=progress)
         elapsed = time.monotonic() - start
     benchmarks.append(
         ExtractionBenchmark(
@@ -146,7 +182,7 @@ def run_fold(
     min_band: float,
     max_band: float,
     keep_feature_indices: list[int] | None,
-) -> dict[str, Any]:
+) -> FoldResult:
     """Train and evaluate a single CV fold (optionally dropping feature columns)."""
 
     train_idx = indices_for_ids(fold.train_record_ids, id_to_idx=train_id_to_idx)
@@ -316,11 +352,11 @@ def validate_record_ids_against_splits(
         )
 
 
-def _persist_offload_extract_meta(artifacts_dir: Path, meta: object | None) -> None:
+def _persist_offload_extract_meta(artifacts_dir: Path, meta: ExtractMeta | None) -> None:
     if meta is None:
         return
     try:
-        json_text = meta.model_dump_json(indent=2)  # type: ignore[attr-defined]
+        json_text = meta.model_dump_json(indent=2)
     except Exception:
         return
     (artifacts_dir / "offload_extract_meta.json").write_text(json_text, encoding="utf-8")

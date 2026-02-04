@@ -19,12 +19,13 @@ import socket
 import time
 import urllib.error
 import urllib.request
-from concurrent.futures import ThreadPoolExecutor
+from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from threading import Semaphore
-from typing import Any
+from typing import TypeAlias
 
 from spacy.language import Language
 
@@ -38,16 +39,45 @@ from scripts.ml_training.essay_scoring.features.utils import (
     normalize_whitespace,
     safe_divide,
 )
-from scripts.ml_training.essay_scoring.logging_utils import ProgressLogger
+from scripts.ml_training.essay_scoring.logging_utils import ProgressLogger, ProgressWriter
 from scripts.ml_training.essay_scoring.offload.metrics import OffloadMetricsCollector
 
 logger = logging.getLogger(__name__)
 
 _CACHE_SCHEMA_VERSION = 1
 
+LanguageToolRequestOptions: TypeAlias = dict[str, object]
+LanguageToolResponse: TypeAlias = dict[str, object]
+LanguageToolDerivedCounts: TypeAlias = tuple[float, float, float]
+
+
+def _as_str_object_dict(value: object) -> dict[str, object] | None:
+    if not isinstance(value, dict):
+        return None
+    normalized: dict[str, object] = {}
+    for key, item in value.items():
+        if not isinstance(key, str):
+            return None
+        normalized[key] = item
+    return normalized
+
+
+def _float_or_default(value: object, default: float) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _counts_from_cached_dict(derived_counts: dict[str, object]) -> LanguageToolDerivedCounts:
+    grammar = _float_or_default(derived_counts.get("grammar"), 0.0)
+    spelling = _float_or_default(derived_counts.get("spelling"), 0.0)
+    punctuation = _float_or_default(derived_counts.get("punctuation"), 0.0)
+    return grammar, spelling, punctuation
+
 
 @contextmanager
-def _maybe_acquire(semaphore: Semaphore | None) -> Any:
+def _maybe_acquire(semaphore: Semaphore | None) -> Iterator[None]:
     if semaphore is None:
         yield
         return
@@ -70,8 +100,9 @@ class Tier1FeatureExtractor:
     language_tool_cache_dir: Path | None = None
     language_tool_max_concurrency: int = 10
     language_tool_semaphore: Semaphore | None = None
-    language_tool_request_options: dict[str, Any] | None = None
+    language_tool_request_options: LanguageToolRequestOptions | None = None
     metrics: OffloadMetricsCollector | None = None
+    progress: ProgressWriter | None = None
 
     def __post_init__(self) -> None:
         self._tool = None
@@ -134,6 +165,13 @@ class Tier1FeatureExtractor:
                     )
                 )
                 progress.update(index)
+                if self.progress is not None:
+                    self.progress.update(
+                        substage="tier1.local",
+                        processed=index + 1,
+                        total=len(cleaned_texts),
+                        unit="records",
+                    )
             logger.info(
                 "Tier1 complete (mode=local, n=%d) in %.2fs", len(texts), time.monotonic() - start
             )
@@ -149,7 +187,10 @@ class Tier1FeatureExtractor:
         )
         max_workers = max(1, int(self.language_tool_max_concurrency))
         with ThreadPoolExecutor(max_workers=max_workers) as pool:
-            futures = [pool.submit(self._remote_error_counts, cleaned) for cleaned in cleaned_texts]
+            futures_by_future = {
+                pool.submit(self._remote_error_counts, cleaned): index
+                for index, cleaned in enumerate(cleaned_texts)
+            }
 
             stats_by_index: list[dict[str, float]] = []
             if self.nlp is None:
@@ -162,10 +203,32 @@ class Tier1FeatureExtractor:
                 )
                 stats_by_index.append(self._compute_text_stats_from_doc(doc))
                 progress.update(index)
+                if self.progress is not None:
+                    self.progress.update(
+                        substage="tier1.spacy",
+                        processed=index + 1,
+                        total=len(cleaned_texts),
+                        unit="records",
+                    )
 
-            logger.info("Tier1 awaiting LanguageTool results (n=%d)", len(futures))
-            counts_by_index = [future.result() for future in futures]
-            logger.info("Tier1 LanguageTool results complete (n=%d)", len(futures))
+            logger.info("Tier1 awaiting LanguageTool results (n=%d)", len(futures_by_future))
+            counts_by_index: list[tuple[float, float, float] | None] = [None] * len(cleaned_texts)
+            completed = 0
+            for future in as_completed(futures_by_future):
+                idx = futures_by_future[future]
+                counts_by_index[idx] = future.result()
+                completed += 1
+                if self.progress is not None:
+                    self.progress.update(
+                        substage="tier1.languagetool",
+                        processed=completed,
+                        total=len(cleaned_texts),
+                        unit="records",
+                    )
+            if any(item is None for item in counts_by_index):
+                raise RuntimeError("Tier1 LanguageTool results missing for one or more items.")
+            counts_by_index = [item for item in counts_by_index if item is not None]
+            logger.info("Tier1 LanguageTool results complete (n=%d)", len(futures_by_future))
 
         features = []
         for stats, (grammar_count, spelling_count, punctuation_count) in zip(
@@ -270,41 +333,16 @@ class Tier1FeatureExtractor:
         return grammar_count, spelling_count, punctuation_count
 
     def _remote_error_counts(self, text: str) -> tuple[float, float, float]:
-        response, derived = self._remote_check_cached(text)
-        if derived is not None:
-            return derived
-
-        errors = response.get("errors", [])
-
-        grammar_count = 0.0
-        spelling_count = 0.0
-        punctuation_count = 0.0
-
-        for error in errors:
-            if not isinstance(error, dict):
-                continue
-            category_id = str(error.get("category_id") or error.get("category") or "").upper()
-            rule_id = str(error.get("rule_id") or "").upper()
-
-            if "PUNCT" in category_id or "PUNCT" in rule_id:
-                punctuation_count += 1
-            elif (
-                category_id in {"TYPOS", "SPELLING", "TYPOGRAPHY", "MISSPELLING"}
-                or "SPELL" in category_id
-            ):
-                spelling_count += 1
-            else:
-                grammar_count += 1
-
-        return grammar_count, spelling_count, punctuation_count
+        _, derived = self._remote_check_cached(text)
+        return derived
 
     def _remote_check_cached(
         self, text: str
-    ) -> tuple[dict[str, Any], tuple[float, float, float] | None]:
+    ) -> tuple[LanguageToolResponse, LanguageToolDerivedCounts]:
         if self.language_tool_url is None:
             raise RuntimeError("LanguageTool URL not configured for remote checks.")
 
-        request_options = self.language_tool_request_options or {}
+        request_options: LanguageToolRequestOptions = self.language_tool_request_options or {}
         cache_path = self._cache_path(text=text, request_options=request_options)
         if cache_path is not None and cache_path.exists():
             try:
@@ -314,21 +352,25 @@ class Tier1FeatureExtractor:
                     self.metrics.record_cache_read_error(kind="language_tool")
                 cached_text = ""
             try:
-                cached = json.loads(cached_text)
+                cached_obj: object = json.loads(cached_text)
             except json.JSONDecodeError:
                 if self.metrics is not None:
                     self.metrics.record_cache_decode_error(kind="language_tool")
-                cached = None
-            if isinstance(cached, dict):
-                response = cached.get("response")
-                derived_counts = cached.get("derived_counts")
-                if isinstance(response, dict) and isinstance(derived_counts, dict):
-                    if self.metrics is not None:
-                        self.metrics.record_cache_hit(kind="language_tool")
-                    grammar = float(derived_counts.get("grammar", 0.0))
-                    spelling = float(derived_counts.get("spelling", 0.0))
-                    punctuation = float(derived_counts.get("punctuation", 0.0))
-                    return response, (grammar, spelling, punctuation)
+            else:
+                cached = _as_str_object_dict(cached_obj)
+                if cached is not None:
+                    response_obj = _as_str_object_dict(cached.get("response"))
+                    if response_obj is not None:
+                        if self.metrics is not None:
+                            self.metrics.record_cache_hit(kind="language_tool")
+                        derived_obj = _as_str_object_dict(cached.get("derived_counts"))
+                        derived = (
+                            _counts_from_cached_dict(derived_obj)
+                            if derived_obj is not None
+                            else self._derive_counts(response_obj.get("errors"))
+                        )
+                        return response_obj, derived
+
             if self.metrics is not None:
                 self.metrics.record_cache_miss(kind="language_tool")
         elif cache_path is not None and self.metrics is not None:
@@ -337,7 +379,7 @@ class Tier1FeatureExtractor:
         response = self._fetch_remote_language_tool_response(
             text=text, request_options=request_options
         )
-        derived = self._derive_counts(response.get("errors", []))
+        derived = self._derive_counts(response.get("errors"))
         if cache_path is not None:
             self._write_cache(
                 cache_path=cache_path,
@@ -351,10 +393,10 @@ class Tier1FeatureExtractor:
         return response, derived
 
     def _fetch_remote_language_tool_response(
-        self, *, text: str, request_options: dict[str, Any]
-    ) -> dict[str, Any]:
+        self, *, text: str, request_options: LanguageToolRequestOptions
+    ) -> LanguageToolResponse:
         url = self.language_tool_url.rstrip("/") + "/v1/check"
-        payload: dict[str, Any] = {"text": text, "language": self.language}
+        payload: LanguageToolRequestOptions = {"text": text, "language": self.language}
         payload.update(request_options)
         data = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
         request = urllib.request.Request(
@@ -416,9 +458,12 @@ class Tier1FeatureExtractor:
                 texts_in_request=1,
             )
 
-        response = json.loads(body.decode("utf-8"))
-        if not isinstance(response, dict):
-            raise RuntimeError(f"LanguageTool offload returned invalid JSON type={type(response)}")
+        response_obj: object = json.loads(body.decode("utf-8"))
+        response = _as_str_object_dict(response_obj)
+        if response is None:
+            raise RuntimeError(
+                f"LanguageTool offload returned invalid JSON response type={type(response_obj)}"
+            )
         return response
 
     @staticmethod
@@ -448,7 +493,7 @@ class Tier1FeatureExtractor:
 
         return grammar_count, spelling_count, punctuation_count
 
-    def _cache_path(self, *, text: str, request_options: dict[str, Any]) -> Path | None:
+    def _cache_path(self, *, text: str, request_options: LanguageToolRequestOptions) -> Path | None:
         if self.language_tool_cache_dir is None:
             return None
 
@@ -474,9 +519,9 @@ class Tier1FeatureExtractor:
         *,
         cache_path: Path,
         text: str,
-        request_options: dict[str, Any],
-        response: dict[str, Any],
-        derived_counts: tuple[float, float, float],
+        request_options: LanguageToolRequestOptions,
+        response: LanguageToolResponse,
+        derived_counts: LanguageToolDerivedCounts,
     ) -> None:
         grammar_count, spelling_count, punctuation_count = derived_counts
         payload = {

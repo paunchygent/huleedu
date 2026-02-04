@@ -85,6 +85,7 @@ Operational reference:
 Tracking tasks:
 - `TASKS/assessment/optimize-hemma-offload-throughput.md`
 - `TASKS/assessment/essay-scoring-sensible-progress-logs-for-feature-extraction.md`
+- `TASKS/assessment/essay-scoring-progressjson-counters-for-long-runs.md`
 
 Decision gate:
 - Only optimize throughput after you can attribute time to a concrete bottleneck (LT vs embeddings vs IO),

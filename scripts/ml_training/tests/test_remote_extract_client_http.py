@@ -29,7 +29,11 @@ class _CountingEmbedder:
 
 
 @pytest.mark.asyncio
-async def test_remote_extract_client_roundtrip_http_and_caches(tmp_path, monkeypatch) -> None:
+async def test_remote_extract_client_roundtrip_http_and_caches(
+    requires_localhost_socket: None,
+    tmp_path,
+    monkeypatch,
+) -> None:
     settings.OFFLOAD_LANGUAGE_TOOL_JAR_VERSION = "6.3"
 
     def _fake_fetch_remote(  # noqa: ARG001

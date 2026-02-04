@@ -1,11 +1,20 @@
-"""ANCHOR_ALIGN_TEST mode handler for ENG5 NP runner.
+"""ANCHOR_ALIGN_TEST mode handler for the ENG5 NP runner.
 
-Runs CJ on anchor essays only (no DB anchors) to measure prompt alignment.
+Purpose:
+    Run CJ on anchor essays only (treated as students) to measure prompt/rubric alignment against
+    expert anchor grades without relying on DB-owned anchors or grade projection.
+
+Relationships:
+    - Uses GUEST semantics (`assignment_id=None`) when composing the CJ request.
+    - Uses `upload_cache` to reuse Content Service `storage_id` results across repeated prompt
+      experiments.
+    - Generates a markdown alignment report via `alignment_report.generate_alignment_report`.
 """
 
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -41,6 +50,10 @@ from scripts.cj_experiments_runners.eng5_np.requests import (
     write_cj_request_envelope,
 )
 from scripts.cj_experiments_runners.eng5_np.schema import ensure_schema_available
+from scripts.cj_experiments_runners.eng5_np.upload_cache import (
+    default_cache_path,
+    upload_records_with_cache,
+)
 from scripts.cj_experiments_runners.eng5_np.utils import make_anchor_key
 
 if TYPE_CHECKING:
@@ -155,16 +168,29 @@ class AnchorAlignHandler:
         # Build mapping from anchor file name to normalized anchor ID for essay IDs
         anchor_id_lookup = load_anchor_id_lookup(inventory.anchors_csv)
 
-        # Upload anchor essays to Content Service (treat as students)
-        typer.echo(
-            f"Uploading {len(anchor_files)} anchor essays to Content Service",
-            err=True,
+        # Upload anchor essays to Content Service (treat as students), with disk cache.
+        cache_path = default_cache_path(output_dir=settings.output_dir)
+
+        def _uploader(records: Sequence[FileRecord], url: str) -> dict[str, str]:
+            return asyncio.run(upload_essays_parallel(records=records, content_service_url=url))
+
+        storage_id_map, outcome = upload_records_with_cache(
+            records=anchor_files,
+            content_service_url=settings.content_service_url,
+            cache_path=cache_path,
+            force_reupload=settings.force_reupload,
+            uploader=_uploader,
         )
-        storage_id_map = asyncio.run(
-            upload_essays_parallel(
-                records=anchor_files,
-                content_service_url=settings.content_service_url,
+        if outcome.cache_ignored_reason:
+            typer.echo(
+                f"⚠️  Upload cache ignored ({outcome.cache_ignored_reason}); starting fresh.",
+                err=True,
             )
+        typer.echo(
+            "Content upload cache: "
+            f"reused={outcome.reused_count} uploaded={outcome.uploaded_count} "
+            f"path={outcome.cache_path}",
+            err=True,
         )
 
         # Build essay refs - all anchors treated as students (no is_anchor flag)

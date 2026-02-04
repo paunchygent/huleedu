@@ -29,7 +29,7 @@ from scripts.ml_training.essay_scoring.features.utils import (
     split_paragraphs,
     variance,
 )
-from scripts.ml_training.essay_scoring.logging_utils import ProgressLogger
+from scripts.ml_training.essay_scoring.logging_utils import ProgressLogger, ProgressWriter
 
 if TYPE_CHECKING:
     from sentence_transformers import SentenceTransformer
@@ -76,6 +76,7 @@ class Tier2FeatureExtractor:
     embedding_extractor: EmbeddingExtractorProtocol | None = None
     sentence_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     local_embedder: "SentenceTransformer | None" = None
+    progress: ProgressWriter | None = None
 
     def __post_init__(self) -> None:
         if self.nlp is None:
@@ -169,6 +170,13 @@ class Tier2FeatureExtractor:
                 }
             )
             stage1_progress.update(index)
+            if self.progress is not None:
+                self.progress.update(
+                    substage="tier2.stage1_parse",
+                    processed=index + 1,
+                    total=len(texts),
+                    unit="records",
+                )
 
         logger.info("Tier2 stage1 parse complete in %.2fs", time.monotonic() - stage1_start)
 
@@ -200,6 +208,14 @@ class Tier2FeatureExtractor:
                     len(texts),
                     len(unique_texts),
                 )
+            if self.progress is not None:
+                self.progress.update(
+                    substage="tier2.stage2_unique_texts",
+                    processed=index + 1,
+                    total=len(texts),
+                    unit="records",
+                    details={"unique_texts": int(len(unique_texts))},
+                )
 
         logger.info(
             "Tier2 stage2 unique text collection complete (unique_texts=%d) in %.2fs",
@@ -209,8 +225,26 @@ class Tier2FeatureExtractor:
 
         logger.info("Tier2 embeddings start (unique_texts=%d)", len(unique_texts))
         start = time.monotonic()
+        if self.progress is not None:
+            self.progress.update(
+                substage="tier2.embeddings_unique_texts",
+                processed=0,
+                total=len(unique_texts),
+                unit="texts",
+                details={"unique_texts": int(len(unique_texts))},
+                force=True,
+            )
         embedding_matrix = self._embed_texts(unique_texts, normalize_embeddings=False)
         elapsed = time.monotonic() - start
+        if self.progress is not None:
+            self.progress.update(
+                substage="tier2.embeddings_unique_texts",
+                processed=len(unique_texts),
+                total=len(unique_texts),
+                unit="texts",
+                details={"shape": list(embedding_matrix.shape)},
+                force=True,
+            )
         logger.info(
             "Tier2 embeddings complete (shape=%s) in %.2fs", embedding_matrix.shape, elapsed
         )
@@ -254,6 +288,13 @@ class Tier2FeatureExtractor:
             )
             if (index + 1) % 100 == 0 or index == len(texts) - 1:
                 logger.info("Tier2 progress %d/%d", index + 1, len(texts))
+            if self.progress is not None:
+                self.progress.update(
+                    substage="tier2.stage3_features",
+                    processed=index + 1,
+                    total=len(texts),
+                    unit="records",
+                )
 
         return Tier2BatchResult(
             features=features,

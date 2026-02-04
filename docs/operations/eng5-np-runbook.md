@@ -82,6 +82,8 @@ pdm run eng5-np-run \
 
 > Optional: `--auto-extract-eng5-db` runs the DB extraction helper after completion (requires `--await-completion`).
 
+> Optional: Content uploads use a disk-backed cache stored under the runner output directory (default: `.claude/research/data/eng5_np_2016/content_upload_cache.json`). This avoids re-uploading unchanged essays across repeated runs. Use `--force-reupload` to bypass the cache (for example after a Content Service reset). If `--content-service-url` changes, the runner ignores the existing cache and starts fresh.
+
 > Advanced rollout control: `--llm-batching-mode per_request|serial_bundle|provider_batch_api` publishes `llm_batching_mode_hint` in the CJ request envelope metadata. This is a per-batch hint only; CJ and LLM Provider remain authoritative via their own env vars.
 
 ### Provider batch API trials (Phase 2)

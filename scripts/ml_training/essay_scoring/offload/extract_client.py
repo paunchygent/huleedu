@@ -24,6 +24,7 @@ from scripts.ml_training.essay_scoring.features.schema import (
     build_feature_schema,
     feature_names_for,
 )
+from scripts.ml_training.essay_scoring.logging_utils import ProgressWriter
 from scripts.ml_training.essay_scoring.offload.extract_models import ExtractMeta
 from scripts.ml_training.essay_scoring.offload.metrics import OffloadMetricsCollector
 
@@ -49,6 +50,7 @@ class RemoteExtractClient:
     embedding_config: EmbeddingConfig
     offload_config: OffloadConfig
     metrics: OffloadMetricsCollector | None = None
+    progress: ProgressWriter | None = None
 
     def extract(
         self, texts: list[str], prompts: list[str], feature_set: FeatureSet
@@ -184,6 +186,23 @@ class RemoteExtractClient:
             cache_misses_embedding,
             cache_misses_extract,
         )
+        if self.progress is not None:
+            self.progress.update(
+                substage="offload.extract.cache_scan",
+                processed=len(texts),
+                total=len(texts),
+                unit="records",
+                details={
+                    "ready_from_cache": int(ready_from_cache),
+                    "missing": int(len(missing_texts)),
+                    "cache_hits_embedding": int(cache_hits_embedding),
+                    "cache_hits_extract": int(cache_hits_extract),
+                    "cache_misses_embedding": int(cache_misses_embedding),
+                    "cache_misses_extract": int(cache_misses_extract),
+                    "elapsed_s": round(cache_scan_elapsed, 2),
+                },
+                force=True,
+            )
 
         fetched_meta: ExtractMeta | None = None
         if missing_texts:
@@ -358,6 +377,21 @@ class RemoteExtractClient:
                         rate,
                         eta,
                     )
+                    if self.progress is not None:
+                        self.progress.update(
+                            substage="offload.extract.fetch_missing",
+                            processed=ready_total,
+                            total=total_records,
+                            unit="records",
+                            details={
+                                "ready_from_cache": int(ready_from_cache),
+                                "fetched": int(fetched_items),
+                                "missing_total": int(len(texts)),
+                                "batches": int(batch_count),
+                                "last_batch_items": int(len(chunk_texts)),
+                                "last_batch_elapsed_s": round(chunk_elapsed, 2),
+                            },
+                        )
                     last_progress_log = now
         else:
             logger.info("Hemma extract using in-flight concurrency=%d", max_in_flight)
@@ -449,6 +483,21 @@ class RemoteExtractClient:
                                 rate,
                                 eta,
                             )
+                            if self.progress is not None:
+                                self.progress.update(
+                                    substage="offload.extract.fetch_missing",
+                                    processed=ready_total,
+                                    total=total_records,
+                                    unit="records",
+                                    details={
+                                        "ready_from_cache": int(ready_from_cache),
+                                        "fetched": int(fetched_items),
+                                        "missing_total": int(len(texts)),
+                                        "batches": int(batch_count),
+                                        "last_batch_items": int(n_items),
+                                        "last_batch_elapsed_s": round(chunk_elapsed, 2),
+                                    },
+                                )
                             last_progress_log = now
 
                         next_to_flush += 1

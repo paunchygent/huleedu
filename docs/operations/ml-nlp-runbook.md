@@ -121,6 +121,8 @@ Split schemes:
 ```bash
 pdm run essay-scoring-research cv \
   --dataset-kind ellipse \
+  --ellipse-train-path output/essay_scoring/<PREP_RUN>/artifacts/datasets/ellipse_train_prepared.csv \
+  --ellipse-test-path output/essay_scoring/<PREP_RUN>/artifacts/datasets/ellipse_test_prepared.csv \
   --splits-path output/essay_scoring/<SPLITS_RUN>/artifacts/splits.json \
   --scheme stratified_text \
   --feature-set combined \
@@ -139,6 +141,8 @@ Outputs:
 ```bash
 pdm run essay-scoring-research cv \
   --dataset-kind ellipse \
+  --ellipse-train-path output/essay_scoring/<PREP_RUN>/artifacts/datasets/ellipse_train_prepared.csv \
+  --ellipse-test-path output/essay_scoring/<PREP_RUN>/artifacts/datasets/ellipse_test_prepared.csv \
   --splits-path output/essay_scoring/<SPLITS_RUN>/artifacts/splits.json \
   --scheme stratified_text \
   --feature-set combined \
@@ -152,6 +156,8 @@ Drop-column importance answers: “does this handcrafted feature add signal beyo
 ```bash
 pdm run essay-scoring-research drop-column \
   --dataset-kind ellipse \
+  --ellipse-train-path output/essay_scoring/<PREP_RUN>/artifacts/datasets/ellipse_train_prepared.csv \
+  --ellipse-test-path output/essay_scoring/<PREP_RUN>/artifacts/datasets/ellipse_test_prepared.csv \
   --splits-path output/essay_scoring/<SPLITS_RUN>/artifacts/splits.json \
   --scheme stratified_text \
   --feature-set combined \
@@ -174,8 +180,23 @@ Decision heuristic (starting point; tune after you see results):
 Each run directory contains:
 - `run.log` (INFO-level, full stage + progress logs)
 - `status.json` (single file updated at stage start/complete with a UTC timestamp)
+- `progress.json` (single file updated during long stages with **substage** processed/total + ETA)
 - `stderr.log` (captured stderr for the run; includes Python tracebacks and tool warnings)
 - `fault.log` (faulthandler output: segfault traces + periodic hang stack dumps)
+
+### Monitor progress without log tailing
+
+For runs started after `progress.json` was added, prefer monitoring this file instead of parsing logs:
+
+```bash
+RUN_DIR=output/essay_scoring/<RUN>/
+cat "${RUN_DIR}/progress.json"
+```
+
+If you have `jq` installed:
+```bash
+cat "${RUN_DIR}/progress.json" | jq
+```
 
 Important:
 - `fault.log` is not “a crash file” by default: the research runner enables periodic
@@ -290,3 +311,24 @@ YYYY-MM-DD: <run-name>
 - results:
   - notes:
     - Splits report: `output/essay_scoring/20260204_135554_ellipse_splits_200_1000/reports/splits_report.md`
+
+2026-02-04: `ellipse_cv_combined_stratified_text_20260204_150321`
+- command: `pdm run essay-scoring-research cv --dataset-kind ellipse --ellipse-train-path output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_train_prepared.csv --ellipse-test-path output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_test_prepared.csv --splits-path output/essay_scoring/20260204_135554_ellipse_splits_200_1000/artifacts/splits.json --scheme stratified_text --feature-set combined --language-tool-service-url http://127.0.0.1:18085 --embedding-service-url http://127.0.0.1:19000 --run-name ellipse_cv_combined_stratified_text_20260204_150321`
+- dataset: ELLIPSE (train/test), 200–1000 words, excluded prompts: (see `ExperimentConfig.ellipse_excluded_prompts`)
+- splits: `output/essay_scoring/20260204_135554_ellipse_splits_200_1000/artifacts/splits.json` (scheme=stratified_text)
+- output: `output/essay_scoring/20260204_140326_ellipse_cv_combined_stratified_text_20260204_150321/`
+- results:
+  - QWK (CV val mean±std): 0.62623 ± 0.01793
+  - notes:
+    - CV feature store: `output/essay_scoring/20260204_140326_ellipse_cv_combined_stratified_text_20260204_150321/cv_feature_store`
+
+2026-02-04: `ellipse_cv_combined_prompt_holdout_20260204_150321`
+- command: `pdm run essay-scoring-research cv --dataset-kind ellipse --ellipse-train-path output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_train_prepared.csv --ellipse-test-path output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_test_prepared.csv --splits-path output/essay_scoring/20260204_135554_ellipse_splits_200_1000/artifacts/splits.json --scheme prompt_holdout --feature-set combined --language-tool-service-url http://127.0.0.1:18085 --embedding-service-url http://127.0.0.1:19000 --run-name ellipse_cv_combined_prompt_holdout_20260204_150321`
+- dataset: ELLIPSE (train/test), 200–1000 words, excluded prompts: (see `ExperimentConfig.ellipse_excluded_prompts`)
+- splits: `output/essay_scoring/20260204_135554_ellipse_splits_200_1000/artifacts/splits.json` (scheme=prompt_holdout)
+- output: `output/essay_scoring/20260204_144831_ellipse_cv_combined_prompt_holdout_20260204_150321/`
+- results:
+  - QWK (CV val mean±std): 0.61832 ± 0.02396
+  - notes:
+    - Primary yardstick for CV-first selection (unseen prompt generalization).
+    - Future runs: prefer `--reuse-cv-feature-store-dir output/essay_scoring/<STRAT_CV_RUN>/cv_feature_store` to avoid re-extraction.

@@ -24,7 +24,10 @@ class _CountingEmbedder:
 
 
 @pytest.mark.asyncio
-async def test_offload_extract_combined_returns_zip_with_meta_and_arrays(monkeypatch) -> None:
+async def test_offload_extract_combined_returns_zip_with_meta_and_arrays(
+    requires_localhost_socket: None,
+    monkeypatch,
+) -> None:
     settings.OFFLOAD_LANGUAGE_TOOL_JAR_VERSION = "6.3"
 
     def _fake_fetch_remote(  # noqa: ARG001
@@ -95,7 +98,9 @@ async def test_offload_extract_combined_returns_zip_with_meta_and_arrays(monkeyp
 
 
 @pytest.mark.asyncio
-async def test_offload_extract_invalid_request_includes_correlation_id() -> None:
+async def test_offload_extract_invalid_request_includes_correlation_id(
+    requires_localhost_socket: None,
+) -> None:
     settings.OFFLOAD_LANGUAGE_TOOL_JAR_VERSION = "6.3"
 
     embedder = _CountingEmbedder()

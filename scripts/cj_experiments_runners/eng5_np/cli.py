@@ -371,6 +371,31 @@ def _load_prompt_file(path: Path | None, label: str) -> str | None:
     return content
 
 
+def _parse_course_code(raw: str) -> CourseCode:
+    normalized = raw.strip().upper()
+    try:
+        return CourseCode(normalized)
+    except ValueError as exc:
+        valid = ", ".join(sorted(code.value for code in CourseCode))
+        raise typer.BadParameter(
+            f"Invalid --course-code value: {raw!r}. Valid values are: {valid}.",
+            param_hint="'--course-code'",
+        ) from exc
+
+
+def _parse_language(raw: str) -> Language:
+    normalized = raw.strip().lower()
+    for lang in Language:
+        if normalized == lang.value.lower():
+            return lang
+
+    valid = ", ".join(sorted(lang.value for lang in Language))
+    raise typer.BadParameter(
+        f"Invalid --language value: {raw!r}. Valid values are: {valid}.",
+        param_hint="'--language'",
+    )
+
+
 @app.callback(invoke_without_command=True)
 def main(
     ctx: typer.Context,
@@ -410,15 +435,15 @@ def main(
         None,
         help="Optional organization identifier",
     ),
-    course_code: CourseCode = typer.Option(  # type: ignore[arg-type]
-        CourseCode.ENG5,
+    course_code: str = typer.Option(
+        CourseCode.ENG5.value,
         case_sensitive=False,
-        help="Course code for CJ request",
+        help="Course code for CJ request (e.g., ENG5, ENG6, SV1)",
     ),
-    language: Language = typer.Option(  # type: ignore[arg-type]
-        Language.ENGLISH,
+    language: str = typer.Option(
+        Language.ENGLISH.value,
         case_sensitive=False,
-        help="Essay language (defaults to ENG5 English)",
+        help="Essay language (e.g., en, sv)",
     ),
     no_kafka: bool = typer.Option(
         False,
@@ -443,6 +468,14 @@ def main(
     content_service_url: str = typer.Option(
         os.getenv("CONTENT_SERVICE_URL", "http://localhost:8001/v1/content"),
         help="Content Service upload endpoint",
+    ),
+    force_reupload: bool = typer.Option(
+        False,
+        "--force-reupload",
+        help=(
+            "Re-upload all essays even if a cached storage_id exists. This refreshes the "
+            "disk-backed upload cache stored under the runner output directory."
+        ),
     ),
     llm_provider: str | None = typer.Option(
         None,
@@ -739,6 +772,9 @@ def main(
     else:
         system_prompt_override = build_cj_system_prompt() if cj_system_prompt else None
 
+    course_code_value = _parse_course_code(course_code)
+    language_value = _parse_language(language)
+
     settings = RunnerSettings(
         assignment_id=assignment_id,
         cj_assignment_id=None if mode is RunnerMode.ANCHOR_ALIGN_TEST else assignment_id,
@@ -754,13 +790,14 @@ def main(
         batch_id=batch_id,
         user_id=user_id,
         org_id=org_id,
-        course_code=course_code,
-        language=language,
+        course_code=course_code_value,
+        language=language_value,
         correlation_id=uuid.uuid4(),
         kafka_bootstrap=kafka_bootstrap,
         kafka_client_id=kafka_client_id,
         cj_service_url=cj_service_url,
         content_service_url=content_service_url,
+        force_reupload=force_reupload,
         llm_overrides=_build_llm_overrides(
             provider=effective_llm_provider,
             model=effective_llm_model,

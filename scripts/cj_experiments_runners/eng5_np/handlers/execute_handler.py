@@ -1,12 +1,21 @@
-"""EXECUTE mode handler for ENG5 NP runner.
+"""EXECUTE mode handler for the ENG5 NP runner.
 
-Full execution: student essay upload, Kafka publishing, optional post-run extraction.
+Purpose:
+    Orchestrate a full ENG5 run: validate prerequisites, upload student essays, publish a CJ
+    request to Kafka, optionally await completion, and optionally extract post-run DB diagnostics.
+
+Relationships:
+    - Consumes `RunnerSettings` and `RunnerInventory` built by
+      `scripts.cj_experiments_runners.eng5_np.cli`.
+    - Uses `content_upload` for Content Service uploads and `kafka_flow` for publishing.
+    - Uses `upload_cache` to persist Content Service `storage_id` results across runs.
 """
 
 from __future__ import annotations
 
 import asyncio
 import time
+from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 import aiohttp
@@ -42,6 +51,10 @@ from scripts.cj_experiments_runners.eng5_np.requests import (
     write_cj_request_envelope,
 )
 from scripts.cj_experiments_runners.eng5_np.schema import ensure_schema_available
+from scripts.cj_experiments_runners.eng5_np.upload_cache import (
+    default_cache_path,
+    upload_records_with_cache,
+)
 
 if TYPE_CHECKING:
     from scripts.cj_experiments_runners.eng5_np.inventory import RunnerInventory
@@ -239,17 +252,30 @@ class ExecuteHandler:
         Returns:
             Mapping of checksum to storage_id
         """
+        cache_path = default_cache_path(output_dir=settings.output_dir)
+
+        def _uploader(records: Sequence[FileRecord], url: str) -> dict[str, str]:
+            return asyncio.run(upload_essays_parallel(records=records, content_service_url=url))
+
+        storage_id_map, outcome = upload_records_with_cache(
+            records=students,
+            content_service_url=settings.content_service_url,
+            cache_path=cache_path,
+            force_reupload=settings.force_reupload,
+            uploader=_uploader,
+        )
+        if outcome.cache_ignored_reason:
+            typer.echo(
+                f"⚠️  Upload cache ignored ({outcome.cache_ignored_reason}); starting fresh.",
+                err=True,
+            )
         typer.echo(
-            f"Uploading {len(students)} essays to Content Service at "
-            f"{settings.content_service_url}",
+            "Content upload cache: "
+            f"reused={outcome.reused_count} uploaded={outcome.uploaded_count} "
+            f"path={outcome.cache_path}",
             err=True,
         )
-        return asyncio.run(
-            upload_essays_parallel(
-                records=students,
-                content_service_url=settings.content_service_url,
-            )
-        )
+        return storage_id_map
 
     def _upload_prompt(
         self,

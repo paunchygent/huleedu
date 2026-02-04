@@ -45,6 +45,22 @@ Option A (preferred, explicit CV per feature set):
   - `--feature-set embeddings`
   - `--feature-set combined`
 
+Recommended command pattern (per feature set):
+
+- Define canonical inputs (from the prep/splits task):
+  - `PREP_TRAIN_CSV=output/essay_scoring/<PREP_RUN>/artifacts/datasets/ellipse_train_prepared.csv`
+  - `PREP_TEST_CSV=output/essay_scoring/<PREP_RUN>/artifacts/datasets/ellipse_test_prepared.csv`
+  - `SPLITS_JSON=output/essay_scoring/<SPLITS_RUN>/artifacts/splits.json`
+
+- For each `FEATURE_SET` in `{handcrafted,embeddings,combined}`:
+  1) Run `scheme=stratified_text` first (creates the CV feature store for that feature set):
+     - `pdm run essay-scoring-research cv --dataset-kind ellipse --ellipse-train-path "$PREP_TRAIN_CSV" --ellipse-test-path "$PREP_TEST_CSV" --splits-path "$SPLITS_JSON" --scheme stratified_text --feature-set "$FEATURE_SET" --language-tool-service-url http://127.0.0.1:18085 --embedding-service-url http://127.0.0.1:19000 --run-name ellipse_cv_${FEATURE_SET}_stratified_text`
+  2) Run `scheme=prompt_holdout` reusing that store (avoids re-extraction):
+     - `pdm run essay-scoring-research cv --dataset-kind ellipse --ellipse-train-path "$PREP_TRAIN_CSV" --ellipse-test-path "$PREP_TEST_CSV" --splits-path "$SPLITS_JSON" --scheme prompt_holdout --feature-set "$FEATURE_SET" --reuse-cv-feature-store-dir output/essay_scoring/<STRAT_CV_RUN_FOR_FEATURE_SET>/cv_feature_store --run-name ellipse_cv_${FEATURE_SET}_prompt_holdout`
+
+Operational:
+- Monitor by script via `output/essay_scoring/<RUN>/progress.json`.
+
 Option B (only if you explicitly want single-run ablation):
 - `pdm run essay-scoring-research ablation --dataset-kind ellipse --backend hemma --offload-service-url http://127.0.0.1:19000 --run-name ellipse_ablation_hemma_single_split`
 
