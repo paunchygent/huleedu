@@ -136,6 +136,20 @@ Decision heuristic (starting point; tune after you see results):
 - Keep if mean ΔQWK > 0 and stability ≥ 0.8 (helps in ≥80% of folds).
 - Drop if mean ΔQWK ≤ 0 or stability is low (likely noisy / redundant).
 
+## Observability
+
+Each run directory contains:
+- `run.log` (INFO-level, full stage + progress logs)
+- `status.json` (single file updated at stage start/complete with a UTC timestamp)
+
+Tier logging notes:
+- Tier 1 logs per-item progress and whether it is running with local vs tunneled LanguageTool.
+- Tier 2 logs:
+  - **stage1** parse/syntactic progress (pre-embeddings; this was previously a common “silent gap”)
+  - **stage2** unique-text collection progress (builds the deduped embed batch)
+  - embedding start/complete + per-100 progress in stage3
+- Tier 3 logs per-item progress.
+
 ## Caching + performance notes
 
 ### LanguageTool (Tier 1 error counts)

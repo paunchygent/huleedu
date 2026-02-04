@@ -14,7 +14,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import language_tool_python
 from spacy.language import Language
 
 from scripts.ml_training.essay_scoring.features.schema import Tier1Features
@@ -52,14 +51,13 @@ class Tier1FeatureExtractor:
     def __post_init__(self) -> None:
         self._tool = None
         if self.language_tool_url is None:
+            import language_tool_python  # noqa: PLC0415
+
             self._tool = language_tool_python.LanguageTool(self.language)
         if self.nlp is None:
             self.nlp = load_spacy_model(self.spacy_model)
         else:
             ensure_textdescriptives_readability(self.nlp)
-
-        if self.language_tool_url is not None and self.language_tool_cache_dir is None:
-            self.language_tool_cache_dir = Path("output/essay_scoring/.cache/offload_language_tool")
 
     def extract(self, text: str) -> Tier1Features:
         """Extract Tier 1 features from essay text."""
@@ -85,10 +83,12 @@ class Tier1FeatureExtractor:
         if not texts:
             return []
 
+        start = time.monotonic()
         cleaned_texts = [normalize_whitespace(text) for text in texts]
         progress = ProgressLogger(logger, "Tier1", len(cleaned_texts))
 
         if self.language_tool_url is None:
+            logger.info("Tier1 start (mode=local, n=%d)", len(cleaned_texts))
             features: list[Tier1Features] = []
             if self.nlp is None:
                 raise RuntimeError("spaCy pipeline not initialized for Tier 1 extractor.")
@@ -109,8 +109,19 @@ class Tier1FeatureExtractor:
                     )
                 )
                 progress.update(index)
+            logger.info(
+                "Tier1 complete (mode=local, n=%d) in %.2fs", len(texts), time.monotonic() - start
+            )
             return features
 
+        logger.info(
+            "Tier1 start (mode=remote, n=%d, max_concurrency=%d, cache_dir=%s)",
+            len(cleaned_texts),
+            int(self.language_tool_max_concurrency),
+            str(self.language_tool_cache_dir)
+            if self.language_tool_cache_dir is not None
+            else "<disabled>",
+        )
         max_workers = max(1, int(self.language_tool_max_concurrency))
         with ThreadPoolExecutor(max_workers=max_workers) as pool:
             futures = [pool.submit(self._remote_error_counts, cleaned) for cleaned in cleaned_texts]
@@ -127,7 +138,9 @@ class Tier1FeatureExtractor:
                 stats_by_index.append(self._compute_text_stats_from_doc(doc))
                 progress.update(index)
 
+            logger.info("Tier1 awaiting LanguageTool results (n=%d)", len(futures))
             counts_by_index = [future.result() for future in futures]
+            logger.info("Tier1 LanguageTool results complete (n=%d)", len(futures))
 
         features = []
         for stats, (grammar_count, spelling_count, punctuation_count) in zip(
@@ -141,6 +154,9 @@ class Tier1FeatureExtractor:
                     punctuation_count=punctuation_count,
                 )
             )
+        logger.info(
+            "Tier1 complete (mode=remote, n=%d) in %.2fs", len(texts), time.monotonic() - start
+        )
         return features
 
     def _compute_text_stats(self, cleaned: str) -> dict[str, float]:

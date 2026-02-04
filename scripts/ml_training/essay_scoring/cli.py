@@ -6,7 +6,12 @@ from pathlib import Path
 
 import typer
 
-from scripts.ml_training.essay_scoring.config import DatasetKind, ExperimentConfig, FeatureSet
+from scripts.ml_training.essay_scoring.config import (
+    DatasetKind,
+    ExperimentConfig,
+    FeatureSet,
+    OffloadBackend,
+)
 from scripts.ml_training.essay_scoring.cross_validation import run_cross_validation
 from scripts.ml_training.essay_scoring.dataset_preparation import prepare_dataset
 from scripts.ml_training.essay_scoring.drop_column_importance import run_drop_column_importance
@@ -51,6 +56,14 @@ def run_command(
         None,
         help="Optional run name suffix",
     ),
+    backend: OffloadBackend = typer.Option(
+        OffloadBackend.LOCAL,
+        help="Feature extraction backend (local or hemma).",
+    ),
+    offload_service_url: str | None = typer.Option(
+        None,
+        help="Combined offload service base URL (Hemma tunnel), e.g. http://127.0.0.1:19000.",
+    ),
     embedding_service_url: str | None = typer.Option(
         None,
         help="Optional Hemma embedding offload base URL (e.g. http://127.0.0.1:19000).",
@@ -82,6 +95,8 @@ def run_command(
         ellipse_train_path=ellipse_train_path,
         ellipse_test_path=ellipse_test_path,
         run_name=run_name,
+        backend=backend,
+        offload_service_url=offload_service_url,
         embedding_service_url=embedding_service_url,
         language_tool_service_url=language_tool_service_url,
     )
@@ -125,6 +140,14 @@ def featurize_command(
         None,
         help="Optional run name suffix",
     ),
+    backend: OffloadBackend = typer.Option(
+        OffloadBackend.LOCAL,
+        help="Feature extraction backend (local or hemma).",
+    ),
+    offload_service_url: str | None = typer.Option(
+        None,
+        help="Combined offload service base URL (Hemma tunnel), e.g. http://127.0.0.1:19000.",
+    ),
     embedding_service_url: str | None = typer.Option(
         None,
         help="Optional Hemma embedding offload base URL (e.g. http://127.0.0.1:19000).",
@@ -144,6 +167,8 @@ def featurize_command(
         ellipse_train_path=ellipse_train_path,
         ellipse_test_path=ellipse_test_path,
         run_name=run_name,
+        backend=backend,
+        offload_service_url=offload_service_url,
         embedding_service_url=embedding_service_url,
         language_tool_service_url=language_tool_service_url,
     )
@@ -173,6 +198,14 @@ def ablation_command(
         None,
         help="Override ELLIPSE test CSV path (only used when --dataset-kind=ellipse).",
     ),
+    backend: OffloadBackend = typer.Option(
+        OffloadBackend.LOCAL,
+        help="Feature extraction backend (local or hemma).",
+    ),
+    offload_service_url: str | None = typer.Option(
+        None,
+        help="Combined offload service base URL (Hemma tunnel), e.g. http://127.0.0.1:19000.",
+    ),
     embedding_service_url: str | None = typer.Option(
         None,
         help="Optional Hemma embedding offload base URL (e.g. http://127.0.0.1:19000).",
@@ -192,6 +225,8 @@ def ablation_command(
         ellipse_train_path=ellipse_train_path,
         ellipse_test_path=ellipse_test_path,
         run_name=None,
+        backend=backend,
+        offload_service_url=offload_service_url,
         embedding_service_url=embedding_service_url,
         language_tool_service_url=language_tool_service_url,
     )
@@ -244,6 +279,8 @@ def prepare_dataset_command(
         ellipse_train_path=ellipse_train_path,
         ellipse_test_path=ellipse_test_path,
         run_name=run_name,
+        backend=OffloadBackend.LOCAL,
+        offload_service_url=None,
         embedding_service_url=None,
         language_tool_service_url=None,
     )
@@ -302,6 +339,8 @@ def make_splits_command(
         ellipse_train_path=ellipse_train_path,
         ellipse_test_path=ellipse_test_path,
         run_name=run_name,
+        backend=OffloadBackend.LOCAL,
+        offload_service_url=None,
         embedding_service_url=None,
         language_tool_service_url=None,
     )
@@ -347,6 +386,14 @@ def cv_command(
         None,
         help="Optional run name suffix",
     ),
+    backend: OffloadBackend = typer.Option(
+        OffloadBackend.LOCAL,
+        help="Feature extraction backend (local or hemma).",
+    ),
+    offload_service_url: str | None = typer.Option(
+        None,
+        help="Combined offload service base URL (Hemma tunnel), e.g. http://127.0.0.1:19000.",
+    ),
     embedding_service_url: str | None = typer.Option(
         None,
         help="Optional Hemma embedding offload base URL (e.g. http://127.0.0.1:19000).",
@@ -380,6 +427,8 @@ def cv_command(
         ellipse_train_path=ellipse_train_path,
         ellipse_test_path=ellipse_test_path,
         run_name=run_name,
+        backend=backend,
+        offload_service_url=offload_service_url,
         embedding_service_url=embedding_service_url,
         language_tool_service_url=language_tool_service_url,
     )
@@ -434,6 +483,14 @@ def drop_column_command(
         None,
         help="Optional run name suffix",
     ),
+    backend: OffloadBackend = typer.Option(
+        OffloadBackend.LOCAL,
+        help="Feature extraction backend (local or hemma).",
+    ),
+    offload_service_url: str | None = typer.Option(
+        None,
+        help="Combined offload service base URL (Hemma tunnel), e.g. http://127.0.0.1:19000.",
+    ),
     embedding_service_url: str | None = typer.Option(
         None,
         help="Optional Hemma embedding offload base URL (e.g. http://127.0.0.1:19000).",
@@ -467,6 +524,8 @@ def drop_column_command(
         ellipse_train_path=ellipse_train_path,
         ellipse_test_path=ellipse_test_path,
         run_name=run_name,
+        backend=backend,
+        offload_service_url=offload_service_url,
         embedding_service_url=embedding_service_url,
         language_tool_service_url=language_tool_service_url,
     )
@@ -499,6 +558,8 @@ def _apply_overrides(
     ellipse_train_path: Path | None,
     ellipse_test_path: Path | None,
     run_name: str | None,
+    backend: OffloadBackend,
+    offload_service_url: str | None,
     embedding_service_url: str | None,
     language_tool_service_url: str | None,
 ) -> ExperimentConfig:
@@ -513,17 +574,28 @@ def _apply_overrides(
     if run_name is not None:
         updated_output = config.output.model_copy(update={"run_name": run_name})
         config = config.model_copy(update={"output": updated_output})
-    if embedding_service_url or language_tool_service_url:
-        updated_offload = config.offload.model_copy(
-            update={
-                "embedding_service_url": (
-                    embedding_service_url or config.offload.embedding_service_url
-                ),
-                "language_tool_service_url": language_tool_service_url
-                or config.offload.language_tool_service_url,
-            }
+
+    if backend == OffloadBackend.HEMMA and (embedding_service_url or language_tool_service_url):
+        raise typer.BadParameter(
+            "backend=hemma does not allow embedding_service_url/language_tool_service_url. "
+            "Use --offload-service-url only (single-tunnel mode)."
         )
-        config = config.model_copy(update={"offload": updated_offload})
+
+    updated_offload = config.offload.model_copy(
+        update={
+            "backend": backend,
+            "offload_service_url": offload_service_url or config.offload.offload_service_url,
+            "embedding_service_url": (embedding_service_url or config.offload.embedding_service_url)
+            if backend != OffloadBackend.HEMMA
+            else None,
+            "language_tool_service_url": (
+                language_tool_service_url or config.offload.language_tool_service_url
+            )
+            if backend != OffloadBackend.HEMMA
+            else None,
+        }
+    )
+    config = config.model_copy(update={"offload": updated_offload})
     return config
 
 

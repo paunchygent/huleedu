@@ -73,24 +73,21 @@ pdm run essay-scoring-research drop-column --dataset-kind ellipse --feature-set 
 Note: DeBERTa embeddings require `sentencepiece` + `tiktoken` (included in `ml-research`)
 and the first run will download model weights from Hugging Face.
 
-### Hemma Offload (WIP)
+### Hemma Offload (single tunnel)
 
-Current workflow (two tunnels):
-- LanguageTool on Hemma: `http://127.0.0.1:18085` (tunnel to `127.0.0.1:8085` on Hemma)
-- Embedding offload on Hemma: `http://127.0.0.1:19000` (tunnel to `127.0.0.1:9000` on Hemma)
+Current workflow (one tunnel):
+- Combined offload service on Hemma: `http://127.0.0.1:19000` (tunnel to `127.0.0.1:9000` on Hemma)
+- Optional: LanguageTool direct tunnel (debug only): `http://127.0.0.1:18085` (tunnel to `127.0.0.1:8085`)
 
-Implemented (2026-02-01):
-- Embedding offload server (research-scoped): `scripts/ml_training/essay_scoring/offload/server.py`
+Implemented (2026-02-04):
+- Combined offload endpoint: `POST /v1/extract` in `scripts/ml_training/essay_scoring/offload/server.py`
 - Dockerfile: `scripts/ml_training/essay_scoring/offload/Dockerfile`
 - Research CLI flags:
-  - `--language-tool-service-url http://127.0.0.1:18085`
-  - `--embedding-service-url http://127.0.0.1:19000`
+  - `--backend hemma`
+  - `--offload-service-url http://127.0.0.1:19000`
 
-Planned next step (one tunnel, no local fallbacks):
-- Add a single combined endpoint `POST /v1/extract` on the offload service that returns
-  embeddings + spaCy/TextDescriptives features + LanguageTool-derived densities in one response,
-  and calls LanguageTool internally so the Mac only needs `:19000`.
-- Tracking: `TASKS/assessment/hemma-offload-combined-extract-endpoint.md`
+Tracking:
+- `TASKS/assessment/hemma-offload-combined-extract-endpoint.md`
 
 ---
 

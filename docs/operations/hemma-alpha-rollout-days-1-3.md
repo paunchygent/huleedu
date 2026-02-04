@@ -348,7 +348,6 @@ Note: replace `YOUR_USERNAME` with your macOS username (e.g. `/Users/olofs_mba/.
 
 Verify locally:
 ```bash
-curl -fsS http://127.0.0.1:18085/healthz
 curl -fsS http://127.0.0.1:19000/healthz
 ```
 
@@ -374,7 +373,9 @@ curl -fsS http://127.0.0.1:18085/v1/check \
 This is the research-scoped embedding server under:
 - `scripts/ml_training/essay_scoring/offload/`
 
-It returns embeddings as a binary `.npy` float32 matrix for throughput.
+It supports:
+- `POST /v1/extract` (zip bundle: embeddings + handcrafted features)
+- `POST /v1/embed` (binary `.npy` float32 matrix; legacy/debug)
 
 ### 1. Build the image on Hemma
 
@@ -440,8 +441,8 @@ Example (smoke test, ELLIPSE dataset):
 pdm run essay-scoring-research run \
   --dataset-kind ellipse \
   --feature-set combined \
-  --language-tool-service-url http://127.0.0.1:18085 \
-  --embedding-service-url http://127.0.0.1:19000 \
+  --backend hemma \
+  --offload-service-url http://127.0.0.1:19000 \
   --run-name ellipse_smoke_combined_hemma
 ```
 

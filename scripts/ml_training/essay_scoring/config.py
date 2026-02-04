@@ -24,6 +24,13 @@ class DatasetKind(str, Enum):
     ELLIPSE = "ellipse"
 
 
+class OffloadBackend(str, Enum):
+    """Feature extraction backend selection."""
+
+    LOCAL = "local"
+    HEMMA = "hemma"
+
+
 class EmbeddingConfig(BaseModel):
     """Configuration for embedding extraction."""
 
@@ -84,6 +91,18 @@ class OffloadConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    backend: OffloadBackend = Field(
+        default=OffloadBackend.LOCAL,
+        description="Feature extraction backend to use (local or Hemma offload).",
+    )
+    offload_service_url: str | None = Field(
+        default=None,
+        description=(
+            "Base URL for the combined offload feature server "
+            "(e.g. http://127.0.0.1:19000). Used when backend=hemma."
+        ),
+    )
+
     embedding_service_url: str | None = Field(
         default=None,
         description="Base URL for the offload embedding server (e.g. http://127.0.0.1:19000).",
@@ -96,6 +115,10 @@ class OffloadConfig(BaseModel):
     embedding_cache_dir: Path = Field(
         default=Path("output/essay_scoring/.cache/offload_embeddings"),
         description="Disk cache for per-text embedding vectors (Mac-side).",
+    )
+    handcrafted_cache_dir: Path = Field(
+        default=Path("output/essay_scoring/.cache/offload_handcrafted"),
+        description="Disk cache for per-essay handcrafted feature vectors (Mac-side).",
     )
     language_tool_cache_dir: Path = Field(
         default=Path("output/essay_scoring/.cache/offload_language_tool"),

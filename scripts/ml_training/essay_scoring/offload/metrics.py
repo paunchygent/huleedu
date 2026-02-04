@@ -137,8 +137,10 @@ class OffloadMetricsCollector:
 
     embedding_cache: CacheMetrics = field(default_factory=CacheMetrics)
     language_tool_cache: CacheMetrics = field(default_factory=CacheMetrics)
+    extract_cache: CacheMetrics = field(default_factory=CacheMetrics)
     embedding_requests: RequestMetrics = field(default_factory=RequestMetrics)
     language_tool_requests: RequestMetrics = field(default_factory=RequestMetrics)
+    extract_requests: RequestMetrics = field(default_factory=RequestMetrics)
 
     _lock: Lock = field(default_factory=Lock, init=False, repr=False)
 
@@ -195,6 +197,10 @@ class OffloadMetricsCollector:
                     "cache": self.language_tool_cache.to_dict(),
                     "requests": self.language_tool_requests.to_summary_dict(),
                 },
+                "extract": {
+                    "cache": self.extract_cache.to_dict(),
+                    "requests": self.extract_requests.to_summary_dict(),
+                },
             }
 
     def _cache(self, kind: str) -> CacheMetrics:
@@ -202,6 +208,8 @@ class OffloadMetricsCollector:
             return self.embedding_cache
         if kind == "language_tool":
             return self.language_tool_cache
+        if kind == "extract":
+            return self.extract_cache
         raise ValueError(f"Unknown cache kind: {kind}")
 
     def _requests(self, kind: str) -> RequestMetrics:
@@ -209,6 +217,8 @@ class OffloadMetricsCollector:
             return self.embedding_requests
         if kind == "language_tool":
             return self.language_tool_requests
+        if kind == "extract":
+            return self.extract_requests
         raise ValueError(f"Unknown request kind: {kind}")
 
 

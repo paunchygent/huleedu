@@ -19,6 +19,7 @@ from scripts.ml_training.essay_scoring.cv_feature_store import (
 from scripts.ml_training.essay_scoring.dataset import EssayRecord
 from scripts.ml_training.essay_scoring.features.combiner import FeatureMatrix
 from scripts.ml_training.essay_scoring.features.pipeline import FeaturePipeline
+from scripts.ml_training.essay_scoring.logging_utils import stage_timer
 from scripts.ml_training.essay_scoring.offload.metrics import (
     ExtractionBenchmark,
     persist_offload_metrics,
@@ -60,11 +61,18 @@ def prepare_cv_feature_store(
         return resolved
 
     pipeline = FeaturePipeline(config.embedding, offload=config.offload)
-    logger.info("Extracting train features (n=%d)", len(train_records))
     benchmarks: list[ExtractionBenchmark] = []
-    start = time.monotonic()
-    train_features = pipeline.extract(train_records, feature_set)
-    elapsed = time.monotonic() - start
+    logger.info("Extracting train features (n=%d)", len(train_records))
+    with stage_timer(
+        run_dir,
+        logger,
+        "cv_feature_store_train_extract",
+        records=len(train_records),
+        feature_set=feature_set.value,
+    ):
+        start = time.monotonic()
+        train_features = pipeline.extract(train_records, feature_set)
+        elapsed = time.monotonic() - start
     benchmarks.append(
         ExtractionBenchmark(
             mode="cv_feature_store_train_extract",
@@ -73,9 +81,16 @@ def prepare_cv_feature_store(
         )
     )
     logger.info("Extracting test features (n=%d)", len(test_records))
-    start = time.monotonic()
-    test_features = pipeline.extract(test_records, feature_set)
-    elapsed = time.monotonic() - start
+    with stage_timer(
+        run_dir,
+        logger,
+        "cv_feature_store_test_extract",
+        records=len(test_records),
+        feature_set=feature_set.value,
+    ):
+        start = time.monotonic()
+        test_features = pipeline.extract(test_records, feature_set)
+        elapsed = time.monotonic() - start
     benchmarks.append(
         ExtractionBenchmark(
             mode="cv_feature_store_test_extract",
@@ -99,6 +114,7 @@ def prepare_cv_feature_store(
         metrics=pipeline.offload_metrics,
         benchmarks=benchmarks,
     )
+    _persist_offload_extract_meta(run_dir / "artifacts", pipeline.last_offload_meta)
 
     y_train = np.array([record.overall for record in train_records], dtype=np.float32)
     y_test = np.array([record.overall for record in test_records], dtype=np.float32)
@@ -298,6 +314,16 @@ def validate_record_ids_against_splits(
         raise ValueError(
             "Split definitions contain train_record_ids not present in the filtered train set."
         )
+
+
+def _persist_offload_extract_meta(artifacts_dir: Path, meta: object | None) -> None:
+    if meta is None:
+        return
+    try:
+        json_text = meta.model_dump_json(indent=2)  # type: ignore[attr-defined]
+    except Exception:
+        return
+    (artifacts_dir / "offload_extract_meta.json").write_text(json_text, encoding="utf-8")
 
 
 def sha256_file(path: Path) -> str:

@@ -83,7 +83,9 @@ ssh hemma 'curl -fsS http://127.0.0.1:9000/healthz'
 ```
 
 Current implementation note:
-- The initial offload server is embedding-focused (`POST /v1/embed` returning `.npy`).
+- The research offload server supports:
+  - `POST /v1/extract` (zip bundle: embeddings + handcrafted features)
+  - `POST /v1/embed` (embedding-only `.npy` payload; legacy/debug)
 - Source: `scripts/ml_training/essay_scoring/offload/`
 
 ### Logs (container-level)
@@ -123,7 +125,7 @@ setup from:
 - `docs/operations/hemma-alpha-rollout-days-1-3.md`
 
 ```bash
-# Start both tunnels (manual; if you did not install the LaunchAgent)
+# Start tunnels (manual; if you did not install the LaunchAgent)
 ~/bin/hemma-huleedu-tunnel start
 
 # Check status
@@ -139,13 +141,15 @@ launchctl print gui/$(id -u)/com.hemma.huleedu-tunnel | rg "state =|last exit co
 Manual one-off alternative (dedicated terminal tab):
 
 ```bash
-ssh hemma -L 18085:127.0.0.1:8085
+# Combined offload service (required for research Hemma backend):
 ssh hemma -L 19000:127.0.0.1:9000
+
+# Optional: direct LanguageTool access from the Mac:
+ssh hemma -L 18085:127.0.0.1:8085
 ```
 
 Local verification:
 ```bash
-curl -fsS http://127.0.0.1:18085/healthz
 curl -fsS http://127.0.0.1:19000/healthz
 ```
 

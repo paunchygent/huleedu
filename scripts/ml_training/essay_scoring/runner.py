@@ -27,7 +27,7 @@ from scripts.ml_training.essay_scoring.feature_store import (
 from scripts.ml_training.essay_scoring.features.combiner import FeatureMatrix
 from scripts.ml_training.essay_scoring.features.pipeline import FeaturePipeline
 from scripts.ml_training.essay_scoring.features.schema import build_feature_schema
-from scripts.ml_training.essay_scoring.logging_utils import run_file_logger
+from scripts.ml_training.essay_scoring.logging_utils import run_file_logger, stage_timer
 from scripts.ml_training.essay_scoring.offload.metrics import (
     ExtractionBenchmark,
     persist_offload_metrics,
@@ -99,9 +99,16 @@ def featurize_experiment(
 
         pipeline = FeaturePipeline(config.embedding, offload=config.offload)
         logger.info("Extracting train features")
-        start = time.monotonic()
-        train_features = pipeline.extract(split.train, feature_set)
-        elapsed = time.monotonic() - start
+        with stage_timer(
+            run_paths.run_dir,
+            logger,
+            "feature_extraction_train",
+            records=len(split.train),
+            feature_set=feature_set.value,
+        ):
+            start = time.monotonic()
+            train_features = pipeline.extract(split.train, feature_set)
+            elapsed = time.monotonic() - start
         benchmarks.append(
             ExtractionBenchmark(
                 mode="feature_extraction_train",
@@ -110,9 +117,16 @@ def featurize_experiment(
             )
         )
         logger.info("Extracting validation features")
-        start = time.monotonic()
-        val_features = pipeline.extract(split.val, feature_set)
-        elapsed = time.monotonic() - start
+        with stage_timer(
+            run_paths.run_dir,
+            logger,
+            "feature_extraction_val",
+            records=len(split.val),
+            feature_set=feature_set.value,
+        ):
+            start = time.monotonic()
+            val_features = pipeline.extract(split.val, feature_set)
+            elapsed = time.monotonic() - start
         benchmarks.append(
             ExtractionBenchmark(
                 mode="feature_extraction_val",
@@ -121,9 +135,16 @@ def featurize_experiment(
             )
         )
         logger.info("Extracting test features")
-        start = time.monotonic()
-        test_features = pipeline.extract(split.test, feature_set)
-        elapsed = time.monotonic() - start
+        with stage_timer(
+            run_paths.run_dir,
+            logger,
+            "feature_extraction_test",
+            records=len(split.test),
+            feature_set=feature_set.value,
+        ):
+            start = time.monotonic()
+            test_features = pipeline.extract(split.test, feature_set)
+            elapsed = time.monotonic() - start
         benchmarks.append(
             ExtractionBenchmark(
                 mode="feature_extraction_test",
@@ -148,6 +169,7 @@ def featurize_experiment(
             metrics=pipeline.offload_metrics,
             benchmarks=benchmarks,
         )
+        _persist_offload_extract_meta(run_paths.artifacts_dir, pipeline.last_offload_meta)
 
         feature_store_dir = persist_feature_store(
             run_dir=run_paths.run_dir,
@@ -240,9 +262,16 @@ def run_experiment(
             )
             pipeline = FeaturePipeline(config.embedding, offload=config.offload)
             logger.info("Extracting train features")
-            start = time.monotonic()
-            train_features = pipeline.extract(split.train, feature_set)
-            elapsed = time.monotonic() - start
+            with stage_timer(
+                run_paths.run_dir,
+                logger,
+                "feature_extraction_train",
+                records=len(split.train),
+                feature_set=feature_set.value,
+            ):
+                start = time.monotonic()
+                train_features = pipeline.extract(split.train, feature_set)
+                elapsed = time.monotonic() - start
             benchmarks.append(
                 ExtractionBenchmark(
                     mode="feature_extraction_train",
@@ -251,9 +280,16 @@ def run_experiment(
                 )
             )
             logger.info("Extracting validation features")
-            start = time.monotonic()
-            val_features = pipeline.extract(split.val, feature_set)
-            elapsed = time.monotonic() - start
+            with stage_timer(
+                run_paths.run_dir,
+                logger,
+                "feature_extraction_val",
+                records=len(split.val),
+                feature_set=feature_set.value,
+            ):
+                start = time.monotonic()
+                val_features = pipeline.extract(split.val, feature_set)
+                elapsed = time.monotonic() - start
             benchmarks.append(
                 ExtractionBenchmark(
                     mode="feature_extraction_val",
@@ -262,9 +298,16 @@ def run_experiment(
                 )
             )
             logger.info("Extracting test features")
-            start = time.monotonic()
-            test_features = pipeline.extract(split.test, feature_set)
-            elapsed = time.monotonic() - start
+            with stage_timer(
+                run_paths.run_dir,
+                logger,
+                "feature_extraction_test",
+                records=len(split.test),
+                feature_set=feature_set.value,
+            ):
+                start = time.monotonic()
+                test_features = pipeline.extract(split.test, feature_set)
+                elapsed = time.monotonic() - start
             benchmarks.append(
                 ExtractionBenchmark(
                     mode="feature_extraction_test",
@@ -289,6 +332,7 @@ def run_experiment(
                 metrics=pipeline.offload_metrics,
                 benchmarks=benchmarks,
             )
+            _persist_offload_extract_meta(run_paths.artifacts_dir, pipeline.last_offload_meta)
 
             y_train = np.array([record.overall for record in split.train])
             y_val = np.array([record.overall for record in split.val])
@@ -303,26 +347,38 @@ def run_experiment(
             )
 
         logger.info("Training XGBoost model")
-        training_artifacts = train_model(
-            train_features=train_features,
-            val_features=val_features,
-            y_train=y_train,
-            y_val=y_val,
-            config=config.training,
-            min_band=min_band,
-            max_band=max_band,
-        )
+        with stage_timer(
+            run_paths.run_dir, logger, "training_xgboost", feature_set=feature_set.value
+        ):
+            training_artifacts = train_model(
+                train_features=train_features,
+                val_features=val_features,
+                y_train=y_train,
+                y_val=y_val,
+                config=config.training,
+                min_band=min_band,
+                max_band=max_band,
+            )
 
         model = training_artifacts.model
 
         logger.info("Evaluating model")
-        train_pred = model.predict(_as_dmatrix(train_features.matrix, train_features.feature_names))
-        val_pred = model.predict(_as_dmatrix(val_features.matrix, val_features.feature_names))
-        test_pred = model.predict(_as_dmatrix(test_features.matrix, test_features.feature_names))
+        with stage_timer(run_paths.run_dir, logger, "evaluation"):
+            train_pred = model.predict(
+                _as_dmatrix(train_features.matrix, train_features.feature_names)
+            )
+            val_pred = model.predict(_as_dmatrix(val_features.matrix, val_features.feature_names))
+            test_pred = model.predict(
+                _as_dmatrix(test_features.matrix, test_features.feature_names)
+            )
 
-        train_eval = evaluate_predictions(y_train, train_pred, min_band=min_band, max_band=max_band)
-        val_eval = evaluate_predictions(y_val, val_pred, min_band=min_band, max_band=max_band)
-        test_eval = evaluate_predictions(y_test, test_pred, min_band=min_band, max_band=max_band)
+            train_eval = evaluate_predictions(
+                y_train, train_pred, min_band=min_band, max_band=max_band
+            )
+            val_eval = evaluate_predictions(y_val, val_pred, min_band=min_band, max_band=max_band)
+            test_eval = evaluate_predictions(
+                y_test, test_pred, min_band=min_band, max_band=max_band
+            )
 
         metrics = {
             "train": _evaluation_to_dict(train_eval),
@@ -351,24 +407,26 @@ def run_experiment(
 
         if not skip_shap:
             logger.info("Generating SHAP artifacts")
-            generate_shap_artifacts(
-                model=model,
-                features=test_features.matrix,
-                feature_names=test_features.feature_names,
-                output_dir=run_paths.shap_dir,
-            )
+            with stage_timer(run_paths.run_dir, logger, "shap"):
+                generate_shap_artifacts(
+                    model=model,
+                    features=test_features.matrix,
+                    feature_names=test_features.feature_names,
+                    output_dir=run_paths.shap_dir,
+                )
 
         if not skip_grade_scale_report:
             logger.info("Generating grade-scale report")
-            generate_grade_scale_report(
-                records=split.test,
-                y_true=y_test,
-                y_pred=test_pred,
-                dataset_source=dataset_source,
-                min_band=min_band,
-                max_band=max_band,
-                output_path=run_paths.grade_scale_report_path,
-            )
+            with stage_timer(run_paths.run_dir, logger, "grade_scale_report"):
+                generate_grade_scale_report(
+                    records=split.test,
+                    y_true=y_test,
+                    y_pred=test_pred,
+                    dataset_source=dataset_source,
+                    min_band=min_band,
+                    max_band=max_band,
+                    output_path=run_paths.grade_scale_report_path,
+                )
 
         logger.info("Run complete: %s", run_paths.run_dir)
 
@@ -451,6 +509,16 @@ def _persist_metadata(
 def _persist_feature_schema(run_paths: RunPaths, embedding_dim: int) -> None:
     schema = build_feature_schema(embedding_dim)
     run_paths.feature_schema_path.write_text(schema.model_dump_json(indent=2), encoding="utf-8")
+
+
+def _persist_offload_extract_meta(artifacts_dir: Path, meta: object | None) -> None:
+    if meta is None:
+        return
+    try:
+        json_text = meta.model_dump_json(indent=2)  # type: ignore[attr-defined]
+    except Exception:
+        return
+    (artifacts_dir / "offload_extract_meta.json").write_text(json_text, encoding="utf-8")
 
 
 def _as_dmatrix(matrix: np.ndarray, feature_names: list[str]) -> xgb.DMatrix:

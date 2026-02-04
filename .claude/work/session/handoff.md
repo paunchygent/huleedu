@@ -202,6 +202,41 @@ Update (2026-02-01):
 
 ## UPDATE (2026-02-03)
 
+### Whitebox Essay Scoring: Fix “silent stall” observability (Tier2 Stage 1)
+
+Root cause (confirmed via `run.log` timestamps):
+- The perceived “stall at Tier1 item ~3328” was a short per-item hiccup (~11s).
+- The real “no activity for minutes” gap was **Tier2 Stage 1** (spaCy parse + syntactic feature loop + unique-text collection) which previously had **no progress logging** until `Tier2 embeddings start`.
+
+Changes (observability, no algorithm changes):
+- Tier2 now logs:
+  - Stage1 parse start + periodic progress + completion timing
+  - Stage2 unique-text collection start + periodic progress (including `unique_texts` size) + completion timing
+  - Existing embed start/complete + per-100 progress retained
+  - Code: `scripts/ml_training/essay_scoring/features/tier2_syntactic_cohesion.py`
+- Tier1 now logs:
+  - start (mode=local/remote + concurrency + cache dir)
+  - explicit “awaiting LanguageTool results” marker
+  - completion timing
+  - Code: `scripts/ml_training/essay_scoring/features/tier1_error_readability.py`
+- Pipeline logs explicit tier start/complete timings:
+  - Code: `scripts/ml_training/essay_scoring/features/pipeline.py`
+- Run-level stage markers now write `status.json` (start/complete) during feature extraction + training/eval/SHAP/report:
+  - CV feature store: `scripts/ml_training/essay_scoring/cv_shared.py`
+  - Run/featurize: `scripts/ml_training/essay_scoring/runner.py`
+- Runbook updated to document `run.log` + `status.json` and tier-stage logging:
+  - `docs/operations/ml-nlp-runbook.md`
+
+Verification (local):
+- `pdm run format-all`
+- `pdm run lint-fix --unsafe-fixes`
+- `pdm run typecheck-all`
+- `pdm run pytest-root scripts/ml_training/tests -v`
+
+---
+
+## UPDATE (2026-02-03)
+
 ### ML Research Pipeline: Test Coverage + Integration
 
 - Added integration-style tests to cover the full research pipeline surface (CLI + runner + stores),
@@ -258,6 +293,31 @@ Verification (2026-02-03):
 
 Verification (2026-02-03 local time):
 - `source .env && pdm run pytest-root scripts/ml_training/tests -v` (15 passed)
+
+---
+
+## UPDATE (2026-02-04)
+
+### Hemma Offload: single combined feature endpoint (one tunnel, no fallbacks)
+
+- Implemented `POST /v1/extract` on the research offload server (`scripts/ml_training/essay_scoring/offload/server.py`).
+  - Response is `application/zip` with `meta.json` + optional `embeddings.npy` / `handcrafted.npy`.
+  - Includes `schema_version` + `server_fingerprint`; fingerprint includes `OFFLOAD_LANGUAGE_TOOL_JAR_VERSION`.
+- Mac-side Hemma mode is now single-tunnel:
+  - CLI: `--backend hemma --offload-service-url http://127.0.0.1:19000`
+  - `backend=hemma` fails fast if URL missing and forbids `embedding_service_url` / `language_tool_service_url`.
+- Offload runtime + compose:
+  - `docker-compose.hemma.research.yml` sets `OFFLOAD_LANGUAGE_TOOL_URL=http://language_tool_service:8085` and requires `OFFLOAD_LANGUAGE_TOOL_JAR_VERSION`.
+  - `pyproject.toml` `offload-runtime` now includes `spacy`, `textdescriptives`, and pinned `en_core_web_sm`.
+- Artifacts:
+  - `artifacts/offload_metrics.json` now includes `extract` request/cache metrics.
+  - `artifacts/offload_extract_meta.json` is written for reproducibility when using Hemma backend.
+
+Verification (2026-02-04):
+- `source .env && pdm run format-all`
+- `source .env && pdm run lint-fix --unsafe-fixes`
+- `source .env && pdm run typecheck-all`
+- `source .env && pdm run pytest-root scripts/ml_training/tests -q` (46 passed)
 - `source .env && pdm run format-all` (clean)
 - `source .env && pdm run lint-fix --unsafe-fixes` (clean)
 - `source .env && pdm run typecheck-all` (clean)

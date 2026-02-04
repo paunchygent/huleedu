@@ -116,69 +116,90 @@ Even though the client consumes a single endpoint, the server implementation mus
 
 ### Phase 1 — Contract + versioning + payload format
 
-- [ ] Define Pydantic request/response models for `/v1/extract` (`extra="forbid"`)
-- [ ] Define and test `server_fingerprint` inputs and output format
-- [ ] Decide and document request limits (N, request bytes, response size)
-- [ ] Document zip contents (`meta.json`, `embeddings.npy`, `handcrafted.npy`) and error response format
+- [x] Define Pydantic request/response models for `/v1/extract` (`extra="forbid"`)
+- [x] Define and test `server_fingerprint` inputs and output format
+- [x] Decide and document request limits (N, request bytes, response size)
+- [x] Document zip contents (`meta.json`, `embeddings.npy`, `handcrafted.npy`) and error response format
 - Evidence:
   - Code refs:
+    - `scripts/ml_training/essay_scoring/offload/extract_models.py`
+    - `scripts/ml_training/essay_scoring/offload/settings.py`
+    - `scripts/ml_training/essay_scoring/offload/server.py`
   - Notes/decisions:
+    - Limits: `N<=64`, `request_bytes<=900_000`, `response_bytes<=8_000_000` (enforced server-side).
+    - Contract: `POST /v1/extract` returns `application/zip` with `meta.json` + optional `embeddings.npy` / `handcrafted.npy`; non-2xx returns JSON `ExtractError`.
+    - Fingerprint: sha256 of canonical JSON including schema_version, embedding config + dim, feature schema, runtime versions, and `OFFLOAD_LANGUAGE_TOOL_JAR_VERSION` (required).
 
 ### Phase 2 — Hemma offload server: implement `/v1/extract`
 
-- [ ] Implement `/v1/extract` endpoint in `scripts/ml_training/essay_scoring/offload/server.py`
-- [ ] Implement internal LanguageTool client calls (no Mac tunnel), bounded concurrency
-- [ ] Add readiness gating: fail if LanguageTool dependency unavailable (503; no fallback)
-- [ ] Ensure embeddings used for Tier2 similarity + embeddings matrix are computed once per request
+- [x] Implement `/v1/extract` endpoint in `scripts/ml_training/essay_scoring/offload/server.py`
+- [x] Implement internal LanguageTool client calls (no Mac tunnel), bounded concurrency
+- [x] Add readiness gating: fail if LanguageTool dependency unavailable (503; no fallback)
+- [x] Ensure embeddings used for Tier2 similarity + embeddings matrix are computed once per request
 - Evidence:
   - Code refs:
-  - Hemma health checks:
+    - `scripts/ml_training/essay_scoring/offload/server.py`
+    - `scripts/ml_training/essay_scoring/offload/settings.py`
   - Notes/decisions:
+    - `/healthz` reports config issues (e.g. missing `OFFLOAD_LANGUAGE_TOOL_JAR_VERSION`) as `status=degraded`.
+    - Request-scoped embedding cache ensures Tier2 embedding calls are reused for `embeddings.npy` (no duplicate embedding compute).
 
 ### Phase 3 — Hemma runtime + compose wiring
 
-- [ ] Add spaCy + TextDescriptives + pinned `en_core_web_sm` to the offload runtime dependency set
-- [ ] Update offload Dockerfile to install the above without pulling training deps
-- [ ] Update `docker-compose.hemma.research.yml`:
-  - [ ] set `OFFLOAD_LANGUAGE_TOOL_URL=http://language_tool_service:8085`
-  - [ ] ensure service dependency order / health gating
+- [x] Add spaCy + TextDescriptives + pinned `en_core_web_sm` to the offload runtime dependency set
+- [x] Update offload Dockerfile to install the above without pulling training deps
+- [x] Update `docker-compose.hemma.research.yml`:
+  - [x] set `OFFLOAD_LANGUAGE_TOOL_URL=http://language_tool_service:8085`
+  - [x] ensure service dependency order / health gating
 - Evidence:
-  - Image tag + build output summary:
-  - Hemma `docker ps`:
+  - Code refs:
+    - `pyproject.toml`
+    - `scripts/ml_training/essay_scoring/offload/Dockerfile`
+    - `docker-compose.hemma.research.yml`
   - Notes/decisions:
+    - Compose requires `OFFLOAD_LANGUAGE_TOOL_JAR_VERSION` via `${...:?Missing ...}` (fail-fast deploy).
 
 ### Phase 4 — Research pipeline client: Hemma backend (zero fallbacks)
 
-- [ ] Add `backend: local|hemma` and `offload_service_url` to research config/CLI
-- [ ] Implement `RemoteExtractClient` (download+unzip+load+validate)
-- [ ] Implement Mac-side disk caching keyed by `server_fingerprint` + schema + text/prompt hashes
-- [ ] Update `FeaturePipeline` to enforce: when `backend=hemma`, do not import/use local spaCy/LanguageTool/torch embeddings
+- [x] Add `backend: local|hemma` and `offload_service_url` to research config/CLI
+- [x] Implement `RemoteExtractClient` (download+unzip+load+validate)
+- [x] Implement Mac-side disk caching keyed by `server_fingerprint` + schema + text/prompt hashes
+- [x] Update `FeaturePipeline` to enforce: when `backend=hemma`, do not import/use local spaCy/LanguageTool/torch embeddings
 - Evidence:
   - Code refs:
-  - Example command:
+    - `scripts/ml_training/essay_scoring/config.py`
+    - `scripts/ml_training/essay_scoring/cli.py`
+    - `scripts/ml_training/essay_scoring/offload/extract_client.py`
+    - `scripts/ml_training/essay_scoring/features/pipeline.py`
   - Notes/decisions:
+    - Hemma mode forbids `embedding_service_url`/`language_tool_service_url` and requires `offload_service_url` (single-tunnel).
+    - Extract meta is persisted to `artifacts/offload_extract_meta.json` for reproducibility.
 
 ### Phase 5 — Tests + determinism guarantees
 
-- [ ] In-process HTTP test for `/v1/extract` validates zip structure + meta + array shapes
-- [ ] “No fallback” test: `backend=hemma` fails fast when offload URL missing/unreachable
+- [x] In-process HTTP test for `/v1/extract` validates zip structure + meta + array shapes
+- [x] “No fallback” test: `backend=hemma` fails fast when offload URL missing/unreachable
 - [ ] Parity test on a tiny sample for handcrafted features (document acceptable tolerances)
 - Evidence:
   - Test commands:
+    - `source .env && pdm run pytest-root scripts/ml_training/tests -q`
   - Notes/decisions:
+    - Added tests cover zip/meta/shape + client caching + fail-fast Hemma config.
 
 ### Phase 6 — Runbooks + Hemma verification
 
-- [ ] Update runbooks to make `:19000` the only required tunnel for Hemma backend runs
+- [x] Update runbooks to make `:19000` the only required tunnel for Hemma backend runs
 - [ ] Redeploy on Hemma and verify:
   - [ ] `/healthz` and readiness reflect dependency health
   - [ ] `/v1/extract` works for `feature_set=combined`
   - [ ] warm-cache run on Mac does not call Hemma for cached items
 - [ ] Record performance metrics and tuning notes using `offload_metrics.json`
 - Evidence:
-  - Hemma deploy command:
-  - Health check output:
-  - Run dirs:
+  - Docs refs:
+    - `docs/operations/hemma-server-operations-huleedu.md`
+    - `.claude/work/session/readme-first.md`
+  - Notes/decisions:
+    - Hemma redeploy + live verification pending (not executed in this session).
 
 ## Implementation Phases (full plan)
 

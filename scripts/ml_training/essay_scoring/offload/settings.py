@@ -7,7 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class OffloadServerSettings(BaseSettings):
-    """Settings for the research offload embedding server."""
+    """Settings for the research offload server."""
 
     model_config = SettingsConfigDict(extra="ignore")
 
@@ -20,6 +20,30 @@ class OffloadServerSettings(BaseSettings):
     OFFLOAD_TORCH_DEVICE: str | None = Field(
         default=None,
         description="Optional torch device override (e.g. 'cuda', 'cpu').",
+    )
+
+    OFFLOAD_LANGUAGE_TOOL_URL: str = Field(
+        default="http://language_tool_service:8085",
+        description="Internal base URL for language_tool_service (Hemma compose DNS).",
+    )
+    OFFLOAD_LANGUAGE_TOOL_JAR_VERSION: str = Field(
+        default="",
+        description=(
+            "Required input for server_fingerprint cache safety. "
+            "Set to the LanguageTool JAR version deployed in language_tool_service "
+            "(e.g. '6.3')."
+        ),
+    )
+
+    OFFLOAD_EXTRACT_SCHEMA_VERSION: int = Field(default=1, ge=1)
+    OFFLOAD_EXTRACT_MAX_ITEMS: int = Field(default=64, ge=1, le=512)
+    OFFLOAD_EXTRACT_MAX_REQUEST_BYTES: int = Field(default=900_000, ge=10_000, le=50_000_000)
+    OFFLOAD_EXTRACT_MAX_RESPONSE_BYTES: int = Field(default=8_000_000, ge=100_000, le=200_000_000)
+    OFFLOAD_LANGUAGE_TOOL_MAX_CONCURRENCY: int = Field(default=16, ge=1, le=64)
+
+    OFFLOAD_GIT_SHA: str | None = Field(
+        default=None,
+        description="Optional git SHA to include in meta.json for traceability.",
     )
 
 

@@ -19,6 +19,7 @@ from scripts.ml_training.essay_scoring.features.utils import (
     split_paragraphs,
     variance,
 )
+from scripts.ml_training.essay_scoring.logging_utils import ProgressLogger
 
 if TYPE_CHECKING:
     from sentence_transformers import SentenceTransformer
@@ -87,11 +88,16 @@ class Tier2FeatureExtractor:
             raise RuntimeError("spaCy pipeline not initialized for Tier 2 extractor.")
 
         # Stage 1: parse + deterministic syntactic features.
+        stage1_start = time.monotonic()
+        stage1_progress = ProgressLogger(logger, "Tier2 stage1", len(texts), every=100)
         syntactic_rows: list[dict[str, float]] = []
         sentence_texts_by_index: list[list[str]] = []
         paragraphs_by_index: list[list[str]] = []
 
-        for text, prompt, doc in zip(texts, prompts, self.nlp.pipe(texts), strict=True):
+        logger.info("Tier2 stage1 parse start (n=%d)", len(texts))
+        for index, (text, prompt, doc) in enumerate(
+            zip(texts, prompts, self.nlp.pipe(texts), strict=True)
+        ):
             sentences = list(doc.sents)
             sentence_texts = [sent.text.strip() for sent in sentences if sent.text.strip()]
             sentence_texts_by_index.append(sentence_texts)
@@ -115,8 +121,12 @@ class Tier2FeatureExtractor:
                     "prompt_len": float(len(prompt)),
                 }
             )
+            stage1_progress.update(index)
+
+        logger.info("Tier2 stage1 parse complete in %.2fs", time.monotonic() - stage1_start)
 
         # Stage 2: embed in one (or a few) large batches to avoid thousands of small requests.
+        stage2_start = time.monotonic()
         unique_texts: list[str] = []
         index_by_text: dict[str, int] = {}
 
@@ -126,8 +136,9 @@ class Tier2FeatureExtractor:
             index_by_text[text] = len(unique_texts)
             unique_texts.append(text)
 
-        for text, prompt, sentence_texts, paragraphs in zip(
-            texts, prompts, sentence_texts_by_index, paragraphs_by_index, strict=True
+        logger.info("Tier2 stage2 unique text collection start (n=%d)", len(texts))
+        for index, (text, prompt, sentence_texts, paragraphs) in enumerate(
+            zip(texts, prompts, sentence_texts_by_index, paragraphs_by_index, strict=True)
         ):
             _add(text)
             _add(prompt)
@@ -135,6 +146,19 @@ class Tier2FeatureExtractor:
                 _add(sent)
             for para in paragraphs:
                 _add(para)
+            if (index + 1) % 100 == 0 or index == len(texts) - 1:
+                logger.info(
+                    "Tier2 stage2 progress %d/%d (unique_texts=%d)",
+                    index + 1,
+                    len(texts),
+                    len(unique_texts),
+                )
+
+        logger.info(
+            "Tier2 stage2 unique text collection complete (unique_texts=%d) in %.2fs",
+            len(unique_texts),
+            time.monotonic() - stage2_start,
+        )
 
         logger.info("Tier2 embeddings start (unique_texts=%d)", len(unique_texts))
         start = time.monotonic()
