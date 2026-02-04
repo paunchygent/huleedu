@@ -318,7 +318,7 @@ class MockInstructionRepository(AssessmentInstructionRepositoryProtocol):
             "assignment_id": assignment_id,
             "instructions_text": "Mock instructions",
             "grade_scale": "swedish_8_anchor",
-            "context_origin": "canonical_national",
+            "context_origin": "research_experiment",
         }
 
     async def upsert_assessment_instruction(
@@ -329,7 +329,7 @@ class MockInstructionRepository(AssessmentInstructionRepositoryProtocol):
         course_id: str | None,
         instructions_text: str,
         grade_scale: str,
-        context_origin: str = "canonical_national",
+        context_origin: str = "research_experiment",
         student_prompt_storage_id: str | None = None,
         judge_rubric_storage_id: str | None = None,
     ) -> AssessmentInstruction:

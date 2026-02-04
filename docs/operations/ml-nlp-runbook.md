@@ -2,7 +2,7 @@
 type: runbook
 service: global
 severity: medium
-last_reviewed: '2026-02-03'
+last_reviewed: '2026-02-04'
 ---
 # ML/NLP Research Runbook (Essay Scoring)
 
@@ -141,6 +141,8 @@ Decision heuristic (starting point; tune after you see results):
 Each run directory contains:
 - `run.log` (INFO-level, full stage + progress logs)
 - `status.json` (single file updated at stage start/complete with a UTC timestamp)
+- `stderr.log` (captured stderr for the run; includes Python tracebacks and tool warnings)
+- `fault.log` (faulthandler output: segfault traces + periodic hang stack dumps)
 
 Tier logging notes:
 - Tier 1 logs per-item progress and whether it is running with local vs tunneled LanguageTool.
@@ -182,6 +184,10 @@ This file is the canonical source for throughput + stability tuning:
   `offload.language_tool.requests.latency_s` (p50/p95/p99)
 - cache effectiveness: `offload.*.cache.hit_rate`
 - error budgets: `requests_timeout`, `requests_http_error`, `requests_connection_error`
+
+Hemma-side metrics:
+- The offload server exposes a Prometheus-style endpoint with **GPU memory + request latency**:
+  - `curl -fsS http://127.0.0.1:19000/metrics | head`
 
 Best-practice tuning loop:
 - tune **one knob at a time** (batch size, payload chunking, concurrency)

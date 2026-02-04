@@ -29,7 +29,7 @@ class AssessmentInstructionStore:
         course_id: str | None,
         instructions_text: str,
         grade_scale: str,
-        context_origin: str = "canonical_national",
+        context_origin: str = "research_experiment",
         student_prompt_storage_id: str | None = None,
         judge_rubric_storage_id: str | None = None,
         created_at: datetime | None = None,
@@ -54,7 +54,7 @@ class AssessmentInstructionStore:
         course_id: str | None,
         instructions_text: str,
         grade_scale: str,
-        context_origin: str = "canonical_national",
+        context_origin: str = "research_experiment",
         student_prompt_storage_id: str | None = None,
         judge_rubric_storage_id: str | None = None,
         created_at: datetime | None = None,
@@ -80,7 +80,7 @@ class AssessmentInstructionStore:
             raise ValueError(
                 "grade_scale is immutable once assessment instructions exist for a scope"
             )
-        if getattr(existing, "context_origin", None) != context_origin:
+        if existing.context_origin != context_origin:
             raise ValueError(
                 "context_origin is immutable once assessment instructions exist for a scope"
             )

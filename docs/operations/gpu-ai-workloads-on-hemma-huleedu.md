@@ -2,7 +2,7 @@
 type: runbook
 service: global
 severity: high
-last_reviewed: '2026-02-01'
+last_reviewed: '2026-02-04'
 ---
 # GPU AI Workloads on Hemma (HuleEdu)
 
@@ -41,6 +41,15 @@ ssh hemma 'sudo docker exec -it <container_name> python -c \"import torch; print
 Interpretation:
 - `torch.cuda.is_available() == True` typically indicates GPU availability.
 - `torch.version.hip` should be non-null on ROCm-enabled torch builds.
+
+### Offload service metrics endpoint (recommended)
+
+If the essay scoring offload server is deployed, prefer its `/metrics` endpoint for a
+single view of request latency + GPU memory pressure:
+
+```bash
+ssh hemma 'curl -fsS http://127.0.0.1:9000/metrics | head'
+```
 
 ## Resolution
 

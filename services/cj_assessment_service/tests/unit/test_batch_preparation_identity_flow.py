@@ -713,6 +713,7 @@ class TestIdentityThreadingInBatchCreation:
         mock_instruction_repository.get_assessment_instruction.return_value = SimpleNamespace(
             student_prompt_storage_id=None,
             judge_rubric_storage_id=None,
+            context_origin="research_experiment",
         )
         request_data = CJAssessmentRequestData(
             bos_batch_id=base_request_data["bos_batch_id"],
@@ -773,6 +774,7 @@ class TestIdentityThreadingInBatchCreation:
         mock_instruction_repository.get_assessment_instruction.return_value = SimpleNamespace(
             student_prompt_storage_id=None,
             judge_rubric_storage_id=None,
+            context_origin="research_experiment",
         )
         request_data = CJAssessmentRequestData(
             bos_batch_id=base_request_data["bos_batch_id"],

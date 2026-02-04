@@ -454,3 +454,36 @@ Verification (2026-02-03 local time):
   LanguageTool calls, no local torch/transformers embeddings).
 - Architecture intent: single endpoint for the client, SRP modular server internals (embedding
   provider, spaCy runtime, LanguageTool client, zip bundle writer, fingerprinted metadata).
+
+---
+
+## UPDATE (2026-02-04)
+
+### Essay scoring research: crash/stall diagnostics logs
+
+- Each run dir now also contains:
+  - `stderr.log` (captured stderr for the run)
+  - `fault.log` (faulthandler output: segfault traces + periodic hang stack dumps)
+- Implementation: `scripts/ml_training/essay_scoring/logging_utils.py` (`run_file_logger`)
+- Verification:
+  - `pdm run pytest-root scripts/ml_training/tests -v` (47 passed)
+  - `pdm run format-all`
+  - `pdm run lint-fix --unsafe-fixes`
+  - `pdm run typecheck-all`
+
+### Hemma offload observability: GPU + request metrics
+
+- Offload server now exposes:
+  - `/metrics` (Prometheus text format): GPU availability + per-endpoint request counts + latency
+  - `/healthz` enriched with `gpu` + `metrics` JSON snapshots
+- Implementation:
+  - `scripts/ml_training/essay_scoring/offload/http_app.py`
+  - `scripts/ml_training/essay_scoring/offload/handlers_observability.py`
+  - `scripts/ml_training/essay_scoring/offload/observability.py`
+- Docs:
+  - `docs/operations/hemma-server-operations-huleedu.md` (health + metrics curl examples)
+  - `docs/operations/ml-nlp-runbook.md` (Hemma-side metrics pointer)
+  - `docs/operations/gpu-ai-workloads-on-hemma-huleedu.md` (metrics endpoint reference)
+- Verification:
+  - `pdm run pytest-root scripts/ml_training/tests -v` (49 passed)
+  - `pdm run validate-docs`

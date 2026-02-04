@@ -521,9 +521,7 @@ class TestCreditConsumptionLogic:
         correlation_id = str(uuid4())
         batch_id = "batch_svenska_åäöÅÄÖ"
 
-        mock_repository.get_credit_balance.side_effect = lambda st, si: (
-            200 if st == "org" else 100
-        )
+        mock_repository.get_credit_balance.side_effect = lambda st, si: 200 if st == "org" else 100
         mock_repository.update_credit_balance.return_value = 175
 
         # Act

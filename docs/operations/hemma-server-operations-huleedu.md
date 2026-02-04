@@ -2,7 +2,7 @@
 type: runbook
 service: global
 severity: high
-last_reviewed: '2026-02-01'
+last_reviewed: '2026-02-04'
 ---
 # Hemma Server Operations (HuleEdu)
 
@@ -82,6 +82,11 @@ Feature offload service (DeBERTa + spaCy; if deployed):
 ssh hemma 'curl -fsS http://127.0.0.1:9000/healthz'
 ```
 
+Offload metrics (GPU + request latency, Prometheus text format):
+```bash
+ssh hemma 'curl -fsS http://127.0.0.1:9000/metrics | head'
+```
+
 Current implementation note:
 - The research offload server supports:
   - `POST /v1/extract` (zip bundle: embeddings + handcrafted features)
@@ -151,6 +156,11 @@ ssh hemma -L 18085:127.0.0.1:8085
 Local verification:
 ```bash
 curl -fsS http://127.0.0.1:19000/healthz
+```
+
+Local metrics (via tunnel):
+```bash
+curl -fsS http://127.0.0.1:19000/metrics | head
 ```
 
 ### Hemma compose layering (enforce localhost-only services)

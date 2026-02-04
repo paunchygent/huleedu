@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import faulthandler
 import json
 import logging
+import signal
+import sys
 import time
 from contextlib import contextmanager
 from datetime import datetime, timezone
+from io import TextIOBase, UnsupportedOperation
 from pathlib import Path
 
 from rich.logging import RichHandler
@@ -32,6 +36,45 @@ def configure_console_logging(level: int = logging.WARNING) -> None:
     )
 
 
+class _Tee(TextIOBase):
+    def __init__(self, *streams: TextIOBase) -> None:
+        self._streams = [stream for stream in streams if stream is not None]
+
+    def write(self, s: str) -> int:
+        for stream in self._streams:
+            stream.write(s)
+        return len(s)
+
+    def flush(self) -> None:
+        for stream in self._streams:
+            stream.flush()
+
+    def writable(self) -> bool:
+        return True
+
+    def isatty(self) -> bool:
+        return any(getattr(stream, "isatty", lambda: False)() for stream in self._streams)
+
+    def fileno(self) -> int:
+        for stream in self._streams:
+            fileno = getattr(stream, "fileno", None)
+            if fileno is None:
+                continue
+            try:
+                return int(fileno())
+            except UnsupportedOperation:
+                continue
+        raise UnsupportedOperation("fileno")
+
+    @property
+    def encoding(self) -> str | None:
+        for stream in self._streams:
+            encoding = getattr(stream, "encoding", None)
+            if encoding is not None:
+                return encoding
+        return None
+
+
 @contextmanager
 def run_file_logger(log_path: Path, level: int = logging.INFO):
     """Attach a file logger for the duration of a run."""
@@ -42,9 +85,54 @@ def run_file_logger(log_path: Path, level: int = logging.INFO):
     handler.setFormatter(logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s"))
     root_logger = logging.getLogger()
     root_logger.addHandler(handler)
+
+    stderr_path = log_path.with_name("stderr.log")
+    fault_path = log_path.with_name("fault.log")
+    original_stderr = sys.stderr
+    stderr_handle = stderr_path.open("w", encoding="utf-8")
+    fault_handle = fault_path.open("w", encoding="utf-8")
+
+    sys.stderr = _Tee(original_stderr, stderr_handle)
+    was_enabled = faulthandler.is_enabled()
+    faulthandler.enable(file=fault_handle, all_threads=True)
+
+    dump_enabled = False
+    try:
+        faulthandler.dump_traceback_later(600, repeat=True, file=fault_handle)
+        dump_enabled = True
+    except RuntimeError:
+        dump_enabled = False
+    sigusr1_registered = False
+    try:
+        faulthandler.register(signal.SIGUSR1, file=fault_handle, all_threads=True)
+        sigusr1_registered = True
+    except (ValueError, AttributeError, RuntimeError):
+        pass
     try:
         yield
     finally:
+        if dump_enabled:
+            try:
+                faulthandler.cancel_dump_traceback_later()
+            except RuntimeError:
+                pass
+        if sigusr1_registered:
+            try:
+                faulthandler.unregister(signal.SIGUSR1)
+            except RuntimeError:
+                pass
+        try:
+            faulthandler.disable()
+        except RuntimeError:
+            pass
+        if was_enabled:
+            try:
+                faulthandler.enable(file=sys.__stderr__, all_threads=True)
+            except UnsupportedOperation:
+                pass
+        sys.stderr = original_stderr
+        stderr_handle.close()
+        fault_handle.close()
         root_logger.removeHandler(handler)
         handler.close()
 
