@@ -36,6 +36,49 @@ def configure_console_logging(level: int = logging.WARNING) -> None:
     )
 
 
+def _read_current_stage(run_dir: Path) -> str:
+    status_path = run_dir / "status.json"
+    if not status_path.exists():
+        return "unknown"
+    try:
+        payload = json.loads(status_path.read_text(encoding="utf-8"))
+    except Exception:
+        return "unknown"
+    stage = payload.get("stage")
+    if not stage:
+        return "unknown"
+    return str(stage)
+
+
+def mark_run_failed(
+    run_dir: Path,
+    *,
+    stage: str | None = None,
+    reason: str,
+    signal_name: str | None = None,
+    error_type: str | None = None,
+    message: str | None = None,
+    **extra: object,
+) -> None:
+    """Best-effort write of a failed run status marker.
+
+    This is used both for normal exception handling and for SIGINT/SIGTERM so
+    interrupted runs don't look like they are still running.
+    """
+
+    resolved_stage = stage or _read_current_stage(run_dir)
+    payload_extra: dict[str, object] = {"failure_reason": reason}
+    if signal_name:
+        payload_extra["signal"] = signal_name
+    if error_type:
+        payload_extra["error_type"] = error_type
+    if message:
+        payload_extra["message"] = message
+    if extra:
+        payload_extra.update(extra)
+    update_status(run_dir, stage=resolved_stage, state="failed", **payload_extra)
+
+
 class _Tee(TextIOBase):
     def __init__(self, *streams: TextIOBase) -> None:
         self._streams = [stream for stream in streams if stream is not None]
@@ -80,6 +123,7 @@ def run_file_logger(log_path: Path, level: int = logging.INFO):
     """Attach a file logger for the duration of a run."""
 
     log_path.parent.mkdir(parents=True, exist_ok=True)
+    run_dir = log_path.parent
     handler = logging.FileHandler(log_path, encoding="utf-8")
     handler.setLevel(level)
     handler.setFormatter(logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s"))
@@ -108,9 +152,38 @@ def run_file_logger(log_path: Path, level: int = logging.INFO):
         sigusr1_registered = True
     except (ValueError, AttributeError, RuntimeError):
         pass
+
+    prev_sigint = signal.getsignal(signal.SIGINT)
+    prev_sigterm = signal.getsignal(signal.SIGTERM)
+    sig_handlers_installed = False
+
+    def _handle_interrupt(signum: int, _frame: object) -> None:
+        sig = signal.Signals(signum)
+        mark_run_failed(run_dir, reason="signal", signal_name=sig.name)
+        if sig == signal.SIGINT:
+            raise KeyboardInterrupt
+        raise SystemExit(128 + signum)
+
+    try:
+        signal.signal(signal.SIGINT, _handle_interrupt)
+        signal.signal(signal.SIGTERM, _handle_interrupt)
+        sig_handlers_installed = True
+    except Exception:
+        # Signal registration can fail in some embedded environments; treat as best-effort.
+        sig_handlers_installed = False
+
     try:
         yield
     finally:
+        if sig_handlers_installed:
+            try:
+                signal.signal(signal.SIGINT, prev_sigint)
+            except Exception:
+                pass
+            try:
+                signal.signal(signal.SIGTERM, prev_sigterm)
+            except Exception:
+                pass
         if dump_enabled:
             try:
                 faulthandler.cancel_dump_traceback_later()
@@ -159,15 +232,24 @@ def stage_timer(run_dir: Path, logger: logging.Logger, stage: str, **extra: obje
     logger.info("Stage start: %s", stage)
     try:
         yield
-    finally:
+    except BaseException as exc:
         elapsed = time.monotonic() - start
-        logger.info("Stage complete: %s (%.2fs)", stage, elapsed)
-        update_status(
+        if isinstance(exc, (KeyboardInterrupt, SystemExit)):
+            logger.warning("Stage interrupted: %s", stage)
+        else:
+            logger.exception("Stage failed: %s", stage)
+        mark_run_failed(
             run_dir,
             stage=stage,
-            state="completed",
+            reason="exception",
+            error_type=type(exc).__name__,
             elapsed_seconds=round(elapsed, 2),
         )
+        raise
+    else:
+        elapsed = time.monotonic() - start
+        logger.info("Stage complete: %s (%.2fs)", stage, elapsed)
+        update_status(run_dir, stage=stage, state="completed", elapsed_seconds=round(elapsed, 2))
 
 
 class ProgressLogger:
