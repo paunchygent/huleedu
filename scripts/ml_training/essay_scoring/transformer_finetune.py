@@ -20,16 +20,17 @@ import math
 import random
 import statistics
 import time
+from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import TypedDict
+from typing import Callable, TypedDict
 
 import numpy as np
 import torch
 from torch.optim import AdamW
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader, Dataset, Sampler
 from transformers import (
     AutoModelForSequenceClassification,
     AutoTokenizer,
@@ -184,6 +185,8 @@ class TransformerFinetuneConfig:
     random_seed: int
     dataloader_num_workers: int
     dataloader_prefetch_factor: int
+    use_length_bucketing: bool = True
+    bucket_size_multiplier: int = 20
 
 
 @dataclass(frozen=True)
@@ -253,12 +256,31 @@ class ChunkDataset(Dataset[ChunkSample]):
 
     def __init__(self, samples: list[ChunkSample]) -> None:
         self._samples = samples
+        self._sample_lengths = [len(sample.input_ids) for sample in samples]
 
     def __len__(self) -> int:
         return len(self._samples)
 
     def __getitem__(self, index: int) -> ChunkSample:
         return self._samples[index]
+
+    def sample_lengths(self) -> list[int]:
+        """Return token lengths for each sample in index order."""
+
+        return self._sample_lengths
+
+
+class BucketBatchSampler(Sampler[list[int]]):
+    """Sampler that yields precomputed batches of sample indices."""
+
+    def __init__(self, batches: list[list[int]]) -> None:
+        self._batches = batches
+
+    def __iter__(self) -> Iterator[list[int]]:
+        return iter(self._batches)
+
+    def __len__(self) -> int:
+        return len(self._batches)
 
 
 def run_transformer_finetune_cv(
@@ -555,6 +577,8 @@ def _run_fold(
         num_workers=finetune_config.dataloader_num_workers,
         prefetch_factor=finetune_config.dataloader_prefetch_factor,
         pin_memory=device.type == "cuda",
+        use_length_bucketing=finetune_config.use_length_bucketing,
+        bucket_size_multiplier=finetune_config.bucket_size_multiplier,
     )
     train_eval_loader = _build_dataloader(
         dataset=train_dataset,
@@ -564,6 +588,8 @@ def _run_fold(
         num_workers=finetune_config.dataloader_num_workers,
         prefetch_factor=finetune_config.dataloader_prefetch_factor,
         pin_memory=device.type == "cuda",
+        use_length_bucketing=finetune_config.use_length_bucketing,
+        bucket_size_multiplier=finetune_config.bucket_size_multiplier,
     )
     val_loader = _build_dataloader(
         dataset=val_dataset,
@@ -573,6 +599,8 @@ def _run_fold(
         num_workers=finetune_config.dataloader_num_workers,
         prefetch_factor=finetune_config.dataloader_prefetch_factor,
         pin_memory=device.type == "cuda",
+        use_length_bucketing=finetune_config.use_length_bucketing,
+        bucket_size_multiplier=finetune_config.bucket_size_multiplier,
     )
 
     model = _build_model(
@@ -860,7 +888,7 @@ def _flatten_chunk_samples(essays: list[ChunkedEssay]) -> list[ChunkSample]:
 
 def _build_collate_fn(
     tokenizer: PreTrainedTokenizerBase,
-):
+) -> Callable[[list[ChunkSample]], CollatedBatch]:
     def collate(samples: list[ChunkSample]) -> CollatedBatch:
         encoded = tokenizer.pad(
             {
@@ -891,7 +919,35 @@ def _build_dataloader(
     num_workers: int,
     prefetch_factor: int,
     pin_memory: bool,
+    use_length_bucketing: bool,
+    bucket_size_multiplier: int,
 ) -> DataLoader[CollatedBatch]:
+    if use_length_bucketing:
+        bucket_batches = _build_bucketed_batch_indices(
+            sample_lengths=dataset.sample_lengths(),
+            batch_size=batch_size,
+            shuffle=shuffle,
+            bucket_size_multiplier=bucket_size_multiplier,
+        )
+        batch_sampler = BucketBatchSampler(bucket_batches)
+        if num_workers > 0:
+            return DataLoader(
+                dataset,
+                batch_sampler=batch_sampler,
+                num_workers=num_workers,
+                persistent_workers=True,
+                prefetch_factor=prefetch_factor,
+                pin_memory=pin_memory,
+                collate_fn=collate_fn,
+            )
+        return DataLoader(
+            dataset,
+            batch_sampler=batch_sampler,
+            num_workers=0,
+            pin_memory=pin_memory,
+            collate_fn=collate_fn,
+        )
+
     if num_workers > 0:
         return DataLoader(
             dataset,
@@ -911,6 +967,40 @@ def _build_dataloader(
         pin_memory=pin_memory,
         collate_fn=collate_fn,
     )
+
+
+def _build_bucketed_batch_indices(
+    *,
+    sample_lengths: list[int],
+    batch_size: int,
+    shuffle: bool,
+    bucket_size_multiplier: int,
+) -> list[list[int]]:
+    """Construct length-aware batches to reduce padding overhead."""
+
+    if batch_size <= 0:
+        raise ValueError("batch_size must be > 0 for length bucketing.")
+    if bucket_size_multiplier <= 0:
+        raise ValueError("bucket_size_multiplier must be > 0 for length bucketing.")
+    if not sample_lengths:
+        return []
+
+    indices = list(range(len(sample_lengths)))
+    if shuffle:
+        random.shuffle(indices)
+
+    bucket_size = max(batch_size, batch_size * bucket_size_multiplier)
+    batches: list[list[int]] = []
+    for bucket_start in range(0, len(indices), bucket_size):
+        bucket = indices[bucket_start : bucket_start + bucket_size]
+        bucket.sort(key=lambda index: sample_lengths[index], reverse=True)
+        for batch_start in range(0, len(bucket), batch_size):
+            batch = bucket[batch_start : batch_start + batch_size]
+            if batch:
+                batches.append(batch)
+    if shuffle:
+        random.shuffle(batches)
+    return batches
 
 
 def _chunk_records(
@@ -1107,3 +1197,5 @@ def _validate_finetune_config(config: TransformerFinetuneConfig) -> None:
         raise ValueError("dataloader_num_workers must be >= 0.")
     if config.dataloader_prefetch_factor < 1:
         raise ValueError("dataloader_prefetch_factor must be >= 1.")
+    if config.bucket_size_multiplier < 1:
+        raise ValueError("bucket_size_multiplier must be >= 1.")

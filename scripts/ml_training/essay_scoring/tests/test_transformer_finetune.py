@@ -19,6 +19,7 @@ from scripts.ml_training.essay_scoring.transformer_finetune import (
     ChunkedEssay,
     MixedPrecisionMode,
     TransformerFinetuneConfig,
+    _build_bucketed_batch_indices,
     _resolve_precision_runtime,
     _validate_finetune_config,
     build_chunk_spans,
@@ -66,6 +67,34 @@ def test_build_chunk_spans_generates_overlap_windows_without_gaps() -> None:
     assert spans == [(0, 5), (3, 8), (6, 11), (9, 12)]
 
 
+def test_build_bucketed_batch_indices_keeps_similar_lengths_together() -> None:
+    batches = _build_bucketed_batch_indices(
+        sample_lengths=[10, 2, 9, 3, 8, 4],
+        batch_size=2,
+        shuffle=False,
+        bucket_size_multiplier=3,
+    )
+
+    assert batches == [[0, 2], [4, 5], [3, 1]]
+
+
+def test_build_bucketed_batch_indices_rejects_invalid_settings() -> None:
+    with pytest.raises(ValueError, match="batch_size must be > 0"):
+        _build_bucketed_batch_indices(
+            sample_lengths=[1, 2, 3],
+            batch_size=0,
+            shuffle=False,
+            bucket_size_multiplier=2,
+        )
+    with pytest.raises(ValueError, match="bucket_size_multiplier must be > 0"):
+        _build_bucketed_batch_indices(
+            sample_lengths=[1, 2, 3],
+            batch_size=2,
+            shuffle=False,
+            bucket_size_multiplier=0,
+        )
+
+
 def test_compute_truncation_coverage_reports_expected_fields() -> None:
     essays = [
         ChunkedEssay(
@@ -109,6 +138,7 @@ def test_validate_finetune_config_accepts_valid_defaults() -> None:
         ("warmup_ratio", 0.6, "warmup_ratio must be"),
         ("dataloader_num_workers", -1, "dataloader_num_workers must be"),
         ("dataloader_prefetch_factor", 0, "dataloader_prefetch_factor must be"),
+        ("bucket_size_multiplier", 0, "bucket_size_multiplier must be"),
     ],
 )
 def test_validate_finetune_config_rejects_invalid_values(
