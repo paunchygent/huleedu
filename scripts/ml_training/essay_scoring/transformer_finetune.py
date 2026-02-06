@@ -1180,7 +1180,18 @@ def _resolve_precision_runtime(
             label="fp16",
         )
 
+    is_rocm_runtime = getattr(torch.version, "hip", None) is not None
     if torch.cuda.is_bf16_supported():
+        if is_rocm_runtime:
+            logger.warning(
+                "auto mixed precision on ROCm resolves to fp16 due observed bf16 instability."
+            )
+            return PrecisionRuntime(
+                enabled=True,
+                dtype=torch.float16,
+                use_grad_scaler=True,
+                label="fp16",
+            )
         return PrecisionRuntime(
             enabled=True,
             dtype=torch.bfloat16,

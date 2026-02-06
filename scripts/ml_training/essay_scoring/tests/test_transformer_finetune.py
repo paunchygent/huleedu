@@ -217,6 +217,7 @@ def test_resolve_precision_runtime_prefers_bf16_when_supported(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(torch.cuda, "is_bf16_supported", lambda: True)
+    monkeypatch.setattr(torch.version, "hip", None, raising=False)
     runtime = _resolve_precision_runtime(
         mode=MixedPrecisionMode.AUTO,
         device=torch.device("cuda"),
@@ -226,6 +227,22 @@ def test_resolve_precision_runtime_prefers_bf16_when_supported(
     assert runtime.dtype == torch.bfloat16
     assert runtime.use_grad_scaler is False
     assert runtime.label == "bf16"
+
+
+def test_resolve_precision_runtime_auto_uses_fp16_on_rocm_when_bf16_supported(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(torch.cuda, "is_bf16_supported", lambda: True)
+    monkeypatch.setattr(torch.version, "hip", "7.2.0", raising=False)
+    runtime = _resolve_precision_runtime(
+        mode=MixedPrecisionMode.AUTO,
+        device=torch.device("cuda"),
+    )
+
+    assert runtime.enabled is True
+    assert runtime.dtype == torch.float16
+    assert runtime.use_grad_scaler is True
+    assert runtime.label == "fp16"
 
 
 def test_resolve_precision_runtime_falls_back_to_fp16_when_bf16_unsupported(
