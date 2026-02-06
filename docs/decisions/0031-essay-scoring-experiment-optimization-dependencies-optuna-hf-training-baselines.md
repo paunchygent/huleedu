@@ -122,6 +122,34 @@ Cons / risks:
 - Heavier dependency footprint (especially HF stack) and longer install times.
 - Fine-tuning can overfit quickly on small datasets and may require GPU/Hemma scheduling discipline.
 
+## Gate G3.1 Execution Log (2026-02-06)
+
+Canonical launcher and wrappers:
+- local launcher:
+  `pdm run run-local-pdm g3-launch-hemma`
+- remote operations:
+  `pdm run run-local-pdm run-hemma -- ...`
+
+Observed fail-closed outcomes on Hemma:
+- run
+  `ellipse_gate_g3_1_transformer_lora_prompt_holdout_20260206_232914`
+  failed with ROCm `AcceleratorError` under `precision=bf16`.
+- run
+  `ellipse_gate_g3_1_transformer_lora_prompt_holdout_20260206_233408`
+  failed with `ValueError: Attempting to unscale FP16 gradients`.
+
+Stabilization changes applied:
+- added `peft` to `dependency-groups.ml-research` for LoRA runtime parity,
+- hardened launcher preflight with fail-closed `MISSING_MODULE:peft` check,
+- ROCm precision policy in transformer fine-tuning:
+  - `mixed_precision=auto` resolves to `fp16` on ROCm,
+  - GradScaler disabled for ROCm fp16 path.
+
+Current state:
+- run
+  `ellipse_gate_g3_1_transformer_lora_prompt_holdout_20260206_233717`
+  is running detached on Hemma (Gate G3.1 in progress).
+
 ## Related
 
 - Hub: `docs/reference/ref-essay-scoring-research-hub.md`

@@ -89,12 +89,18 @@ Latest verification snapshot (2026-02-06):
 - G3 hardening landed:
   - tokenizer-agnostic chunk special-token wrapping via `cls/sep` (fallback `bos/eos`) ids,
   - `require_gpu` runtime guard for transformer fine-tuning,
-  - length-bucketing in dataloaders.
-- G3 launcher hardening staged (verification pending):
+  - length-bucketing in dataloaders,
+  - ROCm mixed precision safety:
+    - `mixed_precision=auto` resolves to fp16 on ROCm,
+    - GradScaler disabled for ROCm fp16 path.
+- G3 launcher hardening verified:
   - canonical Hemma root fixed and enforced: `/home/paunchygent/apps/huleedu`,
   - preflight `--help` flag checks made deterministic (`NO_COLOR=1 COLUMNS=240`),
   - detached launch command assembly switched to Bash array + `printf '%q'`
-    (removes brittle `${RUN_NAME}` nested expansion behavior).
+    (removes brittle `${RUN_NAME}` nested expansion behavior),
+  - fail-closed preflight module check for LoRA dependency (`MISSING_MODULE:peft`).
+- `scripts/run-hemma.sh` wrapper now has deterministic argument transport/parsing for
+  both argv and `--shell` mode.
 - Canonical detached launcher is `pdm run g3-launch-hemma` (fail-closed preflight + launch).
 - Execution-context wrappers are canonical:
   - `pdm run run-local-pdm <script> [args]` for local `pdm run ...`,
@@ -103,8 +109,9 @@ Latest verification snapshot (2026-02-06):
   `research-transformer-train` (`huleedu_essay_transformer_train`).
 - Validation gate run from repo root (via `./scripts/dev-shell.sh`) is green:
   `pdm run format-all`, `pdm run lint-fix --unsafe-fixes`, `pdm run typecheck-all`,
-  `pdm run pytest-root scripts/ml_training/essay_scoring/tests/test_transformer_finetune.py -q`
-  (`18 passed`).
+  `pdm run pytest-root scripts/ml_training/essay_scoring/tests/test_transformer_finetune.py -q`,
+  `pdm run pytest-root scripts/ml_training/essay_scoring/tests/test_g3_launch_hemma.py -q`
+  (`20 passed` + `8 passed`).
 
 ### Hemma Offload (single tunnel)
 

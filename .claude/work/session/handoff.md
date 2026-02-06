@@ -77,7 +77,7 @@ Mandatory mechanics:
 - Use anti-truncation chunking with overlap and essay-level pooling.
 - Truncation-only runs are invalid for gate acceptance.
 - Hemma GPU profile requirements:
-  - mixed precision `bf16` when supported (fallback `fp16`),
+  - mixed precision `auto` (currently resolves to ROCm-safe `fp16` without GradScaler),
   - gradient checkpointing enabled,
   - gradient accumulation for effective batch size `32-64`.
 
@@ -116,9 +116,31 @@ duplicated in this handoff.
   `output/essay_scoring/20260206_214222_ellipse_gate_g3_1_transformer_lora_prompt_holdout_20260206_214215`
   - invalid due to CPU runtime and tokenizer compatibility crash.
 
+### Valid G3.1 failed attempts (evidence retained)
+
+- `ellipse_gate_g3_1_transformer_lora_prompt_holdout_20260206_232914`
+  - run dir:
+    `output/essay_scoring/20260206_232921_ellipse_gate_g3_1_transformer_lora_prompt_holdout_20260206_232914`
+  - failed with ROCm `AcceleratorError` (`HIP error: unspecified launch failure`) under bf16.
+- `ellipse_gate_g3_1_transformer_lora_prompt_holdout_20260206_233408`
+  - run dir:
+    `output/essay_scoring/20260206_233415_ellipse_gate_g3_1_transformer_lora_prompt_holdout_20260206_233408`
+  - failed with `ValueError: Attempting to unscale FP16 gradients.` under fp16+GradScaler.
+
+### Active G3.1 run (2026-02-06)
+
+- run name:
+  `ellipse_gate_g3_1_transformer_lora_prompt_holdout_20260206_233717`
+- run dir:
+  `output/essay_scoring/20260206_233723_ellipse_gate_g3_1_transformer_lora_prompt_holdout_20260206_233717`
+- driver log:
+  `output/essay_scoring/ellipse_gate_g3_1_transformer_lora_prompt_holdout_20260206_233717.driver.log`
+- status:
+  detached and running (`status.json.state=running`).
+
 ## Recently Completed (Compressed)
 
-### Gate G3 launcher contract hardening ⚠️ IMPLEMENTED, VERIFICATION PENDING
+### Gate G3 launcher + runtime hardening ✅ IMPLEMENTED AND VERIFIED
 - Fixed canonical Hemma repo root spelling to `/home/paunchygent/apps/huleedu`
   in `scripts/ml_training/essay_scoring/g3_launch_hemma.py`.
 - Hardened preflight CLI flag checks against terminal-width truncation by forcing
@@ -127,9 +149,16 @@ duplicated in this handoff.
   Bash array + `printf '%q'` is now used instead of interpolated command strings.
 - Added fail-fast config validation so legacy typo root
   `/home/paunchygent/apps/huledu` is rejected before any remote command executes.
-- Added/updated launcher tests in code at
-  `scripts/ml_training/essay_scoring/tests/test_g3_launch_hemma.py`
-  to lock these invariants; verification run is still pending.
+- Added fail-closed LoRA dependency preflight (`MISSING_MODULE:peft`) and ensured `peft`
+  is included in `dependency-groups.ml-research`.
+- Fixed `scripts/run-hemma.sh` argument transport and mode parsing so quoted/space-containing
+  remote commands execute deterministically from local wrapper calls.
+- Added ROCm precision safety in transformer fine-tuning:
+  - `mixed_precision=auto` now resolves to fp16 on ROCm,
+  - GradScaler is disabled on ROCm fp16 path to avoid unscale failures.
+- Added/updated tests in:
+  - `scripts/ml_training/essay_scoring/tests/test_g3_launch_hemma.py`
+  - `scripts/ml_training/essay_scoring/tests/test_transformer_finetune.py`
 
 ### Transformer module validation + test coverage ✅ COMPLETED
 - Reviewed `scripts/ml_training/essay_scoring/transformer_finetune.py` against current upstream guidance

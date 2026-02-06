@@ -65,6 +65,22 @@ Use a staged review:
 
 **Status:** `pending`
 
+### Execution Evidence (2026-02-06)
+
+- Attempt
+  `ellipse_gate_g3_1_transformer_lora_prompt_holdout_20260206_232914`
+  failed on ROCm with `AcceleratorError` under bf16.
+- Attempt
+  `ellipse_gate_g3_1_transformer_lora_prompt_holdout_20260206_233408`
+  failed on ROCm fp16 with `ValueError: Attempting to unscale FP16 gradients`.
+- Stabilization changes shipped:
+  - LoRA runtime dependency parity (`peft`) in `ml-research`,
+  - fail-closed launcher preflight module check for `peft`,
+  - ROCm precision policy adjusted to fp16 without grad scaling for `auto`.
+- Current baseline run:
+  `ellipse_gate_g3_1_transformer_lora_prompt_holdout_20260206_233717`
+  is running detached on Hemma; final artifact review is pending completion.
+
 ## Links
 
 - Story:

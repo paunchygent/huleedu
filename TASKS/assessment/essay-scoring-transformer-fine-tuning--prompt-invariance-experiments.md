@@ -154,7 +154,7 @@ Unlock evidence:
   - `pdm run pytest-root scripts/ml_training/essay_scoring/tests -q`
 - Result: all checks passed (`46 passed`).
 
-## Launcher Hardening Snapshot (2026-02-06, Verification Pending)
+## Launcher Hardening Snapshot (2026-02-06, Verified)
 
 - Canonical Gate G3 launcher path kept as:
   - `pdm run g3-launch-hemma` (single execution path, fail-closed).
@@ -168,6 +168,44 @@ Unlock evidence:
     to avoid nested shell expansion bugs around run-name injection,
   - explicit fail-fast rejection of typo root
     `/home/paunchygent/apps/huledu` before remote execution.
-- Regression tests updated in code at
+- Regression tests updated and executed at
   `scripts/ml_training/essay_scoring/tests/test_g3_launch_hemma.py`
-  to prevent these failures from reappearing; execution verification is pending.
+  to prevent these failures from reappearing.
+- Remote execution wrapper `scripts/run-hemma.sh` fixed and verified:
+  - deterministic parsing for `--` and `--shell`,
+  - safe remote argv transport for quoted/space-containing arguments.
+
+## Gate G3.1 Execution Evidence (2026-02-06)
+
+Fail-closed canonical launcher used for all attempts:
+- `pdm run run-local-pdm g3-launch-hemma`
+
+Attempt A (after peft dependency fix):
+- run name:
+  `ellipse_gate_g3_1_transformer_lora_prompt_holdout_20260206_232914`
+- run dir:
+  `output/essay_scoring/20260206_232921_ellipse_gate_g3_1_transformer_lora_prompt_holdout_20260206_232914`
+- driver log:
+  `output/essay_scoring/ellipse_gate_g3_1_transformer_lora_prompt_holdout_20260206_232914.driver.log`
+- status:
+  `failed` (`error_type=AcceleratorError`, `HIP error: unspecified launch failure`) while running `precision=bf16`.
+
+Attempt B (ROCm auto precision fallback to fp16):
+- run name:
+  `ellipse_gate_g3_1_transformer_lora_prompt_holdout_20260206_233408`
+- run dir:
+  `output/essay_scoring/20260206_233415_ellipse_gate_g3_1_transformer_lora_prompt_holdout_20260206_233408`
+- driver log:
+  `output/essay_scoring/ellipse_gate_g3_1_transformer_lora_prompt_holdout_20260206_233408.driver.log`
+- status:
+  `failed` (`error_type=ValueError`, `Attempting to unscale FP16 gradients.`).
+
+Attempt C (ROCm fp16 + no GradScaler):
+- run name:
+  `ellipse_gate_g3_1_transformer_lora_prompt_holdout_20260206_233717`
+- run dir:
+  `output/essay_scoring/20260206_233723_ellipse_gate_g3_1_transformer_lora_prompt_holdout_20260206_233717`
+- driver log:
+  `output/essay_scoring/ellipse_gate_g3_1_transformer_lora_prompt_holdout_20260206_233717.driver.log`
+- status:
+  `running` (detached screen session active; `status.json.state=running`).
