@@ -8,6 +8,22 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
+TrainingParamValue = int | float | str | bool
+
+
+def _default_training_params() -> dict[str, TrainingParamValue]:
+    """Return default XGBoost parameters with narrow value types."""
+
+    return {
+        "objective": "reg:squarederror",
+        "max_depth": 6,
+        "learning_rate": 0.03,
+        "min_child_weight": 5,
+        "reg_lambda": 2.0,
+        "colsample_bytree": 0.6,
+        "subsample": 0.8,
+    }
+
 
 class FeatureSet(str, Enum):
     """Feature set choices for ablation and training."""
@@ -53,17 +69,7 @@ class TrainingConfig(BaseModel):
     test_ratio: float = 0.15
     num_boost_round: int = 1500
     early_stopping_rounds: int = 100
-    params: dict[str, int | float | str | bool] = Field(
-        default_factory=lambda: {
-            "objective": "reg:squarederror",
-            "max_depth": 6,
-            "learning_rate": 0.03,
-            "min_child_weight": 5,
-            "reg_lambda": 2.0,
-            "colsample_bytree": 0.6,
-            "subsample": 0.8,
-        }
-    )
+    params: dict[str, TrainingParamValue] = Field(default_factory=_default_training_params)
 
 
 class OutputConfig(BaseModel):

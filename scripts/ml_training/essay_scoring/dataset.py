@@ -102,7 +102,7 @@ def load_ielts_dataset(path: Path) -> EssayDataset:
         raise ValueError("Dataset contains no valid rows after filtering.")
 
     records: list[EssayRecord] = []
-    for _, row in frame.iterrows():
+    for row_index, (_, row) in enumerate(frame.iterrows()):
         component_scores = {
             name: _coerce_float(row.get(name))
             for name in OPTIONAL_COMPONENTS
@@ -111,10 +111,10 @@ def load_ielts_dataset(path: Path) -> EssayDataset:
         task_type = str(row.get("Task_Type", ""))
         question = str(row.get("Question", ""))
         essay = str(row.get("Essay", ""))
-        overall = float(row.get("Overall"))
+        overall = _require_float(row.get("Overall"), field_name="Overall")
         record_id = _make_record_id(
             source_key="ielts",
-            row_index=int(row.name),
+            row_index=row_index,
             task_type=task_type,
             question=question,
             essay=essay,
@@ -146,10 +146,23 @@ def _coerce_float(value: object) -> float | None:
 
     if value is None or (isinstance(value, float) and pd.isna(value)):
         return None
-    try:
+    if isinstance(value, bool):
         return float(value)
-    except (TypeError, ValueError):
-        return None
+    if isinstance(value, (int, float, str)):
+        try:
+            return float(value)
+        except ValueError:
+            return None
+    return None
+
+
+def _require_float(value: object, *, field_name: str) -> float:
+    """Convert required numeric values and fail fast on invalid input."""
+
+    coerced = _coerce_float(value)
+    if coerced is None:
+        raise ValueError(f"Dataset contains invalid numeric value for {field_name!r}: {value!r}")
+    return coerced
 
 
 ELLIPSE_REQUIRED_COLUMNS = {"full_text", "prompt", "Overall"}
@@ -230,7 +243,7 @@ def _load_ellipse_records(frame: pd.DataFrame, *, source_key: str) -> list[Essay
         raise ValueError("ELLIPSE dataset contains no valid rows after filtering.")
 
     records: list[EssayRecord] = []
-    for _, row in frame.iterrows():
+    for row_index, (_, row) in enumerate(frame.iterrows()):
         component_scores: dict[str, float | None] = {}
         for name in ELLIPSE_SCORE_COLUMNS:
             if name not in frame.columns:
@@ -244,10 +257,10 @@ def _load_ellipse_records(frame: pd.DataFrame, *, source_key: str) -> list[Essay
         task_type = str(row.get("task", ""))
         question = str(row.get("prompt", ""))
         essay = str(row.get("full_text", ""))
-        overall = float(overall_value)
+        overall = _require_float(overall_value, field_name="Overall")
         record_id = _make_record_id(
             source_key=source_key,
-            row_index=int(row.name),
+            row_index=row_index,
             task_type=task_type,
             question=question,
             essay=essay,

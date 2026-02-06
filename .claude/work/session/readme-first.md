@@ -65,6 +65,9 @@ pdm run essay-scoring-research cv --dataset-kind ellipse --feature-set combined 
 # Reuse extracted features for faster parameter sweeps
 pdm run essay-scoring-research cv --reuse-cv-feature-store-dir output/essay_scoring/<RUN_DIR_OR_CV_FEATURE_STORE_DIR> --splits-path <SPLITS_JSON> --scheme stratified_text --dataset-kind ellipse --feature-set combined
 
+# Gate comparison (paired folds + bootstrap CI + threshold checks)
+pdm run essay-scoring-research compare-cv-runs --reference-run-dir <REFERENCE_XGB_RUN_DIR> --candidate-run-dir <CANDIDATE_XGB_RUN_DIR> --gate-profile prompt_holdout_primary --min-prompt-n 30 --bottom-k-prompts 5
+
 # Pruned handcrafted predictor subset (column filtering; embeddings always kept in combined)
 # Use repeatable: --predictor-handcrafted-drop <feature_name> or --predictor-handcrafted-keep <feature_name>
 # (see runbook for a full example)
@@ -90,29 +93,18 @@ Performance + stability reference:
 - See `docs/operations/ml-nlp-runbook.md` for an example completed ELLIPSE Hemma backend run entry
   with QWK + throughput.
 
-Implemented (2026-02-04):
-- Combined offload endpoint: `POST /v1/extract` in `scripts/ml_training/essay_scoring/offload/server.py`
-- Dockerfile: `scripts/ml_training/essay_scoring/offload/Dockerfile`
-- Research CLI flags:
-  - `--backend hemma`
-  - `--offload-service-url http://127.0.0.1:19000`
-
-Tracking:
-- `TASKS/assessment/hemma-offload-combined-extract-endpoint.md`
-- Decision gate (experiment optimization deps): `docs/decisions/0031-essay-scoring-experiment-optimization-dependencies-optuna-hf-training-baselines.md`
-- Review records (dependency gate):
+Canonical references (keep implementation history out of this file):
+- Runbook: `docs/operations/ml-nlp-runbook.md`
+- Active session context and frozen run contracts: `.claude/work/session/handoff.md`
+- Research hub: `docs/reference/ref-essay-scoring-research-hub.md`
+- Decision record (accepted): `docs/decisions/0031-essay-scoring-experiment-optimization-dependencies-optuna-hf-training-baselines.md`
+- Tasks:
+  - `TASKS/assessment/essay-scoring-optuna-hyperparameter-optimization-cv-selected.md`
+  - `TASKS/assessment/essay-scoring-transformer-fine-tuning--prompt-invariance-experiments.md`
+  - `TASKS/assessment/essay-scoring-statsmodels-diagnostics--catboost-baseline.md`
+- Review records:
   - `docs/product/reviews/review-transformer-fine-tuning-prompt-invariance-dependencies.md`
   - `docs/product/reviews/review-statsmodels-diagnostics-catboost-baseline-dependencies.md`
-- Codified navigation manifest (essay-scoring):
-- Codified navigation manifests:
-  - `scripts/docs_mgmt/workstream_topology/essay-scoring.toml`
-  - `scripts/docs_mgmt/workstream_topology/tasks-lifecycle-v2.toml`
-  - Hub render/check via: `pdm run render-workstream-hubs` and `pdm run validate-docs`
-- Agent workflow anchor:
-  - `AGENTS.md` was surgically refactored (2026-02-06) to reduce duplication and offload stable details to:
-    - `.agent/rules/*`
-    - `docs/operations/*` runbooks
-    - repo-local skills in `scripts/codex_skills/`
 
 ---
 

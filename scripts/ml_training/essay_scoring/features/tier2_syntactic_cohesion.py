@@ -13,13 +13,14 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import numpy as np
 import spacy
 from spacy.language import Language
-from spacy.tokens import Doc
+from spacy.tokens import Doc, Span, Token
 
 from scripts.ml_training.essay_scoring.features.protocols import EmbeddingExtractorProtocol
 from scripts.ml_training.essay_scoring.features.schema import Tier2Features
@@ -307,12 +308,12 @@ class Tier2FeatureExtractor:
 
         return self.extract_batch([text], [prompt])[0]
 
-    def _average_parse_depth(self, sentences: list[object]) -> float:
+    def _average_parse_depth(self, sentences: Sequence[Span]) -> float:
         """Compute average maximum dependency depth per sentence."""
 
         if not sentences:
             return 0.0
-        depths = []
+        depths: list[int] = []
         for sentence in sentences:
             depth = 0
             for token in sentence:
@@ -321,12 +322,12 @@ class Tier2FeatureExtractor:
         return float(np.mean(np.array(depths, dtype=float)))
 
     @staticmethod
-    def _token_depth(token: object) -> int:
+    def _token_depth(token: Token) -> int:
         """Compute the depth of a token in the dependency tree."""
 
         depth = 0
         current = token
-        max_depth = len(getattr(token, "doc", []))
+        max_depth = len(token.doc)
         while current.head is not current:
             depth += 1
             if max_depth and depth > max_depth:
@@ -335,7 +336,7 @@ class Tier2FeatureExtractor:
         return depth
 
     @staticmethod
-    def _passive_ratio(doc: object) -> float:
+    def _passive_ratio(doc: Doc) -> float:
         """Compute ratio of passive constructions to verbs."""
 
         passive_count = sum(1 for token in doc if token.dep_ == "auxpass")
@@ -343,7 +344,7 @@ class Tier2FeatureExtractor:
         return safe_divide(float(passive_count), float(verb_count))
 
     @staticmethod
-    def _dependency_distance(doc: object) -> float:
+    def _dependency_distance(doc: Doc) -> float:
         """Compute average dependency distance for tokens."""
 
         distances = [abs(token.i - token.head.i) for token in doc if token.head is not token]

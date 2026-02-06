@@ -63,7 +63,7 @@ class Tier3FeatureExtractor:
         """
 
         paragraph_count = float(len(paragraphs))
-        has_intro = 1.0 if self._has_intro(paragraphs, self.nlp) else 0.0
+        has_intro = 1.0 if self._has_intro(paragraphs) else 0.0
         has_conclusion = 1.0 if self._has_conclusion(paragraphs) else 0.0
         lexical_overlap = self._lexical_overlap_from_doc(doc)
         pronoun_noun_ratio = self._pronoun_noun_ratio_from_doc(doc)
@@ -77,12 +77,10 @@ class Tier3FeatureExtractor:
         )
 
     @staticmethod
-    def _has_intro(paragraphs: list[str], nlp: Language) -> bool:
+    def _has_intro(paragraphs: list[str]) -> bool:
         if not paragraphs:
             return False
-        # Tokenizer-only (no tagger/parser) is enough for word-count heuristics.
-        doc = nlp.make_doc(paragraphs[0])
-        return sum(1 for token in doc if not token.is_space) >= 30
+        return len(paragraphs[0].split()) >= 30
 
     @staticmethod
     def _has_conclusion(paragraphs: list[str]) -> bool:

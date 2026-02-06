@@ -2,7 +2,7 @@
 id: 'essay-scoring-decision-gate-for-experiment-optimization-dependencies'
 title: 'essay-scoring: decision gate for experiment optimization dependencies'
 type: 'task'
-status: 'proposed'
+status: 'done'
 priority: 'high'
 domain: 'assessment'
 service: ''
@@ -77,6 +77,16 @@ The decision must be documented in `ADR-0031` and integrated into the CV-first s
 - The research doc contains concrete, repo-grounded findings (trial caps, expected ROI, risks).
 - Exactly one follow-up implementation task is promoted to `in_progress` with explicit acceptance
   criteria.
+
+## Outcome (2026-02-06)
+
+- `ADR-0031` accepted with decision matrix:
+  - Optuna: accept
+  - HF fine-tuning stack: defer
+  - statsmodels + CatBoost: defer
+- Optuna pilot + stratified stability-pair evidence recorded in:
+  - `TASKS/assessment/essay-scoring-optuna-hyperparameter-optimization-cv-selected.md`
+  - `docs/decisions/0031-essay-scoring-experiment-optimization-dependencies-optuna-hf-training-baselines.md`
 
 ## Related
 

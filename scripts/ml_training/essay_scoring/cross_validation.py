@@ -85,7 +85,7 @@ from scripts.ml_training.essay_scoring.training.training_modes import (
 
 logger = logging.getLogger(__name__)
 
-_CV_METRICS_SCHEMA_VERSION = 4
+_CV_METRICS_SCHEMA_VERSION = 5
 
 
 class WordCountWindow(TypedDict):
@@ -137,6 +137,7 @@ class CrossValidationMetricsPayload(TypedDict):
     ensemble_seed_base: int
     ensemble_member_seeds_by_fold: dict[str, list[int]]
     ensemble_member_seeds_final_fit: list[int]
+    model_family: str
     training_mode: str
     grade_band_weighting: str
     grade_band_weight_cap: float
@@ -225,7 +226,7 @@ def run_cross_validation(
             config=config,
             run_dir=run_paths.run_dir,
             feature_set=feature_set,
-            word_window=word_window,
+            word_window={"min": min_words, "max": max_words},
             train_records=train_records,
             test_records=test_records,
             reuse_store_dir=reuse_cv_feature_store_dir,
@@ -234,7 +235,7 @@ def run_cross_validation(
             store_dir=cv_store_dir,
             expected_config=config,
             expected_feature_set=feature_set,
-            expected_word_count_window=word_window,
+            expected_word_count_window={"min": min_words, "max": max_words},
         )
 
         keep_feature_indices = resolve_keep_feature_indices(
@@ -279,6 +280,7 @@ def run_cross_validation(
             logger,
             "cv_folds_train_eval",
             scheme=scheme,
+            model_family="xgboost",
             n_splits=int(splits.n_splits),
             feature_set=feature_set.value,
         ):
@@ -427,6 +429,7 @@ def run_cross_validation(
             logger,
             "cv_final_train_test_eval",
             scheme=scheme,
+            model_family="xgboost",
             feature_set=feature_set.value,
         ):
             final_eval, locked_test_pred_raw = _run_final_train_and_test_eval(
@@ -466,6 +469,7 @@ def run_cross_validation(
             "ensemble_seed_base": int(config.training.random_seed),
             "ensemble_member_seeds_by_fold": ensemble_seeds_by_fold,
             "ensemble_member_seeds_final_fit": list(ensemble_member_seeds),
+            "model_family": "xgboost",
             "training_mode": training_mode.value,
             "grade_band_weighting": grade_band_weighting.value,
             "grade_band_weight_cap": float(grade_band_weight_cap),
@@ -591,9 +595,6 @@ def _run_final_train_and_test_eval(
         mode=grade_band_weighting,
         cap=grade_band_weight_cap,
     )
-    dval = xgb.DMatrix(val_mat, feature_names=feature_names)
-    dtest = xgb.DMatrix(test_mat, feature_names=feature_names)
-
     if not member_seeds:
         raise ValueError("member_seeds must be non-empty for CV final fit.")
 
@@ -614,6 +615,8 @@ def _run_final_train_and_test_eval(
             sample_weight_train=sample_weight_train,
         )
         member_best_iterations.append(int(artifacts.best_iteration))
+        dval = xgb.DMatrix(val_mat, feature_names=feature_names)
+        dtest = xgb.DMatrix(test_mat, feature_names=feature_names)
         member_predt_val.append(np.asarray(artifacts.model.predict(dval)))
         member_predt_test.append(np.asarray(artifacts.model.predict(dtest)))
 

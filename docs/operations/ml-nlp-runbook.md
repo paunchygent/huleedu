@@ -188,6 +188,59 @@ Outputs:
 - `output/essay_scoring/<SWEEP>/progress.json`
 - Per-configuration CV runs under `output/essay_scoring/<SWEEP>/variants/`
 
+### Optuna sweep pilot (decision gate)
+
+Use `optuna-sweep` when you want trial-budgeted optimization with explicit prompt/tail guardrails.
+
+Example (prompt-holdout; combined; drop-3; weighting+calibration; frozen ELLIPSE inputs):
+
+```bash
+pdm run essay-scoring-research optuna-sweep \
+  --scheme prompt_holdout \
+  --feature-set combined \
+  --training-mode regression \
+  --grade-band-weighting sqrt_inv_freq \
+  --grade-band-weight-cap 3.0 \
+  --prediction-mapping qwk_cutpoints_lfo \
+  --predictor-handcrafted-drop has_conclusion \
+  --predictor-handcrafted-drop clause_count \
+  --predictor-handcrafted-drop flesch_kincaid \
+  --ellipse-train-path output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_train_prepared.csv \
+  --ellipse-test-path output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_test_prepared.csv \
+  --splits-path output/essay_scoring/20260204_135554_ellipse_splits_200_1000/artifacts/splits.json \
+  --reuse-cv-feature-store-dir output/essay_scoring/20260204_144831_ellipse_cv_combined_prompt_holdout_20260204_150321/cv_feature_store \
+  --n-trials 40 \
+  --objective worst_prompt_qwk_then_mean_qwk \
+  --min-prompt-n 30 \
+  --bottom-k-prompts 5 \
+  --baseline-best-run-dir output/essay_scoring/20260205_192751_ellipse_gate_e_xgb_sweep_prompt_holdout_drop3_wcal_20260205_202746/variants/20260205_194952_ellipse_gate_e_xgb_sweep_prompt_holdout_drop3_wcal_20260205_202746_97e84d798d \
+  --run-name ellipse_optuna_pilot_prompt_holdout_drop3_wcal
+```
+
+Outputs:
+- `output/essay_scoring/<SWEEP>/artifacts/optuna_trials.json`
+- `output/essay_scoring/<SWEEP>/artifacts/selected_params.json`
+- `output/essay_scoring/<SWEEP>/reports/optuna_summary.md`
+- `output/essay_scoring/<SWEEP>/progress.json`
+- Per-trial CV runs under `output/essay_scoring/<SWEEP>/variants/`
+
+### Paired gate comparison (fold-paired + bootstrap CI)
+
+Compare candidate vs reference CV runs with paired-fold bootstrap CIs and strict thresholds:
+
+```bash
+pdm run essay-scoring-research compare-cv-runs \
+  --reference-run-dir output/essay_scoring/<REFERENCE_XGB_RUN_DIR> \
+  --candidate-run-dir output/essay_scoring/<CANDIDATE_XGB_RUN_DIR> \
+  --gate-profile prompt_holdout_primary \
+  --min-prompt-n 30 \
+  --bottom-k-prompts 5
+```
+
+Outputs:
+- `output/essay_scoring/<COMPARE_RUN>/artifacts/cv_comparison.json`
+- `output/essay_scoring/<COMPARE_RUN>/reports/cv_comparison.md`
+
 ### CV ensembling (Gate F)
 
 CV supports simple seed ensembling per fold:

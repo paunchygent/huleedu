@@ -2,7 +2,7 @@
 id: 'essay-scoring-transformer-fine-tuning--prompt-invariance-experiments'
 title: 'essay-scoring: transformer fine-tuning + prompt invariance experiments'
 type: 'task'
-status: 'proposed'
+status: 'in_progress'
 priority: 'medium'
 domain: 'assessment'
 service: ''
@@ -84,3 +84,14 @@ Implement and compare one of:
   `TASKS/assessment/essay-scoring-decision-gate-for-experiment-optimization-dependencies.md`
 - Review record:
   `docs/product/reviews/review-transformer-fine-tuning-prompt-invariance-dependencies.md`
+
+## Gate Unlock (2026-02-06)
+
+This task is promoted after Gate G1 (`statsmodels + CatBoost`) failed the
+prompt-holdout primary thresholds while passing only stratified stability.
+
+Unlock evidence:
+- prompt-holdout comparison (failed):
+  `output/essay_scoring/20260206_190010_ellipse_gate_g1_compare_prompt_holdout_catboost_vs_b28c`
+- stratified stability comparison (passed):
+  `output/essay_scoring/20260206_190014_ellipse_gate_g1_compare_stratified_catboost_vs_b28c`

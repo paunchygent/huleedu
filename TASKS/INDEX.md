@@ -1,6 +1,6 @@
 # TASKS Index
 
-Generated: 2026-02-06T10:23:12
+Generated: 2026-02-06T20:01:06
 
 ## Summary
 
@@ -64,15 +64,15 @@ Generated: 2026-02-06T10:23:12
 - [essay-scoring: construct validity audit + feature candidates](TASKS/assessment/essay-scoring-construct-validity-audit--feature-candidates.md) — `proposed`
 - [essay-scoring: CV baseline (stratified_text + prompt_holdout) on ELLIPSE](TASKS/assessment/essay-scoring-cv-baseline-stratified-text--prompt-holdout-on-ellipse.md) — `done`
 - [essay-scoring: CV ensembling (ELLIPSE CV-first)](TASKS/assessment/essay-scoring-cv-ensembling-ellipse-cv-first.md) — `done`
-- [essay-scoring: decision gate for experiment optimization dependencies](TASKS/assessment/essay-scoring-decision-gate-for-experiment-optimization-dependencies.md) — `proposed`
+- [essay-scoring: decision gate for experiment optimization dependencies](TASKS/assessment/essay-scoring-decision-gate-for-experiment-optimization-dependencies.md) — `done`
 - [essay-scoring: drop-column importance for handcrafted features (CV)](TASKS/assessment/essay-scoring-drop-column-importance-for-handcrafted-features-cv.md) — `done`
-- [essay-scoring: Optuna hyperparameter optimization (CV-selected)](TASKS/assessment/essay-scoring-optuna-hyperparameter-optimization-cv-selected.md) — `proposed`
+- [essay-scoring: Optuna hyperparameter optimization (CV-selected)](TASKS/assessment/essay-scoring-optuna-hyperparameter-optimization-cv-selected.md) — `done`
 - [essay-scoring: ordinal/custom objective experiments (QWK)](TASKS/assessment/essay-scoring-ordinal-custom-objective-experiments-qwk.md) — `proposed`
 - [essay-scoring: prepare ELLIPSE dataset + CV splits (200–1000 words)](TASKS/assessment/essay-scoring-prepare-ellipse-dataset--cv-splits-2001000-words.md) — `done`
 - [essay-scoring: residual diagnostics by prompt and grade band](TASKS/assessment/essay-scoring-residual-diagnostics-by-prompt-and-grade-band.md) — `done`
-- [essay-scoring: statsmodels diagnostics + CatBoost baseline](TASKS/assessment/essay-scoring-statsmodels-diagnostics--catboost-baseline.md) — `proposed`
+- [essay-scoring: statsmodels diagnostics + CatBoost baseline](TASKS/assessment/essay-scoring-statsmodels-diagnostics--catboost-baseline.md) — `done`
 - [essay-scoring: tail calibration + grade-band imbalance mitigation](TASKS/assessment/essay-scoring-tail-calibration--grade-band-imbalance-mitigation.md) — `in_progress`
-- [essay-scoring: transformer fine-tuning + prompt invariance experiments](TASKS/assessment/essay-scoring-transformer-fine-tuning--prompt-invariance-experiments.md) — `proposed`
+- [essay-scoring: transformer fine-tuning + prompt invariance experiments](TASKS/assessment/essay-scoring-transformer-fine-tuning--prompt-invariance-experiments.md) — `in_progress`
 - [essay-scoring: validate pruned handcrafted subset under prompt_holdout](TASKS/assessment/essay-scoring-validate-pruned-handcrafted-subset-under-prompt-holdout.md) — `done`
 - [essay-scoring: XGBoost hyperparameter sweep (CV-selected)](TASKS/assessment/essay-scoring-xgboost-hyperparameter-sweep-cv-selected.md) — `done`
 - [Event Publishing Infrastructure Improvements](TASKS/assessment/event-publishing-improvements.md) — `proposed`
@@ -253,7 +253,7 @@ Generated: 2026-02-06T10:23:12
 - [Frontend Live Data Integration](TASKS/programs/teacher_dashboard_integration/frontend-live-data-integration.md) — `programs`
 - [WebSocket Batch Updates](TASKS/programs/teacher_dashboard_integration/websocket-batch-updates.md) — `programs`
 
-### done (44)
+### done (47)
 - [Add Database Metrics Instrumentation to Remaining Services](TASKS/infrastructure/add-database-metrics-instrumentation-to-remaining-services.md) — `infrastructure`
 - [add strict workstream-topology-scaffold command](TASKS/architecture/add-strict-workstream-topology-scaffold-command.md) — `architecture`
 - [Align TASKS and docs lifecycle v2](TASKS/architecture/align-tasks-and-docs-lifecycle-v2.md) — `architecture`
@@ -276,9 +276,12 @@ Generated: 2026-02-06T10:23:12
 - [essay-scoring: ablation (handcrafted vs embeddings vs combined) on ELLIPSE](TASKS/assessment/essay-scoring-ablation-handcrafted-vs-embeddings-vs-combined-on-ellipse.md) — `assessment`
 - [essay-scoring: CV baseline (stratified_text + prompt_holdout) on ELLIPSE](TASKS/assessment/essay-scoring-cv-baseline-stratified-text--prompt-holdout-on-ellipse.md) — `assessment`
 - [essay-scoring: CV ensembling (ELLIPSE CV-first)](TASKS/assessment/essay-scoring-cv-ensembling-ellipse-cv-first.md) — `assessment`
+- [essay-scoring: decision gate for experiment optimization dependencies](TASKS/assessment/essay-scoring-decision-gate-for-experiment-optimization-dependencies.md) — `assessment`
 - [essay-scoring: drop-column importance for handcrafted features (CV)](TASKS/assessment/essay-scoring-drop-column-importance-for-handcrafted-features-cv.md) — `assessment`
+- [essay-scoring: Optuna hyperparameter optimization (CV-selected)](TASKS/assessment/essay-scoring-optuna-hyperparameter-optimization-cv-selected.md) — `assessment`
 - [essay-scoring: prepare ELLIPSE dataset + CV splits (200–1000 words)](TASKS/assessment/essay-scoring-prepare-ellipse-dataset--cv-splits-2001000-words.md) — `assessment`
 - [essay-scoring: residual diagnostics by prompt and grade band](TASKS/assessment/essay-scoring-residual-diagnostics-by-prompt-and-grade-band.md) — `assessment`
+- [essay-scoring: statsmodels diagnostics + CatBoost baseline](TASKS/assessment/essay-scoring-statsmodels-diagnostics--catboost-baseline.md) — `assessment`
 - [essay-scoring: validate pruned handcrafted subset under prompt_holdout](TASKS/assessment/essay-scoring-validate-pruned-handcrafted-subset-under-prompt-holdout.md) — `assessment`
 - [essay-scoring: XGBoost hyperparameter sweep (CV-selected)](TASKS/assessment/essay-scoring-xgboost-hyperparameter-sweep-cv-selected.md) — `assessment`
 - [Filename propagation from ELS to RAS for teacher result visibility](TASKS/assessment/filename-propagation-from-els-to-ras-for-teacher-result-visibility.md) — `assessment`
@@ -299,7 +302,7 @@ Generated: 2026-02-06T10:23:12
 - [US-007.2 Schema Consolidation](TASKS/infrastructure/us-0072-schema-consolidation.md) — `infrastructure`
 - [US-007.3 Creation Scripts](TASKS/infrastructure/us-0073-creation-scripts.md) — `infrastructure`
 
-### in_progress (36)
+### in_progress (37)
 - [Anchor Alignment Prompt Tuning Experiment](TASKS/assessment/anchor-alignment-prompt-tuning-experiment.md) — `assessment`
 - [BT SE batch quality indicators](TASKS/assessment/bt-se-batch-quality-indicators.md) — `assessment`
 - [BT SE Zero Anomaly and Anchor Inversions Investigation](TASKS/assessment/bt-se-zero-anomaly-and-anchor-inversions-investigation.md) — `assessment`
@@ -314,6 +317,7 @@ Generated: 2026-02-06T10:23:12
 - [ENG5 reasoning controls & CJ plumbing](TASKS/assessment/eng5-reasoning-controls--cj-plumbing.md) — `assessment`
 - [Essay scoring: sensible progress logs for feature extraction](TASKS/assessment/essay-scoring-sensible-progress-logs-for-feature-extraction.md) — `assessment`
 - [essay-scoring: tail calibration + grade-band imbalance mitigation](TASKS/assessment/essay-scoring-tail-calibration--grade-band-imbalance-mitigation.md) — `assessment`
+- [essay-scoring: transformer fine-tuning + prompt invariance experiments](TASKS/assessment/essay-scoring-transformer-fine-tuning--prompt-invariance-experiments.md) — `assessment`
 - [fix ci docker compose v2 in scripts](TASKS/infrastructure/fix-ci-docker-compose-v2-in-scripts.md) — `infrastructure`
 - [Fix Els Transaction Boundary Violations](TASKS/infrastructure/fix-els-transaction-boundary-violations.md) — `infrastructure`
 - [Hemma operations runbooks (HuleEdu + GPU)](TASKS/infrastructure/hemma-operations-runbooks-huleedu--gpu.md) — `infrastructure`
@@ -344,7 +348,7 @@ Generated: 2026-02-06T10:23:12
 - [CJ Prompt Cache Benchmark & Warm-Up Validation](TASKS/assessment/cj-prompt-cache-benchmark.md) — `assessment`
 - [Refactor CJ Assessment Service for Compliance](TASKS/assessment/refactor-cj-assessment-service-for-compliance.md) — `assessment`
 
-### proposed (67)
+### proposed (63)
 - [90-Day Execution Roadmap (Alpha ➜ Beta)](TASKS/architecture/roadmap-90-day-execution.md) — `architecture`
 - [AI Feedback Service Implementation Task](TASKS/assessment/ai-feedback-service-implementation.md) — `assessment`
 - [API Productization & Docs (Weeks 8–10)](TASKS/assessment/api-productization-and-docs-plan.md) — `assessment`
@@ -370,11 +374,7 @@ Generated: 2026-02-06T10:23:12
 - [Essay scoring: progress.json counters for long runs](TASKS/assessment/essay-scoring-progressjson-counters-for-long-runs.md) — `assessment`
 - [Essay-scoring runner: mark status.json failed on SIGINT/SIGTERM](TASKS/assessment/essay-scoring-runner-mark-statusjson-failed-on-sigint-sigterm.md) — `assessment`
 - [essay-scoring: construct validity audit + feature candidates](TASKS/assessment/essay-scoring-construct-validity-audit--feature-candidates.md) — `assessment`
-- [essay-scoring: decision gate for experiment optimization dependencies](TASKS/assessment/essay-scoring-decision-gate-for-experiment-optimization-dependencies.md) — `assessment`
-- [essay-scoring: Optuna hyperparameter optimization (CV-selected)](TASKS/assessment/essay-scoring-optuna-hyperparameter-optimization-cv-selected.md) — `assessment`
 - [essay-scoring: ordinal/custom objective experiments (QWK)](TASKS/assessment/essay-scoring-ordinal-custom-objective-experiments-qwk.md) — `assessment`
-- [essay-scoring: statsmodels diagnostics + CatBoost baseline](TASKS/assessment/essay-scoring-statsmodels-diagnostics--catboost-baseline.md) — `assessment`
-- [essay-scoring: transformer fine-tuning + prompt invariance experiments](TASKS/assessment/essay-scoring-transformer-fine-tuning--prompt-invariance-experiments.md) — `assessment`
 - [Event Publishing Infrastructure Improvements](TASKS/assessment/event-publishing-improvements.md) — `assessment`
 - [Event Schema Governance & CI Gate (Weeks 6–8)](TASKS/assessment/event-schema-governance-and-ci-plan.md) — `assessment`
 - [Existing](TASKS/assessment/task-054-suggested-improvements-to-bayesian-model.md) — `assessment`

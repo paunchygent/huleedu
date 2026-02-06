@@ -241,8 +241,8 @@ class RemoteEmbeddingClient(EmbeddingExtractorProtocol):
                 texts_in_request=len(texts),
             )
 
-        array = np.load(io.BytesIO(body))
-        return array.astype(np.float32, copy=False)
+        array = np.asarray(np.load(io.BytesIO(body)), dtype=np.float32)
+        return array
 
     def _cache_key(self, text: str) -> str:
         hasher = hashlib.sha256()

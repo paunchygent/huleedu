@@ -28,6 +28,7 @@ from threading import Semaphore
 from typing import TypeAlias
 
 from spacy.language import Language
+from spacy.tokens import Doc
 
 from scripts.ml_training.essay_scoring.features.schema import Tier1Features
 from scripts.ml_training.essay_scoring.features.spacy_pipeline import (
@@ -63,10 +64,14 @@ def _as_str_object_dict(value: object) -> dict[str, object] | None:
 
 
 def _float_or_default(value: object, default: float) -> float:
-    try:
+    if isinstance(value, bool):
         return float(value)
-    except (TypeError, ValueError):
-        return default
+    if isinstance(value, (int, float, str)):
+        try:
+            return float(value)
+        except ValueError:
+            return default
+    return default
 
 
 def _counts_from_cached_dict(derived_counts: dict[str, object]) -> LanguageToolDerivedCounts:
@@ -225,14 +230,17 @@ class Tier1FeatureExtractor:
                         total=len(cleaned_texts),
                         unit="records",
                     )
-            if any(item is None for item in counts_by_index):
-                raise RuntimeError("Tier1 LanguageTool results missing for one or more items.")
-            counts_by_index = [item for item in counts_by_index if item is not None]
+            resolved_counts: list[tuple[float, float, float]] = []
+            for item in counts_by_index:
+                if item is None:
+                    raise RuntimeError("Tier1 LanguageTool results missing for one or more items.")
+                resolved_counts.append(item)
+            counts_for_merge = resolved_counts
             logger.info("Tier1 LanguageTool results complete (n=%d)", len(futures_by_future))
 
         features = []
         for stats, (grammar_count, spelling_count, punctuation_count) in zip(
-            stats_by_index, counts_by_index, strict=True
+            stats_by_index, counts_for_merge, strict=True
         ):
             features.append(
                 self._build_features(
@@ -254,13 +262,9 @@ class Tier1FeatureExtractor:
         return self._compute_text_stats_from_doc(doc)
 
     @staticmethod
-    def _compute_text_stats_from_doc(doc: object) -> dict[str, float]:
-        words = [
-            token.text
-            for token in doc
-            if not getattr(token, "is_space", False) and not getattr(token, "is_punct", False)
-        ]
-        sentences = [sent for sent in getattr(doc, "sents", [])]
+    def _compute_text_stats_from_doc(doc: Doc) -> dict[str, float]:
+        words = [token.text for token in doc if not token.is_space and not token.is_punct]
+        sentences = [sent for sent in doc.sents]
         word_count = float(len(words))
         sentence_count = float(len(sentences))
         avg_sentence_length = safe_divide(word_count, sentence_count)
@@ -268,17 +272,18 @@ class Tier1FeatureExtractor:
         ttr = safe_divide(len(set(token.lower() for token in words)), word_count)
         avg_word_length = safe_divide(sum(len(token) for token in words), word_count)
 
-        readability = getattr(getattr(doc, "_", None), "readability", {})
+        readability_obj = getattr(doc._, "readability", None)
+        readability = _as_str_object_dict(readability_obj) or {}
 
         return {
             "word_count": float(word_count),
             "avg_sentence_length": float(avg_sentence_length),
             "ttr": float(ttr),
             "avg_word_length": float(avg_word_length),
-            "flesch_kincaid": float(readability["flesch_kincaid_grade"]),
-            "smog": float(readability["smog"]),
-            "coleman_liau": float(readability["coleman_liau_index"]),
-            "ari": float(readability["automated_readability_index"]),
+            "flesch_kincaid": _float_or_default(readability.get("flesch_kincaid_grade"), 0.0),
+            "smog": _float_or_default(readability.get("smog"), 0.0),
+            "coleman_liau": _float_or_default(readability.get("coleman_liau_index"), 0.0),
+            "ari": _float_or_default(readability.get("automated_readability_index"), 0.0),
         }
 
     @staticmethod
@@ -395,6 +400,8 @@ class Tier1FeatureExtractor:
     def _fetch_remote_language_tool_response(
         self, *, text: str, request_options: LanguageToolRequestOptions
     ) -> LanguageToolResponse:
+        if self.language_tool_url is None:
+            raise RuntimeError("LanguageTool URL not configured for remote checks.")
         url = self.language_tool_url.rstrip("/") + "/v1/check"
         payload: LanguageToolRequestOptions = {"text": text, "language": self.language}
         payload.update(request_options)

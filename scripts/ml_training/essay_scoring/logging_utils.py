@@ -131,7 +131,7 @@ def mark_run_failed(
 
 class _Tee(TextIOBase):
     def __init__(self, *streams: TextIOBase) -> None:
-        self._streams = [stream for stream in streams if stream is not None]
+        self._streams = list(streams)
 
     def write(self, s: str) -> int:
         for stream in self._streams:
@@ -150,22 +150,19 @@ class _Tee(TextIOBase):
 
     def fileno(self) -> int:
         for stream in self._streams:
-            fileno = getattr(stream, "fileno", None)
-            if fileno is None:
-                continue
             try:
-                return int(fileno())
+                return int(stream.fileno())
             except UnsupportedOperation:
                 continue
         raise UnsupportedOperation("fileno")
 
-    @property
-    def encoding(self) -> str | None:
-        for stream in self._streams:
-            encoding = getattr(stream, "encoding", None)
-            if encoding is not None:
-                return encoding
-        return None
+
+def _as_text_io_base(stream: object) -> TextIOBase | None:
+    """Return stream when it is a TextIOBase, otherwise None."""
+
+    if isinstance(stream, TextIOBase):
+        return stream
+    return None
 
 
 @contextmanager
@@ -183,10 +180,14 @@ def run_file_logger(log_path: Path, level: int = logging.INFO):
     stderr_path = log_path.with_name("stderr.log")
     fault_path = log_path.with_name("fault.log")
     original_stderr = sys.stderr
+    original_stderr_stream = _as_text_io_base(original_stderr)
     stderr_handle = stderr_path.open("w", encoding="utf-8")
     fault_handle = fault_path.open("w", encoding="utf-8")
 
-    sys.stderr = _Tee(original_stderr, stderr_handle)
+    if original_stderr_stream is not None:
+        sys.stderr = _Tee(original_stderr_stream, stderr_handle)
+    else:
+        sys.stderr = _Tee(stderr_handle)
     was_enabled = faulthandler.is_enabled()
     faulthandler.enable(file=fault_handle, all_threads=True)
 
@@ -250,8 +251,11 @@ def run_file_logger(log_path: Path, level: int = logging.INFO):
             pass
         if was_enabled:
             try:
-                faulthandler.enable(file=sys.__stderr__, all_threads=True)
-            except UnsupportedOperation:
+                if sys.__stderr__ is not None:
+                    faulthandler.enable(file=sys.__stderr__.fileno(), all_threads=True)
+                else:
+                    faulthandler.enable(all_threads=True)
+            except (RuntimeError, UnsupportedOperation):
                 pass
         sys.stderr = original_stderr
         stderr_handle.close()
@@ -263,7 +267,7 @@ def run_file_logger(log_path: Path, level: int = logging.INFO):
 def update_status(run_dir: Path, stage: str, state: str, **extra: object) -> None:
     """Write a status marker for the current run stage."""
 
-    payload = {
+    payload: dict[str, object] = {
         "stage": stage,
         "state": state,
         "timestamp": datetime.now(timezone.utc).isoformat(),

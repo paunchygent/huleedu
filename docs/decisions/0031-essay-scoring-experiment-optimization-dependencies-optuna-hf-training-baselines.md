@@ -1,7 +1,7 @@
 ---
 type: decision
 id: ADR-0031
-status: proposed
+status: accepted
 created: '2026-02-06'
 last_updated: '2026-02-06'
 ---
@@ -9,7 +9,7 @@ last_updated: '2026-02-06'
 
 ## Status
 
-Proposed (decision gate tracked in
+Accepted (decision gate tracked in
 `TASKS/assessment/essay-scoring-decision-gate-for-experiment-optimization-dependencies.md`).
 
 ## Context
@@ -43,7 +43,14 @@ Non-goals:
 
 ## Decision
 
-Adopt a phased dependency strategy with explicit decision gates.
+Adopt a phased dependency strategy with explicit decision gates and the following
+final decision matrix.
+
+| Dependency track | Decision | Rationale |
+|---|---|---|
+| Optuna (`optuna`) | Accept | Prompt-holdout pilot + stratified stability pair completed. Stable selected config (`b28c376a73`) held under `scheme=stratified_text` and outperformed near-miss (`16796accd7`) on stability metrics. |
+| HF training stack (`datasets`, `accelerate`, `evaluate`, `torchmetrics`, optional `peft`) | Defer | Added implementation/runtime complexity is not yet justified before finishing current CV-first gains with accepted Optuna flow. |
+| Diagnostics + alt baseline (`statsmodels`, `catboost`) | Defer | Useful but not required to unblock immediate optimization path; prioritize after Optuna hardening and next gate results. |
 
 ### 1) Add Optuna (recommended first; small/low-risk)
 
@@ -63,6 +70,14 @@ Overfitting-to-splits mitigation:
 - Cap trial count (pilot 30–50) and require a stability check under `scheme=stratified_text` for the
   top configs.
 - Persist sweep artifacts (definition, trial results, and selected config) for reproducibility.
+
+Evidence (completed):
+
+- Prompt-holdout pilot selected `b28c376a73` with improved worst-prompt robustness.
+- Stratified stability pair (`b28c376a73` vs `16796accd7`) confirmed:
+  - `b28c376a73`: `val_qwk_mean=0.68537`, train-val QWK gap `0.15331`
+  - `16796accd7`: `val_qwk_mean=0.67733`, train-val QWK gap `0.22705`
+- Decision: promote Optuna path with `b28c376a73` as stable selected configuration.
 
 ### 2) Add statsmodels + CatBoost (optional; diagnostic/baseline)
 

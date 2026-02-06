@@ -109,10 +109,10 @@ def decode_ordinal_predictions(
     class_band_values = (np.arange(n_classes) + min_half_id) / 2.0
 
     if mode == TrainingMode.ORDINAL_MULTICLASS_EXPECTED:
-        return pred_proba @ class_band_values
+        return np.asarray(pred_proba @ class_band_values, dtype=float)
     if mode == TrainingMode.ORDINAL_MULTICLASS_ARGMAX:
         class_ids = np.argmax(pred_proba, axis=1)
-        return class_band_values[class_ids]
+        return np.asarray(class_band_values[class_ids], dtype=float)
     raise ValueError(f"Unsupported ordinal decode mode: {mode}")
 
 
@@ -141,7 +141,7 @@ def qwk_custom_metric(
     if is_ordinal_multiclass(mode):
         min_half_id = int(round(min_band * 2.0))
 
-        def qwk_eval_inner(preds: np.ndarray, dtrain: xgb.DMatrix) -> tuple[str, float]:
+        def qwk_eval_ordinal(preds: np.ndarray, dtrain: xgb.DMatrix) -> tuple[str, float]:
             labels = dtrain.get_label().astype(float)
             y_true = (np.round(labels).astype(int) + min_half_id) / 2.0
             y_pred = decode_ordinal_predictions(
@@ -149,10 +149,10 @@ def qwk_custom_metric(
             )
             return "qwk", qwk_score(y_true, y_pred, min_band=min_band, max_band=max_band)
 
-        return qwk_eval_inner
+        return qwk_eval_ordinal
 
-    def qwk_eval_inner(preds: np.ndarray, dtrain: xgb.DMatrix) -> tuple[str, float]:
+    def qwk_eval_regression(preds: np.ndarray, dtrain: xgb.DMatrix) -> tuple[str, float]:
         labels = dtrain.get_label()
         return "qwk", qwk_score(labels, preds, min_band=min_band, max_band=max_band)
 
-    return qwk_eval_inner
+    return qwk_eval_regression

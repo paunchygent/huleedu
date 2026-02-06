@@ -15,6 +15,7 @@ import numpy as np
 from scripts.ml_training.essay_scoring.config import DatasetKind, ExperimentConfig, FeatureSet
 from scripts.ml_training.essay_scoring.cv_feature_store import load_cv_feature_store
 from scripts.ml_training.essay_scoring.cv_shared import (
+    FoldResult,
     SplitScheme,
     filter_by_word_count,
     prepare_cv_feature_store,
@@ -245,7 +246,7 @@ def _candidate_handcrafted_features(feature_names: list[str]) -> list[str]:
     return [name for name in handcrafted if name in feature_names]
 
 
-def _summarize_baseline(folds: list[dict[str, Any]]) -> dict[str, float]:
+def _summarize_baseline(folds: list[FoldResult]) -> dict[str, float]:
     val_qwk = np.array([float(fold["val"]["qwk"]) for fold in folds], dtype=float)
     val_mae = np.array([float(fold["val"]["mean_absolute_error"]) for fold in folds], dtype=float)
     val_adj = np.array([float(fold["val"]["adjacent_accuracy"]) for fold in folds], dtype=float)

@@ -21,7 +21,12 @@ from typing import Literal, TypedDict
 import numpy as np
 import xgboost as xgb
 
-from scripts.ml_training.essay_scoring.config import DatasetKind, ExperimentConfig, FeatureSet
+from scripts.ml_training.essay_scoring.config import (
+    DatasetKind,
+    ExperimentConfig,
+    FeatureSet,
+    TrainingConfig,
+)
 from scripts.ml_training.essay_scoring.cv_feature_store import (
     persist_cv_feature_store,
     resolve_cv_feature_store_dir,
@@ -226,28 +231,34 @@ def run_fold(
         cap=grade_band_weight_cap,
     )
 
-    artifacts = train_model(
-        FeatureMatrix(matrix=train_matrix, feature_names=feature_names),
-        FeatureMatrix(matrix=val_matrix, feature_names=feature_names),
-        y[train_idx],
-        y[val_idx],
-        config.training,
-        min_band=min_band,
-        max_band=max_band,
+    model, best_iteration = _train_xgboost_model(
+        train_matrix=train_matrix,
+        val_matrix=val_matrix,
+        feature_names=feature_names,
+        y_train=y[train_idx],
+        y_val=y[val_idx],
+        training_config=config.training,
         training_mode=training_mode,
         sample_weight_train=sample_weight_train,
+        min_band=min_band,
+        max_band=max_band,
     )
-
-    dtrain = xgb.DMatrix(train_matrix, feature_names=feature_names)
-    dval = xgb.DMatrix(val_matrix, feature_names=feature_names)
     pred_train = decode_predictions(
-        artifacts.model.predict(dtrain),
+        _predict_raw_with_xgboost(
+            model=model,
+            matrix=train_matrix,
+            feature_names=feature_names,
+        ),
         min_band=min_band,
         max_band=max_band,
         mode=training_mode,
     )
     pred_val = decode_predictions(
-        artifacts.model.predict(dval),
+        _predict_raw_with_xgboost(
+            model=model,
+            matrix=val_matrix,
+            feature_names=feature_names,
+        ),
         min_band=min_band,
         max_band=max_band,
         mode=training_mode,
@@ -261,7 +272,7 @@ def run_fold(
     return {
         "fold": int(fold.fold),
         "sizes": {"train": int(train_idx.size), "val": int(val_idx.size)},
-        "best_iteration": int(artifacts.best_iteration),
+        "best_iteration": int(best_iteration),
         "train": {
             "qwk": float(eval_train.qwk),
             "adjacent_accuracy": float(eval_train.adjacent_accuracy),
@@ -328,8 +339,6 @@ def run_fold_with_predictions(
         cap=grade_band_weight_cap,
     )
 
-    dtrain = xgb.DMatrix(train_matrix, feature_names=feature_names)
-    dval = xgb.DMatrix(val_matrix, feature_names=feature_names)
     seeds = member_seeds or [int(config.training.random_seed)]
     if not seeds:
         raise ValueError("member_seeds must be non-empty when provided.")
@@ -339,20 +348,33 @@ def run_fold_with_predictions(
     member_predt_val: list[np.ndarray] = []
     for seed in seeds:
         training_config = config.training.model_copy(update={"random_seed": int(seed)})
-        artifacts = train_model(
-            FeatureMatrix(matrix=train_matrix, feature_names=feature_names),
-            FeatureMatrix(matrix=val_matrix, feature_names=feature_names),
-            y[train_idx],
-            y[val_idx],
-            training_config,
-            min_band=min_band,
-            max_band=max_band,
+        model, best_iteration = _train_xgboost_model(
+            train_matrix=train_matrix,
+            val_matrix=val_matrix,
+            feature_names=feature_names,
+            y_train=y[train_idx],
+            y_val=y[val_idx],
+            training_config=training_config,
             training_mode=training_mode,
             sample_weight_train=sample_weight_train,
+            min_band=min_band,
+            max_band=max_band,
         )
-        member_best_iterations.append(int(artifacts.best_iteration))
-        member_predt_train.append(np.asarray(artifacts.model.predict(dtrain)))
-        member_predt_val.append(np.asarray(artifacts.model.predict(dval)))
+        member_best_iterations.append(int(best_iteration))
+        member_predt_train.append(
+            _predict_raw_with_xgboost(
+                model=model,
+                matrix=train_matrix,
+                feature_names=feature_names,
+            )
+        )
+        member_predt_val.append(
+            _predict_raw_with_xgboost(
+                model=model,
+                matrix=val_matrix,
+                feature_names=feature_names,
+            )
+        )
 
     best_iteration = (
         int(round(float(np.mean(member_best_iterations)))) if member_best_iterations else 0
@@ -400,6 +422,47 @@ def run_fold_with_predictions(
         val_true=y[val_idx].astype(float),
         val_pred_raw=pred_val,
     )
+
+
+def _train_xgboost_model(
+    *,
+    train_matrix: np.ndarray,
+    val_matrix: np.ndarray,
+    feature_names: list[str],
+    y_train: np.ndarray,
+    y_val: np.ndarray,
+    training_config: TrainingConfig,
+    training_mode: TrainingMode,
+    sample_weight_train: np.ndarray | None,
+    min_band: float,
+    max_band: float,
+) -> tuple[xgb.Booster, int]:
+    """Train one XGBoost model and return `(model, best_iteration)`."""
+
+    artifacts = train_model(
+        FeatureMatrix(matrix=train_matrix, feature_names=feature_names),
+        FeatureMatrix(matrix=val_matrix, feature_names=feature_names),
+        y_train,
+        y_val,
+        training_config,
+        min_band=min_band,
+        max_band=max_band,
+        training_mode=training_mode,
+        sample_weight_train=sample_weight_train,
+    )
+    return artifacts.model, int(artifacts.best_iteration)
+
+
+def _predict_raw_with_xgboost(
+    *,
+    model: xgb.Booster,
+    matrix: np.ndarray,
+    feature_names: list[str],
+) -> np.ndarray:
+    """Predict raw score values from an XGBoost model."""
+
+    dmatrix = xgb.DMatrix(matrix, feature_names=feature_names)
+    return np.asarray(model.predict(dmatrix))
 
 
 def indices_for_ids(record_ids: list[str], *, id_to_idx: dict[str, int]) -> np.ndarray:

@@ -64,7 +64,7 @@ class RemoteExtractClient:
         extract_start = time.monotonic()
         if not texts:
             empty = np.empty((0, 0), dtype=np.float32)
-            meta = self._load_expected_meta_or_fail()
+            empty_meta = self._load_expected_meta_or_fail()
             return RemoteExtractResult(
                 embeddings=empty
                 if feature_set in {FeatureSet.EMBEDDINGS, FeatureSet.COMBINED}
@@ -72,7 +72,7 @@ class RemoteExtractClient:
                 handcrafted=empty
                 if feature_set in {FeatureSet.HANDCRAFTED, FeatureSet.COMBINED}
                 else None,
-                meta=meta,
+                meta=empty_meta,
             )
 
         if len(texts) != len(prompts):
