@@ -600,7 +600,7 @@ def _run_fold(
         num_warmup_steps=warmup_steps,
         num_training_steps=total_steps,
     )
-    scaler = torch.cuda.amp.GradScaler(enabled=precision.use_grad_scaler)
+    scaler = torch.amp.GradScaler("cuda", enabled=precision.use_grad_scaler)
 
     best_qwk = float("-inf")
     best_epoch = 0
@@ -746,7 +746,7 @@ def _train_one_epoch(
     loader: DataLoader[CollatedBatch],
     optimizer: AdamW,
     scheduler: torch.optim.lr_scheduler.LRScheduler,
-    scaler: torch.cuda.amp.GradScaler,
+    scaler: torch.amp.GradScaler,
     device: torch.device,
     precision: PrecisionRuntime,
     gradient_accumulation_steps: int,
@@ -760,7 +760,7 @@ def _train_one_epoch(
         input_ids = batch.input_ids.to(device)
         attention_mask = batch.attention_mask.to(device)
         labels = batch.labels.to(device)
-        with torch.autocast(
+        with torch.amp.autocast(
             device_type=device.type,
             dtype=precision.dtype,
             enabled=precision.enabled,
@@ -814,7 +814,7 @@ def _predict_by_record(
     for batch in loader:
         input_ids = batch.input_ids.to(device)
         attention_mask = batch.attention_mask.to(device)
-        with torch.autocast(
+        with torch.amp.autocast(
             device_type=device.type,
             dtype=precision.dtype,
             enabled=precision.enabled,

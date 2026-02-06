@@ -116,3 +116,25 @@ Unlock evidence:
   `output/essay_scoring/20260206_190010_ellipse_gate_g1_compare_prompt_holdout_catboost_vs_b28c`
 - stratified stability comparison (passed):
   `output/essay_scoring/20260206_190014_ellipse_gate_g1_compare_stratified_catboost_vs_b28c`
+
+## Validation Snapshot (2026-02-06)
+
+- Reviewed transformer loop semantics against current upstream docs for:
+  - `/huggingface/transformers` (sequence-classification fine-tune loop expectations)
+  - `/pytorch/pytorch` (AMP/autocast/GradScaler modern API)
+- Modernized AMP usage in
+  `scripts/ml_training/essay_scoring/transformer_finetune.py`:
+  - `torch.cuda.amp.GradScaler` -> `torch.amp.GradScaler("cuda", ...)`
+  - `torch.autocast` -> `torch.amp.autocast`
+- Added deterministic module tests in
+  `scripts/ml_training/essay_scoring/tests/test_transformer_finetune.py` for:
+  - chunk span generation,
+  - truncation coverage telemetry,
+  - precision runtime selection,
+  - finetune config validation guards.
+- Validation + tests executed from repo root via `./scripts/dev-shell.sh`:
+  - `pdm run format-all`
+  - `pdm run lint-fix --unsafe-fixes`
+  - `pdm run typecheck-all`
+  - `pdm run pytest-root scripts/ml_training/essay_scoring/tests -q`
+- Result: all checks passed (`46 passed`).

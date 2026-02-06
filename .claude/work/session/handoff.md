@@ -101,6 +101,21 @@ duplicated in this handoff.
 
 ## Recently Completed (Compressed)
 
+### Transformer module validation + test coverage ✅ COMPLETED
+- Reviewed `scripts/ml_training/essay_scoring/transformer_finetune.py` against current upstream guidance
+  (`/huggingface/transformers`, `/pytorch/pytorch`).
+- Updated AMP usage to modern APIs:
+  - `torch.amp.GradScaler("cuda", ...)`
+  - `torch.amp.autocast(...)`
+- Added deterministic helper tests:
+  - `scripts/ml_training/essay_scoring/tests/test_transformer_finetune.py`
+- Validation/test commands executed via `./scripts/dev-shell.sh`:
+  - `pdm run format-all`
+  - `pdm run lint-fix --unsafe-fixes`
+  - `pdm run typecheck-all`
+  - `pdm run pytest-root scripts/ml_training/essay_scoring/tests -q`
+- Result: green (`46 passed`).
+
 ### Optuna sweep command and artifact contract ✅ COMPLETED
 - Landed `optuna-sweep` CLI and sweep runner with trial artifacts, selected-params output, summary report, and progress tracking.
 - Paths: `scripts/ml_training/essay_scoring/optuna_sweep.py`, `scripts/ml_training/essay_scoring/commands/sweep_commands.py`.

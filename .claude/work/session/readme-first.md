@@ -82,6 +82,16 @@ pdm run essay-scoring-research drop-column --dataset-kind ellipse --feature-set 
 Note: DeBERTa embeddings require `sentencepiece` + `tiktoken` (included in `ml-research`)
 and the first run will download model weights from Hugging Face.
 
+Latest verification snapshot (2026-02-06):
+- `scripts/ml_training/essay_scoring/transformer_finetune.py` reviewed against current
+  `/huggingface/transformers` and `/pytorch/pytorch` guidance.
+- AMP usage modernized (`torch.amp.GradScaler`, `torch.amp.autocast`).
+- Deterministic helper tests added:
+  `scripts/ml_training/essay_scoring/tests/test_transformer_finetune.py`.
+- Validation gate run from repo root (via `./scripts/dev-shell.sh`) is green:
+  `pdm run format-all`, `pdm run lint-fix --unsafe-fixes`, `pdm run typecheck-all`,
+  `pdm run pytest-root scripts/ml_training/essay_scoring/tests -q` (`46 passed`).
+
 ### Hemma Offload (single tunnel)
 
 Current workflow (one tunnel):
