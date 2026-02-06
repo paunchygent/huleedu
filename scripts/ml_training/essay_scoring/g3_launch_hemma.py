@@ -266,6 +266,17 @@ def build_preflight_script(*, config: G3LaunchConfig) -> str:
     run_prefix = shlex.quote(config.run_name_prefix)
     repo_root = shlex.quote(config.remote_repo_root)
     container = shlex.quote(config.training_container)
+    lora_module_check = ""
+    if config.use_lora:
+        lora_module_check = (
+            f"sudo docker exec {container} python - <<'PY'\n"
+            "try:\n"
+            "    import peft\n"
+            "except ModuleNotFoundError:\n"
+            "    raise SystemExit('MISSING_MODULE:peft')\n"
+            "print('LORA_MODULES_OK')\n"
+            "PY\n"
+        )
     return (
         "set -euo pipefail\n"
         f"cd {repo_root}\n"
@@ -291,6 +302,7 @@ def build_preflight_script(*, config: G3LaunchConfig) -> str:
         "{ echo 'MISSING_FLAG:--chunk-overlap-tokens'; exit 1; }\n"
         "grep -q -- '--require-gpu' /tmp/g3_transformer_help.txt || "
         "{ echo 'MISSING_FLAG:--require-gpu'; exit 1; }\n"
+        f"{lora_module_check}"
         f"if /usr/bin/screen -ls 2>/dev/null | grep -q {run_prefix}; then "
         f"echo 'STALE_SCREEN:{config.run_name_prefix}'; exit 1; "
         "fi\n"

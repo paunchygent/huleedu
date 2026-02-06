@@ -69,7 +69,15 @@ def test_build_preflight_script_enforces_gpu_and_cli_contract() -> None:
     assert "NO_COLOR=1 COLUMNS=240" in script
     assert "MISSING_FLAG:--chunk-overlap-tokens" in script
     assert "MISSING_FLAG:--require-gpu" in script
+    assert "MISSING_MODULE:peft" in script
+    assert "LORA_MODULES_OK" in script
     assert "STALE_SCREEN:ellipse_gate_g3_1_transformer_lora_prompt_holdout" in script
+
+
+def test_build_preflight_script_skips_lora_module_check_when_lora_disabled() -> None:
+    script = build_preflight_script(config=G3LaunchConfig(use_lora=False))
+    assert "MISSING_MODULE:peft" not in script
+    assert "LORA_MODULES_OK" not in script
 
 
 def test_build_launch_script_uses_bash_array_with_safe_run_name_injection() -> None:
