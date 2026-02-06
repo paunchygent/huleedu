@@ -26,6 +26,9 @@ from scripts.ml_training.essay_scoring.commands.experiment_commands import (
 from scripts.ml_training.essay_scoring.commands.sweep_commands import (
     register as register_sweep_commands,
 )
+from scripts.ml_training.essay_scoring.commands.transformer_commands import (
+    register as register_transformer_commands,
+)
 
 app = typer.Typer(help="Whitebox essay scoring research pipeline")
 
@@ -38,6 +41,7 @@ def register_commands(application: typer.Typer) -> None:
     register_cv_commands(application)
     register_sweep_commands(application)
     register_comparison_commands(application)
+    register_transformer_commands(application)
 
 
 register_commands(app)
