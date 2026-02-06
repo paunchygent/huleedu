@@ -539,6 +539,9 @@ llm-check-models = "python -m services.llm_provider_service.cli_check_models"
 llm-admin = "python -m services.llm_provider_service.admin_cli"
 prompt-cache-benchmark = "python -m scripts.prompt_cache_benchmark.cli"
 essay-scoring-research = "python -m scripts.ml_training.essay_scoring.cli"
+g3-launch-hemma = "python -m scripts.ml_training.essay_scoring.cli g3-launch-hemma"
+run-local-pdm = {cmd = ["scripts/run-local-pdm.sh"]}  # Canonical local wrapper (.env + repo root + pdm run)
+run-hemma = {cmd = ["scripts/run-hemma.sh"]}  # Canonical remote wrapper (ssh + cd /home/paunchygent/apps/huleedu)
 
 # Frontend Development (Vue 3 + Vite + Tailwind 4)
 fe-install.cmd = "pnpm install"

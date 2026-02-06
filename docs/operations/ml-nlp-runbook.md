@@ -85,39 +85,25 @@ GPU training service (`essay_transformer_train`) and keep local machine as the o
 
 Start the training runtime on Hemma:
 ```bash
-ssh hemma 'cd ~/apps/huleedu && sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.hemma.research.yml --profile research-transformer-train up -d --build essay_transformer_train'
+pdm run run-hemma -- sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.hemma.research.yml --profile research-transformer-train up -d --build essay_transformer_train
 ```
 
-GPU/CLI preflight:
+Canonical launch command (local orchestrator; fail-closed preflight + detached launch):
 ```bash
-ssh hemma 'cd ~/apps/huleedu && sudo docker exec huleedu_essay_transformer_train python - <<\"PY\"\nimport torch\nprint(torch.cuda.is_available(), getattr(torch.version, \"hip\", None))\nPY'
-ssh hemma 'cd ~/apps/huleedu && sudo docker exec huleedu_essay_transformer_train /bin/bash -lc \"cd /app && /opt/venv/bin/pdm run essay-scoring-research transformer-finetune --help >/dev/null\"'
+pdm run run-local-pdm g3-launch-hemma
 ```
 
-Detached launch pattern (single SSH command, screen on Hemma):
+Dry-run (prints exact remote preflight/launch scripts without executing):
 ```bash
-ssh hemma /bin/bash -s <<'EOF'
-set -euo pipefail
-cd /home/paunchygent/apps/huleedu
-RUN_NAME=ellipse_gate_g3_1_transformer_lora_prompt_holdout_$(date +%Y%m%d_%H%M%S)
-LOG=output/essay_scoring/${RUN_NAME}.driver.log
-mkdir -p output/essay_scoring
-/usr/bin/screen -S "${RUN_NAME}" -dm /bin/bash -lc '
-  sudo docker exec huleedu_essay_transformer_train /bin/bash -lc "
-    cd /app &&
-    /opt/venv/bin/pdm run essay-scoring-research transformer-finetune \
-      --scheme prompt_holdout \
-      --splits-path output/essay_scoring/20260204_135554_ellipse_splits_200_1000/artifacts/splits.json \
-      --ellipse-train-path output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_train_prepared.csv \
-      --ellipse-test-path output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_test_prepared.csv \
-      --reuse-cv-feature-store-dir output/essay_scoring/20260204_144831_ellipse_cv_combined_prompt_holdout_20260204_150321/cv_feature_store \
-      --require-gpu \
-      --run-name ${RUN_NAME}
-  " 2>&1 | tee -a "${LOG}"'
-echo "$RUN_NAME"
-echo "$LOG"
-EOF
+pdm run run-local-pdm essay-scoring-research g3-launch-hemma --dry-run
 ```
+
+The canonical launcher validates, then launches:
+- remote repo root and frozen input paths exist,
+- `huleedu_essay_transformer_train` container is running,
+- ROCm GPU runtime is available in the exact launch interpreter,
+- `transformer-finetune` CLI contract includes `--chunk-overlap-tokens` and `--require-gpu`,
+- no stale detached screen session matches the G3 run prefix.
 
 Persistent tunnel setup lives in:
 - `docs/operations/hemma-alpha-rollout-days-1-3.md`

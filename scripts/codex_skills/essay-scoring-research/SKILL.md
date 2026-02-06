@@ -89,26 +89,15 @@ Selection artifacts:
 
 Start the Hemma training runtime:
 ```bash
-ssh hemma 'cd ~/apps/huleedu && sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.hemma.research.yml --profile research-transformer-train up -d --build essay_transformer_train'
+pdm run run-hemma -- sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.hemma.research.yml --profile research-transformer-train up -d --build essay_transformer_train
 ```
 
-Run the transformer command in detached mode through Hemma `screen`:
+Run the canonical fail-closed launcher from local repo root:
 ```bash
-ssh hemma /bin/bash -s <<'EOF'
-set -euo pipefail
-cd /home/paunchygent/apps/huleedu
-RUN_NAME=ellipse_gate_g3_1_transformer_lora_prompt_holdout_$(date +%Y%m%d_%H%M%S)
-LOG=output/essay_scoring/${RUN_NAME}.driver.log
-mkdir -p output/essay_scoring
-/usr/bin/screen -S "${RUN_NAME}" -dm /bin/bash -lc '
-  sudo docker exec huleedu_essay_transformer_train /bin/bash -lc "
-    cd /app &&
-    /opt/venv/bin/pdm run essay-scoring-research transformer-finetune \
-      --scheme prompt_holdout \
-      --require-gpu \
-      --run-name ${RUN_NAME}
-  " 2>&1 | tee -a "${LOG}"'
-echo "$RUN_NAME"
-echo "$LOG"
-EOF
+pdm run run-local-pdm g3-launch-hemma
+```
+
+Dry-run to inspect generated remote scripts:
+```bash
+pdm run run-local-pdm essay-scoring-research g3-launch-hemma --dry-run
 ```

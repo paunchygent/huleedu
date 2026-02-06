@@ -22,12 +22,15 @@
 6. For code-review tasks, create `.claude/archive/code-reviews/<what-is-being-reviewed_YYYY_MM_DD>.md` and update it each phase.
 
 ## Core Execution Invariants
-- Start an env-aware shell before `pdm run`:
-
-```bash
-./scripts/dev-shell.sh
-```
-
+- Keep command context explicit (local vs remote):
+  - Local `pdm run ...` commands: use `pdm run run-local-pdm <script> [args]`
+    (wrapper loads `.env`, enforces repo root, then runs `pdm run ...`).
+  - Remote Hemma commands: prefer argv mode
+    `pdm run run-hemma -- <command> [args]`
+    (wrapper enforces `cd /home/paunchygent/apps/huleedu` on Hemma before execution;
+    avoids shell quoting/operator drift).
+  - Use `--shell "<command>"` only when shell operators are required.
+- `./scripts/dev-shell.sh` remains valid for interactive local shells.
 - Run `pdm` commands from repo root only.
 - After each major task phase, update:
   - active task documents in `TASKS/`

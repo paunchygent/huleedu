@@ -68,6 +68,11 @@ Mandatory mechanics:
 - Use Hemma training runtime container `huleedu_essay_transformer_train`
   (compose profile `research-transformer-train`) for G3 execution.
 - Do not use host `pdm run` on Hemma for transformer G3 runs.
+- Use context-safe wrappers:
+  - local orchestration: `pdm run run-local-pdm ...`
+  - remote Hemma commands: `pdm run run-hemma -- <command> [args]`
+- Use `pdm run g3-launch-hemma` as the only canonical detached launcher
+  (includes fail-closed preflight and run contract checks).
 - Use dynamic padding + length bucketing.
 - Use anti-truncation chunking with overlap and essay-level pooling.
 - Truncation-only runs are invalid for gate acceptance.
@@ -112,6 +117,19 @@ duplicated in this handoff.
   - invalid due to CPU runtime and tokenizer compatibility crash.
 
 ## Recently Completed (Compressed)
+
+### Gate G3 launcher contract hardening ⚠️ IMPLEMENTED, VERIFICATION PENDING
+- Fixed canonical Hemma repo root spelling to `/home/paunchygent/apps/huleedu`
+  in `scripts/ml_training/essay_scoring/g3_launch_hemma.py`.
+- Hardened preflight CLI flag checks against terminal-width truncation by forcing
+  `NO_COLOR=1 COLUMNS=240` when rendering `transformer-finetune --help`.
+- Reworked detached launch command construction to avoid fragile nested shell expansion:
+  Bash array + `printf '%q'` is now used instead of interpolated command strings.
+- Added fail-fast config validation so legacy typo root
+  `/home/paunchygent/apps/huledu` is rejected before any remote command executes.
+- Added/updated launcher tests in code at
+  `scripts/ml_training/essay_scoring/tests/test_g3_launch_hemma.py`
+  to lock these invariants; verification run is still pending.
 
 ### Transformer module validation + test coverage ✅ COMPLETED
 - Reviewed `scripts/ml_training/essay_scoring/transformer_finetune.py` against current upstream guidance

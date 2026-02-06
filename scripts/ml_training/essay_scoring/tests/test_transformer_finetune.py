@@ -133,7 +133,10 @@ class _TokenizerWithoutBuildInputs:
     """Minimal tokenizer stub exposing only methods used by `_chunk_records`."""
 
     def __init__(self) -> None:
-        self._special = {"cls": 101, "sep": 102}
+        self.cls_token_id = 101
+        self.sep_token_id = 102
+        self.bos_token_id = None
+        self.eos_token_id = None
 
     def encode(
         self,
@@ -146,23 +149,8 @@ class _TokenizerWithoutBuildInputs:
         assert truncation is False
         return [ord(char) % 50 + 10 for char in text]
 
-    def prepare_for_model(
-        self,
-        token_ids: list[int],
-        *,
-        add_special_tokens: bool,
-        truncation: bool,
-        return_attention_mask: bool,
-        return_token_type_ids: bool,
-    ) -> dict[str, list[int]]:
-        assert add_special_tokens is True
-        assert truncation is False
-        assert return_attention_mask is False
-        assert return_token_type_ids is False
-        return {"input_ids": [self._special["cls"], *token_ids, self._special["sep"]]}
 
-
-def test_chunk_records_uses_prepare_for_model_for_special_tokens() -> None:
+def test_chunk_records_uses_tokenizer_special_ids_for_chunk_boundaries() -> None:
     record = EssayRecord(
         record_id="r1",
         task_type="task2",

@@ -154,6 +154,11 @@ ssh hemma 'sudo docker exec huleedu_essay_transformer_train python - <<\"PY\"\ni
 ssh hemma 'sudo docker exec huleedu_essay_transformer_train /bin/bash -lc \"cd /app && /opt/venv/bin/pdm run essay-scoring-research transformer-finetune --help >/dev/null\"'
 ```
 
+Canonical G3 detached launch (from local repo root):
+```bash
+pdm run g3-launch-hemma
+```
+
 Embedding offload deploy (script alternative; handles docker-snap mount workarounds):
 ```bash
 ssh hemma 'cd ~/apps/huleedu && ./scripts/ml_training/essay_scoring/offload/hemma_offload_deploy.sh'

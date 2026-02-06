@@ -23,6 +23,9 @@ from scripts.ml_training.essay_scoring.commands.dataset_commands import (
 from scripts.ml_training.essay_scoring.commands.experiment_commands import (
     register as register_experiment_commands,
 )
+from scripts.ml_training.essay_scoring.commands.g3_launch_commands import (
+    register as register_g3_launch_commands,
+)
 from scripts.ml_training.essay_scoring.commands.sweep_commands import (
     register as register_sweep_commands,
 )
@@ -42,6 +45,7 @@ def register_commands(application: typer.Typer) -> None:
     register_sweep_commands(application)
     register_comparison_commands(application)
     register_transformer_commands(application)
+    register_g3_launch_commands(application)
 
 
 register_commands(app)

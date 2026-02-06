@@ -1038,15 +1038,7 @@ def _chunk_records(
         chunks: list[list[int]] = []
         for start, end in spans:
             content = token_ids[start:end]
-            encoded = tokenizer.prepare_for_model(
-                content,
-                add_special_tokens=True,
-                truncation=False,
-                return_attention_mask=False,
-                return_token_type_ids=False,
-            )
-            with_specials = list(encoded["input_ids"])
-            chunks.append(with_specials)
+            chunks.append(_with_chunk_special_tokens(tokenizer=tokenizer, content=content))
         chunked[record.record_id] = ChunkedEssay(
             record_id=record.record_id,
             prompt=record.question,
@@ -1055,6 +1047,24 @@ def _chunk_records(
             chunk_input_ids=chunks,
         )
     return chunked
+
+
+def _with_chunk_special_tokens(
+    *, tokenizer: PreTrainedTokenizerBase, content: list[int]
+) -> list[int]:
+    cls_token_id = tokenizer.cls_token_id
+    sep_token_id = tokenizer.sep_token_id
+    if cls_token_id is not None and sep_token_id is not None:
+        return [int(cls_token_id), *content, int(sep_token_id)]
+
+    bos_token_id = tokenizer.bos_token_id
+    eos_token_id = tokenizer.eos_token_id
+    if bos_token_id is not None and eos_token_id is not None:
+        return [int(bos_token_id), *content, int(eos_token_id)]
+
+    raise ValueError(
+        "Tokenizer must provide cls/sep or bos/eos special token IDs for chunk construction."
+    )
 
 
 def _build_summary_payload(

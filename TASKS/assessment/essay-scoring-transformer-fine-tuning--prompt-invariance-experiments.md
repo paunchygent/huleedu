@@ -153,3 +153,21 @@ Unlock evidence:
   - `pdm run typecheck-all`
   - `pdm run pytest-root scripts/ml_training/essay_scoring/tests -q`
 - Result: all checks passed (`46 passed`).
+
+## Launcher Hardening Snapshot (2026-02-06, Verification Pending)
+
+- Canonical Gate G3 launcher path kept as:
+  - `pdm run g3-launch-hemma` (single execution path, fail-closed).
+- Launcher robustness fixes applied in
+  `scripts/ml_training/essay_scoring/g3_launch_hemma.py`:
+  - fixed/standardized canonical Hemma repo root to
+    `/home/paunchygent/apps/huleedu`,
+  - deterministic preflight CLI contract check via
+    `NO_COLOR=1 COLUMNS=240 ... transformer-finetune --help`,
+  - detached command launch refactored to Bash array + `printf '%q'`
+    to avoid nested shell expansion bugs around run-name injection,
+  - explicit fail-fast rejection of typo root
+    `/home/paunchygent/apps/huledu` before remote execution.
+- Regression tests updated in code at
+  `scripts/ml_training/essay_scoring/tests/test_g3_launch_hemma.py`
+  to prevent these failures from reappearing; execution verification is pending.

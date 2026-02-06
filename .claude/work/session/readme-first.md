@@ -87,9 +87,18 @@ Latest verification snapshot (2026-02-06):
   `/huggingface/transformers` and `/pytorch/pytorch` guidance.
 - AMP usage modernized (`torch.amp.GradScaler`, `torch.amp.autocast`).
 - G3 hardening landed:
-  - tokenizer-agnostic chunk special-token wrapping via `prepare_for_model(...)`,
+  - tokenizer-agnostic chunk special-token wrapping via `cls/sep` (fallback `bos/eos`) ids,
   - `require_gpu` runtime guard for transformer fine-tuning,
   - length-bucketing in dataloaders.
+- G3 launcher hardening staged (verification pending):
+  - canonical Hemma root fixed and enforced: `/home/paunchygent/apps/huleedu`,
+  - preflight `--help` flag checks made deterministic (`NO_COLOR=1 COLUMNS=240`),
+  - detached launch command assembly switched to Bash array + `printf '%q'`
+    (removes brittle `${RUN_NAME}` nested expansion behavior).
+- Canonical detached launcher is `pdm run g3-launch-hemma` (fail-closed preflight + launch).
+- Execution-context wrappers are canonical:
+  - `pdm run run-local-pdm <script> [args]` for local `pdm run ...`,
+  - `pdm run run-hemma -- <command> [args]` for Hemma SSH commands from canonical remote root.
 - Hemma GPU execution is standardized on compose profile
   `research-transformer-train` (`huleedu_essay_transformer_train`).
 - Validation gate run from repo root (via `./scripts/dev-shell.sh`) is green:
