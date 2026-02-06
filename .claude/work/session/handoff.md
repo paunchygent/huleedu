@@ -67,6 +67,85 @@ Update (2026-02-04):
   - New file per run dir: `progress.json` (substage processed/total + ETA).
   - Tracking task: `TASKS/assessment/essay-scoring-progressjson-counters-for-long-runs.md`
   - Runbook note: `docs/operations/ml-nlp-runbook.md`
+- CV-first Gate A (ablation) + Gate B (drop-column) completed on ELLIPSE (200–1000 words):
+  - Story hub: `TASKS/assessment/improve-essay-scoring-prediction-power-ellipse-cv-first.md`
+  - Drop-column metrics: `output/essay_scoring/20260204_180603_ellipse_drop_column_combined_stratified_text_20260204_190546/artifacts/drop_column_importance.json`
+  - Next: Gate C residual diagnostics by prompt + grade band.
+- Update (2026-02-04): Gate C residual diagnostics implementation landed (CV now writes per-record
+  residuals + `reports/residual_diagnostics.md`). Next: rerun the baseline CV
+  (`feature_set=combined`, `scheme=prompt_holdout`) with `--reuse-cv-feature-store-dir` and record
+  the produced report path back into the story hub + Gate C task.
+
+Update (2026-02-04, later):
+- Gate C baseline CV residual diagnostics run completed (combined + prompt_holdout, feature-store reuse):
+  - `output/essay_scoring/20260204_193204_ellipse_cv_combined_prompt_holdout_residuals_20260204_203200/reports/residual_diagnostics.md`
+- Two follow-up tasks created based on Gate C findings (grade compression / tail bias + feature-discipline validation):
+  - `TASKS/assessment/essay-scoring-validate-pruned-handcrafted-subset-under-prompt-holdout.md`
+  - `TASKS/assessment/essay-scoring-tail-calibration--grade-band-imbalance-mitigation.md`
+- Story hub updated to group work into single-axis tracks (avoid combinatorics):
+  - `TASKS/assessment/improve-essay-scoring-prediction-power-ellipse-cv-first.md`
+- CV now supports pruned handcrafted predictor tests (column filtering; no re-extraction):
+  - CLI flags: repeatable `--predictor-handcrafted-keep <feature_name>` (allowlist) and
+    `--predictor-handcrafted-drop <feature_name>` (denylist) for `cv` runs
+  - Artifacts:
+    - `artifacts/predictor_feature_selection.json`
+    - `artifacts/cv_metrics.json` includes `predictor_feature_selection`
+    - `reports/cv_report.md` prints predictor selection summary lines
+- Gate B prompt-holdout pruned predictor run started (denylist v1; reuses baseline CV feature store):
+  - Run dir: `output/essay_scoring/20260204_204456_ellipse_cv_combined_prompt_holdout_pruned_handcrafted_20260204_214450/`
+  - Driver log: `output/essay_scoring/ellipse_cv_combined_prompt_holdout_pruned_handcrafted_20260204_214450.driver.log`
+  - Selection artifact (already written): `output/essay_scoring/20260204_204456_ellipse_cv_combined_prompt_holdout_pruned_handcrafted_20260204_214450/artifacts/predictor_feature_selection.json`
+- Gate B prompt-holdout pruning validated (decision-ready):
+  - Adopt “drop 3” predictor prune: `has_conclusion`, `clause_count`, `flesch_kincaid`
+  - Evidence run dir: `output/essay_scoring/20260204_204929_ellipse_cv_combined_prompt_holdout_prune_drop3_20260204_214922/`
+  - Task closed out: `TASKS/assessment/essay-scoring-validate-pruned-handcrafted-subset-under-prompt-holdout.md`
+
+Update (2026-02-05):
+- CV now supports an explicit training-mode switch for ordinal experiments:
+  - `pdm run essay-scoring-research cv --training-mode regression|ordinal_multiclass_expected|ordinal_multiclass_argmax`
+  - Code: `scripts/ml_training/essay_scoring/training/training_modes.py` + wiring in CV runner.
+  - Task context: `TASKS/assessment/essay-scoring-ordinal-custom-objective-experiments-qwk.md`
+- Gate D tail calibration / imbalance mitigation tooling added (CV-only):
+  - Training-time weighting flags:
+    - `--grade-band-weighting {none,sqrt_inv_freq}`
+    - `--grade-band-weight-cap <float>`
+  - Post-hoc mapping flag:
+    - `--prediction-mapping {round_half_band,qwk_cutpoints_lfo}` (leave-one-fold-out cutpoints; leak-safe)
+  - Calibration artifacts (when enabled):
+    - `artifacts/calibration_cutpoints_by_fold.json`
+    - `artifacts/calibration_summary.json`
+- Gate D experiment matrix completed (prompt_holdout CV, combined, drop-3 predictor, feature-store reuse):
+  - A baseline: `output/essay_scoring/20260205_163458_ellipse_gate_d_baseline_prompt_holdout_drop3_20260205_173454/` (QWK: 0.62210 ± 0.01743)
+  - B weighting-only: `output/essay_scoring/20260205_170701_ellipse_gate_d_weighting_prompt_holdout_drop3_20260205_180657/` (QWK: 0.63516 ± 0.01650)
+  - C calibration-only: `output/essay_scoring/20260205_170843_ellipse_gate_d_calibration_prompt_holdout_drop3_20260205_180838/` (QWK: 0.68615 ± 0.01029)
+  - D weighting+calibration: `output/essay_scoring/20260205_171050_ellipse_gate_d_weighting_calibration_prompt_holdout_drop3_20260205_181046/` (QWK: 0.68360 ± 0.01470)
+- Gate D decision: adopt weighting+calibration as the default for CV-first selection (best high-tail adjacent accuracy; QWK within noise vs calibration-only).
+- Gate E XGBoost hyperparameter sweep completed (prompt_holdout; combined; drop-3; weighting+calibration; feature-store reuse):
+  - Sweep dir: `output/essay_scoring/20260205_192751_ellipse_gate_e_xgb_sweep_prompt_holdout_drop3_wcal_20260205_202746/`
+  - Best config: `config_id=97e84d798d` (max_depth=4, min_child_weight=20, reg_lambda=2.0, reg_alpha=0.0)
+  - Best run dir: `output/essay_scoring/20260205_192751_ellipse_gate_e_xgb_sweep_prompt_holdout_drop3_wcal_20260205_202746/variants/20260205_194952_ellipse_gate_e_xgb_sweep_prompt_holdout_drop3_wcal_20260205_202746_97e84d798d/`
+  - Stratified_text sanity check run: `output/essay_scoring/20260205_202126_ellipse_gate_e_xgb_bestparams_stratified_text_20260205_212122/`
+
+Update (2026-02-05):
+- Gate F CV ensembling implemented:
+  - `pdm run essay-scoring-research cv --ensemble-size <N>` trains N models per fold (seed ensemble) and averages
+    predictions before metrics + residual diagnostics.
+  - Code: `scripts/ml_training/essay_scoring/cross_validation.py`, `scripts/ml_training/essay_scoring/cv_shared.py`,
+    `scripts/ml_training/essay_scoring/cli.py`, `scripts/ml_training/essay_scoring/reports/cv_report.py`
+  - Tests: `scripts/ml_training/essay_scoring/tests/test_cv_ensembling.py`
+- Prompt-holdout experiments (combined; drop-3; weighting+calibration; best XGB params; feature-store reuse):
+  - `ensemble_size=1` run: `output/essay_scoring/20260205_213805_ellipse_gate_f_cv_ensemble1_prompt_holdout_drop3_wcal_bestparams_20260205_223800/`
+    - CV val QWK mean±std: `0.68460 ± 0.01659`
+    - High tail adjacent_acc (`y_true>=4.0`): `0.87907`
+  - `ensemble_size=3` run: `output/essay_scoring/20260205_213920_ellipse_gate_f_cv_ensemble3_prompt_holdout_drop3_wcal_bestparams_20260205_223917/`
+    - CV val QWK mean±std: `0.68573 ± 0.01755`
+    - High tail adjacent_acc (`y_true>=4.0`): `0.83411` (regression)
+  - `ensemble_size=5` run: `output/essay_scoring/20260205_214118_ellipse_gate_f_cv_ensemble5_prompt_holdout_drop3_wcal_bestparams_20260205_224115/`
+    - CV val QWK mean±std: `0.68946 ± 0.01533`
+    - High tail adjacent_acc (`y_true>=4.0`): `0.85271` (regression)
+- Decision: keep `ensemble_size=1` as best-current. Ensembling increases mean QWK but degrades high-tail adjacent
+  accuracy (primary yardstick / guardrail).
+- Task closed out: `TASKS/assessment/essay-scoring-cv-ensembling-ellipse-cv-first.md`
 
 Local verification (2026-02-01):
 - `pdm lock -G ml-research`
@@ -213,6 +292,7 @@ Update (2026-02-01):
 - Cache is ignored (and rewritten) when `--content-service-url` changes.
 - Focused validation:
   - `pdm run pytest-root scripts/tests/test_eng5_np_manifest_caching.py scripts/cj_experiments_runners/eng5_np/tests/unit/test_execute_handler.py scripts/cj_experiments_runners/eng5_np/tests/unit/test_anchor_align_handler.py -v` ✅
+- Status: `TASKS/programs/eng5/eng5-runner-assumption-hardening.md` is now **DONE** (R1–R7).
 - Command:
   - `pdm run essay-scoring-research run --feature-set combined --dataset-path data/cefr_ielts_datasets/ielts_writing_dataset.csv --language-tool-service-url http://127.0.0.1:18085 --embedding-service-url http://127.0.0.1:19000 --run-name ielts_full_combined_hemma_tier2offload`
 - Output dir:
@@ -605,3 +685,14 @@ Verification (2026-02-03 local time):
 - Feature naming clarity: Tier1 error-rate features renamed to include units (per 100 words):
   - task: `TASKS/assessment/essay-scoring-tier1-error-rates-per-100-words-naming.md`
   - decision: `docs/decisions/0030-essay-scoring-tier1-error-rate-feature-names-include-units.md`
+
+### Decision gate: experiment optimization dependencies (2026-02-06)
+
+- ADR (proposed): `docs/decisions/0031-essay-scoring-experiment-optimization-dependencies-optuna-hf-training-baselines.md`
+- New tasks (decision + options):
+  - Decision gate: `TASKS/assessment/essay-scoring-decision-gate-for-experiment-optimization-dependencies.md`
+  - Optuna (CV-selected): `TASKS/assessment/essay-scoring-optuna-hyperparameter-optimization-cv-selected.md`
+  - HF fine-tuning + prompt invariance: `TASKS/assessment/essay-scoring-transformer-fine-tuning--prompt-invariance-experiments.md`
+  - statsmodels + CatBoost baseline: `TASKS/assessment/essay-scoring-statsmodels-diagnostics--catboost-baseline.md`
+- Research notes doc:
+  `docs/research/research-essay-scoring-dependency-decision-research-optuna-hf-fine-tuning-baselines.md`

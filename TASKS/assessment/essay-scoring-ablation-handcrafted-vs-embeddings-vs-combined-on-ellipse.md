@@ -2,7 +2,7 @@
 id: 'essay-scoring-ablation-handcrafted-vs-embeddings-vs-combined-on-ellipse'
 title: 'essay-scoring: ablation (handcrafted vs embeddings vs combined) on ELLIPSE'
 type: 'task'
-status: 'proposed'
+status: 'done'
 priority: 'high'
 domain: 'assessment'
 service: ''
@@ -74,6 +74,41 @@ Deliverable reporting:
   - CV mean±std QWK for each feature set
   - a clear winner and effect size (ΔQWK vs baseline)
 - Decision-ready conclusion: is `combined` worth the extra feature extraction cost?
+
+## Results (2026-02-04)
+
+Canonical inputs (200–1000 words; exclusions unchanged; shared splits):
+- `output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_train_prepared.csv`
+- `output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_test_prepared.csv`
+- `output/essay_scoring/20260204_135554_ellipse_splits_200_1000/artifacts/splits.json`
+
+Runs:
+- `embeddings`:
+  - `scheme=stratified_text`: `output/essay_scoring/20260204_164449_ellipse_cv_embeddings_stratified_text_20260204_174445/`
+  - `scheme=prompt_holdout` (reuse store): `output/essay_scoring/20260204_165648_ellipse_cv_embeddings_prompt_holdout_20260204_175630/`
+- `handcrafted`:
+  - `scheme=stratified_text`: `output/essay_scoring/20260204_180119_ellipse_cv_handcrafted_stratified_text_20260204_190101/`
+  - `scheme=prompt_holdout` (reuse store): `output/essay_scoring/20260204_180303_ellipse_cv_handcrafted_prompt_holdout_20260204_190248/`
+- `combined` (baseline already recorded in the story hub):
+  - `scheme=stratified_text`: `output/essay_scoring/20260204_140326_ellipse_cv_combined_stratified_text_20260204_150321/`
+  - `scheme=prompt_holdout`: `output/essay_scoring/20260204_144831_ellipse_cv_combined_prompt_holdout_20260204_150321/`
+
+CV val QWK (mean±std):
+
+| feature_set | stratified_text | prompt_holdout |
+| --- | --- | --- |
+| `embeddings` | 0.5520 ± 0.0215 | 0.5447 ± 0.0220 |
+| `handcrafted` | 0.5737 ± 0.0139 | 0.5644 ± 0.0189 |
+| `combined` | 0.6262 ± 0.0179 | 0.6183 ± 0.0240 |
+
+Effect sizes (prompt-holdout; primary yardstick):
+- `combined` vs `embeddings`: **+0.0737 QWK**
+- `combined` vs `handcrafted`: **+0.0539 QWK**
+
+Conclusion:
+- `combined` is decisively better than either feature family alone under prompt-holdout CV.
+- Proceed to Gate B: drop-column importance (to prune/validate the handcrafted set), then Gate C:
+  residual diagnostics by prompt + grade band before trying objective/ensembling changes.
 
 ## Related
 

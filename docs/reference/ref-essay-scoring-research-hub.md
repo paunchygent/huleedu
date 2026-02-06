@@ -4,7 +4,7 @@ id: REF-essay-scoring-research-hub
 title: Essay scoring research hub
 status: active
 created: '2026-02-04'
-last_updated: '2026-02-04'
+last_updated: '2026-02-06'
 topic: essay-scoring
 ---
 # Essay scoring research hub
@@ -31,6 +31,7 @@ Use it to:
    - `docs/decisions/0021-ml-scoring-integration-in-nlp-service.md` (ADR-0021)
 3) **What we’re improving now (decision-ready work)**:
    - `TASKS/assessment/improve-essay-scoring-prediction-power-ellipse-cv-first.md` (CV-first story hub)
+   - Decision gate (experiment optimization deps): `docs/decisions/0031-essay-scoring-experiment-optimization-dependencies-optuna-hf-training-baselines.md`
 4) **Latest completed run analysis (evidence)**:
    - `.claude/work/reports/essay-scoring/2026-02-04-ellipse-full-hemma-post-run-analysis.md`
 
@@ -64,7 +65,7 @@ Decision gates (evidence required before choosing levers):
 - **Gate A (signal vs cost)**: CV ablation across feature sets.
 - **Gate B (feature discipline)**: drop-column CV for handcrafted features.
 - **Gate C (failure modes)**: residual diagnostics by prompt and grade band.
-- **Gate D (model lever)**: tuning vs ordinal/custom objective vs ensembling.
+- **Gate D (model lever)**: tail calibration/imbalance mitigation → objective alignment → tuning/ensembling.
 - **Gate E (construct validity)**: audit + candidate features under prompt-holdout.
 
 Primary selection rule (applies across gates):
@@ -75,6 +76,12 @@ Secondary evaluation regime (important, but deferred):
 - **Prompt-specific training/evaluation** (within a single yearly assignment prompt) is critical for
   later product validation and anchor alignment, but should be prioritized once the Swedish essay
   database (and its prompt metadata) exists.
+
+Immediate next steps (post Gate C baseline):
+- Validate a pruned handcrafted predictor subset under prompt-holdout:
+  `TASKS/assessment/essay-scoring-validate-pruned-handcrafted-subset-under-prompt-holdout.md`
+- Address tail calibration / grade-band imbalance:
+  `TASKS/assessment/essay-scoring-tail-calibration--grade-band-imbalance-mitigation.md`
 
 ### Spoke B: Offload performance + stability (Hemma)
 
@@ -132,7 +139,9 @@ Common “evidence” files:
 
 CV runs add:
 - `output/essay_scoring/<RUN_DIR>/artifacts/cv_metrics.json`
+- `output/essay_scoring/<RUN_DIR>/artifacts/predictor_feature_selection.json` (if feature filtering is used)
 - `output/essay_scoring/<RUN_DIR>/reports/cv_report.md`
+- `output/essay_scoring/<RUN_DIR>/reports/residual_diagnostics.md` (Gate C)
 - `output/essay_scoring/<RUN_DIR>/cv_feature_store/` (reuse this for sweeps)
 
 ## Examples

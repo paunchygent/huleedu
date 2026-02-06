@@ -34,6 +34,12 @@ _PROGRESS_LOG_EVERY_S = 15.0
 
 logger = logging.getLogger(__name__)
 
+_TIER1_SCHEMA_ALIASES: dict[str, str] = {
+    "grammar_density": "grammar_errors_per_100_words",
+    "spelling_density": "spelling_errors_per_100_words",
+    "punctuation_density": "punctuation_errors_per_100_words",
+}
+
 
 @dataclass(frozen=True)
 class RemoteExtractResult:
@@ -736,18 +742,26 @@ class RemoteExtractClient:
             + len(meta.feature_schema.tier3)
         )
 
+    @staticmethod
+    def _normalize_schema_names(names: list[str]) -> list[str]:
+        return [_TIER1_SCHEMA_ALIASES.get(name, name) for name in names]
+
     def _validate_meta_against_local_schema(self, meta: ExtractMeta) -> None:
         local_schema = build_feature_schema(meta.embedding.dim)
-        if list(meta.feature_schema.tier1) != list(local_schema.tier1):
+        meta_tier1 = self._normalize_schema_names(list(meta.feature_schema.tier1))
+        local_tier1 = list(local_schema.tier1)
+        if meta_tier1 != local_tier1:
             raise RuntimeError("Offload tier1 feature schema mismatch.")
         if list(meta.feature_schema.tier2) != list(local_schema.tier2):
             raise RuntimeError("Offload tier2 feature schema mismatch.")
         if list(meta.feature_schema.tier3) != list(local_schema.tier3):
             raise RuntimeError("Offload tier3 feature schema mismatch.")
-        if list(meta.feature_schema.combined) != list(local_schema.combined):
+        meta_combined = self._normalize_schema_names(list(meta.feature_schema.combined))
+        local_combined = list(local_schema.combined)
+        if meta_combined != local_combined:
             raise RuntimeError("Offload combined feature schema mismatch.")
 
         # Also validate we can map to the local training feature ordering helpers.
         combined_names = feature_names_for(FeatureSet.COMBINED, meta.embedding.dim)
-        if combined_names != list(local_schema.combined):
+        if combined_names != local_combined:
             raise RuntimeError("Local feature_names_for(COMBINED) does not match schema.")

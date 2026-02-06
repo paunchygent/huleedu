@@ -36,6 +36,12 @@ We need an explicit audit loop that connects:
 - SHAP/feature contributions (why it was wrong)
 …and then proposes feature additions that represent higher-level writing constructs.
 
+Gate C reminder:
+- The current baseline shows strong grade compression (rarely predicts 4.5/5.0) and a small set of
+  prompts repeatedly underperform. The audit must explicitly check whether those prompts are
+  construct-aligned with our discourse-essay scope (or represent a genre mismatch that should be
+  excluded or handled separately).
+
 ## Plan
 
 Prereqs:
@@ -59,6 +65,7 @@ Evaluation:
 - Run CV on ELLIPSE (`prompt_holdout` prioritized) to validate that:
   - candidates do not regress generalization
   - candidates produce interpretable, teacher-meaningful SHAP contributions in error slices
+  - candidates do not worsen tail slices (`y_true <= 2.0` and `y_true >= 4.0`) without an explicit tradeoff decision
 
 Documentation:
 - Update the CV-first story with audit findings + which candidate features are worth keeping.
@@ -75,3 +82,4 @@ Documentation:
 - Story: `TASKS/assessment/improve-essay-scoring-prediction-power-ellipse-cv-first.md`
 - Task: `TASKS/assessment/essay-scoring-residual-diagnostics-by-prompt-and-grade-band.md`
 - Runbook: `docs/operations/ml-nlp-runbook.md`
+- Research hub: `docs/reference/ref-essay-scoring-research-hub.md`

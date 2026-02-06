@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, TypedDict
 
@@ -41,7 +42,15 @@ from scripts.ml_training.essay_scoring.text_processing import (
     sha256_text,
 )
 from scripts.ml_training.essay_scoring.training.evaluation import evaluate_predictions
+from scripts.ml_training.essay_scoring.training.grade_band_weighting import (
+    GradeBandWeighting,
+    compute_grade_band_sample_weights,
+)
 from scripts.ml_training.essay_scoring.training.trainer import train_model
+from scripts.ml_training.essay_scoring.training.training_modes import (
+    TrainingMode,
+    decode_predictions,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +80,17 @@ class FoldResult(TypedDict):
     best_iteration: int
     train: FoldEval
     val: FoldEval
+
+
+@dataclass(frozen=True)
+class FoldPredictions:
+    """Fold training outputs needed for residual diagnostics."""
+
+    fold_result: FoldResult
+    val_record_ids: list[str]
+    val_indices: np.ndarray
+    val_true: np.ndarray
+    val_pred_raw: np.ndarray
 
 
 def prepare_cv_feature_store(
@@ -182,6 +202,9 @@ def run_fold(
     min_band: float,
     max_band: float,
     keep_feature_indices: list[int] | None,
+    training_mode: TrainingMode = TrainingMode.REGRESSION,
+    grade_band_weighting: GradeBandWeighting = GradeBandWeighting.NONE,
+    grade_band_weight_cap: float = 3.0,
 ) -> FoldResult:
     """Train and evaluate a single CV fold (optionally dropping feature columns)."""
 
@@ -197,6 +220,12 @@ def run_fold(
         train_matrix = train_matrix[:, keep_feature_indices]
         val_matrix = val_matrix[:, keep_feature_indices]
 
+    sample_weight_train = compute_grade_band_sample_weights(
+        y[train_idx],
+        mode=grade_band_weighting,
+        cap=grade_band_weight_cap,
+    )
+
     artifacts = train_model(
         FeatureMatrix(matrix=train_matrix, feature_names=feature_names),
         FeatureMatrix(matrix=val_matrix, feature_names=feature_names),
@@ -205,12 +234,24 @@ def run_fold(
         config.training,
         min_band=min_band,
         max_band=max_band,
+        training_mode=training_mode,
+        sample_weight_train=sample_weight_train,
     )
 
     dtrain = xgb.DMatrix(train_matrix, feature_names=feature_names)
     dval = xgb.DMatrix(val_matrix, feature_names=feature_names)
-    pred_train = artifacts.model.predict(dtrain)
-    pred_val = artifacts.model.predict(dval)
+    pred_train = decode_predictions(
+        artifacts.model.predict(dtrain),
+        min_band=min_band,
+        max_band=max_band,
+        mode=training_mode,
+    )
+    pred_val = decode_predictions(
+        artifacts.model.predict(dval),
+        min_band=min_band,
+        max_band=max_band,
+        mode=training_mode,
+    )
 
     eval_train = evaluate_predictions(
         y[train_idx], pred_train, min_band=min_band, max_band=max_band
@@ -232,6 +273,133 @@ def run_fold(
             "mean_absolute_error": float(eval_val.mean_absolute_error),
         },
     }
+
+
+def run_fold_with_predictions(
+    *,
+    fold: FoldDefinition,
+    train_id_to_idx: dict[str, int],
+    features: FeatureMatrix,
+    y: np.ndarray,
+    config: ExperimentConfig,
+    member_seeds: list[int] | None = None,
+    min_band: float,
+    max_band: float,
+    keep_feature_indices: list[int] | None,
+    training_mode: TrainingMode = TrainingMode.REGRESSION,
+    grade_band_weighting: GradeBandWeighting = GradeBandWeighting.NONE,
+    grade_band_weight_cap: float = 3.0,
+) -> FoldPredictions:
+    """Train and evaluate a fold while returning raw val predictions.
+
+    Args:
+        fold: Fold definition with train/val record ids.
+        train_id_to_idx: Mapping of record_id -> feature row index.
+        features: Full train feature matrix.
+        y: Train labels aligned with `features`.
+        config: Experiment config (training params).
+        member_seeds: Optional list of per-model random seeds to ensemble across within this fold.
+            When provided, trains one XGBoost model per seed and averages their raw predictions
+            before decoding/evaluation. When omitted, trains a single model using
+            `config.training.random_seed`.
+        min_band: Minimum valid score band.
+        max_band: Maximum valid score band.
+        keep_feature_indices: Optional list of feature indices to keep.
+
+    Returns:
+        FoldPredictions containing fold metrics and the raw validation predictions.
+    """
+
+    train_idx = indices_for_ids(fold.train_record_ids, id_to_idx=train_id_to_idx)
+    val_idx = indices_for_ids(fold.val_record_ids, id_to_idx=train_id_to_idx)
+
+    train_matrix = features.matrix[train_idx]
+    val_matrix = features.matrix[val_idx]
+    feature_names = list(features.feature_names)
+
+    if keep_feature_indices is not None:
+        feature_names = [feature_names[idx] for idx in keep_feature_indices]
+        train_matrix = train_matrix[:, keep_feature_indices]
+        val_matrix = val_matrix[:, keep_feature_indices]
+
+    sample_weight_train = compute_grade_band_sample_weights(
+        y[train_idx],
+        mode=grade_band_weighting,
+        cap=grade_band_weight_cap,
+    )
+
+    dtrain = xgb.DMatrix(train_matrix, feature_names=feature_names)
+    dval = xgb.DMatrix(val_matrix, feature_names=feature_names)
+    seeds = member_seeds or [int(config.training.random_seed)]
+    if not seeds:
+        raise ValueError("member_seeds must be non-empty when provided.")
+
+    member_best_iterations: list[int] = []
+    member_predt_train: list[np.ndarray] = []
+    member_predt_val: list[np.ndarray] = []
+    for seed in seeds:
+        training_config = config.training.model_copy(update={"random_seed": int(seed)})
+        artifacts = train_model(
+            FeatureMatrix(matrix=train_matrix, feature_names=feature_names),
+            FeatureMatrix(matrix=val_matrix, feature_names=feature_names),
+            y[train_idx],
+            y[val_idx],
+            training_config,
+            min_band=min_band,
+            max_band=max_band,
+            training_mode=training_mode,
+            sample_weight_train=sample_weight_train,
+        )
+        member_best_iterations.append(int(artifacts.best_iteration))
+        member_predt_train.append(np.asarray(artifacts.model.predict(dtrain)))
+        member_predt_val.append(np.asarray(artifacts.model.predict(dval)))
+
+    best_iteration = (
+        int(round(float(np.mean(member_best_iterations)))) if member_best_iterations else 0
+    )
+    predt_train = np.mean(np.stack(member_predt_train, axis=0), axis=0)
+    predt_val = np.mean(np.stack(member_predt_val, axis=0), axis=0)
+
+    pred_train = decode_predictions(
+        predt_train,
+        min_band=min_band,
+        max_band=max_band,
+        mode=training_mode,
+    )
+    pred_val = decode_predictions(
+        predt_val,
+        min_band=min_band,
+        max_band=max_band,
+        mode=training_mode,
+    )
+
+    eval_train = evaluate_predictions(
+        y[train_idx], pred_train, min_band=min_band, max_band=max_band
+    )
+    eval_val = evaluate_predictions(y[val_idx], pred_val, min_band=min_band, max_band=max_band)
+
+    fold_result: FoldResult = {
+        "fold": int(fold.fold),
+        "sizes": {"train": int(train_idx.size), "val": int(val_idx.size)},
+        "best_iteration": best_iteration,
+        "train": {
+            "qwk": float(eval_train.qwk),
+            "adjacent_accuracy": float(eval_train.adjacent_accuracy),
+            "mean_absolute_error": float(eval_train.mean_absolute_error),
+        },
+        "val": {
+            "qwk": float(eval_val.qwk),
+            "adjacent_accuracy": float(eval_val.adjacent_accuracy),
+            "mean_absolute_error": float(eval_val.mean_absolute_error),
+        },
+    }
+    return FoldPredictions(
+        fold_result=fold_result,
+        val_record_ids=list(fold.val_record_ids),
+        val_indices=val_idx,
+        val_true=y[val_idx].astype(float),
+        val_pred_raw=pred_val,
+    )
 
 
 def indices_for_ids(record_ids: list[str], *, id_to_idx: dict[str, int]) -> np.ndarray:

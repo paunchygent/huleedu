@@ -2,7 +2,7 @@
 type: runbook
 service: global
 severity: medium
-last_reviewed: '2026-02-04'
+last_reviewed: '2026-02-05'
 ---
 # ML/NLP Research Runbook (Essay Scoring)
 
@@ -133,8 +133,16 @@ pdm run essay-scoring-research cv \
 
 Outputs:
 - `output/essay_scoring/<RUN>/reports/cv_report.md`
+- `output/essay_scoring/<RUN>/reports/residual_diagnostics.md` (by prompt, grade band, covariates)
 - `output/essay_scoring/<RUN>/artifacts/cv_metrics.json`
+- `output/essay_scoring/<RUN>/artifacts/residuals_cv_val_oof.csv` + `.jsonl`
+- `output/essay_scoring/<RUN>/artifacts/residuals_locked_test.csv` + `.jsonl`
 - `output/essay_scoring/<RUN>/cv_feature_store/` (reusable across sweeps)
+
+Optional (objective experiments):
+- `--training-mode regression` (default)
+- `--training-mode ordinal_multiclass_expected` (train `multi:softprob`, decode via expected value)
+- `--training-mode ordinal_multiclass_argmax` (train `multi:softprob`, decode via argmax band)
 
 ### Reuse extracted features for fast sweeps
 
@@ -148,6 +156,73 @@ pdm run essay-scoring-research cv \
   --feature-set combined \
   --reuse-cv-feature-store-dir output/essay_scoring/<CV_RUN>/cv_feature_store
 ```
+
+### XGBoost hyperparameter sweep (Gate E)
+
+When Gate D is locked, prefer `xgb-sweep` over ad-hoc manual loops. It reuses the CV feature store,
+records tail slices, and writes a single sweep summary table.
+
+Example (prompt-holdout; combined; drop-3; weighting+calibration):
+
+```bash
+pdm run essay-scoring-research xgb-sweep \
+  --splits-path output/essay_scoring/<SPLITS_RUN>/artifacts/splits.json \
+  --scheme prompt_holdout \
+  --feature-set combined \
+  --training-mode regression \
+  --grade-band-weighting sqrt_inv_freq \
+  --grade-band-weight-cap 3.0 \
+  --prediction-mapping qwk_cutpoints_lfo \
+  --predictor-handcrafted-drop has_conclusion \
+  --predictor-handcrafted-drop clause_count \
+  --predictor-handcrafted-drop flesch_kincaid \
+  --ellipse-train-path output/essay_scoring/<PREP_RUN>/artifacts/datasets/ellipse_train_prepared.csv \
+  --ellipse-test-path output/essay_scoring/<PREP_RUN>/artifacts/datasets/ellipse_test_prepared.csv \
+  --reuse-cv-feature-store-dir output/essay_scoring/<BASELINE_CV_RUN>/cv_feature_store \
+  --run-name ellipse_gate_e_xgb_sweep_prompt_holdout_drop3_weighting_calibration
+```
+
+Outputs:
+- `output/essay_scoring/<SWEEP>/reports/sweep_summary.md` (sorted by high-tail adjacent accuracy, then mean QWK)
+- `output/essay_scoring/<SWEEP>/artifacts/sweep_results.json` (incremental; safe to monitor)
+- `output/essay_scoring/<SWEEP>/progress.json`
+- Per-configuration CV runs under `output/essay_scoring/<SWEEP>/variants/`
+
+### CV ensembling (Gate F)
+
+CV supports simple seed ensembling per fold:
+- Flag: `--ensemble-size <N>` (default: `1`)
+- Behavior: trains N XGBoost models per fold (different random seeds), averages raw predictions, then runs the
+  usual rounding/mapping + residual diagnostics.
+
+Important selection note:
+- Do not accept global QWK gains that worsen tail slices unless you explicitly decide to trade them off.
+
+Example (prompt-holdout; combined; drop-3; weighting+calibration; feature-store reuse):
+
+```bash
+pdm run essay-scoring-research cv \
+  --dataset-kind ellipse \
+  --ellipse-train-path output/essay_scoring/<PREP_RUN>/artifacts/datasets/ellipse_train_prepared.csv \
+  --ellipse-test-path output/essay_scoring/<PREP_RUN>/artifacts/datasets/ellipse_test_prepared.csv \
+  --splits-path output/essay_scoring/<SPLITS_RUN>/artifacts/splits.json \
+  --scheme prompt_holdout \
+  --feature-set combined \
+  --ensemble-size 5 \
+  --reuse-cv-feature-store-dir output/essay_scoring/<BASELINE_CV_RUN>/cv_feature_store \
+  --grade-band-weighting sqrt_inv_freq \
+  --grade-band-weight-cap 3.0 \
+  --prediction-mapping qwk_cutpoints_lfo \
+  --predictor-handcrafted-drop has_conclusion \
+  --predictor-handcrafted-drop clause_count \
+  --predictor-handcrafted-drop flesch_kincaid \
+  --run-name ellipse_gate_f_cv_ensemble5_prompt_holdout
+```
+
+Decision (2026-02-05, ELLIPSE CV-first):
+- On the current best baseline (prompt_holdout, drop-3, weighting+calibration, best XGB params),
+  `ensemble_size>1` increased mean QWK but degraded **high-tail adjacent accuracy** (`y_true>=4.0`).
+  Keep `ensemble_size=1` as best-current until tail behavior is improved via other levers.
 
 ### 4) Drop-column importance (feature selection, handcrafted features)
 
@@ -174,6 +249,47 @@ Outputs:
 Decision heuristic (starting point; tune after you see results):
 - Keep if mean ΔQWK > 0 and stability ≥ 0.8 (helps in ≥80% of folds).
 - Drop if mean ΔQWK ≤ 0 or stability is low (likely noisy / redundant).
+
+### 5) CV-first follow-ups (post Gate C baseline)
+
+After you have a prompt-holdout CV run with residual diagnostics (`reports/residual_diagnostics.md`),
+use the story hub to pick the next lever (avoid ad-hoc tuning):
+- Story hub: `TASKS/assessment/improve-essay-scoring-prediction-power-ellipse-cv-first.md`
+
+Recommended next tasks (in order):
+1) Validate a pruned handcrafted predictor subset under prompt-holdout (Gate B → prompt generalization):
+   - `TASKS/assessment/essay-scoring-validate-pruned-handcrafted-subset-under-prompt-holdout.md`
+2) Address grade compression / tail bias before heavy sweeps (Gate D, slice-aware):
+   - `TASKS/assessment/essay-scoring-tail-calibration--grade-band-imbalance-mitigation.md`
+3) Only then move to objective variants / hyperparam sweeps / ensembling:
+   - `TASKS/assessment/essay-scoring-ordinal-custom-objective-experiments-qwk.md`
+   - `TASKS/assessment/essay-scoring-xgboost-hyperparameter-sweep-cv-selected.md`
+   - `TASKS/assessment/essay-scoring-cv-ensembling-ellipse-cv-first.md`
+
+Example: prompt-holdout CV with a pruned handcrafted predictor denylist (embeddings always kept):
+
+```bash
+pdm run essay-scoring-research cv \
+  --dataset-kind ellipse \
+  --ellipse-train-path output/essay_scoring/<PREP_RUN>/artifacts/datasets/ellipse_train_prepared.csv \
+  --ellipse-test-path output/essay_scoring/<PREP_RUN>/artifacts/datasets/ellipse_test_prepared.csv \
+  --splits-path output/essay_scoring/<SPLITS_RUN>/artifacts/splits.json \
+  --scheme prompt_holdout \
+  --feature-set combined \
+  --reuse-cv-feature-store-dir output/essay_scoring/<BASELINE_CV_RUN>/cv_feature_store \
+  --predictor-handcrafted-drop has_conclusion \
+  --predictor-handcrafted-drop clause_count \
+  --predictor-handcrafted-drop flesch_kincaid \
+  --run-name ellipse_cv_combined_prompt_holdout_pruned_handcrafted
+```
+
+Note: `--predictor-handcrafted-keep <feature_name>` also exists for “strong keep only” experiments,
+but the denylist tends to be more ergonomic when you are only dropping a small number of features.
+
+Selection artifacts:
+- `output/essay_scoring/<RUN>/artifacts/predictor_feature_selection.json`
+- `output/essay_scoring/<RUN>/artifacts/cv_metrics.json` includes `predictor_feature_selection`
+- `output/essay_scoring/<RUN>/reports/cv_report.md` includes predictor selection summary lines
 
 ## Observability
 
@@ -332,3 +448,131 @@ YYYY-MM-DD: <run-name>
   - notes:
     - Primary yardstick for CV-first selection (unseen prompt generalization).
     - Future runs: prefer `--reuse-cv-feature-store-dir output/essay_scoring/<STRAT_CV_RUN>/cv_feature_store` to avoid re-extraction.
+
+2026-02-04: `ellipse_cv_embeddings_stratified_text_20260204_174445`
+- command: `pdm run essay-scoring-research cv --dataset-kind ellipse --feature-set embeddings --scheme stratified_text --splits-path output/essay_scoring/20260204_135554_ellipse_splits_200_1000/artifacts/splits.json --ellipse-train-path output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_train_prepared.csv --ellipse-test-path output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_test_prepared.csv --backend hemma --offload-service-url http://127.0.0.1:19000 --run-name ellipse_cv_embeddings_stratified_text_20260204_174445`
+- dataset: ELLIPSE (train/test), 200–1000 words, excluded prompts: (see `ExperimentConfig.ellipse_excluded_prompts`)
+- splits: `output/essay_scoring/20260204_135554_ellipse_splits_200_1000/artifacts/splits.json` (scheme=stratified_text)
+- output: `output/essay_scoring/20260204_164449_ellipse_cv_embeddings_stratified_text_20260204_174445/`
+- results:
+  - QWK (CV val mean±std): 0.55198 ± 0.02148
+  - notes:
+    - CV feature store: `output/essay_scoring/20260204_164449_ellipse_cv_embeddings_stratified_text_20260204_174445/cv_feature_store`
+
+2026-02-04: `ellipse_cv_embeddings_prompt_holdout_20260204_175630`
+- command: `pdm run essay-scoring-research cv --dataset-kind ellipse --feature-set embeddings --scheme prompt_holdout --splits-path output/essay_scoring/20260204_135554_ellipse_splits_200_1000/artifacts/splits.json --ellipse-train-path output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_train_prepared.csv --ellipse-test-path output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_test_prepared.csv --reuse-cv-feature-store-dir output/essay_scoring/20260204_164449_ellipse_cv_embeddings_stratified_text_20260204_174445/cv_feature_store --backend hemma --offload-service-url http://127.0.0.1:19000 --run-name ellipse_cv_embeddings_prompt_holdout_20260204_175630`
+- dataset: ELLIPSE (train/test), 200–1000 words, excluded prompts: (see `ExperimentConfig.ellipse_excluded_prompts`)
+- splits: `output/essay_scoring/20260204_135554_ellipse_splits_200_1000/artifacts/splits.json` (scheme=prompt_holdout)
+- output: `output/essay_scoring/20260204_165648_ellipse_cv_embeddings_prompt_holdout_20260204_175630/`
+- results:
+  - QWK (CV val mean±std): 0.54465 ± 0.02199
+
+2026-02-04: `ellipse_cv_handcrafted_stratified_text_20260204_190101`
+- command: `pdm run essay-scoring-research cv --dataset-kind ellipse --feature-set handcrafted --scheme stratified_text --splits-path output/essay_scoring/20260204_135554_ellipse_splits_200_1000/artifacts/splits.json --ellipse-train-path output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_train_prepared.csv --ellipse-test-path output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_test_prepared.csv --backend hemma --offload-service-url http://127.0.0.1:19000 --run-name ellipse_cv_handcrafted_stratified_text_20260204_190101`
+- dataset: ELLIPSE (train/test), 200–1000 words, excluded prompts: (see `ExperimentConfig.ellipse_excluded_prompts`)
+- splits: `output/essay_scoring/20260204_135554_ellipse_splits_200_1000/artifacts/splits.json` (scheme=stratified_text)
+- output: `output/essay_scoring/20260204_180119_ellipse_cv_handcrafted_stratified_text_20260204_190101/`
+- results:
+  - QWK (CV val mean±std): 0.57372 ± 0.01393
+  - notes:
+    - CV feature store: `output/essay_scoring/20260204_180119_ellipse_cv_handcrafted_stratified_text_20260204_190101/cv_feature_store`
+
+2026-02-04: `ellipse_cv_handcrafted_prompt_holdout_20260204_190248`
+- command: `pdm run essay-scoring-research cv --dataset-kind ellipse --feature-set handcrafted --scheme prompt_holdout --splits-path output/essay_scoring/20260204_135554_ellipse_splits_200_1000/artifacts/splits.json --ellipse-train-path output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_train_prepared.csv --ellipse-test-path output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_test_prepared.csv --reuse-cv-feature-store-dir output/essay_scoring/20260204_180119_ellipse_cv_handcrafted_stratified_text_20260204_190101/cv_feature_store --backend hemma --offload-service-url http://127.0.0.1:19000 --run-name ellipse_cv_handcrafted_prompt_holdout_20260204_190248`
+- dataset: ELLIPSE (train/test), 200–1000 words, excluded prompts: (see `ExperimentConfig.ellipse_excluded_prompts`)
+- splits: `output/essay_scoring/20260204_135554_ellipse_splits_200_1000/artifacts/splits.json` (scheme=prompt_holdout)
+- output: `output/essay_scoring/20260204_180303_ellipse_cv_handcrafted_prompt_holdout_20260204_190248/`
+- results:
+  - QWK (CV val mean±std): 0.56444 ± 0.01887
+
+2026-02-04: `ellipse_drop_column_combined_stratified_text_20260204_190546`
+- command: `pdm run essay-scoring-research drop-column --dataset-kind ellipse --feature-set combined --scheme stratified_text --splits-path output/essay_scoring/20260204_135554_ellipse_splits_200_1000/artifacts/splits.json --ellipse-train-path output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_train_prepared.csv --ellipse-test-path output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_test_prepared.csv --reuse-cv-feature-store-dir output/essay_scoring/20260204_140326_ellipse_cv_combined_stratified_text_20260204_150321/cv_feature_store --run-name ellipse_drop_column_combined_stratified_text_20260204_190546`
+- dataset: ELLIPSE (train/test), 200–1000 words, excluded prompts: (see `ExperimentConfig.ellipse_excluded_prompts`)
+- splits: `output/essay_scoring/20260204_135554_ellipse_splits_200_1000/artifacts/splits.json` (scheme=stratified_text)
+- feature_set: combined (drop-column evaluates Tier1–Tier3 features only)
+- output: `output/essay_scoring/20260204_180603_ellipse_drop_column_combined_stratified_text_20260204_190546/`
+- results:
+  - Baseline (CV val QWK mean±std): 0.6262 ± 0.0179
+  - Top deltas (ΔQWK mean): grammar_errors_per_100_words (+0.0261), spelling_errors_per_100_words (+0.0211), parse_tree_depth (+0.0134)
+  - Suggested drop from predictor input (ΔQWK ≤ 0): has_conclusion (-0.0024), clause_count (-0.0014), flesch_kincaid (-0.0002)
+
+2026-02-04: `ellipse_cv_combined_prompt_holdout_prune_drop3_20260204_214922`
+- command: `pdm run essay-scoring-research cv --dataset-kind ellipse --feature-set combined --scheme prompt_holdout --splits-path output/essay_scoring/20260204_135554_ellipse_splits_200_1000/artifacts/splits.json --ellipse-train-path output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_train_prepared.csv --ellipse-test-path output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_test_prepared.csv --reuse-cv-feature-store-dir output/essay_scoring/20260204_144831_ellipse_cv_combined_prompt_holdout_20260204_150321/cv_feature_store --predictor-handcrafted-drop has_conclusion --predictor-handcrafted-drop clause_count --predictor-handcrafted-drop flesch_kincaid --run-name ellipse_cv_combined_prompt_holdout_prune_drop3_20260204_214922`
+- output: `output/essay_scoring/20260204_204929_ellipse_cv_combined_prompt_holdout_prune_drop3_20260204_214922/`
+- results:
+  - QWK (CV val mean±std): 0.62210 ± 0.01743
+- notes:
+  - “Drop-3” handcrafted prune adopted for the predictor going forward.
+
+2026-02-05: `ellipse_cv_combined_prompt_holdout_ordinal_expected_20260205_155521`
+- command: `pdm run essay-scoring-research cv --dataset-kind ellipse --feature-set combined --scheme prompt_holdout --training-mode ordinal_multiclass_expected --splits-path output/essay_scoring/20260204_135554_ellipse_splits_200_1000/artifacts/splits.json --ellipse-train-path output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_train_prepared.csv --ellipse-test-path output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_test_prepared.csv --reuse-cv-feature-store-dir output/essay_scoring/20260204_144831_ellipse_cv_combined_prompt_holdout_20260204_150321/cv_feature_store --predictor-handcrafted-drop has_conclusion --predictor-handcrafted-drop clause_count --predictor-handcrafted-drop flesch_kincaid --run-name ellipse_cv_combined_prompt_holdout_ordinal_expected_20260205_155521`
+- output: `output/essay_scoring/20260205_145529_ellipse_cv_combined_prompt_holdout_ordinal_expected_20260205_155521/`
+- results:
+  - QWK (CV val mean±std): 0.58728 ± 0.01729
+- notes:
+  - Regressed vs regression baseline; do not adopt as “best current” on ELLIPSE.
+
+2026-02-05: `ellipse_cv_combined_prompt_holdout_ordinal_argmax_20260205_155521`
+- command: `pdm run essay-scoring-research cv --dataset-kind ellipse --feature-set combined --scheme prompt_holdout --training-mode ordinal_multiclass_argmax --splits-path output/essay_scoring/20260204_135554_ellipse_splits_200_1000/artifacts/splits.json --ellipse-train-path output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_train_prepared.csv --ellipse-test-path output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_test_prepared.csv --reuse-cv-feature-store-dir output/essay_scoring/20260204_144831_ellipse_cv_combined_prompt_holdout_20260204_150321/cv_feature_store --predictor-handcrafted-drop has_conclusion --predictor-handcrafted-drop clause_count --predictor-handcrafted-drop flesch_kincaid --run-name ellipse_cv_combined_prompt_holdout_ordinal_argmax_20260205_155521`
+- output: `output/essay_scoring/20260205_145529_ellipse_cv_combined_prompt_holdout_ordinal_argmax_20260205_155521/`
+- results:
+  - QWK (CV val mean±std): 0.54047 ± 0.02357
+- notes:
+  - Much worse than regression; avoid for ELLIPSE objective experiments.
+
+2026-02-05: `ellipse_gate_d_baseline_prompt_holdout_drop3_20260205_173454`
+- command: `pdm run essay-scoring-research cv --dataset-kind ellipse --feature-set combined --scheme prompt_holdout --training-mode regression --splits-path output/essay_scoring/20260204_135554_ellipse_splits_200_1000/artifacts/splits.json --ellipse-train-path output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_train_prepared.csv --ellipse-test-path output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_test_prepared.csv --reuse-cv-feature-store-dir output/essay_scoring/20260204_144831_ellipse_cv_combined_prompt_holdout_20260204_150321/cv_feature_store --predictor-handcrafted-drop has_conclusion --predictor-handcrafted-drop clause_count --predictor-handcrafted-drop flesch_kincaid --run-name ellipse_gate_d_baseline_prompt_holdout_drop3_20260205_173454`
+- output: `output/essay_scoring/20260205_163458_ellipse_gate_d_baseline_prompt_holdout_drop3_20260205_173454/`
+- results:
+  - QWK (CV val mean±std): 0.62210 ± 0.01743
+- notes:
+  - Gate D baseline for tail calibration + imbalance mitigation.
+
+2026-02-05: `ellipse_gate_d_weighting_prompt_holdout_drop3_20260205_180657`
+- command: `pdm run essay-scoring-research cv --dataset-kind ellipse --feature-set combined --scheme prompt_holdout --training-mode regression --splits-path output/essay_scoring/20260204_135554_ellipse_splits_200_1000/artifacts/splits.json --ellipse-train-path output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_train_prepared.csv --ellipse-test-path output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_test_prepared.csv --reuse-cv-feature-store-dir output/essay_scoring/20260204_144831_ellipse_cv_combined_prompt_holdout_20260204_150321/cv_feature_store --predictor-handcrafted-drop has_conclusion --predictor-handcrafted-drop clause_count --predictor-handcrafted-drop flesch_kincaid --grade-band-weighting sqrt_inv_freq --grade-band-weight-cap 3.0 --run-name ellipse_gate_d_weighting_prompt_holdout_drop3_20260205_180657`
+- output: `output/essay_scoring/20260205_170701_ellipse_gate_d_weighting_prompt_holdout_drop3_20260205_180657/`
+- results:
+  - QWK (CV val mean±std): 0.63516 ± 0.01650
+- notes:
+  - Training-time weighting improves tails modestly and improves mean QWK.
+
+2026-02-05: `ellipse_gate_d_calibration_prompt_holdout_drop3_20260205_180838`
+- command: `pdm run essay-scoring-research cv --dataset-kind ellipse --feature-set combined --scheme prompt_holdout --training-mode regression --splits-path output/essay_scoring/20260204_135554_ellipse_splits_200_1000/artifacts/splits.json --ellipse-train-path output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_train_prepared.csv --ellipse-test-path output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_test_prepared.csv --reuse-cv-feature-store-dir output/essay_scoring/20260204_144831_ellipse_cv_combined_prompt_holdout_20260204_150321/cv_feature_store --predictor-handcrafted-drop has_conclusion --predictor-handcrafted-drop clause_count --predictor-handcrafted-drop flesch_kincaid --prediction-mapping qwk_cutpoints_lfo --run-name ellipse_gate_d_calibration_prompt_holdout_drop3_20260205_180838`
+- output: `output/essay_scoring/20260205_170843_ellipse_gate_d_calibration_prompt_holdout_drop3_20260205_180838/`
+- results:
+  - QWK (CV val mean±std): 0.68615 ± 0.01029
+- notes:
+  - Post-hoc cutpoint mapping (leave-one-fold-out) persists:
+    - `artifacts/calibration_cutpoints_by_fold.json`
+    - `artifacts/calibration_summary.json`
+
+2026-02-05: `ellipse_gate_d_weighting_calibration_prompt_holdout_drop3_20260205_181046`
+- command: `pdm run essay-scoring-research cv --dataset-kind ellipse --feature-set combined --scheme prompt_holdout --training-mode regression --splits-path output/essay_scoring/20260204_135554_ellipse_splits_200_1000/artifacts/splits.json --ellipse-train-path output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_train_prepared.csv --ellipse-test-path output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_test_prepared.csv --reuse-cv-feature-store-dir output/essay_scoring/20260204_144831_ellipse_cv_combined_prompt_holdout_20260204_150321/cv_feature_store --predictor-handcrafted-drop has_conclusion --predictor-handcrafted-drop clause_count --predictor-handcrafted-drop flesch_kincaid --grade-band-weighting sqrt_inv_freq --grade-band-weight-cap 3.0 --prediction-mapping qwk_cutpoints_lfo --run-name ellipse_gate_d_weighting_calibration_prompt_holdout_drop3_20260205_181046`
+- output: `output/essay_scoring/20260205_171050_ellipse_gate_d_weighting_calibration_prompt_holdout_drop3_20260205_181046/`
+- results:
+  - QWK (CV val mean±std): 0.68360 ± 0.01470
+- notes:
+  - Weighting + calibration improves high-tail adjacent accuracy most (OOF) with mean QWK still
+    within fold noise vs calibration-only; adopt as the default when tail adjacent accuracy is the
+    primary yardstick (noisy-label setting). Calibration-only remains the runner-up for max QWK /
+    bias reduction (see Gate D task decision).
+
+2026-02-05: `ellipse_gate_e_xgb_sweep_prompt_holdout_drop3_wcal_20260205_202746`
+- command: `pdm run essay-scoring-research xgb-sweep --splits-path output/essay_scoring/20260204_135554_ellipse_splits_200_1000/artifacts/splits.json --scheme prompt_holdout --feature-set combined --training-mode regression --grade-band-weighting sqrt_inv_freq --grade-band-weight-cap 3.0 --prediction-mapping qwk_cutpoints_lfo --predictor-handcrafted-drop has_conclusion --predictor-handcrafted-drop clause_count --predictor-handcrafted-drop flesch_kincaid --ellipse-train-path output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_train_prepared.csv --ellipse-test-path output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_test_prepared.csv --reuse-cv-feature-store-dir output/essay_scoring/20260204_144831_ellipse_cv_combined_prompt_holdout_20260204_150321/cv_feature_store --run-name ellipse_gate_e_xgb_sweep_prompt_holdout_drop3_wcal_20260205_202746`
+- output: `output/essay_scoring/20260205_192751_ellipse_gate_e_xgb_sweep_prompt_holdout_drop3_wcal_20260205_202746/`
+- results:
+  - Best config: `97e84d798d` (max_depth=4, min_child_weight=20, reg_lambda=2.0, reg_alpha=0.0)
+  - Best run: `output/essay_scoring/20260205_192751_ellipse_gate_e_xgb_sweep_prompt_holdout_drop3_wcal_20260205_202746/variants/20260205_194952_ellipse_gate_e_xgb_sweep_prompt_holdout_drop3_wcal_20260205_202746_97e84d798d/`
+  - CV val QWK mean±std: `0.68460 ± 0.01659`
+  - High tail adjacent_acc (`y_true>=4.0`): `0.87907`
+- notes:
+  - Sweep summary: `output/essay_scoring/20260205_192751_ellipse_gate_e_xgb_sweep_prompt_holdout_drop3_wcal_20260205_202746/reports/sweep_summary.md`
+  - Variants live under: `output/essay_scoring/20260205_192751_ellipse_gate_e_xgb_sweep_prompt_holdout_drop3_wcal_20260205_202746/variants/`
+
+2026-02-05: `ellipse_gate_e_xgb_bestparams_stratified_text_20260205_212122`
+- command: (same as Gate E `xgb-sweep` above, but with `--scheme stratified_text` and a one-config
+  grid containing only the selected best params: max_depth=4, min_child_weight=20, reg_lambda=2.0,
+  reg_alpha=0.0)
+- output: `output/essay_scoring/20260205_202126_ellipse_gate_e_xgb_bestparams_stratified_text_20260205_212122/`
+- results:
+  - CV val QWK mean±std: `0.68509 ± 0.01969`

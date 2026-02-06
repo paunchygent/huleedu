@@ -23,6 +23,8 @@ Canonical reference: `docs/operations/ml-nlp-runbook.md`.
   - `run`: `--reuse-feature-store-dir output/essay_scoring/<RUN>/feature_store`
   - `cv`/sweeps: `--reuse-cv-feature-store-dir output/essay_scoring/<CV_RUN>/cv_feature_store`
 - Monitor progress by script via `output/essay_scoring/<RUN>/progress.json` (not log parsing).
+- CV runs MUST produce residual diagnostics (`reports/residual_diagnostics.md`) plus per-record rows
+  under `artifacts/residuals_*.{csv,jsonl}` (Gate C).
 
 ## ELLIPSE CV-first: canonical inputs
 
@@ -55,3 +57,26 @@ pdm run essay-scoring-research cv --dataset-kind ellipse \
 
 Note: `cv` does not compute SHAP. Run SHAP via `pdm run essay-scoring-research run` (do not pass
 `--skip-shap`).
+
+## Pruned handcrafted predictor subset (combined)
+
+Use this to test a pruned handcrafted predictor set under `scheme=prompt_holdout`
+(Gate B → prompt generalization) **without re-extracting features**
+(column filtering only).
+
+```bash
+pdm run essay-scoring-research cv --dataset-kind ellipse \
+  --ellipse-train-path "$PREP_TRAIN_CSV" --ellipse-test-path "$PREP_TEST_CSV" \
+  --splits-path "$SPLITS_JSON" --scheme prompt_holdout --feature-set combined \
+  --reuse-cv-feature-store-dir output/essay_scoring/<PROMPT_HOLDOUT_BASELINE_RUN>/cv_feature_store \
+  --predictor-handcrafted-drop has_conclusion \
+  --predictor-handcrafted-drop clause_count \
+  --predictor-handcrafted-drop flesch_kincaid \
+  --run-name ellipse_cv_combined_prompt_holdout_pruned_handcrafted
+```
+
+Note: `--predictor-handcrafted-keep <feature_name>` also exists for “strong keep only” experiments.
+
+Selection artifacts:
+- `output/essay_scoring/<RUN>/artifacts/predictor_feature_selection.json`
+- `output/essay_scoring/<RUN>/reports/cv_report.md` includes predictor selection summary

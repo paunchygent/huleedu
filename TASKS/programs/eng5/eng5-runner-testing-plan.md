@@ -7,7 +7,7 @@ priority: medium
 domain: programs
 owner_team: agents
 created: '2025-11-21'
-last_updated: '2026-02-01'
+last_updated: '2026-02-04'
 service: ''
 owner: ''
 program: ''
@@ -17,7 +17,7 @@ labels: []
 
 # Task: ENG5 Runner Testing Plan
 
-**Linked task**: `TASK-ENG5-RUNNER-ASSUMPTION-HARDENING.md`
+**Linked task**: `TASKS/programs/eng5/eng5-runner-assumption-hardening.md`
 
 This task captures the test layout and skeletons required to validate the ENG5 runner assumption hardening work.
 

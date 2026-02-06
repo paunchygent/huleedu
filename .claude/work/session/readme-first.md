@@ -63,6 +63,10 @@ pdm run essay-scoring-research cv --dataset-kind ellipse --feature-set combined 
 # Reuse extracted features for faster parameter sweeps
 pdm run essay-scoring-research cv --reuse-cv-feature-store-dir output/essay_scoring/<RUN_DIR_OR_CV_FEATURE_STORE_DIR> --splits-path <SPLITS_JSON> --scheme stratified_text --dataset-kind ellipse --feature-set combined
 
+# Pruned handcrafted predictor subset (column filtering; embeddings always kept in combined)
+# Use repeatable: --predictor-handcrafted-drop <feature_name> or --predictor-handcrafted-keep <feature_name>
+# (see runbook for a full example)
+
 # Drop-column importance (handcrafted feature selection; heavy but leak-safe)
 pdm run essay-scoring-research drop-column --dataset-kind ellipse --feature-set combined --splits-path <SPLITS_JSON> --scheme stratified_text --reuse-cv-feature-store-dir output/essay_scoring/<RUN_DIR_OR_CV_FEATURE_STORE_DIR> --run-name ellipse_drop_column_combined
 
@@ -93,6 +97,7 @@ Implemented (2026-02-04):
 
 Tracking:
 - `TASKS/assessment/hemma-offload-combined-extract-endpoint.md`
+- Decision gate (experiment optimization deps): `docs/decisions/0031-essay-scoring-experiment-optimization-dependencies-optuna-hf-training-baselines.md`
 
 ---
 

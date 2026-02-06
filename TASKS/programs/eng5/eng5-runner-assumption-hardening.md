@@ -52,9 +52,11 @@ Recent validation exposed several incorrect ENG5 runner assumptions that mask co
 
 ## Immediate Next Actions
 
-1. Complete Checkpoint 4 (R6) by documenting anchor grade metadata and CJ enforcement surfaces (grade-scale ownership is enforced in the runner via R3).
-2. Complete Checkpoint 5 (R7 Phase 1–2) by documenting the current essay-upload flow, then adding manifest-level caching with a `--force-reupload` override plus unit coverage.
-3. Run and analyse dedicated ENG5 anchor alignment experiments using `ANCHOR_ALIGN_TEST` with language-control prompts and Sonnet 4.5, feeding findings back into runner defaults and CJ prompt configuration.
+1. Open a follow-up task for **R7 Phase 3** (`--verify-content`) once Content Service exposes a stable existence API (e.g. `content_exists`) and we agree on failure semantics vs. re-upload.
+2. Run an end-to-end ENG5 execute twice (same inputs) to capture artefacts proving:
+   - Cache reuse avoids re-upload
+   - `--force-reupload` recovers after Content Service resets
+3. Decide whether to mark `TASKS/programs/eng5/eng5-runner-testing-plan.md` as `done` (it’s now largely implemented) or archive it as historical scaffolding.
 
 ## Progress (2026-02-01) – Grade Scale Ownership (R3)
 

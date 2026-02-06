@@ -2,7 +2,7 @@
 id: 'essay-scoring-residual-diagnostics-by-prompt-and-grade-band'
 title: 'essay-scoring: residual diagnostics by prompt and grade band'
 type: 'task'
-status: 'proposed'
+status: 'done'
 priority: 'medium'
 domain: 'assessment'
 service: ''
@@ -53,6 +53,39 @@ Target outputs:
 
 - A run directory contains per-record predictions + a residual diagnostics report.
 - The report is referenced from the story with a short “what to do next” section.
+
+## Implementation (2026-02-04)
+
+Code:
+- CV fold predictions + locked-test predictions are persisted by `cv` runs:
+  - `scripts/ml_training/essay_scoring/cv_shared.py` (`run_fold_with_predictions`)
+  - `scripts/ml_training/essay_scoring/cross_validation.py` (writes artifacts + report)
+- Report generator:
+  - `scripts/ml_training/essay_scoring/reports/residual_diagnostics.py`
+
+Artifacts written under the CV run directory:
+- Per-record rows:
+  - `artifacts/residuals_cv_val_oof.csv` + `.jsonl` (OOF val predictions across folds)
+  - `artifacts/residuals_locked_test.csv` + `.jsonl` (locked test from the final fit)
+- Report:
+  - `reports/residual_diagnostics.md`
+
+How to run (feature-store reuse; Gate C baseline):
+- Run `pdm run essay-scoring-research cv --scheme prompt_holdout --reuse-cv-feature-store-dir <CV_RUN_DIR_OR_cv_feature_store_DIR> ...`
+- Verify the run dir contains `reports/residual_diagnostics.md` and the `artifacts/residuals_*.{csv,jsonl}` files.
+
+## Results (2026-02-04)
+
+Baseline residual diagnostics run (combined + prompt_holdout, feature-store reuse):
+- Run dir: `output/essay_scoring/20260204_193204_ellipse_cv_combined_prompt_holdout_residuals_20260204_203200/`
+  - Residual report: `output/essay_scoring/20260204_193204_ellipse_cv_combined_prompt_holdout_residuals_20260204_203200/reports/residual_diagnostics.md`
+  - Artifacts:
+    - `output/essay_scoring/20260204_193204_ellipse_cv_combined_prompt_holdout_residuals_20260204_203200/artifacts/residuals_locked_test.csv`
+    - `output/essay_scoring/20260204_193204_ellipse_cv_combined_prompt_holdout_residuals_20260204_203200/artifacts/residuals_cv_val_oof.csv`
+
+Key takeaways (high-level):
+- Strong tail bias / grade compression (rarely predicts 4.5/5.0; high tail underpredicted; low tail overpredicted).
+- A small set of prompts repeatedly underperform and should be construct-audited.
 
 ## Related
 

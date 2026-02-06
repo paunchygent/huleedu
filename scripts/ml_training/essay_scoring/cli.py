@@ -15,6 +15,10 @@ from scripts.ml_training.essay_scoring.config import (
 from scripts.ml_training.essay_scoring.cross_validation import run_cross_validation
 from scripts.ml_training.essay_scoring.dataset_preparation import prepare_dataset
 from scripts.ml_training.essay_scoring.drop_column_importance import run_drop_column_importance
+from scripts.ml_training.essay_scoring.hyperparameter_sweep import (
+    load_param_grid,
+    run_xgb_hyperparameter_sweep,
+)
 from scripts.ml_training.essay_scoring.logging_utils import configure_console_logging
 from scripts.ml_training.essay_scoring.runner import (
     featurize_experiment,
@@ -22,8 +26,13 @@ from scripts.ml_training.essay_scoring.runner import (
     run_experiment,
 )
 from scripts.ml_training.essay_scoring.split_definitions import generate_splits
+from scripts.ml_training.essay_scoring.training.grade_band_weighting import GradeBandWeighting
+from scripts.ml_training.essay_scoring.training.prediction_mapping import PredictionMapping
+from scripts.ml_training.essay_scoring.training.training_modes import TrainingMode
 
 app = typer.Typer(help="Whitebox essay scoring research pipeline")
+
+_DEFAULT_DROP3_HANDCRAFTED: list[str] = ["has_conclusion", "clause_count", "flesch_kincaid"]
 
 
 @app.command("run")
@@ -394,6 +403,15 @@ def cv_command(
         "stratified_text",
         help="Split scheme: stratified_text or prompt_holdout.",
     ),
+    ensemble_size: int = typer.Option(
+        1,
+        help=(
+            "Number of models to train per fold (seed ensemble). "
+            "CV metrics are computed on the averaged predictions."
+        ),
+        min=1,
+        max=10,
+    ),
     config_path: Path | None = typer.Option(
         None,
         help="Path to JSON config overrides",
@@ -405,6 +423,51 @@ def cv_command(
     feature_set: FeatureSet | None = typer.Option(
         None,
         help="Feature set to train (handcrafted, embeddings, combined)",
+    ),
+    training_mode: TrainingMode = typer.Option(
+        TrainingMode.REGRESSION,
+        help=(
+            "Training mode for the XGBoost model. "
+            "Use ordinal_multiclass_* to study grade-band compression and tail behavior."
+        ),
+    ),
+    grade_band_weighting: GradeBandWeighting = typer.Option(
+        GradeBandWeighting.NONE,
+        help=(
+            "Optional training-time grade-band weighting scheme to reduce tail bias (Gate D). "
+            "Use with prompt_holdout CV only."
+        ),
+    ),
+    grade_band_weight_cap: float = typer.Option(
+        3.0,
+        help="Maximum per-sample weight when grade-band weighting is enabled.",
+        min=1.0,
+        max=10.0,
+    ),
+    prediction_mapping: PredictionMapping = typer.Option(
+        PredictionMapping.ROUND_HALF_BAND,
+        help=(
+            "Optional post-hoc mapping from y_pred_raw -> y_pred for CV metrics and residual "
+            "diagnostics. Use qwk_cutpoints_lfo to learn monotone cutpoints without leakage "
+            "(leave-one-fold-out)."
+        ),
+    ),
+    predictor_handcrafted_keep: list[str] | None = typer.Option(
+        None,
+        help=(
+            "Optional allowlist of handcrafted feature names to include in the predictor. "
+            "For feature_set=combined, embeddings are always kept; "
+            "this filters only handcrafted columns. "
+            "Repeat the flag for multiple features."
+        ),
+    ),
+    predictor_handcrafted_drop: list[str] | None = typer.Option(
+        None,
+        help=(
+            "Optional denylist of handcrafted feature names to drop from the predictor. "
+            "Cannot be used with --predictor-handcrafted-keep. "
+            "Repeat the flag for multiple features."
+        ),
     ),
     ellipse_train_path: Path | None = typer.Option(
         None,
@@ -479,13 +542,178 @@ def cv_command(
         feature_set=feature_set or config.feature_set,
         splits_path=splits_path,
         scheme=scheme,  # type: ignore[arg-type]
+        ensemble_size=ensemble_size,
         reuse_cv_feature_store_dir=reuse_cv_feature_store_dir,
         min_words=min_words,
         max_words=max_words,
+        handcrafted_keep=predictor_handcrafted_keep,
+        handcrafted_drop=predictor_handcrafted_drop,
+        training_mode=training_mode,
+        grade_band_weighting=grade_band_weighting,
+        grade_band_weight_cap=grade_band_weight_cap,
+        prediction_mapping=prediction_mapping,
     )
     typer.echo(f"CV complete: {summary.run_paths.run_dir}")
     typer.echo(f"Metrics: {summary.metrics_path}")
     typer.echo(f"Report: {summary.report_path}")
+    typer.echo(f"Residual report: {summary.residual_report_path}")
+
+
+@app.command("xgb-sweep")
+def xgb_sweep_command(
+    splits_path: Path = typer.Option(
+        ...,
+        help="Path to a splits.json file created by `make-splits`.",
+        exists=True,
+        dir_okay=False,
+        file_okay=True,
+    ),
+    scheme: str = typer.Option(
+        "prompt_holdout",
+        help=(
+            "Split scheme: stratified_text or prompt_holdout. "
+            "Prefer prompt_holdout for CV-first selection."
+        ),
+    ),
+    grid_path: Path | None = typer.Option(
+        None,
+        help=(
+            "Optional JSON file defining `training_params_grid` for the sweep. "
+            "If omitted, uses a small default grid focused on regularization."
+        ),
+    ),
+    max_runs: int | None = typer.Option(
+        None,
+        help=(
+            "Optional cap on the number of configurations to run (useful for a quick pilot sweep)."
+        ),
+        min=1,
+    ),
+    shuffle: bool = typer.Option(
+        False,
+        help="Shuffle sweep order (useful when running a capped pilot sweep).",
+    ),
+    shuffle_seed: int = typer.Option(
+        42,
+        help="Seed used when --shuffle is enabled.",
+    ),
+    config_path: Path | None = typer.Option(
+        None,
+        help="Path to JSON config overrides (used as the base config before applying grid params).",
+    ),
+    feature_set: FeatureSet = typer.Option(
+        FeatureSet.COMBINED,
+        help="Feature set to train (handcrafted, embeddings, combined).",
+    ),
+    training_mode: TrainingMode = typer.Option(
+        TrainingMode.REGRESSION,
+        help="Training mode for the XGBoost model. Sweeps should start with regression.",
+    ),
+    grade_band_weighting: GradeBandWeighting = typer.Option(
+        GradeBandWeighting.SQRT_INV_FREQ,
+        help=(
+            "Training-time grade-band weighting scheme (default uses Gate D best-current "
+            "sqrt_inv_freq)."
+        ),
+    ),
+    grade_band_weight_cap: float = typer.Option(
+        3.0,
+        help="Maximum per-sample weight when grade-band weighting is enabled.",
+        min=1.0,
+        max=10.0,
+    ),
+    prediction_mapping: PredictionMapping = typer.Option(
+        PredictionMapping.QWK_CUTPOINTS_LFO,
+        help=(
+            "Post-hoc mapping for CV metrics/residual diagnostics (default uses Gate D "
+            "best-current qwk_cutpoints_lfo)."
+        ),
+    ),
+    predictor_handcrafted_keep: list[str] | None = typer.Option(
+        None,
+        help=(
+            "Optional allowlist of handcrafted feature names to include in the predictor. "
+            "For feature_set=combined, embeddings are always kept; "
+            "this filters only handcrafted columns."
+        ),
+    ),
+    predictor_handcrafted_drop: list[str] | None = typer.Option(
+        None,
+        help=(
+            "Optional denylist of handcrafted feature names to drop from the predictor. "
+            "Cannot be used with --predictor-handcrafted-keep. "
+            "If omitted, defaults to the current 'drop-3' prune "
+            "(has_conclusion, clause_count, flesch_kincaid)."
+        ),
+    ),
+    ellipse_train_path: Path = typer.Option(
+        ...,
+        help="ELLIPSE train CSV path (prepared dataset).",
+        exists=True,
+        dir_okay=False,
+        file_okay=True,
+    ),
+    ellipse_test_path: Path = typer.Option(
+        ...,
+        help="ELLIPSE test CSV path (prepared dataset).",
+        exists=True,
+        dir_okay=False,
+        file_okay=True,
+    ),
+    reuse_cv_feature_store_dir: Path = typer.Option(
+        ...,
+        help="Reuse an existing CV feature store directory (or its parent run dir).",
+        exists=True,
+        dir_okay=True,
+        file_okay=False,
+    ),
+    run_name: str = typer.Option(
+        "ellipse_xgb_sweep_prompt_holdout_drop3_weighting_calibration",
+        help="Sweep run name suffix (a timestamp prefix is always added).",
+    ),
+) -> None:
+    """Run an XGBoost hyperparameter sweep using CV and feature-store reuse."""
+
+    if predictor_handcrafted_keep and predictor_handcrafted_drop:
+        raise typer.BadParameter(
+            "Cannot combine --predictor-handcrafted-keep with --predictor-handcrafted-drop."
+        )
+    if predictor_handcrafted_keep is None and predictor_handcrafted_drop is None:
+        predictor_handcrafted_drop = list(_DEFAULT_DROP3_HANDCRAFTED)
+
+    configure_console_logging()
+    config = _apply_overrides(
+        config=_load_config(config_path),
+        dataset_kind=DatasetKind.ELLIPSE,
+        dataset_path=None,
+        ellipse_train_path=ellipse_train_path,
+        ellipse_test_path=ellipse_test_path,
+        run_name=None,
+        backend=OffloadBackend.LOCAL,
+        offload_service_url=None,
+        offload_request_timeout_s=None,
+        embedding_service_url=None,
+        language_tool_service_url=None,
+    )
+    sweep_dir = run_xgb_hyperparameter_sweep(
+        base_config=config,
+        splits_path=splits_path,
+        scheme=scheme,  # type: ignore[arg-type]
+        reuse_cv_feature_store_dir=reuse_cv_feature_store_dir,
+        sweep_run_name=run_name,
+        param_grid=load_param_grid(grid_path),
+        feature_set=feature_set,
+        handcrafted_keep=predictor_handcrafted_keep,
+        handcrafted_drop=predictor_handcrafted_drop,
+        training_mode=training_mode,
+        grade_band_weighting=grade_band_weighting,
+        grade_band_weight_cap=grade_band_weight_cap,
+        prediction_mapping=prediction_mapping,
+        max_runs=max_runs,
+        shuffle=shuffle,
+        shuffle_seed=shuffle_seed,
+    )
+    typer.echo(f"Sweep complete: {sweep_dir}")
 
 
 @app.command("drop-column")
