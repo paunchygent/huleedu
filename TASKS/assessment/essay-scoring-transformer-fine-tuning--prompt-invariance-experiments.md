@@ -34,41 +34,62 @@ This is an escalation path if we hit a “representation ceiling”.
 
 ## Plan
 
-### A) Dependencies (decision-gated)
+### Gate G3 Execution Order (strict)
 
-If accepted in ADR-0031, add to `dependency-groups.ml-research`:
-- `datasets`, `accelerate`, `evaluate`, `torchmetrics`
-- optional: `peft` (LoRA-style parameter-efficient fine-tuning)
+- G3.1 baseline transformer fine-tune (LoRA, no invariance).
+- G3.2 prompt-invariance variant (same backbone/hparams; add adversarial prompt head + GRL).
+- G3.3 fallback variant (GroupDRO-style worst-prompt penalty) only if G3.2 is unstable or fails
+  to meet thresholds.
 
-### B) Minimal fine-tuning prototype (CV-first)
+### Canonical Inputs and Reference
 
-Scope: a smallest-possible prototype that still respects CV discipline.
+- Reuse frozen ELLIPSE train/test/splits and CV feature-store paths from handoff.
+- Reference comparator remains stable XGB config `b28c376a73`:
+  - prompt-holdout reference run dir:
+    `output/essay_scoring/20260206_105542_ellipse_optuna_pilot_prompt_holdout_drop3_wcal_20260206_115536/variants/20260206_110018_ellipse_optuna_pilot_prompt_holdout_drop3_wcal_20260206_115536_b28c376a73_trial005`
+  - stratified stability reference run dir:
+    `output/essay_scoring/20260206_175815_ellipse_optuna_stability_stratified_b28c376a73_20260206_185804`
 
-1) Dataset + splits
-   - Use the prepared ELLIPSE CSVs + existing `splits.json`.
-   - Train/eval under `scheme=prompt_holdout` with identical reporting artifacts (cv_metrics +
-     residual diagnostics).
-2) Model + objective
-   - Start with a single encoder model (DeBERTa-v3 or RoBERTa) with a regression head.
-   - Keep the score scale consistent with our half-band evaluation (no label remapping).
-3) Baselines
-   - Fine-tune without invariance constraints first (to establish a truthful baseline).
+### Mandatory Run Mechanics (no exceptions)
 
-### C) Add prompt-invariance constraints (core experiment)
+- Detached execution required (`/usr/bin/screen`) with driver log in `output/essay_scoring/`.
+- Hemma GPU is mandatory for all transformer fine-tuning runs in this task.
+- Hemma GPU profile requirements:
+  - mixed precision (`bf16` when supported, otherwise `fp16`),
+  - gradient checkpointing enabled,
+  - gradient accumulation tuned to an effective batch size in the `32-64` range.
+- Dynamic padding + length bucketing required.
+- Anti-truncation required: chunk long essays with overlap and pool to essay-level prediction.
+- Silent truncation-only runs are invalid for gate acceptance.
+- Non-Hemma transformer fine-tuning runs are invalid for gate acceptance.
 
-Implement and compare one of:
-- Adversarial prompt classifier (gradient reversal): optimize score prediction while making prompt
-  identity hard to predict from the representation.
-- A simpler group-robust objective: penalize worst-prompt loss (group DRO-like behavior).
+### Required Telemetry and Artifacts
 
-### D) Compute + run discipline
+- Existing CV artifacts must be emitted unchanged:
+  - `artifacts/cv_metrics.json`
+  - `reports/residual_diagnostics.md`
+  - `artifacts/residuals_cv_val_oof.csv` + `.jsonl`
+- Add transformer-specific run telemetry artifact:
+  - `artifacts/truncation_coverage.json` containing at least:
+    - `pct_essays_exceeding_max_length`
+    - `avg_tokens_truncated_before_chunking`
+    - `avg_chunks_per_essay`
+    - `p95_chunks_per_essay`
 
-- If GPU is needed, run on Hemma with detached execution and write driver logs to
-  `output/essay_scoring/<RUN>/` per runbook (`docs/operations/ml-nlp-runbook.md`).
-- Ensure reproducibility:
-  - fixed seeds,
-  - persisted configs/artifacts,
-  - no selection on locked test.
+### Gate Acceptance Thresholds (relative to b28c376a73)
+
+- Prompt-holdout primary (`min_prompt_n=30`, `bottom_k=5`):
+  - worst-prompt QWK delta `>= +0.010`
+  - mean QWK delta `>= -0.003`
+  - low-tail adjacent-accuracy delta `>= -0.010`
+  - high-tail adjacent-accuracy delta `>= -0.010`
+- Stratified stability:
+  - mean QWK delta `>= -0.005`
+
+### Decision Branch
+
+- If thresholds pass: continue transformer track with one constrained tuning round.
+- If thresholds fail: record “no justified uplift” and defer/close track with evidence links.
 
 ## Success Criteria
 
