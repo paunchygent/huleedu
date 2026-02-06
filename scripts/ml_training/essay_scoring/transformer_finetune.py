@@ -1153,6 +1153,9 @@ def _resolve_precision_runtime(
     if device.type != "cuda":
         return PrecisionRuntime(enabled=False, dtype=None, use_grad_scaler=False, label="none")
 
+    is_rocm_runtime = getattr(torch.version, "hip", None) is not None
+    fp16_use_grad_scaler = not is_rocm_runtime
+
     if mode == MixedPrecisionMode.NONE:
         return PrecisionRuntime(enabled=False, dtype=None, use_grad_scaler=False, label="none")
 
@@ -1168,7 +1171,7 @@ def _resolve_precision_runtime(
         return PrecisionRuntime(
             enabled=True,
             dtype=torch.float16,
-            use_grad_scaler=True,
+            use_grad_scaler=fp16_use_grad_scaler,
             label="fp16",
         )
 
@@ -1176,20 +1179,20 @@ def _resolve_precision_runtime(
         return PrecisionRuntime(
             enabled=True,
             dtype=torch.float16,
-            use_grad_scaler=True,
+            use_grad_scaler=fp16_use_grad_scaler,
             label="fp16",
         )
 
-    is_rocm_runtime = getattr(torch.version, "hip", None) is not None
     if torch.cuda.is_bf16_supported():
         if is_rocm_runtime:
             logger.warning(
-                "auto mixed precision on ROCm resolves to fp16 due observed bf16 instability."
+                "auto mixed precision on ROCm resolves to fp16 without grad scaling due observed "
+                "bf16/scaler instability."
             )
             return PrecisionRuntime(
                 enabled=True,
                 dtype=torch.float16,
-                use_grad_scaler=True,
+                use_grad_scaler=fp16_use_grad_scaler,
                 label="fp16",
             )
         return PrecisionRuntime(
@@ -1201,7 +1204,7 @@ def _resolve_precision_runtime(
     return PrecisionRuntime(
         enabled=True,
         dtype=torch.float16,
-        use_grad_scaler=True,
+        use_grad_scaler=fp16_use_grad_scaler,
         label="fp16",
     )
 
