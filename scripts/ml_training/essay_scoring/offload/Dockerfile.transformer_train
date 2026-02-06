@@ -29,14 +29,39 @@ RUN pip install --no-cache-dir pdm
 
 COPY pyproject.toml pdm.lock ./
 
-RUN pdm export -G ml-research -f requirements --without-hashes -o /tmp/requirements.txt && \
-    grep -Evi '^torch([<=>\\[].*)?$' /tmp/requirements.txt \
-      | grep -Evi '^torchvision([<=>\\[].*)?$' \
-      | grep -Ev '^nvidia[-_]' \
-      | grep -Ev '^cuda[-_]' \
-      | grep -Ev '^triton\\b' \
-      > /tmp/requirements.filtered.txt && \
-    python -m pip install --no-cache-dir -r /tmp/requirements.filtered.txt
+RUN pdm export -G ml-research -f requirements --without-hashes -o /tmp/requirements.txt
+
+RUN python - <<'PY'
+from pathlib import Path
+import re
+
+source_path = Path("/tmp/requirements.txt")
+target_path = Path("/tmp/requirements.filtered.txt")
+
+blocked_exact = {"torch", "torchvision", "triton"}
+blocked_prefixes = ("nvidia-", "cuda-")
+name_pattern = re.compile(r"^([A-Za-z0-9_.-]+)")
+
+filtered: list[str] = []
+for raw_line in source_path.read_text().splitlines():
+    line = raw_line.strip()
+    if not line or line.startswith("#"):
+        continue
+    requirement = line.split(";", 1)[0].strip()
+    match = name_pattern.match(requirement)
+    if not match:
+        continue
+    package_name = match.group(1).lower().replace("_", "-")
+    if package_name in blocked_exact:
+        continue
+    if any(package_name.startswith(prefix) for prefix in blocked_prefixes):
+        continue
+    filtered.append(line)
+
+target_path.write_text("\n".join(filtered) + "\n")
+PY
+
+RUN python -m pip install --no-cache-dir --no-deps -r /tmp/requirements.filtered.txt
 
 RUN python - <<'PY'
 import torch
