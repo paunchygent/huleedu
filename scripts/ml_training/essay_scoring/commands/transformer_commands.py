@@ -195,6 +195,10 @@ def register(app: typer.Typer) -> None:
             min=1,
             max=16,
         ),
+        require_gpu: bool = typer.Option(
+            True,
+            help="Fail fast when CUDA/HIP GPU is unavailable (required for Gate G3 runs).",
+        ),
     ) -> None:
         """Run CV-first transformer fine-tuning with Gate G3-ready artifacts."""
 
@@ -241,6 +245,7 @@ def register(app: typer.Typer) -> None:
                 random_seed=random_seed,
                 dataloader_num_workers=dataloader_num_workers,
                 dataloader_prefetch_factor=dataloader_prefetch_factor,
+                require_gpu=require_gpu,
             ),
         )
         typer.echo(f"Transformer CV complete: {summary.run_paths.run_dir}")

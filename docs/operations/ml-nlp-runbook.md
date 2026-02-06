@@ -2,7 +2,7 @@
 type: runbook
 service: global
 severity: medium
-last_reviewed: '2026-02-05'
+last_reviewed: '2026-02-06'
 ---
 # ML/NLP Research Runbook (Essay Scoring)
 
@@ -76,6 +76,47 @@ mkdir -p output/essay_scoring
      --skip-shap --skip-grade-scale-report --run-name \"${RUN_NAME}\" 2>&1 \
    | tee -a \"${LOG}\""
 tail -f "$LOG"
+```
+
+### Gate G3 transformer fine-tuning (Hemma GPU; local orchestrator)
+
+For Gate G3 runs, CPU fallback is invalid. Run transformer fine-tuning inside the dedicated Hemma
+GPU training service (`essay_transformer_train`) and keep local machine as the orchestrator.
+
+Start the training runtime on Hemma:
+```bash
+ssh hemma 'cd ~/apps/huleedu && sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.hemma.research.yml --profile research-transformer-train up -d --build essay_transformer_train'
+```
+
+GPU/CLI preflight:
+```bash
+ssh hemma 'cd ~/apps/huleedu && sudo docker exec huleedu_essay_transformer_train python - <<\"PY\"\nimport torch\nprint(torch.cuda.is_available(), getattr(torch.version, \"hip\", None))\nPY'
+ssh hemma 'cd ~/apps/huleedu && sudo docker exec huleedu_essay_transformer_train /bin/bash -lc \"cd /app && /opt/venv/bin/pdm run essay-scoring-research transformer-finetune --help >/dev/null\"'
+```
+
+Detached launch pattern (single SSH command, screen on Hemma):
+```bash
+ssh hemma /bin/bash -s <<'EOF'
+set -euo pipefail
+cd /home/paunchygent/apps/huleedu
+RUN_NAME=ellipse_gate_g3_1_transformer_lora_prompt_holdout_$(date +%Y%m%d_%H%M%S)
+LOG=output/essay_scoring/${RUN_NAME}.driver.log
+mkdir -p output/essay_scoring
+/usr/bin/screen -S "${RUN_NAME}" -dm /bin/bash -lc '
+  sudo docker exec huleedu_essay_transformer_train /bin/bash -lc "
+    cd /app &&
+    /opt/venv/bin/pdm run essay-scoring-research transformer-finetune \
+      --scheme prompt_holdout \
+      --splits-path output/essay_scoring/20260204_135554_ellipse_splits_200_1000/artifacts/splits.json \
+      --ellipse-train-path output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_train_prepared.csv \
+      --ellipse-test-path output/essay_scoring/20260204_135541_ellipse_prep_200_1000/artifacts/datasets/ellipse_test_prepared.csv \
+      --reuse-cv-feature-store-dir output/essay_scoring/20260204_144831_ellipse_cv_combined_prompt_holdout_20260204_150321/cv_feature_store \
+      --require-gpu \
+      --run-name ${RUN_NAME}
+  " 2>&1 | tee -a "${LOG}"'
+echo "$RUN_NAME"
+echo "$LOG"
+EOF
 ```
 
 Persistent tunnel setup lives in:

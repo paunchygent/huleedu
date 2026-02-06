@@ -15,11 +15,14 @@ from __future__ import annotations
 import pytest
 import torch
 
+from scripts.ml_training.essay_scoring.dataset import EssayRecord
 from scripts.ml_training.essay_scoring.transformer_finetune import (
     ChunkedEssay,
     MixedPrecisionMode,
     TransformerFinetuneConfig,
     _build_bucketed_batch_indices,
+    _chunk_records,
+    _enforce_gpu_requirement,
     _resolve_precision_runtime,
     _validate_finetune_config,
     build_chunk_spans,
@@ -126,6 +129,62 @@ def test_compute_truncation_coverage_reports_expected_fields() -> None:
     assert coverage["chunk_overlap_tokens"] == 2
 
 
+class _TokenizerWithoutBuildInputs:
+    """Minimal tokenizer stub exposing only methods used by `_chunk_records`."""
+
+    def __init__(self) -> None:
+        self._special = {"cls": 101, "sep": 102}
+
+    def encode(
+        self,
+        text: str,
+        *,
+        add_special_tokens: bool,
+        truncation: bool,
+    ) -> list[int]:
+        assert add_special_tokens is False
+        assert truncation is False
+        return [ord(char) % 50 + 10 for char in text]
+
+    def prepare_for_model(
+        self,
+        token_ids: list[int],
+        *,
+        add_special_tokens: bool,
+        truncation: bool,
+        return_attention_mask: bool,
+        return_token_type_ids: bool,
+    ) -> dict[str, list[int]]:
+        assert add_special_tokens is True
+        assert truncation is False
+        assert return_attention_mask is False
+        assert return_token_type_ids is False
+        return {"input_ids": [self._special["cls"], *token_ids, self._special["sep"]]}
+
+
+def test_chunk_records_uses_prepare_for_model_for_special_tokens() -> None:
+    record = EssayRecord(
+        record_id="r1",
+        task_type="task2",
+        question="prompt-a",
+        essay="abcdefghij",
+        overall=5.0,
+        component_scores={},
+    )
+    tokenizer = _TokenizerWithoutBuildInputs()
+    chunked = _chunk_records(
+        records=[record],
+        tokenizer=tokenizer,
+        max_length=6,
+        chunk_overlap_tokens=1,
+    )
+
+    essay = chunked["r1"]
+    assert essay.token_count == 10
+    assert len(essay.chunk_input_ids) > 1
+    assert all(chunk[0] == 101 and chunk[-1] == 102 for chunk in essay.chunk_input_ids)
+
+
 def test_validate_finetune_config_accepts_valid_defaults() -> None:
     _validate_finetune_config(_base_finetune_config())
 
@@ -194,3 +253,12 @@ def test_resolve_precision_runtime_falls_back_to_fp16_when_bf16_unsupported(
     assert runtime.dtype == torch.float16
     assert runtime.use_grad_scaler is True
     assert runtime.label == "fp16"
+
+
+def test_enforce_gpu_requirement_raises_on_non_cuda_device() -> None:
+    with pytest.raises(RuntimeError, match="GPU is required"):
+        _enforce_gpu_requirement(device=torch.device("cpu"), require_gpu=True)
+
+
+def test_enforce_gpu_requirement_allows_optional_gpu() -> None:
+    _enforce_gpu_requirement(device=torch.device("cpu"), require_gpu=False)

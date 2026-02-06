@@ -2,7 +2,7 @@
 id: "codex-skill-essay-scoring-research"
 type: "skill"
 created: "2026-02-04"
-last_updated: "2026-02-04"
+last_updated: "2026-02-06"
 scope: "repo"
 ---
 # Codex Skill: Essay Scoring Research (ML)
@@ -25,6 +25,10 @@ Canonical reference: `docs/operations/ml-nlp-runbook.md`.
 - Monitor progress by script via `output/essay_scoring/<RUN>/progress.json` (not log parsing).
 - CV runs MUST produce residual diagnostics (`reports/residual_diagnostics.md`) plus per-record rows
   under `artifacts/residuals_*.{csv,jsonl}` (Gate C).
+- Gate G3 transformer runs MUST require GPU (`--require-gpu`) and are invalid if runtime resolves
+  to CPU.
+- On Hemma, transformer fine-tuning must run in the dedicated
+  `essay_transformer_train` container profile, not via host `pdm run`.
 
 ## ELLIPSE CV-first: canonical inputs
 
@@ -80,3 +84,31 @@ Note: `--predictor-handcrafted-keep <feature_name>` also exists for “strong ke
 Selection artifacts:
 - `output/essay_scoring/<RUN>/artifacts/predictor_feature_selection.json`
 - `output/essay_scoring/<RUN>/reports/cv_report.md` includes predictor selection summary
+
+## Transformer Gate G3 launcher (Hemma GPU)
+
+Start the Hemma training runtime:
+```bash
+ssh hemma 'cd ~/apps/huleedu && sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.hemma.research.yml --profile research-transformer-train up -d --build essay_transformer_train'
+```
+
+Run the transformer command in detached mode through Hemma `screen`:
+```bash
+ssh hemma /bin/bash -s <<'EOF'
+set -euo pipefail
+cd /home/paunchygent/apps/huleedu
+RUN_NAME=ellipse_gate_g3_1_transformer_lora_prompt_holdout_$(date +%Y%m%d_%H%M%S)
+LOG=output/essay_scoring/${RUN_NAME}.driver.log
+mkdir -p output/essay_scoring
+/usr/bin/screen -S "${RUN_NAME}" -dm /bin/bash -lc '
+  sudo docker exec huleedu_essay_transformer_train /bin/bash -lc "
+    cd /app &&
+    /opt/venv/bin/pdm run essay-scoring-research transformer-finetune \
+      --scheme prompt_holdout \
+      --require-gpu \
+      --run-name ${RUN_NAME}
+  " 2>&1 | tee -a "${LOG}"'
+echo "$RUN_NAME"
+echo "$LOG"
+EOF
+```

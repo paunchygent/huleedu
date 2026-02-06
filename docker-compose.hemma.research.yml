@@ -67,3 +67,35 @@ services:
       - video
     ipc: host
     shm_size: "8g"
+
+  # Research-only GPU runtime for transformer fine-tuning (Gate G3).
+  # This service is intentionally separate from `essay_embed_offload` so training
+  # dependencies and execution lifecycle do not affect the API offload surface.
+  essay_transformer_train:
+    profiles:
+      - research-transformer-train
+    build:
+      context: .
+      dockerfile: scripts/ml_training/essay_scoring/offload/Dockerfile.transformer_train
+      args:
+        BASE_IMAGE: ${HULEEDU_TRANSFORMER_TRAIN_BASE_IMAGE:-rocm/pytorch:latest}
+    image: ${HULEEDU_TRANSFORMER_TRAIN_IMAGE_TAG:-huleedu-transformer-train:dev}
+    container_name: huleedu_essay_transformer_train
+    restart: unless-stopped
+    networks:
+      - huleedu_internal_network
+    working_dir: /app
+    environment:
+      - HF_TOKEN=${HF_TOKEN:-}
+      - HF_HOME=/cache/huggingface
+      - TRANSFORMERS_CACHE=/cache/huggingface
+    volumes:
+      - .:/app
+      - ${HULEEDU_HEMMA_HF_CACHE_PATH:-/srv/scratch/huleedu/cache/huggingface}:/cache/huggingface
+    devices:
+      - /dev/kfd
+      - /dev/dri
+    group_add:
+      - video
+    ipc: host
+    shm_size: "8g"

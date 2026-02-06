@@ -86,11 +86,16 @@ Latest verification snapshot (2026-02-06):
 - `scripts/ml_training/essay_scoring/transformer_finetune.py` reviewed against current
   `/huggingface/transformers` and `/pytorch/pytorch` guidance.
 - AMP usage modernized (`torch.amp.GradScaler`, `torch.amp.autocast`).
-- Deterministic helper tests added:
-  `scripts/ml_training/essay_scoring/tests/test_transformer_finetune.py`.
+- G3 hardening landed:
+  - tokenizer-agnostic chunk special-token wrapping via `prepare_for_model(...)`,
+  - `require_gpu` runtime guard for transformer fine-tuning,
+  - length-bucketing in dataloaders.
+- Hemma GPU execution is standardized on compose profile
+  `research-transformer-train` (`huleedu_essay_transformer_train`).
 - Validation gate run from repo root (via `./scripts/dev-shell.sh`) is green:
   `pdm run format-all`, `pdm run lint-fix --unsafe-fixes`, `pdm run typecheck-all`,
-  `pdm run pytest-root scripts/ml_training/essay_scoring/tests -q` (`46 passed`).
+  `pdm run pytest-root scripts/ml_training/essay_scoring/tests/test_transformer_finetune.py -q`
+  (`18 passed`).
 
 ### Hemma Offload (single tunnel)
 

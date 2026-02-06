@@ -91,6 +91,21 @@ This is an escalation path if we hit a “representation ceiling”.
 - If thresholds pass: continue transformer track with one constrained tuning round.
 - If thresholds fail: record “no justified uplift” and defer/close track with evidence links.
 
+## Frozen Invalid Attempts (Do Not Use for Gate Evidence)
+
+1. CLI boolean contract error (invalid launch):
+   - driver log:
+     `output/essay_scoring/ellipse_gate_g3_1_transformer_lora_prompt_holdout_20260206_214141.driver.log`
+   - failure: passed positional `true true` values to Typer boolean flags.
+2. CPU runtime + tokenizer compatibility crash (invalid launch):
+   - driver log:
+     `output/essay_scoring/ellipse_gate_g3_1_transformer_lora_prompt_holdout_20260206_214215.driver.log`
+   - run dir:
+     `output/essay_scoring/20260206_214222_ellipse_gate_g3_1_transformer_lora_prompt_holdout_20260206_214215`
+   - failures:
+     - runtime resolved to `device=cpu` (out-of-contract for G3),
+     - tokenizer method mismatch (`DebertaV2Tokenizer` missing `build_inputs_with_special_tokens`).
+
 ## Success Criteria
 
 - We have a minimal fine-tuning baseline with prompt-holdout CV metrics and residual diagnostics.

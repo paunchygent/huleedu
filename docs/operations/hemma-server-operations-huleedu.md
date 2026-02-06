@@ -87,6 +87,12 @@ Offload metrics (GPU + request latency, Prometheus text format):
 ssh hemma 'curl -fsS http://127.0.0.1:9000/metrics | head'
 ```
 
+Transformer training runtime (Gate G3) status:
+```bash
+ssh hemma 'sudo docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" | rg huleedu_essay_transformer_train'
+ssh hemma 'sudo docker exec huleedu_essay_transformer_train python - <<\"PY\"\nimport torch\nprint(torch.cuda.is_available(), getattr(torch.version, \"hip\", None))\nPY'
+```
+
 Current implementation note:
 - The research offload server supports:
   - `POST /v1/extract` (zip bundle: embeddings + handcrafted features)
@@ -192,6 +198,11 @@ Note:
 Enable the embedding offload container (profile-gated):
 ```bash
 ssh hemma 'cd ~/apps/huleedu && sudo docker compose -f docker-compose.hemma.yml -f docker-compose.prod.yml -f docker-compose.hemma.research.yml --profile research-offload up -d --build essay_embed_offload'
+```
+
+Enable the transformer fine-tuning runtime (profile-gated):
+```bash
+ssh hemma 'cd ~/apps/huleedu && sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.hemma.research.yml --profile research-transformer-train up -d --build essay_transformer_train'
 ```
 
 ### Restart a specific service

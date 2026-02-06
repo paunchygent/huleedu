@@ -1,0 +1,48 @@
+# Research-scoped transformer fine-tuning runtime for Hemma GPU execution.
+#
+# Intent:
+# - Keep G3 transformer fine-tuning isolated from the offload API container.
+# - Use ROCm torch from the base image as the authoritative GPU runtime.
+# - Install only default + `ml-research` Python deps needed for training CLI.
+# - Exclude pip-installed torch/cuda packages to avoid overriding ROCm torch.
+ARG BASE_IMAGE=rocm/pytorch:latest
+FROM ${BASE_IMAGE} AS runtime
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PDM_USE_VENV=false \
+    PDM_IGNORE_ACTIVE_VENV=1 \
+    PROJECT_ROOT=/app \
+    PYTHONPATH=/app \
+    HF_HOME=/cache/huggingface \
+    TRANSFORMERS_CACHE=/cache/huggingface
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    build-essential \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir pdm
+
+COPY pyproject.toml pdm.lock ./
+
+RUN pdm export -G ml-research -f requirements --without-hashes -o /tmp/requirements.txt && \
+    grep -Evi '^torch([<=>\\[].*)?$' /tmp/requirements.txt \
+      | grep -Evi '^torchvision([<=>\\[].*)?$' \
+      | grep -Ev '^nvidia[-_]' \
+      | grep -Ev '^cuda[-_]' \
+      | grep -Ev '^triton\\b' \
+      > /tmp/requirements.filtered.txt && \
+    python -m pip install --no-cache-dir -r /tmp/requirements.filtered.txt
+
+RUN python - <<'PY'
+import torch
+print("torch", torch.__version__)
+print("hip", getattr(torch.version, "hip", None))
+print("cuda_is_available", torch.cuda.is_available())
+PY
+
+CMD ["sleep", "infinity"]

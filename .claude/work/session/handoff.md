@@ -65,6 +65,9 @@ Strict execution order:
 Mandatory mechanics:
 - Run detached via `/usr/bin/screen` and persist driver log under `output/essay_scoring/`.
 - Transformer fine-tuning must run on Hemma GPU; local fine-tuning runs are out-of-contract.
+- Use Hemma training runtime container `huleedu_essay_transformer_train`
+  (compose profile `research-transformer-train`) for G3 execution.
+- Do not use host `pdm run` on Hemma for transformer G3 runs.
 - Use dynamic padding + length bucketing.
 - Use anti-truncation chunking with overlap and essay-level pooling.
 - Truncation-only runs are invalid for gate acceptance.
@@ -98,6 +101,15 @@ Required artifacts and decision outputs:
 
 Historical Optuna/CatBoost execution detail is retained in task/ADR/research artifacts and is not
 duplicated in this handoff.
+
+### Frozen invalid G3.1 attempts (excluded from evidence)
+
+- `output/essay_scoring/ellipse_gate_g3_1_transformer_lora_prompt_holdout_20260206_214141.driver.log`
+  - invalid due to Typer boolean invocation contract (`true true` extra args).
+- `output/essay_scoring/ellipse_gate_g3_1_transformer_lora_prompt_holdout_20260206_214215.driver.log`
+  and run dir
+  `output/essay_scoring/20260206_214222_ellipse_gate_g3_1_transformer_lora_prompt_holdout_20260206_214215`
+  - invalid due to CPU runtime and tokenizer compatibility crash.
 
 ## Recently Completed (Compressed)
 

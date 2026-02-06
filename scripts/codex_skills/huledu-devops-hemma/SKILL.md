@@ -36,6 +36,10 @@ ssh hemma -L 19000:127.0.0.1:9000 -N
 curl -fsS http://127.0.0.1:19000/healthz
 ```
 
+Transformer fine-tuning note:
+- Gate G3 training must run in the dedicated container `huleedu_essay_transformer_train`
+  (compose profile `research-transformer-train`), not from host Python.
+
 ## Long-running research runs (Mac)
 
 If a run “stops without errors” and Hemma containers are idle, the most common cause is the Mac-side
@@ -137,6 +141,17 @@ ssh hemma 'cd ~/apps/huleedu && sudo docker compose -f docker-compose.hemma.yml 
 Embedding offload deploy (ROCm/HIP, localhost-only, compose profile):
 ```bash
 ssh hemma 'cd ~/apps/huleedu && sudo docker compose -f docker-compose.hemma.yml -f docker-compose.prod.yml -f docker-compose.hemma.research.yml --profile research-offload up -d --build essay_embed_offload'
+```
+
+Transformer training runtime deploy (ROCm/HIP, profile-gated):
+```bash
+ssh hemma 'cd ~/apps/huleedu && sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.hemma.research.yml --profile research-transformer-train up -d --build essay_transformer_train'
+```
+
+Training runtime preflight:
+```bash
+ssh hemma 'sudo docker exec huleedu_essay_transformer_train python - <<\"PY\"\nimport torch\nprint(torch.cuda.is_available(), getattr(torch.version, \"hip\", None))\nPY'
+ssh hemma 'sudo docker exec huleedu_essay_transformer_train /bin/bash -lc \"cd /app && /opt/venv/bin/pdm run essay-scoring-research transformer-finetune --help >/dev/null\"'
 ```
 
 Embedding offload deploy (script alternative; handles docker-snap mount workarounds):

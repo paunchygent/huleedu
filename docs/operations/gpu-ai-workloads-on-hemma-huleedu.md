@@ -83,6 +83,11 @@ For the DeBERTa + spaCy feature offload service, ensure:
 - the container runs with ROCm-visible devices and permissions
 - `OFFLOAD_TORCH_DEVICE` is set appropriately (often `cuda` on ROCm-enabled torch builds)
 
+For transformer fine-tuning (Gate G3), use the dedicated compose service
+`essay_transformer_train` (profile `research-transformer-train`) instead of host `pdm run`.
+The host Python runtime may report `torch.cuda.is_available() == False` even when the ROCm
+container has GPU access.
+
 Recommended base image (Hemma, AMD ROCm):
 - `rocm/pytorch:latest`
 

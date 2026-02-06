@@ -185,6 +185,7 @@ class TransformerFinetuneConfig:
     random_seed: int
     dataloader_num_workers: int
     dataloader_prefetch_factor: int
+    require_gpu: bool = False
     use_length_bucketing: bool = True
     bucket_size_multiplier: int = 20
 
@@ -318,9 +319,18 @@ def run_transformer_finetune_cv(
         progress = ProgressWriter(run_paths.run_dir)
         _seed_everything(finetune_config.random_seed)
         device = _resolve_device()
+        _enforce_gpu_requirement(device=device, require_gpu=finetune_config.require_gpu)
         precision = _resolve_precision_runtime(
             mode=finetune_config.mixed_precision,
             device=device,
+        )
+        progress.update(
+            substage="transformer_cv.bootstrap",
+            processed=0,
+            total=1,
+            unit="stage",
+            details={"device": device.type, "precision": precision.label},
+            force=True,
         )
 
         logger.info(
@@ -1028,7 +1038,14 @@ def _chunk_records(
         chunks: list[list[int]] = []
         for start, end in spans:
             content = token_ids[start:end]
-            with_specials = tokenizer.build_inputs_with_special_tokens(content)
+            encoded = tokenizer.prepare_for_model(
+                content,
+                add_special_tokens=True,
+                truncation=False,
+                return_attention_mask=False,
+                return_token_type_ids=False,
+            )
+            with_specials = list(encoded["input_ids"])
             chunks.append(with_specials)
         chunked[record.record_id] = ChunkedEssay(
             record_id=record.record_id,
@@ -1166,6 +1183,16 @@ def _resolve_precision_runtime(
         use_grad_scaler=True,
         label="fp16",
     )
+
+
+def _enforce_gpu_requirement(*, device: torch.device, require_gpu: bool) -> None:
+    """Fail fast when a research run requires GPU but runtime resolved to CPU/MPS."""
+
+    if require_gpu and device.type != "cuda":
+        raise RuntimeError(
+            "GPU is required for this transformer fine-tuning run, but runtime resolved "
+            f"to '{device.type}'."
+        )
 
 
 def _seed_everything(seed: int) -> None:
