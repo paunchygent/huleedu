@@ -18,8 +18,8 @@ These are the sources of truth for documentation and TASKS:
 
 - `.claude/rules/090-documentation-standards.md`
   - Canonical rule for documentation location, structure, content, maintenance, and review.
-- `documentation/DOCS_STRUCTURE_SPEC.md`
-  - Defines allowed top-level directories under `documentation/` and their semantics.
+- `docs/DOCS_STRUCTURE_SPEC.md`
+  - Defines allowed top-level directories under `docs/` and their semantics.
   - Specifies file/directory naming rules and frontmatter for runbooks/decisions.
 - **TASKS structure specification** (referenced from 090)
   - Defines `TASKS/` taxonomy, task frontmatter schema, filename rules, and enforcement.
@@ -50,11 +50,11 @@ As this skill, always align recommendations with these specs.
    - Runbooks (type, service, severity, last_reviewed).
    - Decision records (type, id, status, created, last_updated).
 5. Recommend running:
-   - `python scripts/docs_mgmt/validate_docs_structure.py` (and `--strict` for CI-equivalent checks).
+   - `pdm run validate-docs`.
 
 ### 2. Adding a New Runbook
 
-- Location: `documentation/operations/`.
+- Location: `docs/operations/`.
 - Naming: `kebab-case`, e.g. `llm-provider-queue-debugging.md`.
 - Frontmatter template:
 
@@ -70,12 +70,12 @@ last_reviewed: YYYY-MM-DD
 - After creation or edits, suggest:
 
 ```bash
-python scripts/docs_mgmt/validate_docs_structure.py --strict
+pdm run validate-docs
 ```
 
 ### 3. Adding an ADR
 
-- Location: `documentation/decisions/`.
+- Location: `docs/decisions/`.
 - Filename pattern: `NNNN-short-descriptor.md` (e.g. `0005-llm-batching-architecture.md`).
 - Frontmatter template:
 
@@ -106,7 +106,7 @@ Recommended steps:
 2. Use the task management script to scaffold a new task:
 
 ```bash
-python scripts/task_mgmt/new_task.py --domain assessment --title "LLM batching configuration wiring"
+pdm run new-task --domain assessment --title "LLM batching configuration wiring"
 ```
 
 3. Ensure frontmatter matches the canonical schema (id, title, status, priority, domain, service, owner_team, owner, program, created, last_updated, related, labels).
@@ -117,8 +117,8 @@ python scripts/task_mgmt/new_task.py --domain assessment --title "LLM batching c
 Use the validation and indexing scripts regularly:
 
 ```bash
-python scripts/task_mgmt/validate_front_matter.py
-python scripts/task_mgmt/index_tasks.py
+pdm run validate-tasks
+pdm run index-tasks
 ```
 
 - `validate_front_matter.py` ensures all tasks conform to the schema and enums.
@@ -144,7 +144,7 @@ Key scripts to reference and propose:
 
 - **Docs management** (`scripts/docs_mgmt/`):
   - `validate_docs_structure.py`
-    - Validates `documentation/` against `DOCS_STRUCTURE_SPEC.md`.
+    - Validates `docs/` against `DOCS_STRUCTURE_SPEC.md`.
     - Supports `--root`, `--verbose`, `--strict`.
   - `migrate_docs_structure.py`
     - Assists with reorganizing existing docs into the canonical structure.
@@ -162,7 +162,7 @@ As this skill, you do not execute these scripts directly, but you **suggest exac
 
 ## Best Practices
 
-1. **Always classify first**: Decide if a change belongs to project docs (`documentation/`), tasks (`TASKS/`), service README, or rules.
+1. **Always classify first**: Decide if a change belongs to project docs (`docs/`), tasks (`TASKS/`), service README, or rules.
 2. **Respect normative specs**: Never improvise a new directory or naming scheme without updating the specs and rule 090.
 3. **Prefer linking over duplication**: For standards and rules, link to `.claude/rules/` / `.windsurf/rules/` instead of copying content.
 4. **Keep docs terse and technical**: High information density, minimal narrative.

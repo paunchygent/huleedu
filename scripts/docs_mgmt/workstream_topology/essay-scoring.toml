@@ -1,0 +1,26 @@
+[workstream]
+id = "essay-scoring"
+title = "Essay scoring research"
+hub = "docs/reference/ref-essay-scoring-research-hub.md"
+
+[canonical]
+runbook = "docs/operations/ml-nlp-runbook.md"
+epic = "docs/product/epics/ml-essay-scoring-pipeline.md"
+decision = "docs/decisions/0031-essay-scoring-experiment-optimization-dependencies-optuna-hf-training-baselines.md"
+gate_task = "TASKS/assessment/essay-scoring-decision-gate-for-experiment-optimization-dependencies.md"
+research = "docs/research/research-essay-scoring-dependency-decision-research-optuna-hf-fine-tuning-baselines.md"
+
+[links]
+active_tasks = [
+  "TASKS/assessment/essay-scoring-optuna-hyperparameter-optimization-cv-selected.md",
+  "TASKS/assessment/essay-scoring-transformer-fine-tuning--prompt-invariance-experiments.md",
+  "TASKS/assessment/essay-scoring-statsmodels-diagnostics--catboost-baseline.md",
+]
+review_records = [
+  "docs/product/reviews/review-transformer-fine-tuning-prompt-invariance-dependencies.md",
+  "docs/product/reviews/review-statsmodels-diagnostics-catboost-baseline-dependencies.md",
+]
+evidence_roots = [
+  "output/essay_scoring",
+  ".claude/work/reports/essay-scoring",
+]

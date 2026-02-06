@@ -80,8 +80,12 @@ The decision must be documented in `ADR-0031` and integrated into the CV-first s
 
 ## Related
 
+- Hub: `docs/reference/ref-essay-scoring-research-hub.md`
 - ADR: `docs/decisions/0031-essay-scoring-experiment-optimization-dependencies-optuna-hf-training-baselines.md`
 - Research: `docs/research/research-essay-scoring-dependency-decision-research-optuna-hf-fine-tuning-baselines.md`
+- Review records:
+  - `docs/product/reviews/review-transformer-fine-tuning-prompt-invariance-dependencies.md`
+  - `docs/product/reviews/review-statsmodels-diagnostics-catboost-baseline-dependencies.md`
 - Tasks:
   - `TASKS/assessment/essay-scoring-optuna-hyperparameter-optimization-cv-selected.md`
   - `TASKS/assessment/essay-scoring-transformer-fine-tuning--prompt-invariance-experiments.md`

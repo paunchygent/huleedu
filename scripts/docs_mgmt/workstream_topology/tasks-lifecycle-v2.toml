@@ -1,0 +1,23 @@
+[workstream]
+id = "tasks-lifecycle-v2"
+title = "TASKS lifecycle v2 governance"
+hub = "docs/reference/ref-tasks-lifecycle-v2.md"
+
+[canonical]
+runbook = "docs/reference/ref-tasks-overview.md"
+epic = "docs/product/epics/dev-tooling-script-consolidation-epic.md"
+decision = "docs/decisions/0027-tasks-lifecycle-v2-story-review-gate-done-status-research-docs.md"
+gate_task = "TASKS/architecture/align-tasks-and-docs-lifecycle-v2.md"
+research = "docs/research/research-tasks-lifecycle-v2-governance-and-topology-notes.md"
+
+[links]
+active_tasks = [
+  "TASKS/architecture/align-tasks-and-docs-lifecycle-v2.md",
+]
+review_records = [
+  "docs/product/reviews/review-example-story-approval.md",
+]
+evidence_roots = [
+  "TASKS",
+  "docs/product/reviews",
+]

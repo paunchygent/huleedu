@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Migrate documentation/ to spec-compliant structure.
+Migrate docs/ to a spec-compliant structure.
 
 Reorganizes directory structure, fixes file naming violations, and optionally
-adds frontmatter to runbooks and decisions per documentation/DOCS_STRUCTURE_SPEC.md.
+adds frontmatter to runbooks and decisions per docs/DOCS_STRUCTURE_SPEC.md.
 
 No external dependencies required.
 """
@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Dict, List, Tuple
 
 ROOT = Path(__file__).resolve().parents[2]
-DOCS_DIR = ROOT / "documentation"
+DOCS_DIR = ROOT / "docs"
 
 # Directory migration mappings based on audit findings
 # Order matters: process archives first, then simple renames, then merges
@@ -356,7 +356,7 @@ def main(argv: list[str]) -> int:
     Returns:
         Exit code (0=success, 2=usage error)
     """
-    ap = argparse.ArgumentParser(description="Migrate documentation/ to spec-compliant structure")
+    ap = argparse.ArgumentParser(description="Migrate docs/ to spec-compliant structure")
     ap.add_argument("--root", default=str(DOCS_DIR), help="Docs root directory")
     ap.add_argument("--dry-run", action="store_true", help="Show changes without applying")
     ap.add_argument("--backup", action="store_true", help="Create backup before migration")

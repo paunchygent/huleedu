@@ -23,7 +23,7 @@ from typing import Any, Dict, Tuple
 ROOT = Path(__file__).resolve().parents[2]
 DOCS_DIR = ROOT / "docs"
 
-# Top-level directories allowed under documentation/ (§3)
+# Top-level directories allowed under docs/ (§3)
 ALLOWED_TOP_LEVEL_DIRS = {
     "overview",
     "architecture",

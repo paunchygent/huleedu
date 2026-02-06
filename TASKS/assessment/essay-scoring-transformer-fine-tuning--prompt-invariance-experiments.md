@@ -78,6 +78,9 @@ Implement and compare one of:
 
 ## Related
 
+- Hub: `docs/reference/ref-essay-scoring-research-hub.md`
 - ADR: `docs/decisions/0031-essay-scoring-experiment-optimization-dependencies-optuna-hf-training-baselines.md`
 - Decision gate:
   `TASKS/assessment/essay-scoring-decision-gate-for-experiment-optimization-dependencies.md`
+- Review record:
+  `docs/product/reviews/review-transformer-fine-tuning-prompt-invariance-dependencies.md`

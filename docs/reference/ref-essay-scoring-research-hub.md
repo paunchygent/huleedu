@@ -22,6 +22,28 @@ Use it to:
 - find “what we’re improving now” (story/task hubs)
 - avoid making decisions without the required evidence (CV, ablations, diagnostics)
 
+<!-- BEGIN:workstream-topology:essay-scoring -->
+## Topology Contract (Generated)
+
+- Manifest: `scripts/docs_mgmt/workstream_topology/essay-scoring.toml`
+- Canonical chain:
+  - Runbook: `docs/operations/ml-nlp-runbook.md`
+  - Epic: `docs/product/epics/ml-essay-scoring-pipeline.md`
+  - Decision: `docs/decisions/0031-essay-scoring-experiment-optimization-dependencies-optuna-hf-training-baselines.md`
+  - Decision gate task: `TASKS/assessment/essay-scoring-decision-gate-for-experiment-optimization-dependencies.md`
+  - Research: `docs/research/research-essay-scoring-dependency-decision-research-optuna-hf-fine-tuning-baselines.md`
+- Active tracks:
+  - `TASKS/assessment/essay-scoring-optuna-hyperparameter-optimization-cv-selected.md`
+  - `TASKS/assessment/essay-scoring-transformer-fine-tuning--prompt-invariance-experiments.md`
+  - `TASKS/assessment/essay-scoring-statsmodels-diagnostics--catboost-baseline.md`
+- Review records:
+  - `docs/product/reviews/review-transformer-fine-tuning-prompt-invariance-dependencies.md`
+  - `docs/product/reviews/review-statsmodels-diagnostics-catboost-baseline-dependencies.md`
+- Evidence roots:
+  - `output/essay_scoring`
+  - `.claude/work/reports/essay-scoring`
+<!-- END:workstream-topology:essay-scoring -->
+
 ## Start Here (Navigation)
 
 1) **How to run experiments (canonical)**:

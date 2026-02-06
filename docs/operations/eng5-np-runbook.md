@@ -359,7 +359,7 @@ labels in logs and reports.
 - **Metrics**:
   - `huleedu_cj_prompt_fetch_failures_total` (CJ service) – must stay flat.
   - `llm_requests_total{status="queued"}` (LLM provider) – confirms enqueue volume.
-- **Grafana dashboards**: review sections 51–62 in `documentation/OPERATIONS/01-Grafana-Playbook.md`
+- **Grafana dashboards**: review sections 51–62 in `docs/operations/01-grafana-playbook.md`
   for ENG5 prompt hydration and CJ runner monitoring panels.
 - **Runner summary**: after completion the CLI prints provider/model token and cost totals plus
   whether partial data occurred.

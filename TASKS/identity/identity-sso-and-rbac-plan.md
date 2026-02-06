@@ -63,7 +63,7 @@ Work Packages
 
 5) Tests + Docs
    - Add tests: `services/identity_service/tests/*`, `services/api_gateway_service/tests/test_auth.py` (expand)
-   - Docs: Identity README (flows), Gateway README (guards), update `documentation/`.
+   - Docs: Identity README (flows), Gateway README (guards), update `docs/`.
 
 Dependencies
 

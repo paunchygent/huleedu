@@ -1,10 +1,10 @@
 # TASKS Index
 
-Generated: 2026-02-06T07:31:41
+Generated: 2026-02-06T10:23:12
 
 ## Summary
 
-- Total tasks indexed: 178
+- Total tasks indexed: 180
 - assessment: 94
 - content: 2
 - identity: 4
@@ -12,7 +12,7 @@ Generated: 2026-02-06T07:31:41
 - infrastructure: 29
 - security: 1
 - integrations: 14
-- architecture: 11
+- architecture: 13
 - other: 21 (integration, programs)
 
 ## By Domain
@@ -177,12 +177,14 @@ Generated: 2026-02-06T07:31:41
 - [TASKS Directory Inventory Analysis](TASKS/integrations/task-inventory-analysis.md) — `proposed`
 - [✅ COMPLETED (2025-11-12)](TASKS/integrations/cj-prompt-context-persistence-plan.md) — `proposed`
 
-### architecture (11)
+### architecture (13)
 - [90-Day Execution Roadmap (Alpha ➜ Beta)](TASKS/architecture/roadmap-90-day-execution.md) — `proposed`
+- [add strict workstream-topology-scaffold command](TASKS/architecture/add-strict-workstream-topology-scaffold-command.md) — `done`
 - [Align TASKS and docs lifecycle v2](TASKS/architecture/align-tasks-and-docs-lifecycle-v2.md) — `done`
 - [Backend-For-Frontend (BFF) Pattern — Adoption & Rollout Plan](TASKS/architecture/bff-pattern-adoption-and-rollout-plan.md) — `proposed`
 - [Cj Lps Contracts Refactor Analysis](TASKS/architecture/cj-lps-contracts-refactor-analysis.md) — `archived`
 - [CJ LPS reasoning-verbosity metadata contract](TASKS/architecture/cj-lps-reasoning-verbosity-metadata-contract.md) — `done`
+- [codify workstream topology manifests and validation for docs navigation](TASKS/architecture/codify-workstream-topology-manifests-and-validation-for-docs-navigation.md) — `done`
 - [Common Core Documentation Session 1](TASKS/architecture/common-core-documentation-session-1.md) — `archived`
 - [Common Core Documentation Session 1 Updated](TASKS/architecture/common-core-documentation-session-1-updated.md) — `archived`
 - [Cross Service Test Boundary Refactor](TASKS/architecture/cross-service-test-boundary-refactor.md) — `blocked`
@@ -251,8 +253,9 @@ Generated: 2026-02-06T07:31:41
 - [Frontend Live Data Integration](TASKS/programs/teacher_dashboard_integration/frontend-live-data-integration.md) — `programs`
 - [WebSocket Batch Updates](TASKS/programs/teacher_dashboard_integration/websocket-batch-updates.md) — `programs`
 
-### done (42)
+### done (44)
 - [Add Database Metrics Instrumentation to Remaining Services](TASKS/infrastructure/add-database-metrics-instrumentation-to-remaining-services.md) — `infrastructure`
+- [add strict workstream-topology-scaffold command](TASKS/architecture/add-strict-workstream-topology-scaffold-command.md) — `architecture`
 - [Align TASKS and docs lifecycle v2](TASKS/architecture/align-tasks-and-docs-lifecycle-v2.md) — `architecture`
 - [API Gateway batch listing endpoint tests](TASKS/identity/api-gateway-batch-listing-endpoint-tests.md) — `identity`
 - [Assignment-owned prompt/rubric locking (context_origin)](TASKS/assessment/assignment-owned-prompt-rubric-locking-context-origin.md) — `assessment`
@@ -264,6 +267,7 @@ Generated: 2026-02-06T07:31:41
 - [CJ LPS reasoning-verbosity metadata contract](TASKS/architecture/cj-lps-reasoning-verbosity-metadata-contract.md) — `architecture`
 - [CJ Prompt Cache Template Builder](TASKS/assessment/cj-prompt-cache-template-builder.md) — `assessment`
 - [CMS Batch Class Info Internal Endpoint](TASKS/programs/teacher_dashboard_integration/cms-batch-class-info-internal-endpoint.md) — `programs`
+- [codify workstream topology manifests and validation for docs navigation](TASKS/architecture/codify-workstream-topology-manifests-and-validation-for-docs-navigation.md) — `architecture`
 - [ENG5 Provider Batch API Harness Coverage](TASKS/integrations/eng5-provider-batch-api-harness-coverage.md) — `integrations`
 - [Eng5 Runner Assumption Hardening](TASKS/programs/eng5/eng5-runner-assumption-hardening.md) — `programs`
 - [Essay scoring research: warm-cache feature store + 1.0-9.0 scale alignment](TASKS/assessment/essay-scoring-research-warm-cache-feature-store--10-90-scale-alignment.md) — `assessment`

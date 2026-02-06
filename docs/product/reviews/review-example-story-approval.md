@@ -46,6 +46,7 @@ the approval gate for moving a **story** from `in_review` → `approved`.
 
 ## Links (optional)
 
+- Hub: `docs/reference/ref-tasks-lifecycle-v2.md`
 - Story: `TASKS/<domain>/<story-id>.md`
 - Research: `docs/research/research-<slug>.md`
 - ADR: `docs/decisions/NNNN-<slug>.md`

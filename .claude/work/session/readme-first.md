@@ -35,6 +35,8 @@ pdm run pytest-root tests/integration/
 pdm run validate-docs
 pdm run validate-tasks
 pdm run index-tasks
+pdm run render-workstream-hubs
+pdm run workstream-topology-scaffold --help
 ```
 
 ## Research Tools (Essay Scoring)
@@ -98,6 +100,19 @@ Implemented (2026-02-04):
 Tracking:
 - `TASKS/assessment/hemma-offload-combined-extract-endpoint.md`
 - Decision gate (experiment optimization deps): `docs/decisions/0031-essay-scoring-experiment-optimization-dependencies-optuna-hf-training-baselines.md`
+- Review records (dependency gate):
+  - `docs/product/reviews/review-transformer-fine-tuning-prompt-invariance-dependencies.md`
+  - `docs/product/reviews/review-statsmodels-diagnostics-catboost-baseline-dependencies.md`
+- Codified navigation manifest (essay-scoring):
+- Codified navigation manifests:
+  - `scripts/docs_mgmt/workstream_topology/essay-scoring.toml`
+  - `scripts/docs_mgmt/workstream_topology/tasks-lifecycle-v2.toml`
+  - Hub render/check via: `pdm run render-workstream-hubs` and `pdm run validate-docs`
+- Agent workflow anchor:
+  - `AGENTS.md` was surgically refactored (2026-02-06) to reduce duplication and offload stable details to:
+    - `.agent/rules/*`
+    - `docs/operations/*` runbooks
+    - repo-local skills in `scripts/codex_skills/`
 
 ---
 

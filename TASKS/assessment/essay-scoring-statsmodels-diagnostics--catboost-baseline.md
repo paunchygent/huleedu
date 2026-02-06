@@ -64,6 +64,9 @@ If accepted in ADR-0031, add to `dependency-groups.ml-research`:
 
 ## Related
 
+- Hub: `docs/reference/ref-essay-scoring-research-hub.md`
 - ADR: `docs/decisions/0031-essay-scoring-experiment-optimization-dependencies-optuna-hf-training-baselines.md`
 - Research notes:
   `docs/research/research-essay-scoring-dependency-decision-research-optuna-hf-fine-tuning-baselines.md`
+- Review record:
+  `docs/product/reviews/review-statsmodels-diagnostics-catboost-baseline-dependencies.md`

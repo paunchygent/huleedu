@@ -91,6 +91,7 @@ Persist under a single sweep run dir:
 
 ## Related
 
+- Hub: `docs/reference/ref-essay-scoring-research-hub.md`
 - Decision gate:
   `TASKS/assessment/essay-scoring-decision-gate-for-experiment-optimization-dependencies.md`
 - ADR: `docs/decisions/0031-essay-scoring-experiment-optimization-dependencies-optuna-hf-training-baselines.md`

@@ -75,12 +75,29 @@ Risks / unknowns:
 ## Decision / Next Steps
 
 Decision tracking:
+- Hub: `docs/reference/ref-essay-scoring-research-hub.md`
 - ADR: `docs/decisions/0031-essay-scoring-experiment-optimization-dependencies-optuna-hf-training-baselines.md`
 - Decision gate task:
   `TASKS/assessment/essay-scoring-decision-gate-for-experiment-optimization-dependencies.md`
+- Review records:
+  - `docs/product/reviews/review-transformer-fine-tuning-prompt-invariance-dependencies.md`
+  - `docs/product/reviews/review-statsmodels-diagnostics-catboost-baseline-dependencies.md`
+
+Short recommendation (before touching `pyproject.toml`):
+- Proceed with an Optuna pilot design using this objective:
+  - Primary: `mean(bottom_5_prompt_qwk)` computed from `cv_val_oof` prompt slices.
+  - Eligibility filter: only prompts with `n >= 30` (`min_prompt_n=30`).
+  - Secondary tie-breaker: overall CV mean QWK.
+- Use strict pilot guardrails:
+  - `30-50` trials only (start at `40`),
+  - fixed `splits.json` + required feature-store reuse,
+  - stability check on `scheme=stratified_text` for the top candidate(s),
+  - no acceptance if tail slices regress materially without explicit tradeoff sign-off.
+- Do not add dependencies yet. First finalize the objective/acceptance protocol in docs and task
+  acceptance criteria, then apply dependency changes in one controlled update.
 
 Proposed next steps (ordered by ROI):
-1) Run an Optuna pilot with strict trial caps and a worst-prompt-first objective.
+1) Finalize the Optuna pilot protocol with the agreed objective (`bottom-5`, `min_prompt_n=30`).
 2) If Optuna proves useful, adopt it and make it the default for future XGB sweeps.
 3) Add statsmodels/CatBoost only if it improves decision reliability or baseline confidence.
 4) Defer HF fine-tuning until we can justify it with a representation ceiling / target gap analysis.

@@ -128,7 +128,7 @@ Library `README.md` files MUST include:
 ### 6.1 Pydantic Models and Schemas as Source of Truth
 
 - Pydantic models and schemas in the shared contract libraries (for example `libs/common_core/src/common_core/`) ARE the primary source of truth for event and HTTP API contracts.
-- Documentation in `documentation/reference/` MUST reference these models rather than duplicating them by hand.
+- Documentation in `docs/reference/` MUST reference these models rather than duplicating them by hand.
 
 ### 6.2 Auto-Generation and Synchronization
 

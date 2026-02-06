@@ -16,13 +16,13 @@ Real-world style scenarios for using the Documentation Structure Maintainer skil
 > "I need a runbook for debugging when the LLM provider queue depth spikes. Where should it go and what should it look like?"
 
 **Skill reasoning**:
-- Purpose: operational procedure → `documentation/operations/`.
+- Purpose: operational procedure → `docs/operations/`.
 - Filename: `llm-provider-queue-depth-debugging.md` (kebab-case).
 - Frontmatter: runbook schema.
 
 **Suggested structure**:
 
-- Path: `documentation/operations/llm-provider-queue-depth-debugging.md`
+- Path: `docs/operations/llm-provider-queue-depth-debugging.md`
 - Frontmatter:
 
 ```yaml
@@ -43,7 +43,7 @@ last_reviewed: 2025-11-17
 **Suggested validation command**:
 
 ```bash
-python scripts/docs_mgmt/validate_docs_structure.py --strict
+pdm run validate-docs
 ```
 
 ---
@@ -56,13 +56,13 @@ python scripts/docs_mgmt/validate_docs_structure.py --strict
 > "We finalized the decision to centralize HTTP API contracts in common_core. Help me document this ADR correctly."
 
 **Skill reasoning**:
-- Type: architecture decision → `documentation/decisions/`.
+- Type: architecture decision → `docs/decisions/`.
 - Filename: `0006-http-contracts-in-common-core.md`.
 - Frontmatter: ADR schema.
 
 **Suggested structure**:
 
-- Path: `documentation/decisions/0006-http-contracts-in-common-core.md`
+- Path: `docs/decisions/0006-http-contracts-in-common-core.md`
 - Frontmatter:
 
 ```yaml
@@ -84,7 +84,7 @@ last_updated: 2025-11-17
 **Suggested validation command**:
 
 ```bash
-python scripts/docs_mgmt/validate_docs_structure.py --strict
+pdm run validate-docs
 ```
 
 ---
@@ -106,7 +106,7 @@ python scripts/docs_mgmt/validate_docs_structure.py --strict
 1. Generate new task via script:
 
 ```bash
-python scripts/task_mgmt/new_task.py \
+pdm run new-task \
   --domain assessment \
   --title "LLM batching configuration wiring" \
   --program cj_confidence
@@ -120,22 +120,22 @@ python scripts/task_mgmt/new_task.py \
 3. Run validation:
 
 ```bash
-python scripts/task_mgmt/validate_front_matter.py
-python scripts/task_mgmt/index_tasks.py
+pdm run validate-tasks
+pdm run index-tasks
 ```
 
 ---
 
 ## Example 4: Normalizing Legacy Documentation
 
-**Objective**: Migrate older docs into the canonical `documentation/` layout.
+**Objective**: Migrate older docs into the canonical `docs/` layout.
 
 **User request**:
-> "We have some old architecture docs scattered under documentation/ and docs/. Help me normalize them." 
+> "We have some old architecture docs scattered in legacy locations. Help me normalize them under docs/."
 
 **Skill reasoning**:
-- Use `documentation/DOCS_STRUCTURE_SPEC.md` to classify each file.
-- Propose a mapping plan (e.g. `documentation/OPERATIONS/` → `documentation/operations/`, `PRD:s/` → `documentation/product/`).
+- Use `docs/DOCS_STRUCTURE_SPEC.md` to classify each file.
+- Propose a mapping plan (e.g. `docs/OPERATIONS/` → `docs/operations/`, `PRD:s/` → `docs/product/`).
 - Use `migrate_docs_structure.py` where appropriate, then validate.
 
 **Suggested workflow**:
@@ -146,7 +146,7 @@ python scripts/task_mgmt/index_tasks.py
 4. After moves, validate:
 
 ```bash
-python scripts/docs_mgmt/validate_docs_structure.py --verbose
+pdm run validate-docs
 ```
 
 5. Fix any reported violations (naming, missing frontmatter) and rerun.
@@ -161,21 +161,21 @@ python scripts/docs_mgmt/validate_docs_structure.py --verbose
 > "How should we wire up validation so docs and tasks stay compliant automatically?" 
 
 **Skill reasoning**:
-- Use docs validation for `documentation/`.
+- Use docs validation for `docs/`.
 - Use task validation for `TASKS/`.
 - Integrate both into pre-commit and CI.
 
 **Suggested configuration outline** (high-level):
 
 - **Pre-commit**:
-  - Run `python scripts/docs_mgmt/validate_docs_structure.py --strict` on changed files under `documentation/`.
-  - Run `python scripts/task_mgmt/validate_front_matter.py` on changed files under `TASKS/`.
+  - Run `pdm run validate-docs` on changed docs.
+  - Run `pdm run validate-tasks` on changed files under `TASKS/`.
 
 - **CI pipeline step**:
 
 ```bash
-python scripts/docs_mgmt/validate_docs_structure.py --strict
-python scripts/task_mgmt/validate_front_matter.py
+pdm run validate-docs
+pdm run validate-tasks
 ```
 
 - Treat non-zero exit codes as build failures.

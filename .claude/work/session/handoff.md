@@ -166,8 +166,8 @@ Additional verification (2026-02-01):
 - `pdm run lint-fix --unsafe-fixes`
 - `pdm run typecheck-all`
 - `pdm run validate-tasks`
-- `pdm run python scripts/task_mgmt/index_tasks.py --root "$(pwd)/TASKS" --out "/tmp/huleedu_tasks_index.md" --fail-on-missing`
-- `pdm run python scripts/docs_mgmt/validate_docs_structure.py --verbose`
+- `pdm run index-tasks --root "$(pwd)/TASKS" --out "/tmp/huleedu_tasks_index.md" --fail-on-missing`
+- `pdm run validate-docs`
 
 Additional verification (2026-02-01, later run):
 - `pdm install -G ml-research` (installed `tiktoken`, `sentencepiece`)
@@ -696,3 +696,37 @@ Verification (2026-02-03 local time):
   - statsmodels + CatBoost baseline: `TASKS/assessment/essay-scoring-statsmodels-diagnostics--catboost-baseline.md`
 - Research notes doc:
   `docs/research/research-essay-scoring-dependency-decision-research-optuna-hf-fine-tuning-baselines.md`
+- Formal review records (pending):
+  - `docs/product/reviews/review-transformer-fine-tuning-prompt-invariance-dependencies.md`
+  - `docs/product/reviews/review-statsmodels-diagnostics-catboost-baseline-dependencies.md`
+
+### Docs-as-code codification: workstream topology contract (2026-02-06)
+
+- New task:
+  - `TASKS/architecture/codify-workstream-topology-manifests-and-validation-for-docs-navigation.md`
+- New codified manifests:
+  - `scripts/docs_mgmt/workstream_topology/essay-scoring.toml`
+  - `scripts/docs_mgmt/workstream_topology/tasks-lifecycle-v2.toml`
+- New tooling:
+  - Renderer: `scripts/docs_mgmt/render_workstream_hubs.py`
+  - Validator: `scripts/docs_mgmt/validate_workstream_topology.py`
+  - Scaffold CLI: `scripts/docs_mgmt/workstream_topology_scaffold.py`
+- Shared parser/render helpers: `scripts/docs_mgmt/workstream_topology_manifest.py`
+- Hubs now have generated marker blocks:
+  - `docs/reference/ref-essay-scoring-research-hub.md`
+  - `docs/reference/ref-tasks-lifecycle-v2.md`
+- `validate-docs` now validates both docs structure and topology contract:
+  - `pdm run validate-docs`
+- Canonical command surface for topology contracts:
+  - `pdm run workstream-topology-scaffold`
+  - `pdm run render-workstream-hubs`
+  - `pdm run validate-docs`
+- New scaffold task (completed):
+  - `TASKS/architecture/add-strict-workstream-topology-scaffold-command.md`
+- Agent workflow docs refresh:
+  - `AGENTS.md` reduced from 416 lines to 169 lines while preserving core behavior.
+  - Stable/reference-heavy content moved behind explicit pointers to:
+    - `.agent/rules/*`
+    - `docs/operations/*` runbooks
+    - `scripts/codex_skills/essay-scoring-research/SKILL.md`
+    - `scripts/codex_skills/huledu-devops-hemma/SKILL.md`

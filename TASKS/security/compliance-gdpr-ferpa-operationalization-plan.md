@@ -61,7 +61,7 @@ Work Packages
 
 5) Secrets/KMS
    - Author plan to move to Vault/Cloud Secrets + KMS; document key rotation cadence.
-   - Acceptance: doc in `documentation/setup_environment/SECRETS_MANAGEMENT.md` updated; ops tasks listed.
+   - Acceptance: doc in `docs/operations/` (or legacy archive if still applicable) updated; ops tasks listed.
 
 Tests
 

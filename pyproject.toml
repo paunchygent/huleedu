@@ -518,7 +518,9 @@ index-tasks = "python -m scripts.task_mgmt.index_tasks"  # Regenerate TASKS/INDE
 
 # Documentation & Rules Management
 new-doc = {cmd = ["python", "-m", "scripts.docs_mgmt.new_doc"]}  # Create new doc (runbook, adr, epic, review, reference, research)
-validate-docs = "python -m scripts.docs_mgmt.validate_docs_structure --verbose"  # Validate docs/ taxonomy and frontmatter warnings
+workstream-topology-scaffold = {cmd = ["python", "-m", "scripts.docs_mgmt.workstream_topology_scaffold"]}  # Scaffold topology manifest + hub markers with strict invariants
+render-workstream-hubs = "python -m scripts.docs_mgmt.render_workstream_hubs --verbose"  # Render generated topology blocks in reference hubs
+validate-docs = {shell = "python -m scripts.docs_mgmt.validate_docs_structure --verbose && python -m scripts.docs_mgmt.validate_workstream_topology --check-hubs --verbose"}  # Validate docs/ structure + codified workstream topology contracts
 new-rule = {cmd = ["python", "-m", "scripts.claude_mgmt.new_rule"]}  # Create new rule file
 
 # Observability Stack Management

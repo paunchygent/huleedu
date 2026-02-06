@@ -1,60 +1,139 @@
 # HuleEdu Developer Reference
 
-## Golden rules:
-1. No vibe-coding, each implementation or change in production code behavior must be researche and have a decision, epic, and story/fix describing it.
-2. Avoid any legacy support and deprecation paths. HuleEdu is a pure prototype codebase with no production data to protect. Convoluted legacy paths and semantics add clutter and confusion in our high-churn, fast evolving codebase. 
-3. Respect SOLID, YAGNI and DDD/Clean Code SRP principles: always leave code cleaner than you found it. 
-4. Respect and USE .agent/rules and docs/. We have a comprehensive onboarding system built just for you.
+## Golden Rules
+1. No vibe-coding: every production behavior change must be grounded in a decision, epic, and story/fix.
+2. No legacy/deprecation clutter: this prototype codebase optimizes for clarity and fast iteration.
+3. Respect SOLID, YAGNI, DDD, and SRP: leave code cleaner than you found it.
+4. Use `.agent/rules/` and `docs/` as the primary source of truth.
 
-## Core Workflow
+## Platform Invariant
+- Hemma (`hemma.hule.education`) is the canonical remote deployment and ML offloading platform for HuleEdu.
+- Canonical sources:
+  - `docs/operations/hemma-server-operations-huleedu.md`
+  - `docs/operations/gpu-ai-workloads-on-hemma-huleedu.md`
+  - `docs/decisions/0025-hemma-hosted-nlp-feature-offload-for-essay-scoring-research-binary-protocol.md`
 
-### 1. Initial Setup
+## Session Start (Mandatory)
+1. Read `.agent/rules/000-rule-index.md`.
+2. Read task-relevant rules from the index before making changes.
+3. Read `.claude/work/session/handoff.md` and `.claude/work/session/readme-first.md`.
+4. Select working mode via `.agent/rules/110-ai-agent-interaction-modes.md`.
+5. If introducing/updating third-party dependencies or complex workflows, use Context7 first.
+6. For code-review tasks, create `.claude/archive/code-reviews/<what-is-being-reviewed_YYYY_MM_DD>.md` and update it each phase.
 
-Before using pdm run, start an env-aware shell:
+## Core Execution Invariants
+- Start an env-aware shell before `pdm run`:
 
 ```bash
-./scripts/dev-shell.sh  Use semantics for running docker tests in shell by always loading .env before `pdm run pytest-root...`
+./scripts/dev-shell.sh
 ```
 
-### ML / Research Runs (Essay Scoring) — mandatory defaults
+- Run `pdm` commands from repo root only.
+- After each major task phase, update:
+  - active task documents in `TASKS/`
+  - `.claude/work/session/handoff.md`
+  - `.claude/work/session/readme-first.md`
+- Do not run git commands or delete files you did not create without user permission.
+- For Hemma/repo alignment, use `git pull` / `git fetch` for tracked files; do not use `scp` for repo code sync.
+- If executing inside a container, run `pdm run <command>` from the container root.
+- If launching 2+ subagents, launch them in one parallel tool call.
 
-- **Detached execution required**: long ML runs MUST be started in detached mode (prefer `/usr/bin/screen`) and MUST write a driver log under `output/essay_scoring/` (see `docs/operations/ml-nlp-runbook.md`).
-- **Feature store required**: after the first successful run creates a feature store, all follow-up runs MUST reuse it:
-  - `run`: always pass `--reuse-feature-store-dir output/essay_scoring/<RUN>/feature_store`
-  - `cv` / sweeps: always pass `--reuse-cv-feature-store-dir output/essay_scoring/<CV_RUN>/cv_feature_store`
-- **Do not ignore canonical flags** (ELLIPSE CV-first): always use `--ellipse-train-path` + `--ellipse-test-path` (prepared CSVs) and `--splits-path` (matching `splits.json`) when running `cv`/`drop-column`/ablations on ELLIPSE.
-- **Machine-readable progress required**: monitor long stages via `output/essay_scoring/<RUN>/progress.json` (updated continuously; suitable for scripts) rather than log parsing.
-- **Residual diagnostics required (Gate C)**: CV runs MUST produce `reports/residual_diagnostics.md`
-  plus per-record residual rows under `artifacts/residuals_*.{csv,jsonl}` for prompt/band/slice
-  analysis.
+## Documentation and Task Management (Mandatory)
+- Use script aliases from `pyproject.toml` (do not call Python modules directly for these workflows).
+- Create and maintain work with:
+  - `pdm run new-task`
+  - `pdm run new-doc`
+  - `pdm run new-rule`
+- `.claude/work/tasks/` is deprecated; use `TASKS/`.
 
-```markdown
-- FIRST ACTION: Load `.agent/rules/000-rule-index.md` first. The index contains onboard instructions for all services and project rules and standards. If the prompt contains a task description, use it to read and review all rule files related to the task at hand.
-- SECOND ACTION Use the user's task description to read and review all rule files related to the task at hand.
-- THIRD ACTION Read `.claude/work/session/handoff.md` and `.claude/work/session/readme-first.md` for **critical** cross-service task context.
+Canonical validation flow:
 
-- WHEN IMPLEMENTING NEW CODE using library dependencies: always use Context7 to ensure updated library API context.
-- WHEN PERFORMING A **CODE REVIEW**: If task is **code review** create a new file in `.claude/archive/code-reviews/` using <WHAT_IS_BEING_REVIEWED_YEAR_MONTH_DAY.md>. After each task phase, Always stop to update `.claude/archive/code-reviews/<WHAT_IS_BEING_REVIEWED_YEAR_MONTH_DAY.md>` with any new information + ask user any clarifying questions to retain alignment with user's intent.
-
-### 2. Task Execution
-
-```markdown
-1. **To avoid immediate task failure**: Read `.claude/work/session/handoff.md` and `.claude/work/session/readme-first.md` for **critical** cross-service task context.
-2. **Select Mode**: Use `.agent/rules/110-ai-agent-interaction-modes.md` to choose mode (Planning, Coding, Debugging)
-3. **Rule Reference**: Consult `.agent/rules/000-rule-index.md` for relevant rules
-cross-service task context.
-4. **Update**: After each task phase, Always stop to update 1. **active task documents** 2.`.claude/work/session/handoff.md` and `.claude/work/session/readme-first.md` with any new information + ask user any clarifying questions to retain alignment with user's intent.
-5. **await user input** **NEVER** RUN GIT COMMANDS OR delete files you have not created WITHOUT ASKING FOR PERMISSION!
-6. **Repo alignment (Hemma and CI)**: Use `git pull` / `git fetch` as the canonical sync mechanism for tracked files. **Do not** use `scp` to “sync” repo code (it causes drift and missed files). `scp` is acceptable only for **non-versioned** artifacts (for example `.env` secrets) and even then prefer a documented, repeatable process.
-7. **Git safety**: It’s OK to run safe/read-only git commands (for example `git status`, `git diff`, `git log`, `git fetch`) after asking once. Always ask again before destructive commands (for example `git reset --hard`, `git clean`, rewriting history, or deleting branches).
-8. **Hemma SSH command hygiene**: Always run from the Hemma repo root (`/home/paunchygent/apps/huleedu`). Use a single SSH command that includes `cd` (don’t assume a working directory persists). For multi-line sequences, prefer `ssh hemma /bin/bash -s <<'EOF' ... EOF` to avoid quoting/globbing issues.
-
-Hemma SSH examples:
 ```bash
-# One-liner
-ssh hemma /bin/bash -c 'cd /home/paunchygent/apps/huleedu && ./scripts/validate-production-config.sh'
+pdm run validate-tasks
+pdm run validate-docs
+pdm run index-tasks --root "$(pwd)/TASKS" --out "/tmp/huleedu_tasks_index.md" --fail-on-missing
+```
 
-# Multi-line (preferred when your commands contain quotes/braces/pipes)
+Specs:
+- `TASKS/_REORGANIZATION_PROPOSAL.md`
+- `docs/DOCS_STRUCTURE_SPEC.md`
+- `.claude/CLAUDE_STRUCTURE_SPEC.md`
+
+## ML / Essay Scoring Research (Mandatory Defaults)
+Canonical runbook and skill:
+- `docs/operations/ml-nlp-runbook.md`
+- `scripts/codex_skills/essay-scoring-research/SKILL.md`
+
+Mandatory defaults:
+- Long runs must be detached (prefer `/usr/bin/screen`) and write driver logs under `output/essay_scoring/`.
+- Reuse feature stores after first successful extraction:
+  - `run`: `--reuse-feature-store-dir output/essay_scoring/<RUN>/feature_store`
+  - `cv` / sweeps: `--reuse-cv-feature-store-dir output/essay_scoring/<CV_RUN>/cv_feature_store`
+- For ELLIPSE CV-first runs, always pass canonical inputs:
+  - `--ellipse-train-path`
+  - `--ellipse-test-path`
+  - `--splits-path`
+- Track progress via `output/essay_scoring/<RUN>/progress.json` (not log parsing).
+- CV runs must produce residual diagnostics:
+  - `reports/residual_diagnostics.md`
+  - `artifacts/residuals_*.{csv,jsonl}`
+
+## Testing and Quality Gates
+- Always run:
+
+```bash
+pdm run format-all
+pdm run lint-fix --unsafe-fixes
+pdm run typecheck-all
+```
+
+- Use root-aware tests:
+
+```bash
+pdm run pytest-root <path-or-nodeid> [pytest args]
+```
+
+- Reference methodology rules:
+  - `.agent/rules/075-test-creation-methodology.md`
+  - `.agent/rules/075.1-parallel-test-creation-methodology.md`
+
+## Docker Development (Canonical Surface)
+Use these script aliases:
+
+```bash
+pdm run dev-start [service]
+pdm run dev-build [service]
+pdm run dev-build-start [service]
+pdm run dev-build-clean [service]
+pdm run dev-restart [service]
+pdm run dev-recreate [service]
+pdm run dev-stop [service]
+pdm run dev-logs [service]
+pdm run dev-check
+```
+
+For container debugging patterns, use:
+- `.agent/rules/046-docker-container-debugging.md`
+
+## Hemma Remote Development (Condensed)
+Canonical references:
+- `docs/operations/hemma-server-operations-huleedu.md`
+- `docs/operations/gpu-ai-workloads-on-hemma-huleedu.md`
+- `docs/operations/hemma-alpha-rollout-days-1-3.md`
+- `docs/decisions/0025-hemma-hosted-nlp-feature-offload-for-essay-scoring-research-binary-protocol.md`
+- `scripts/codex_skills/huledu-devops-hemma/SKILL.md`
+
+SSH hygiene:
+- Run from Hemma repo root: `/home/paunchygent/apps/huleedu`.
+- Prefer a single SSH command that includes `cd`, or a heredoc for multi-line sequences.
+
+Examples:
+
+```bash
+ssh hemma /bin/bash -c 'cd /home/paunchygent/apps/huleedu && ./scripts/validate-production-config.sh'
+```
+
+```bash
 ssh hemma /bin/bash -s <<'EOF'
 set -euo pipefail
 cd /home/paunchygent/apps/huleedu
@@ -63,354 +142,35 @@ sudo docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 EOF
 ```
 
-Hemma tunnels (local workstation):
-```bash
-# Persistent tunnels (preferred): ~/bin wrapper + LaunchAgent (mirrors Skriptoteket)
-# Setup steps live in: docs/operations/hemma-alpha-rollout-days-1-3.md
-~/bin/hemma-huleedu-tunnel start
-~/bin/hemma-huleedu-tunnel status
-
-# Health checks (local ports)
-curl -fsS http://127.0.0.1:18085/healthz  # LanguageTool service (Hemma :8085)
-curl -fsS http://127.0.0.1:19000/healthz  # Embedding offload (Hemma :9000)
-```
-```
-**docker exec/run**
-if we exec/run inside a container, we’ll use pdm run <command> from the container root directory.
-
-### 3. Error Resolution Protocol
-
-```markdown
-1. **Investigate First**: Check implementation before proposing changes
-2. **Follow Patterns**: Use existing code patterns over new abstractions
-3. **Root Cause**: Fix immediate issues before redesigning
-```
-
-### 4. Documentation & Testing
-
-**Task Tracking:**
-- **ALWAYS** use `pdm run new-task` to create tasks (never create manually)
-- Create: `pdm run new-task --domain <domain> --title "Title"` → `TASKS/<domain>/<id>.md`
-- Update: Active tasks in `TASKS/`, session context in `.claude/work/session/handoff.md`
-- ⚠️ `.claude/work/tasks/` is DEPRECATED
-
-**Documentation:**
-- Runbooks: `docs/operations/` (requires frontmatter)
-- ADRs: `docs/decisions/` (requires frontmatter)
-- How-tos: `docs/how-to/`
-- Reports: `.claude/work/reports/` (research-diagnostic agent)
-
-**Naming:**
-- All files: lowercase `kebab-case` (filename must match frontmatter `id` for tasks)
-- No spaces in filenames
-
-**Testing:**
-- All code changes require tests (run and verified)
-- Never lint manually before `format-all` and `lint-fix --unsafe-fixes`
-- Always `typecheck-all` from root after implementation
-
-**Validate:**
-```bash
-pdm run python scripts/task_mgmt/validate_front_matter.py --verbose
-pdm run python scripts/task_mgmt/index_tasks.py --root "$(pwd)/TASKS" --out "/tmp/huleedu_tasks_index.md" --fail-on-missing
-pdm run python scripts/docs_mgmt/validate_docs_structure.py --verbose
-```
-
-- **ALWAYS** create tasks/docs/rules via `pdm run new-task`, `pdm run new-doc`, `pdm run new-rule` (never by hand), and after updates run `pdm run validate-tasks` plus the docs validators and task/docs indexers.
-- **ALWAYS** use the `pdm run` script aliases defined in `pyproject.toml` (e.g. `new-task`, `validate-tasks`, `new-doc`, `new-rule`) from repo root instead of calling Python modules/files directly.
-
-**Specs:** `TASKS/_REORGANIZATION_PROPOSAL.md`, `docs/DOCS_STRUCTURE_SPEC.md`, `.claude/CLAUDE_STRUCTURE_SPEC.md`
-
----
-
-## Technical Reference
-
-### Architectural Overview
-
-### Architecture (.agent/rules/010-foundational-principles.md)
-
-```markdown
-- **Pattern**: Event-driven microservices with STRICT DDD, CC principles, and small modular SRP files (<400-500 LoC HARD LIMIT FILE SIZE).
-- **Stack**: 
-  - Core: Python 3.11, Quart, monorepo PDM, Dishka, Pydantic classes for all data classes.
-  - Data: PostgreSQL, SQLAlchemy, asyncpg
-  - Comms: Kafka, aiohttp, Redis
-  - Container: Docker, Docker Compose
-  - Dependency management: PDM with single root lockfile. 
-  - Client Facing Services: FastAPI 
-```
-
-**CRITICAL CONSTRAINT** Always use `pdm <command>` *from root directory* to run any command. *Never* use `pdm <command>` from subdirectory.
-
-**dependency resolution** full path relative root for all imports. **NEVER** use relative imports when importing dependencies from outside service directory.
-
-### Service Communication (.agent/rules/020-architectural-mandates.md)
-
-```markdown
-- **Primary**: Asynchronous via Kafka
-- **Secondary**: Synchronous HTTP for queries requiring immediate response
-- **Strict**: No direct DB access between services
-- **Strict**: all boundary objects defined as event contracts and api models in libs/common_core/src/common_core. All events registered as topics in libs/common_core/src/common_core/event_enums.py. 
-- **Strict**: all error and exception handling done using centralized and quart/fastapi specific error handling patterns `libs/huleedu_service_libs/src/huleedu_service_libs/error_handling/`+ error models in `libs/common_core/src/common_core/error_enums.py`
-```
-
-### Database & Persistence (.agent/rules/085-database-migration-standards.md)
-
-```markdown
-- **ORM**: SQLAlchemy async with `asyncpg`
-- **Strict** ban on RAW SQL
-- **Isolation**: Each service has its own PostgreSQL database
-- **Migrations**: always consult .agent/rules/085-database-migration-standards.md
-```
-
-### HTTP Services (.agent/rules/042-async-patterns-and-di.md)
-
-```markdown
-- **app.py**: Setup only (<150 LoC)
-- **Blueprints**: In `api/` directory
-- **Example**: `@services/file_service/` structure
-```
-
-### Worker Services (.agent/rules/042-async-patterns-and-di.md)
-
-- **Quart Deployment Patterns**:
-  - [services/essay_lifecycle_service]: Standalone worker and API services (complex processing)
-  - Other services: Integrated worker using Quart's `@app.before_serving` in `services/*/app.py` (simpler services)
-- **Example**: `services/spellchecker_service/` (integrated) vs `services/essay_lifecycle_service/` (standalone)
-
-### Dependency Injection (.agent/rules/042-async-patterns-and-di.md)
-
-```markdown
-- **Interfaces**: Define with `typing.Protocol` in `protocols.py`
-- **Providers**: Implement `Provider` classes in `di.py`
-- **Scopes**:
-  - `APP`: Stateless singletons (settings, HTTP clients)
-  - `REQUEST`: Per-operation instances (DB sessions)
-```
-
-### Event System (.agent/rules/051-event-contract-standards.md)
-
-```markdown
-- **Envelope**: All Kafka events use `EventEnvelope`
-- **Topics**: Generate with `topic_name()` utility
-- **Large Data**: Use `StorageReferenceMetadata` for payloads
-```
-
-## Testing & Quality
-
-### Testing (strict adherence to `.agent/rules/075-test-creation-methodology.md` + `.agent/rules/075.1-parallel-test-creation-methodology.md`)
-
-#### Test Types
-
-```markdown
-- **Unit**: Isolated function testing
-- **Integration**: Component interaction
-- **Contracts**: Event/API schema validation
-
-Only cross-service integration and functional Dockers tests in `tests/` directory. Service code tests in services.
-```
-
-#### Test Execution
-
-Preferred (root-aware runner)
+Tunnels:
 
 ```bash
-# Go-to method (resolves paths relative to repo root)
-pdm run pytest-root <path-or-nodeid> [pytest args]
-
-# Examples (from repo root):
-pdm run pytest-root services/class_management_service/tests/test_core_logic.py
-pdm run pytest-root 'services/.../test_file.py::TestClass::test_case'
-pdm run pytest-root services/... -k 'expr'          # selection with -k
-pdm run pytest-root services/... -m 'unit'          # override markers
-
-# From any subdirectory
-bash "$(git rev-parse --show-toplevel)"/scripts/pytest-root.sh <path-or-nodeid> [args]
-
-# Optional: enable alias and use `pyp` or `pdmr`
-source scripts/dev-aliases.sh
-pyp <path-or-nodeid> [args]
-pdmr pytest-root <path-or-nodeid> [args]
-
-# Force root project from any dir (PDM)
-pdmr pytest-root <path-or-nodeid> [args]
-```
-
-#### Common Markers
-
-```markdown
-- `pytest.mark.asyncio`: Unit tests
-- `@pytest.mark.integration`: External services required
-- `@pytest.mark.financial`: incur real costs via external API calls
-- `@pytest.mark.slow`: Long-running tests
-- `@pytest.mark.e2e`: End-to-end tests (using docker-compose)
-```
-
-### Subagents
-
-When asked to launch two or more agents in parallel: launch all agents in a single tool call for parallel execution
-
-### Code Quality
-
-```markdown
-- **Linting**: *run `pdm run format-all` and `pdm run lint-fix --unsafe-fixes` (Ruff) after each file edit*
-- **Pre-commit**: `pdm run pre-commit install`
-```
-
-### Docker Development
-
-```markdown
-# Always use docker ps | grep huleedu first to find container name
-
-# Then access logs: read .cursor/rules/046-docker-container-debugging.md to properly debug containers.
-
-#### Development
-
-```bash
-# Development (hot-reload enabled)
-pdm run dev-start [service]          # Start existing images without rebuilding (fast)
-pdm run dev-build [service]          # Build images with cache (doesn't start)
-pdm run dev-build-start [service]    # Build with cache then start
-pdm run dev-build-clean [service]    # Build without cache (slow, use when needed)
-pdm run dev-restart [service]        # Restart running containers (for volume-mounted code changes)
-pdm run dev-recreate [service]       # Force container recreation to pick up env var changes
-pdm run dev-stop [service]           # Stop running containers
-pdm run dev-logs [service]           # Follow container logs
-pdm run dev-check                    # Check what needs rebuilding
-
-
-```
-
----
-
-## Hemma Remote Development (SSH Tunnels)
-
-We offload heavy NLP workloads (LanguageTool + DeBERTa/spaCy feature extraction) to the
-Hemma server and tunnel localhost-only ports back to the dev machine.
-
-Canonical references in this repo:
-- Ops: `docs/operations/hemma-server-operations-huleedu.md`
-- GPU ops: `docs/operations/gpu-ai-workloads-on-hemma-huleedu.md`
-- ADR: `docs/decisions/0025-hemma-hosted-nlp-feature-offload-for-essay-scoring-research-binary-protocol.md`
-
-### SSH defaults (hemma)
-
-Assumption: local SSH host aliases are configured (non-root default), similar to the
-Skriptoteket setup.
-
-```bash
-ssh hemma
-```
-
-### Quick tunnels (manual)
-
-```bash
-# HuleEdu LanguageTool service HTTP API (POST /v1/check) on Hemma
 ssh hemma -L 18085:127.0.0.1:8085 -N
-
-# Hemma DeBERTa+spaCy feature offload service (binary protocol) (planned)
 ssh hemma -L 19000:127.0.0.1:9000 -N
-```
-
-Health checks:
-```bash
 curl -fsS http://127.0.0.1:18085/healthz
 curl -fsS http://127.0.0.1:19000/healthz
 ```
 
-### Long-running ML research runs (Mac)
-
-When running `pdm run essay-scoring-research ...` jobs that take 10–60+ minutes, avoid relying on
-background jobs started from an agent tool runner session (they may be terminated when the session
-ends).
-
-Preferred:
-- Run from a dedicated terminal tab started via `./scripts/dev-shell.sh` (loads `.env`).
-- For detached execution, use `/usr/bin/screen` (bundled on macOS):
-  - Start: `/usr/bin/screen -S essay_scoring_run -dm /bin/bash -lc '<command>'`
-  - Attach: `/usr/bin/screen -r essay_scoring_run`
-  - Stop: `/usr/bin/screen -S essay_scoring_run -X quit`
-- Interpret `fault.log` correctly: periodic “Timeout (0:10:00)!” entries are faulthandler thread
-  snapshots (not necessarily a crash).
-
-### Persistent tunnels (recommended)
-
-Use `autossh` to keep tunnels alive (matches the approach used for Hemma GPU services
-in Skriptoteket runbooks).
+Long-running Mac-side research jobs:
 
 ```bash
-brew install autossh
-autossh -M 0 -N \
-  -o "ServerAliveInterval=30" \
-  -o "ServerAliveCountMax=3" \
-  -o "ExitOnForwardFailure=yes" \
-  -L 18085:localhost:8085 hemma
+/usr/bin/screen -S essay_scoring_run -dm /bin/bash -lc '<command>'
+/usr/bin/screen -r essay_scoring_run
+/usr/bin/screen -S essay_scoring_run -X quit
 ```
 
-### Containers calling tunneled services
+## Stable Details Offloaded to Rules (Read, Do Not Re-copy Here)
+- Architecture and principles: `.agent/rules/010-foundational-principles.md`
+- Service boundaries and mandates: `.agent/rules/020-architectural-mandates.md`
+- Async patterns and DI: `.agent/rules/042-async-patterns-and-di.md`
+- Event contracts: `.agent/rules/052-event-contract-standards.md`
+- Database and migrations: `.agent/rules/085-database-migration-standards.md`
+- PDM/dependency management: `.agent/rules/081-pdm-dependency-management.md`, `.agent/rules/083-pdm-standards-2025.md`
+- Testing standards: `.agent/rules/070-testing-and-quality-assurance.md`, `.agent/rules/075-test-creation-methodology.md`
+- Documentation standards: `.agent/rules/090-documentation-standards.md`
 
-Local containers reach tunneled host ports via `host.docker.internal` (and an
-`extra_hosts` entry when needed).
-
-Example:
-```text
-http://host.docker.internal:18085
-http://host.docker.internal:19000
-```
-
-### Database Access (Common Issue)
-
-```markdown
-# IMPORTANT: Shell doesn't have .env variables by default!
-# Always source .env first (from repo root):
-source .env
-
-# Then access database (note: quotes around variable are required):
-docker exec huleedu_<service>_db psql -U "$HULEEDU_DB_USER" -d <db_name> -c "SQL"
-
-# Or use hardcoded values:
-docker exec huleedu_class_management_db psql -U huleedu_user -d huleedu_class_management -c "\dt"
-
-# Database names follow pattern: huleedu_<service_name>
-# Example: huleedu_class_management, huleedu_essay_lifecycle, etc.
-```
-
-### Database Environment Separation
-
-```bash
-# Development (default): Docker containers
-HULEEDU_ENVIRONMENT=development
-
-# Production: External managed databases  
-HULEEDU_ENVIRONMENT=production
-# Requires: HULEEDU_PROD_DB_HOST, HULEEDU_PROD_DB_PASSWORD
-
-# Database management
-pdm run db-reset                    # Reset development databases
-pdm run db-seed                     # Seed development data
-pdm run prod-validate              # Validate production config
-pdm run prod-migrate               # Run production migrations
-```
-
-## Database Migrations
-
-### follow established pattern in `.agent/rules/085-database-migration-standards.md`
-
-## Monitoring & Observability
-
-### Metrics
-
-```markdown
-- Use Prometheus, for service metrics
-- Instrument key operations with timing and counters
-- Follow naming conventions: `service_operation_total`, `service_operation_duration_seconds`
-```
-
-## Documentation
-
-### Standards (.agent/rules/090-documentation-standards.md)
-
-- Keep documentation in sync with code changes
-- Use Google-style docstrings for all public interfaces
-- Document all environment variables
-- Include examples in documentation
+## Documentation Standards
+- Keep docs in sync with code changes.
+- Use Google-style docstrings for public interfaces.
+- Document environment variables.
+- Include concise examples where useful.

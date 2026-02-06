@@ -61,3 +61,11 @@ This is the canonical record for moving a story from `in_review` to `approved`.
 Migration notes:
 - Existing `status: research` and `status: completed` were migrated to
   `proposed` and `done` respectively.
+
+## Related
+
+- Hub: `docs/reference/ref-tasks-lifecycle-v2.md`
+- Research:
+  `docs/research/research-tasks-lifecycle-v2-governance-and-topology-notes.md`
+- Implementation task:
+  `TASKS/architecture/align-tasks-and-docs-lifecycle-v2.md`

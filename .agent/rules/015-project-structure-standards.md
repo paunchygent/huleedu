@@ -19,7 +19,7 @@ scope: "all"
 
 **Permitted Root Directories:**
 - `.git/`, `.venv/`, `.mypy_cache/`, `__pycache__/`, `.cursor/`, `.ruff_cache/`, `.windsurf/`, `.claude/`
-- `libs/`, `services/`, `scripts/`, `documentation/`, `TASKS/`
+- `libs/`, `services/`, `scripts/`, `docs/`, `TASKS/`
 - `frontend/` (frontend application), `observability/` (monitoring configs)
 - `test_uploads/` (test fixtures), `tests/` (cross-service integration tests)
 - `data/`, `output/`, `build/`, `dist/` (generated artifacts - gitignored)
@@ -179,15 +179,16 @@ libs/common_core/
 ## 6. Documentation Directory Structure
 
 ```
-documentation/
-├── OPERATIONS/
-├── PRD:s/
-├── SERVICE_FUTURE_ENHANCEMENTS/
-├── TASKS/
-│   ├── PHASE_1.0.md
-│   └── ...
-├── dependencies/
-└── setup_environment/
+docs/
+├── overview/
+├── architecture/
+├── services/
+├── operations/
+├── how-to/
+├── reference/
+├── decisions/
+├── product/
+└── research/
 ```
 
 ## 7. Documentation Placement Rules

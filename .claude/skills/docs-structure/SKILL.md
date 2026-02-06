@@ -10,7 +10,7 @@ Compact skill for reasoning about HuleEdu documentation layout and TASKS structu
 ## When to Use
 
 Activate when the user:
-- Creates, moves, or renames documentation under `documentation/` or `TASKS/`
+- Creates, moves, or renames documentation under `docs/` or `TASKS/`
 - Asks where a doc should live (operations vs decisions vs how-to vs tasks)
 - Wants to validate or migrate documentation structure
 - Mentions `validate_docs_structure.py`, `migrate_docs_structure.py`, `task_mgmt`, or doc/TASKS specs
@@ -18,18 +18,18 @@ Activate when the user:
 ## Core Capabilities
 
 - Classify content type and map it to the correct directory:
-  - `documentation/overview|architecture|services|operations|how-to|reference|decisions|product|research`
+  - `docs/overview|architecture|services|operations|how-to|reference|decisions|product|research`
   - `TASKS/` domain taxonomy: `programs/`, `assessment/`, `content/`, `identity/`, `frontend/`, `infrastructure/`, `security/`, `integrations/`, `architecture/`, `archive/`
 - Suggest compliant filenames and directory names (kebab-case, no spaces; id-based filenames in `TASKS/`)
 - Ensure required frontmatter for:
-  - Runbooks and ADRs (per `documentation/DOCS_STRUCTURE_SPEC.md`)
+  - Runbooks and ADRs (per `docs/DOCS_STRUCTURE_SPEC.md`)
   - Task and programme docs (per canonical TASKS spec)
 - Propose concrete commands for:
-  - `python scripts/docs_mgmt/validate_docs_structure.py [--strict]`
+  - `pdm run validate-docs`
   - `python scripts/docs_mgmt/migrate_docs_structure.py ...`
-  - `python scripts/task_mgmt/new_task.py ...`
-  - `python scripts/task_mgmt/validate_front_matter.py ...`
-  - `python scripts/task_mgmt/index_tasks.py ...`
+  - `pdm run new-task ...`
+  - `pdm run validate-tasks`
+  - `pdm run index-tasks`
 
 ## Quick Workflow
 

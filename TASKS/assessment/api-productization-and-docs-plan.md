@@ -26,7 +26,7 @@ Scope
 References
 
 - Gateway: `services/api_gateway_service/app/*`, `routers/*`
-- Docs: `services/api_gateway_service/README.md`, `documentation/`
+- Docs: `services/api_gateway_service/README.md`, `docs/`
 - Rules: `040-service-implementation-guidelines`, `070`, `090`
 
 Deliverables

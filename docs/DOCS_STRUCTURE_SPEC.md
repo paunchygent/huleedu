@@ -182,6 +182,35 @@ last_updated: YYYY-MM-DD
 - `.claude/` and `.windsurf/rules/` contain AI- and tool-specific instructions and MUST NOT be treated as canonical human documentation.
 - Where relevant, `docs/` SHOULD link to normative rules in `.windsurf/rules/` rather than duplicating content.
 
+## 8.1 Workstream Topology Contract (Codified Navigation)
+
+To reduce navigation drift and cross-link sprawl, workstreams MAY define a codified topology manifest.
+
+Manifest location (outside `docs/` by design):
+- `scripts/docs_mgmt/workstream_topology/<workstream>.toml`
+
+Each manifest SHOULD define:
+- one canonical hub doc (typically in `docs/reference/`),
+- canonical chain docs (runbook, epic, decision, gate task, research),
+- active track tasks,
+- review records,
+- evidence roots.
+
+Hub docs MAY include generated topology blocks with markers:
+
+```md
+<!-- BEGIN:workstream-topology:<workstream-id> -->
+... generated content ...
+<!-- END:workstream-topology:<workstream-id> -->
+```
+
+Generated block contract:
+- New topology manifests SHOULD be created via
+  `pdm run workstream-topology-scaffold` (instead of handwritten TOML).
+- Generated content is rendered via `pdm run render-workstream-hubs`.
+- Validation is enforced via `pdm run validate-docs`.
+- Canonical decision/gate/research/task/review docs in a manifest SHOULD backlink to the hub.
+
 ## 9. Enforcement
 
 - New documentation files MUST be placed in one of the allowed top-level directories.

@@ -109,6 +109,7 @@ Cons / risks:
 
 ## Related
 
+- Hub: `docs/reference/ref-essay-scoring-research-hub.md`
 - Story hub: `TASKS/assessment/improve-essay-scoring-prediction-power-ellipse-cv-first.md`
 - Decision gate task:
   `TASKS/assessment/essay-scoring-decision-gate-for-experiment-optimization-dependencies.md`
@@ -117,5 +118,8 @@ Cons / risks:
   `TASKS/assessment/essay-scoring-transformer-fine-tuning--prompt-invariance-experiments.md`
 - Diagnostics/baselines task:
   `TASKS/assessment/essay-scoring-statsmodels-diagnostics--catboost-baseline.md`
+- Review records:
+  - `docs/product/reviews/review-transformer-fine-tuning-prompt-invariance-dependencies.md`
+  - `docs/product/reviews/review-statsmodels-diagnostics-catboost-baseline-dependencies.md`
 - Research notes:
   `docs/research/research-essay-scoring-dependency-decision-research-optuna-hf-fine-tuning-baselines.md`

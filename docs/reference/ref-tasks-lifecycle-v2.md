@@ -17,6 +17,25 @@ research/reviews as explicit documentation artifacts in `docs/`.
 
 Note: `type: doc` is intentionally not used in `TASKS/` (docs belong under `docs/`).
 
+<!-- BEGIN:workstream-topology:tasks-lifecycle-v2 -->
+## Topology Contract (Generated)
+
+- Manifest: `scripts/docs_mgmt/workstream_topology/tasks-lifecycle-v2.toml`
+- Canonical chain:
+  - Runbook: `docs/reference/ref-tasks-overview.md`
+  - Epic: `docs/product/epics/dev-tooling-script-consolidation-epic.md`
+  - Decision: `docs/decisions/0027-tasks-lifecycle-v2-story-review-gate-done-status-research-docs.md`
+  - Decision gate task: `TASKS/architecture/align-tasks-and-docs-lifecycle-v2.md`
+  - Research: `docs/research/research-tasks-lifecycle-v2-governance-and-topology-notes.md`
+- Active tracks:
+  - `TASKS/architecture/align-tasks-and-docs-lifecycle-v2.md`
+- Review records:
+  - `docs/product/reviews/review-example-story-approval.md`
+- Evidence roots:
+  - `TASKS`
+  - `docs/product/reviews`
+<!-- END:workstream-topology:tasks-lifecycle-v2 -->
+
 ## Canonical statuses
 
 Work item `status` is a work-state enum (not a document category):
