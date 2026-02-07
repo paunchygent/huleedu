@@ -10,7 +10,7 @@ owner_team: 'agents'
 owner: ''
 program: ''
 created: '2026-02-06'
-last_updated: '2026-02-06'
+last_updated: '2026-02-07'
 related: ['improve-essay-scoring-prediction-power-ellipse-cv-first', 'essay-scoring-decision-gate-for-experiment-optimization-dependencies']
 labels: []
 ---
@@ -210,6 +210,17 @@ Attempt C (ROCm fp16 + no GradScaler):
   numerically unstable (`loss=nan`, `val_qwk=0.00000`, `val_mae=nan` in log output).
   This run is excluded from gate acceptance evidence.
 
+Attempt D (fp32 path crashed with dtype mismatch):
+- run name:
+  `ellipse_gate_g3_1_transformer_lora_prompt_holdout_20260207_001728`
+- driver log:
+  `output/essay_scoring/ellipse_gate_g3_1_transformer_lora_prompt_holdout_20260207_001728.driver.log`
+- status:
+  failed with `RuntimeError: Found dtype Float but expected Half` during backward under
+  `mixed_precision=none`.
+  Root cause: Transformers v5 `from_pretrained()` defaults to `dtype="auto"` (checkpoint-derived),
+  which can load fp16 weights even when Gate G3 is configured for fp32 operation.
+
 ## Hardening Update (2026-02-07)
 
 - Launcher/runtime contract hardening implemented locally:
@@ -220,6 +231,9 @@ Attempt C (ROCm fp16 + no GradScaler):
 - Training-loop hardening implemented locally:
   - fail fast on non-finite training loss,
   - fail fast on non-finite logits/labels/aggregated predictions.
+- Dtype stability hardening implemented locally:
+  - force fp32 transformer weight loading by passing `torch_dtype=torch.float32` when building the model,
+    preventing fp16 checkpoint loads under `mixed_precision=none`.
 - Transformer training runtime image defaults pinned locally to:
   `rocm/pytorch:rocm7.2_ubuntu24.04_py3.12_pytorch_release_2.9.1`.
 - Local validation status:

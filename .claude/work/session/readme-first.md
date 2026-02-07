@@ -85,6 +85,8 @@ and the first run will download model weights from Hugging Face.
 Latest verification snapshot (2026-02-07):
 - `scripts/ml_training/essay_scoring/transformer_finetune.py` uses modern AMP API
   (`torch.amp.GradScaler`, `torch.amp.autocast`).
+- Gate G3 fp32 runs force fp32 transformer weight loading (pass `torch_dtype=torch.float32`)
+  to avoid Transformers `dtype="auto"` loading fp16 checkpoints under `mixed_precision=none`.
 - G3 hardening landed:
   - tokenizer-agnostic chunk special-token wrapping via `cls/sep` (fallback `bos/eos`) ids,
   - `require_gpu` runtime guard for transformer fine-tuning,

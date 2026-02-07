@@ -139,6 +139,18 @@ duplicated in this handoff.
 - status:
   numerically unstable (`loss=nan`, `val_mae=nan` observed in log); exclude from gate evidence.
 
+### Latest G3.1 run record (2026-02-07)
+
+- run name:
+  `ellipse_gate_g3_1_transformer_lora_prompt_holdout_20260207_001728`
+- driver log:
+  `output/essay_scoring/ellipse_gate_g3_1_transformer_lora_prompt_holdout_20260207_001728.driver.log`
+- status:
+  crashed during backward with `RuntimeError: Found dtype Float but expected Half`.
+  Root cause: Transformers v5 `from_pretrained()` defaults to `dtype="auto"` (checkpoint-derived),
+  which can load fp16 weights even when Gate G3 resolves to `mixed_precision=none` (fp32 path),
+  while our labels remain fp32.
+
 ### Remediation deployed (2026-02-07)
 
 - Pinned transformer training base image default to AMD-tested tag:
@@ -149,6 +161,8 @@ duplicated in this handoff.
   - HIP/Torch/Python version-prefix checks,
   - finite pre-launch precision canary.
 - Changed launcher default precision for G3 to `none` (fp32, fail-safe).
+- Forced fp32 transformer weight loading for Gate G3 fp32 runs by passing
+  `torch_dtype=torch.float32` to `AutoModelForSequenceClassification.from_pretrained(...)`.
 - Added non-finite fail-fast guards in transformer training/prediction loop.
 - Local validation completed:
   - `pdm run run-local-pdm format-all`
