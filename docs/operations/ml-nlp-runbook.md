@@ -101,8 +101,8 @@ pdm run run-local-pdm essay-scoring-research g3-launch-hemma --dry-run
 The canonical launcher validates, then launches:
 - remote repo root and frozen input paths exist,
 - `huleedu_essay_transformer_train` container is running,
-- training image declares an approved ROCm base-image label
-  (`org.huleedu.transformer_train.base_image`),
+- training runtime exposes an approved ROCm base-image marker
+  (`/etc/huleedu_transformer_base_image.txt`),
 - ROCm/PyTorch/Python runtime versions match the approved contract in preflight,
 - a short in-container precision canary completes with finite values before detached launch,
 - `transformer-finetune` CLI contract includes `--chunk-overlap-tokens` and `--require-gpu`,

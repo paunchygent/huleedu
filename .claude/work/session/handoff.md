@@ -145,7 +145,7 @@ duplicated in this handoff.
   `rocm/pytorch:rocm7.2_ubuntu24.04_py3.12_pytorch_release_2.9.1`
   (`docker-compose.hemma.research.yml`, `Dockerfile.transformer_train`).
 - Added image/runtime preflight contract checks in `g3-launch-hemma`:
-  - approved base-image label required,
+  - approved base-image marker required,
   - HIP/Torch/Python version-prefix checks,
   - finite pre-launch precision canary.
 - Changed launcher default precision for G3 to `none` (fp32, fail-safe).

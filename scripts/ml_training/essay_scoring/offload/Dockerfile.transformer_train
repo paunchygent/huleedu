@@ -26,6 +26,8 @@ LABEL org.huleedu.transformer_train.base_image="${BASE_IMAGE}" \
 
 WORKDIR /app
 
+RUN printf '%s\n' "${BASE_IMAGE}" > /etc/huleedu_transformer_base_image.txt
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     build-essential \

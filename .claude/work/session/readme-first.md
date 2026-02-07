@@ -111,7 +111,7 @@ Latest verification snapshot (2026-02-07):
 - No ROCm mixed-precision profile is accepted yet for gate evidence.
 - Local fail-closed hardening landed (not redeployed while run is active):
   - `g3-launch-hemma` default precision set to `none` (fp32),
-  - preflight now enforces approved transformer base-image label, runtime version prefixes
+  - preflight now enforces approved transformer base-image marker, runtime version prefixes
     (HIP/Torch/Python), and a finite pre-launch precision canary,
   - transformer training loop now fails fast on non-finite loss/logits/predictions,
   - transformer training base image default pinned to

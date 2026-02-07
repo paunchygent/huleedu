@@ -66,9 +66,9 @@ def test_build_transformer_command_uses_container_python_and_required_flags() ->
 def test_build_preflight_script_enforces_gpu_and_cli_contract() -> None:
     script = build_preflight_script(config=G3LaunchConfig())
 
-    assert "MISSING_IMAGE_LABEL:org.huleedu.transformer_train.base_image" in script
-    assert "UNSUPPORTED_BASE_IMAGE:${BASE_IMAGE_LABEL}" in script
-    assert "BASE_IMAGE_OK:${BASE_IMAGE_LABEL}" in script
+    assert "MISSING_BASE_IMAGE_MARKER" in script
+    assert "UNSUPPORTED_BASE_IMAGE:${BASE_IMAGE_MARKER}" in script
+    assert "BASE_IMAGE_OK:${BASE_IMAGE_MARKER}" in script
     assert "torch.cuda.is_available()" in script
     assert "UNSUPPORTED_HIP_VERSION" in script
     assert "UNSUPPORTED_TORCH_VERSION" in script

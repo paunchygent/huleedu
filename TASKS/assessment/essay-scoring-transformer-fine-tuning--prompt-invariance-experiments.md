@@ -214,7 +214,7 @@ Attempt C (ROCm fp16 + no GradScaler):
 
 - Launcher/runtime contract hardening implemented locally:
   - `g3-launch-hemma` default precision changed to `none` (fp32 fail-safe),
-  - preflight now requires approved transformer base-image label and validates
+  - preflight now requires approved transformer base-image marker and validates
     HIP/Torch/Python runtime version prefixes,
   - preflight now runs a finite-value precision canary before detached launch.
 - Training-loop hardening implemented locally:

@@ -315,22 +315,21 @@ def build_preflight_script(*, config: G3LaunchConfig) -> str:
         "PATHS\n"
         f"sudo docker ps --format '{{{{.Names}}}}' | grep -Fxq {container} || "
         f"{{ echo 'MISSING_CONTAINER:{config.training_container}'; exit 1; }}\n"
-        f"BASE_IMAGE_LABEL=$(sudo docker inspect --format "
-        "'{{ index .Config.Labels \"org.huleedu.transformer_train.base_image\" }}' "
-        f"{container})\n"
-        '[ -n "$BASE_IMAGE_LABEL" ] && [ "$BASE_IMAGE_LABEL" != "<no value>" ] || '
-        "{ echo 'MISSING_IMAGE_LABEL:org.huleedu.transformer_train.base_image'; exit 1; }\n"
+        f"BASE_IMAGE_MARKER=$(sudo docker exec {container} /bin/bash -lc "
+        "'cat /etc/huleedu_transformer_base_image.txt 2>/dev/null || true' "
+        "| tr -d '\\r')\n"
+        '[ -n "$BASE_IMAGE_MARKER" ] || { echo "MISSING_BASE_IMAGE_MARKER"; exit 1; }\n'
         "base_image_ok=false\n"
         "while read -r approved_base_image; do\n"
-        '  [ "$BASE_IMAGE_LABEL" = "$approved_base_image" ] && base_image_ok=true && break\n'
+        '  [ "$BASE_IMAGE_MARKER" = "$approved_base_image" ] && base_image_ok=true && break\n'
         "done <<'APPROVED_BASE_IMAGES'\n"
         f"{quoted_approved_base_images}\n"
         "APPROVED_BASE_IMAGES\n"
         'if [ "$base_image_ok" != true ]; then\n'
-        '  echo "UNSUPPORTED_BASE_IMAGE:${BASE_IMAGE_LABEL}"\n'
+        '  echo "UNSUPPORTED_BASE_IMAGE:${BASE_IMAGE_MARKER}"\n'
         "  exit 1\n"
         "fi\n"
-        'echo "BASE_IMAGE_OK:${BASE_IMAGE_LABEL}"\n'
+        'echo "BASE_IMAGE_OK:${BASE_IMAGE_MARKER}"\n'
         f"sudo docker exec {container} python - <<'PY'\n"
         "import platform\n"
         "import torch\n"
