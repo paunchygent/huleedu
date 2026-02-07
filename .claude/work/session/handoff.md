@@ -139,7 +139,7 @@ duplicated in this handoff.
 - status:
   numerically unstable (`loss=nan`, `val_mae=nan` observed in log); exclude from gate evidence.
 
-### Local remediation prepared (2026-02-07, pending redeploy)
+### Remediation deployed (2026-02-07)
 
 - Pinned transformer training base image default to AMD-tested tag:
   `rocm/pytorch:rocm7.2_ubuntu24.04_py3.12_pytorch_release_2.9.1`
@@ -156,6 +156,9 @@ duplicated in this handoff.
   - `pdm run run-local-pdm typecheck-all`
   - `pdm run run-local-pdm pytest-root scripts/ml_training/essay_scoring/tests/test_g3_launch_hemma.py -q`
   - `pdm run run-local-pdm pytest-root scripts/ml_training/essay_scoring/tests/test_transformer_finetune.py -q`
+- Hemma sync/redeploy completed sequentially:
+  - `pdm run run-local-pdm run-hemma -- git pull --ff-only origin main`
+  - `pdm run run-local-pdm run-hemma -- sudo docker compose ... --profile research-transformer-train up -d --build essay_transformer_train`
 
 ## Recently Completed (Compressed)
 

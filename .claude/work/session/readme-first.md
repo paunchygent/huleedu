@@ -109,7 +109,7 @@ Latest verification snapshot (2026-02-07):
   - fp16 + GradScaler run failed with `ValueError: Attempting to unscale FP16 gradients.`,
   - fp16 without GradScaler produced non-finite training (`loss=nan`, `val_mae=nan` in driver log).
 - No ROCm mixed-precision profile is accepted yet for gate evidence.
-- Local fail-closed hardening landed (not redeployed while run is active):
+- Fail-closed hardening is now deployed on Hemma:
   - `g3-launch-hemma` default precision set to `none` (fp32),
   - preflight now enforces approved transformer base-image marker, runtime version prefixes
     (HIP/Torch/Python), and a finite pre-launch precision canary,

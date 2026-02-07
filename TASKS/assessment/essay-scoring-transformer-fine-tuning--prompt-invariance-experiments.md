@@ -210,7 +210,7 @@ Attempt C (ROCm fp16 + no GradScaler):
   numerically unstable (`loss=nan`, `val_qwk=0.00000`, `val_mae=nan` in log output).
   This run is excluded from gate acceptance evidence.
 
-## Local Hardening Update (2026-02-07, Pending Hemma Redeploy)
+## Hardening Update (2026-02-07)
 
 - Launcher/runtime contract hardening implemented locally:
   - `g3-launch-hemma` default precision changed to `none` (fp32 fail-safe),
@@ -228,4 +228,6 @@ Attempt C (ROCm fp16 + no GradScaler):
   - `pdm run run-local-pdm typecheck-all` passed,
   - `pdm run run-local-pdm pytest-root scripts/ml_training/essay_scoring/tests/test_g3_launch_hemma.py -q` passed,
   - `pdm run run-local-pdm pytest-root scripts/ml_training/essay_scoring/tests/test_transformer_finetune.py -q` passed.
-- Hemma redeploy + rerun is explicitly deferred until no active training run exists.
+- Hemma sync/redeploy completed sequentially:
+  - `pdm run run-local-pdm run-hemma -- git pull --ff-only origin main`,
+  - `pdm run run-local-pdm run-hemma -- sudo docker compose ... --profile research-transformer-train up -d --build essay_transformer_train`.

@@ -84,7 +84,7 @@ Use a staged review:
 - Last attempted baseline run:
   `ellipse_gate_g3_1_transformer_lora_prompt_holdout_20260206_233717`
   remains excluded from evidence due to non-finite metrics.
-- Local hardening exists and is pending redeploy/rerun:
+- Local hardening is deployed on Hemma and pending rerun evidence:
   pinned transformer runtime image default, stricter preflight image/runtime checks,
   fp32 launcher default, and non-finite fail-fast checks in training.
 

@@ -148,7 +148,7 @@ Current state:
   `ellipse_gate_g3_1_transformer_lora_prompt_holdout_20260206_233717`
   produced non-finite training (`loss=nan`, `val_mae=nan` in driver log output).
 - No gate-valid G3.1 baseline result exists yet under the current ROCm runtime profile.
-- Local (not yet redeployed) hardening now pins transformer runtime image defaults,
+- Deployed hardening now pins transformer runtime image defaults,
   enforces image/runtime preflight contracts, sets launcher default precision to fp32
   (`none`), and adds non-finite fail-fast guards in training.
 
