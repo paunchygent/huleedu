@@ -755,6 +755,11 @@ def _build_model(
         model_name,
         num_labels=1,
         problem_type="regression",
+        # Gate G3 fp32 runs must be deterministic and fail-closed. Transformers v5+
+        # defaults to dtype="auto" when no dtype override is provided, which can
+        # load checkpoints saved in fp16. That interacts badly with our fp32
+        # training path (no autocast, no GradScaler) when labels remain fp32.
+        torch_dtype=torch.float32,
     )
     if gradient_checkpointing:
         model.gradient_checkpointing_enable()

@@ -21,6 +21,7 @@ from scripts.ml_training.essay_scoring.transformer_finetune import (
     MixedPrecisionMode,
     TransformerFinetuneConfig,
     _build_bucketed_batch_indices,
+    _build_model,
     _chunk_records,
     _enforce_gpu_requirement,
     _resolve_precision_runtime,
@@ -175,6 +176,41 @@ def test_chunk_records_uses_tokenizer_special_ids_for_chunk_boundaries() -> None
 
 def test_validate_finetune_config_accepts_valid_defaults() -> None:
     _validate_finetune_config(_base_finetune_config())
+
+
+def test_build_model_forces_fp32_weights(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    class DummyModel(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+
+    def fake_from_pretrained(*args, **kwargs):
+        captured.update(kwargs)
+        return DummyModel()
+
+    from scripts.ml_training.essay_scoring import transformer_finetune as module_under_test
+
+    monkeypatch.setattr(
+        module_under_test,
+        "AutoModelForSequenceClassification",
+        type(
+            "DummyAutoModel",
+            (),
+            {"from_pretrained": staticmethod(fake_from_pretrained)},
+        ),
+    )
+
+    model = _build_model(
+        model_name="dummy",
+        use_lora=False,
+        lora_r=8,
+        lora_alpha=16,
+        lora_dropout=0.0,
+        gradient_checkpointing=False,
+    )
+    assert isinstance(model, torch.nn.Module)
+    assert captured["torch_dtype"] == torch.float32
 
 
 @pytest.mark.parametrize(
