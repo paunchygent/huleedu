@@ -77,7 +77,8 @@ Mandatory mechanics:
 - Use anti-truncation chunking with overlap and essay-level pooling.
 - Truncation-only runs are invalid for gate acceptance.
 - Hemma GPU profile requirements:
-  - mixed precision `auto` (currently resolves to ROCm-safe `fp16` without GradScaler),
+  - `g3-launch-hemma` default precision is fail-safe `none` (fp32),
+  - precision mode must be explicitly selected and recorded with evidence,
   - gradient checkpointing enabled,
   - gradient accumulation for effective batch size `32-64`.
 
@@ -127,7 +128,7 @@ duplicated in this handoff.
     `output/essay_scoring/20260206_233415_ellipse_gate_g3_1_transformer_lora_prompt_holdout_20260206_233408`
   - failed with `ValueError: Attempting to unscale FP16 gradients.` under fp16+GradScaler.
 
-### Active G3.1 run (2026-02-06)
+### Latest G3.1 run record (2026-02-06)
 
 - run name:
   `ellipse_gate_g3_1_transformer_lora_prompt_holdout_20260206_233717`
@@ -136,7 +137,25 @@ duplicated in this handoff.
 - driver log:
   `output/essay_scoring/ellipse_gate_g3_1_transformer_lora_prompt_holdout_20260206_233717.driver.log`
 - status:
-  detached and running (`status.json.state=running`).
+  numerically unstable (`loss=nan`, `val_mae=nan` observed in log); exclude from gate evidence.
+
+### Local remediation prepared (2026-02-07, pending redeploy)
+
+- Pinned transformer training base image default to AMD-tested tag:
+  `rocm/pytorch:rocm7.2_ubuntu24.04_py3.12_pytorch_release_2.9.1`
+  (`docker-compose.hemma.research.yml`, `Dockerfile.transformer_train`).
+- Added image/runtime preflight contract checks in `g3-launch-hemma`:
+  - approved base-image label required,
+  - HIP/Torch/Python version-prefix checks,
+  - finite pre-launch precision canary.
+- Changed launcher default precision for G3 to `none` (fp32, fail-safe).
+- Added non-finite fail-fast guards in transformer training/prediction loop.
+- Local validation completed:
+  - `pdm run run-local-pdm format-all`
+  - `pdm run run-local-pdm lint-fix --unsafe-fixes`
+  - `pdm run run-local-pdm typecheck-all`
+  - `pdm run run-local-pdm pytest-root scripts/ml_training/essay_scoring/tests/test_g3_launch_hemma.py -q`
+  - `pdm run run-local-pdm pytest-root scripts/ml_training/essay_scoring/tests/test_transformer_finetune.py -q`
 
 ## Recently Completed (Compressed)
 
@@ -153,9 +172,8 @@ duplicated in this handoff.
   is included in `dependency-groups.ml-research`.
 - Fixed `scripts/run-hemma.sh` argument transport and mode parsing so quoted/space-containing
   remote commands execute deterministically from local wrapper calls.
-- Added ROCm precision safety in transformer fine-tuning:
-  - `mixed_precision=auto` now resolves to fp16 on ROCm,
-  - GradScaler is disabled on ROCm fp16 path to avoid unscale failures.
+- ROCm precision behavior was modified during investigation, but no stable mixed-precision
+  profile is accepted yet for G3 gate evidence.
 - Added/updated tests in:
   - `scripts/ml_training/essay_scoring/tests/test_g3_launch_hemma.py`
   - `scripts/ml_training/essay_scoring/tests/test_transformer_finetune.py`

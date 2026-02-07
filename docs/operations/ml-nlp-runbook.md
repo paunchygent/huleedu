@@ -101,9 +101,15 @@ pdm run run-local-pdm essay-scoring-research g3-launch-hemma --dry-run
 The canonical launcher validates, then launches:
 - remote repo root and frozen input paths exist,
 - `huleedu_essay_transformer_train` container is running,
-- ROCm GPU runtime is available in the exact launch interpreter,
+- training image declares an approved ROCm base-image label
+  (`org.huleedu.transformer_train.base_image`),
+- ROCm/PyTorch/Python runtime versions match the approved contract in preflight,
+- a short in-container precision canary completes with finite values before detached launch,
 - `transformer-finetune` CLI contract includes `--chunk-overlap-tokens` and `--require-gpu`,
 - no stale detached screen session matches the G3 run prefix.
+
+Default G3 launcher precision is fail-safe (`--mixed-precision none`). Any AMP mode
+(`bf16`, `fp16`, `auto`) should be treated as explicit opt-in and validated with run evidence.
 
 Persistent tunnel setup lives in:
 - `docs/operations/hemma-alpha-rollout-days-1-3.md`

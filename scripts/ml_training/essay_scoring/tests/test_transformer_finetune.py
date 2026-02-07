@@ -229,7 +229,7 @@ def test_resolve_precision_runtime_prefers_bf16_when_supported(
     assert runtime.label == "bf16"
 
 
-def test_resolve_precision_runtime_auto_uses_fp16_on_rocm_when_bf16_supported(
+def test_resolve_precision_runtime_auto_disables_amp_on_rocm_when_bf16_supported(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(torch.cuda, "is_bf16_supported", lambda: True)
@@ -239,10 +239,10 @@ def test_resolve_precision_runtime_auto_uses_fp16_on_rocm_when_bf16_supported(
         device=torch.device("cuda"),
     )
 
-    assert runtime.enabled is True
-    assert runtime.dtype == torch.float16
+    assert runtime.enabled is False
+    assert runtime.dtype is None
     assert runtime.use_grad_scaler is False
-    assert runtime.label == "fp16"
+    assert runtime.label == "none"
 
 
 def test_resolve_precision_runtime_falls_back_to_fp16_when_bf16_unsupported(
@@ -261,7 +261,7 @@ def test_resolve_precision_runtime_falls_back_to_fp16_when_bf16_unsupported(
     assert runtime.label == "fp16"
 
 
-def test_resolve_precision_runtime_fp16_mode_disables_scaler_on_rocm(
+def test_resolve_precision_runtime_fp16_mode_keeps_scaler_on_rocm(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(torch.version, "hip", "7.2.0", raising=False)
@@ -272,7 +272,7 @@ def test_resolve_precision_runtime_fp16_mode_disables_scaler_on_rocm(
 
     assert runtime.enabled is True
     assert runtime.dtype == torch.float16
-    assert runtime.use_grad_scaler is False
+    assert runtime.use_grad_scaler is True
     assert runtime.label == "fp16"
 
 

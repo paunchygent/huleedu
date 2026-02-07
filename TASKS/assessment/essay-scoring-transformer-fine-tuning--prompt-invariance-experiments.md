@@ -55,7 +55,9 @@ This is an escalation path if we hit a “representation ceiling”.
 - Detached execution required (`/usr/bin/screen`) with driver log in `output/essay_scoring/`.
 - Hemma GPU is mandatory for all transformer fine-tuning runs in this task.
 - Hemma GPU profile requirements:
-  - mixed precision (`bf16` when supported, otherwise `fp16`),
+  - precision mode must be explicit and recorded in run artifacts/logs,
+  - current evidence marks ROCm mixed-precision paths as unstable on this runtime,
+  - gate runs must use a precision mode with finite training metrics,
   - gradient checkpointing enabled,
   - gradient accumulation tuned to an effective batch size in the `32-64` range.
 - Dynamic padding + length bucketing required.
@@ -134,9 +136,6 @@ Unlock evidence:
 
 ## Validation Snapshot (2026-02-06)
 
-- Reviewed transformer loop semantics against current upstream docs for:
-  - `/huggingface/transformers` (sequence-classification fine-tune loop expectations)
-  - `/pytorch/pytorch` (AMP/autocast/GradScaler modern API)
 - Modernized AMP usage in
   `scripts/ml_training/essay_scoring/transformer_finetune.py`:
   - `torch.cuda.amp.GradScaler` -> `torch.amp.GradScaler("cuda", ...)`
@@ -208,4 +207,25 @@ Attempt C (ROCm fp16 + no GradScaler):
 - driver log:
   `output/essay_scoring/ellipse_gate_g3_1_transformer_lora_prompt_holdout_20260206_233717.driver.log`
 - status:
-  `running` (detached screen session active; `status.json.state=running`).
+  numerically unstable (`loss=nan`, `val_qwk=0.00000`, `val_mae=nan` in log output).
+  This run is excluded from gate acceptance evidence.
+
+## Local Hardening Update (2026-02-07, Pending Hemma Redeploy)
+
+- Launcher/runtime contract hardening implemented locally:
+  - `g3-launch-hemma` default precision changed to `none` (fp32 fail-safe),
+  - preflight now requires approved transformer base-image label and validates
+    HIP/Torch/Python runtime version prefixes,
+  - preflight now runs a finite-value precision canary before detached launch.
+- Training-loop hardening implemented locally:
+  - fail fast on non-finite training loss,
+  - fail fast on non-finite logits/labels/aggregated predictions.
+- Transformer training runtime image defaults pinned locally to:
+  `rocm/pytorch:rocm7.2_ubuntu24.04_py3.12_pytorch_release_2.9.1`.
+- Local validation status:
+  - `pdm run run-local-pdm format-all` passed,
+  - `pdm run run-local-pdm lint-fix --unsafe-fixes` passed,
+  - `pdm run run-local-pdm typecheck-all` passed,
+  - `pdm run run-local-pdm pytest-root scripts/ml_training/essay_scoring/tests/test_g3_launch_hemma.py -q` passed,
+  - `pdm run run-local-pdm pytest-root scripts/ml_training/essay_scoring/tests/test_transformer_finetune.py -q` passed.
+- Hemma redeploy + rerun is explicitly deferred until no active training run exists.

@@ -89,7 +89,10 @@ The host Python runtime may report `torch.cuda.is_available() == False` even whe
 container has GPU access.
 
 Recommended base image (Hemma, AMD ROCm):
-- `rocm/pytorch:latest`
+- `rocm/pytorch:rocm7.2_ubuntu24.04_py3.12_pytorch_release_2.9.1`
+
+For Gate G3 training runtime, keep this value pinned via
+`HULEEDU_TRANSFORMER_TRAIN_BASE_IMAGE` and treat unpinned `latest` tags as drift.
 
 Important:
 - Avoid installing `torch` via pip during the image build if the base image already provides a ROCm-enabled torch build. Otherwise, you can accidentally replace it with a non-ROCm wheel.

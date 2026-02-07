@@ -811,6 +811,8 @@ def _train_one_epoch(
             if output.loss is None:
                 raise ValueError("Model did not return a loss tensor.")
             loss = output.loss
+            if not torch.isfinite(loss):
+                raise RuntimeError(f"NONFINITE_LOSS: fold_step={step}")
             loss_step = loss / float(gradient_accumulation_steps)
 
         if precision.use_grad_scaler:
@@ -831,7 +833,10 @@ def _train_one_epoch(
                 optimizer.step()
             scheduler.step()
             optimizer.zero_grad(set_to_none=True)
-        total_loss += float(loss.detach().cpu())
+        loss_value = float(loss.detach().cpu())
+        if not math.isfinite(loss_value):
+            raise RuntimeError(f"NONFINITE_LOSS_VALUE: fold_step={step}")
+        total_loss += loss_value
         n_batches += 1
     if n_batches == 0:
         raise ValueError("Training loader produced zero batches.")
@@ -860,6 +865,10 @@ def _predict_by_record(
             output = model(input_ids=input_ids, attention_mask=attention_mask)
         logits = output.logits.squeeze(-1).detach().cpu().to(torch.float32).numpy()
         labels = batch.labels.detach().cpu().to(torch.float32).numpy()
+        if not np.isfinite(logits).all():
+            raise RuntimeError("NONFINITE_LOGITS")
+        if not np.isfinite(labels).all():
+            raise RuntimeError("NONFINITE_LABELS")
         for index, record_id in enumerate(batch.record_ids):
             preds_by_record.setdefault(record_id, []).append(float(logits[index]))
             if record_id not in label_by_record:
@@ -870,6 +879,10 @@ def _predict_by_record(
         [float(statistics.fmean(preds_by_record[record_id])) for record_id in ordered_record_ids],
         dtype=float,
     )
+    if not np.isfinite(y_true).all():
+        raise RuntimeError("NONFINITE_Y_TRUE")
+    if not np.isfinite(y_pred).all():
+        raise RuntimeError("NONFINITE_Y_PRED")
     return ordered_record_ids, y_true, y_pred
 
 
@@ -1154,7 +1167,6 @@ def _resolve_precision_runtime(
         return PrecisionRuntime(enabled=False, dtype=None, use_grad_scaler=False, label="none")
 
     is_rocm_runtime = getattr(torch.version, "hip", None) is not None
-    fp16_use_grad_scaler = not is_rocm_runtime
 
     if mode == MixedPrecisionMode.NONE:
         return PrecisionRuntime(enabled=False, dtype=None, use_grad_scaler=False, label="none")
@@ -1171,30 +1183,31 @@ def _resolve_precision_runtime(
         return PrecisionRuntime(
             enabled=True,
             dtype=torch.float16,
-            use_grad_scaler=fp16_use_grad_scaler,
+            use_grad_scaler=True,
             label="fp16",
         )
 
     if mode == MixedPrecisionMode.FP16:
+        if is_rocm_runtime:
+            logger.warning(
+                "fp16 requested on ROCm. Keeping standard GradScaler path enabled; "
+                "treat as explicit opt-in and monitor for runtime instability."
+            )
         return PrecisionRuntime(
             enabled=True,
             dtype=torch.float16,
-            use_grad_scaler=fp16_use_grad_scaler,
+            use_grad_scaler=True,
             label="fp16",
         )
 
+    if is_rocm_runtime:
+        logger.warning(
+            "auto mixed precision disabled on ROCm for Gate G3 fail-closed operation; "
+            "resolving to fp32 (`none`)."
+        )
+        return PrecisionRuntime(enabled=False, dtype=None, use_grad_scaler=False, label="none")
+
     if torch.cuda.is_bf16_supported():
-        if is_rocm_runtime:
-            logger.warning(
-                "auto mixed precision on ROCm resolves to fp16 without grad scaling due observed "
-                "bf16/scaler instability."
-            )
-            return PrecisionRuntime(
-                enabled=True,
-                dtype=torch.float16,
-                use_grad_scaler=fp16_use_grad_scaler,
-                label="fp16",
-            )
         return PrecisionRuntime(
             enabled=True,
             dtype=torch.bfloat16,
@@ -1204,7 +1217,7 @@ def _resolve_precision_runtime(
     return PrecisionRuntime(
         enabled=True,
         dtype=torch.float16,
-        use_grad_scaler=fp16_use_grad_scaler,
+        use_grad_scaler=True,
         label="fp16",
     )
 

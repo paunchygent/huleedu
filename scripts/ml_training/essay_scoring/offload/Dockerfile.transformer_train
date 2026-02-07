@@ -5,8 +5,10 @@
 # - Use ROCm torch from the base image as the authoritative GPU runtime.
 # - Install only default + `ml-research` Python deps needed for training CLI.
 # - Exclude pip-installed torch/cuda packages to avoid overriding ROCm torch.
-ARG BASE_IMAGE=rocm/pytorch:latest
+ARG BASE_IMAGE=rocm/pytorch:rocm7.2_ubuntu24.04_py3.12_pytorch_release_2.9.1
 FROM ${BASE_IMAGE} AS runtime
+
+ARG BASE_IMAGE
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -16,6 +18,11 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app \
     HF_HOME=/cache/huggingface \
     TRANSFORMERS_CACHE=/cache/huggingface
+
+LABEL org.huleedu.transformer_train.base_image="${BASE_IMAGE}" \
+    org.huleedu.transformer_train.rocm_line="7.2" \
+    org.huleedu.transformer_train.pytorch_line="2.9" \
+    org.huleedu.transformer_train.python_line="3.12"
 
 WORKDIR /app
 

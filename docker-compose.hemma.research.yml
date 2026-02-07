@@ -78,7 +78,7 @@ services:
       context: .
       dockerfile: scripts/ml_training/essay_scoring/offload/Dockerfile.transformer_train
       args:
-        BASE_IMAGE: ${HULEEDU_TRANSFORMER_TRAIN_BASE_IMAGE:-rocm/pytorch:latest}
+        BASE_IMAGE: ${HULEEDU_TRANSFORMER_TRAIN_BASE_IMAGE:-rocm/pytorch:rocm7.2_ubuntu24.04_py3.12_pytorch_release_2.9.1}
     image: ${HULEEDU_TRANSFORMER_TRAIN_IMAGE_TAG:-huleedu-transformer-train:dev}
     container_name: huleedu_essay_transformer_train
     restart: unless-stopped

@@ -138,17 +138,19 @@ Observed fail-closed outcomes on Hemma:
   `ellipse_gate_g3_1_transformer_lora_prompt_holdout_20260206_233408`
   failed with `ValueError: Attempting to unscale FP16 gradients`.
 
-Stabilization changes applied:
+Changes applied during investigation:
 - added `peft` to `dependency-groups.ml-research` for LoRA runtime parity,
 - hardened launcher preflight with fail-closed `MISSING_MODULE:peft` check,
-- ROCm precision policy in transformer fine-tuning:
-  - `mixed_precision=auto` resolves to `fp16` on ROCm,
-  - GradScaler disabled for ROCm fp16 path.
+- adjusted ROCm precision behavior in transformer fine-tuning while diagnosing runtime failures.
 
 Current state:
 - run
   `ellipse_gate_g3_1_transformer_lora_prompt_holdout_20260206_233717`
-  is running detached on Hemma (Gate G3.1 in progress).
+  produced non-finite training (`loss=nan`, `val_mae=nan` in driver log output).
+- No gate-valid G3.1 baseline result exists yet under the current ROCm runtime profile.
+- Local (not yet redeployed) hardening now pins transformer runtime image defaults,
+  enforces image/runtime preflight contracts, sets launcher default precision to fp32
+  (`none`), and adds non-finite fail-fast guards in training.
 
 ## Related
 

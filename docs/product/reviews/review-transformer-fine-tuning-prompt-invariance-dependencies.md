@@ -23,7 +23,7 @@ The project needs to decide whether a heavier training stack (`datasets`,
 high potential, but it also carries implementation complexity and overfitting risk on
 ELLIPSE if we skip strict invariance and CV-first discipline.
 
-## Proposed Solution
+## Review Approach
 
 Use a staged review:
 
@@ -73,13 +73,20 @@ Use a staged review:
 - Attempt
   `ellipse_gate_g3_1_transformer_lora_prompt_holdout_20260206_233408`
   failed on ROCm fp16 with `ValueError: Attempting to unscale FP16 gradients`.
-- Stabilization changes shipped:
-  - LoRA runtime dependency parity (`peft`) in `ml-research`,
-  - fail-closed launcher preflight module check for `peft`,
-  - ROCm precision policy adjusted to fp16 without grad scaling for `auto`.
-- Current baseline run:
+- Attempt
   `ellipse_gate_g3_1_transformer_lora_prompt_holdout_20260206_233717`
-  is running detached on Hemma; final artifact review is pending completion.
+  produced non-finite training metrics (`loss=nan`, `val_mae=nan`) in driver-log output.
+- Applied investigation changes:
+  - LoRA runtime dependency parity (`peft`) in `ml-research`,
+  - fail-closed launcher preflight module check for `peft`.
+- Current baseline status:
+  no gate-valid G3.1 baseline artifact set yet.
+- Last attempted baseline run:
+  `ellipse_gate_g3_1_transformer_lora_prompt_holdout_20260206_233717`
+  remains excluded from evidence due to non-finite metrics.
+- Local hardening exists and is pending redeploy/rerun:
+  pinned transformer runtime image default, stricter preflight image/runtime checks,
+  fp32 launcher default, and non-finite fail-fast checks in training.
 
 ## Links
 

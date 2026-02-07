@@ -59,13 +59,21 @@ def test_build_transformer_command_uses_container_python_and_required_flags() ->
     assert "${RUN_NAME}" not in command
     assert "--chunk-overlap-tokens 128" in command
     assert "--require-gpu" in command
+    assert "--mixed-precision none" in command
     assert "pdm run" not in command
 
 
 def test_build_preflight_script_enforces_gpu_and_cli_contract() -> None:
     script = build_preflight_script(config=G3LaunchConfig())
 
+    assert "MISSING_IMAGE_LABEL:org.huleedu.transformer_train.base_image" in script
+    assert "UNSUPPORTED_BASE_IMAGE:${BASE_IMAGE_LABEL}" in script
+    assert "BASE_IMAGE_OK:${BASE_IMAGE_LABEL}" in script
     assert "torch.cuda.is_available()" in script
+    assert "UNSUPPORTED_HIP_VERSION" in script
+    assert "UNSUPPORTED_TORCH_VERSION" in script
+    assert "UNSUPPORTED_PYTHON_VERSION" in script
+    assert "PRECISION_CANARY_OK" in script
     assert "NO_COLOR=1 COLUMNS=240" in script
     assert "MISSING_FLAG:--chunk-overlap-tokens" in script
     assert "MISSING_FLAG:--require-gpu" in script
@@ -95,6 +103,12 @@ def test_default_remote_repo_root_uses_huleedu_spelling() -> None:
 def test_run_g3_launch_fails_fast_for_legacy_huledu_remote_root() -> None:
     config = G3LaunchConfig(remote_repo_root="/home/paunchygent/apps/huledu")
     with pytest.raises(G3LaunchError, match="Canonical Hemma repo root"):
+        run_g3_launch(config=config, remote_runner=_NeverCallRunner())
+
+
+def test_run_g3_launch_fails_fast_for_empty_approved_base_images() -> None:
+    config = G3LaunchConfig(approved_transformer_base_images=())
+    with pytest.raises(G3LaunchError, match="approved_transformer_base_images must not be empty"):
         run_g3_launch(config=config, remote_runner=_NeverCallRunner())
 
 

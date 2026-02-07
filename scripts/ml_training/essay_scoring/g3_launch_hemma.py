@@ -23,6 +23,12 @@ DEFAULT_REMOTE_REPO_ROOT = "/home/paunchygent/apps/huleedu"
 DEFAULT_TRAINING_CONTAINER = "huleedu_essay_transformer_train"
 DEFAULT_RUN_NAME_PREFIX = "ellipse_gate_g3_1_transformer_lora_prompt_holdout"
 DEFAULT_MODEL_NAME = "microsoft/deberta-v3-base"
+DEFAULT_APPROVED_TRANSFORMER_BASE_IMAGE = (
+    "rocm/pytorch:rocm7.2_ubuntu24.04_py3.12_pytorch_release_2.9.1"
+)
+DEFAULT_REQUIRED_HIP_VERSION_PREFIX = "7.2"
+DEFAULT_REQUIRED_TORCH_VERSION_PREFIX = "2.9"
+DEFAULT_REQUIRED_PYTHON_VERSION_PREFIX = "3.12"
 
 DEFAULT_SPLITS_PATH = (
     "output/essay_scoring/20260204_135554_ellipse_splits_200_1000/artifacts/splits.json"
@@ -71,7 +77,7 @@ class G3LaunchConfig:
     gradient_accumulation_steps: int = 8
     num_epochs: int = 5
     early_stopping_patience: int = 2
-    mixed_precision: str = "auto"
+    mixed_precision: str = "none"
     gradient_checkpointing: bool = True
     use_lora: bool = True
     lora_r: int = 16
@@ -79,6 +85,10 @@ class G3LaunchConfig:
     lora_dropout: float = 0.1
     random_seed: int = 42
     require_gpu: bool = True
+    approved_transformer_base_images: tuple[str, ...] = (DEFAULT_APPROVED_TRANSFORMER_BASE_IMAGE,)
+    required_hip_version_prefix: str = DEFAULT_REQUIRED_HIP_VERSION_PREFIX
+    required_torch_version_prefix: str = DEFAULT_REQUIRED_TORCH_VERSION_PREFIX
+    required_python_version_prefix: str = DEFAULT_REQUIRED_PYTHON_VERSION_PREFIX
     frozen_inputs: G3FrozenInputs = G3FrozenInputs()
 
 
@@ -178,6 +188,16 @@ def _validate_config(*, config: G3LaunchConfig) -> None:
             "Canonical Hemma repo root per AGENTS.md is "
             "'/home/paunchygent/apps/huleedu'."
         )
+    if not config.approved_transformer_base_images:
+        raise G3LaunchError("approved_transformer_base_images must not be empty.")
+    if any(not image.strip() for image in config.approved_transformer_base_images):
+        raise G3LaunchError("approved_transformer_base_images cannot contain empty values.")
+    if not config.required_hip_version_prefix.strip():
+        raise G3LaunchError("required_hip_version_prefix must not be empty.")
+    if not config.required_torch_version_prefix.strip():
+        raise G3LaunchError("required_torch_version_prefix must not be empty.")
+    if not config.required_python_version_prefix.strip():
+        raise G3LaunchError("required_python_version_prefix must not be empty.")
 
 
 def build_transformer_command_parts(config: G3LaunchConfig) -> list[str]:
@@ -263,9 +283,16 @@ def build_preflight_script(*, config: G3LaunchConfig) -> str:
         config.frozen_inputs.reuse_cv_feature_store_dir,
     ]
     quoted_required_paths = "\n".join(f"  {shlex.quote(path)}" for path in required_paths)
+    quoted_approved_base_images = "\n".join(
+        f"  {shlex.quote(image)}" for image in config.approved_transformer_base_images
+    )
     run_prefix = shlex.quote(config.run_name_prefix)
     repo_root = shlex.quote(config.remote_repo_root)
     container = shlex.quote(config.training_container)
+    required_hip_prefix = config.required_hip_version_prefix
+    required_torch_prefix = config.required_torch_version_prefix
+    required_python_prefix = config.required_python_version_prefix
+    canary_precision = config.mixed_precision
     lora_module_check = ""
     if config.use_lora:
         lora_module_check = (
@@ -288,12 +315,105 @@ def build_preflight_script(*, config: G3LaunchConfig) -> str:
         "PATHS\n"
         f"sudo docker ps --format '{{{{.Names}}}}' | grep -Fxq {container} || "
         f"{{ echo 'MISSING_CONTAINER:{config.training_container}'; exit 1; }}\n"
+        f"BASE_IMAGE_LABEL=$(sudo docker inspect --format "
+        "'{{ index .Config.Labels \"org.huleedu.transformer_train.base_image\" }}' "
+        f"{container})\n"
+        '[ -n "$BASE_IMAGE_LABEL" ] && [ "$BASE_IMAGE_LABEL" != "<no value>" ] || '
+        "{ echo 'MISSING_IMAGE_LABEL:org.huleedu.transformer_train.base_image'; exit 1; }\n"
+        "base_image_ok=false\n"
+        "while read -r approved_base_image; do\n"
+        '  [ "$BASE_IMAGE_LABEL" = "$approved_base_image" ] && base_image_ok=true && break\n'
+        "done <<'APPROVED_BASE_IMAGES'\n"
+        f"{quoted_approved_base_images}\n"
+        "APPROVED_BASE_IMAGES\n"
+        'if [ "$base_image_ok" != true ]; then\n'
+        '  echo "UNSUPPORTED_BASE_IMAGE:${BASE_IMAGE_LABEL}"\n'
+        "  exit 1\n"
+        "fi\n"
+        'echo "BASE_IMAGE_OK:${BASE_IMAGE_LABEL}"\n'
         f"sudo docker exec {container} python - <<'PY'\n"
+        "import platform\n"
         "import torch\n"
         "hip = getattr(torch.version, 'hip', None)\n"
         "if not torch.cuda.is_available() or hip is None:\n"
         "    raise SystemExit('GPU_PREFLIGHT_FAILED')\n"
+        f"if not str(hip).startswith({required_hip_prefix!r}):\n"
+        "    raise SystemExit(f'UNSUPPORTED_HIP_VERSION:{hip}')\n"
+        "torch_version = str(torch.__version__)\n"
+        f"if not torch_version.startswith({required_torch_prefix!r}):\n"
+        "    raise SystemExit(f'UNSUPPORTED_TORCH_VERSION:{torch_version}')\n"
+        "python_version = platform.python_version()\n"
+        f"if not python_version.startswith({required_python_prefix!r}):\n"
+        "    raise SystemExit(f'UNSUPPORTED_PYTHON_VERSION:{python_version}')\n"
         "print('GPU_PREFLIGHT_OK')\n"
+        "print(f'HIP_VERSION:{hip}')\n"
+        "print(f'TORCH_VERSION:{torch_version}')\n"
+        "print(f'PYTHON_VERSION:{python_version}')\n"
+        "PY\n"
+        f"sudo docker exec {container} python - <<'PY'\n"
+        "import torch\n"
+        f"precision_mode = {canary_precision!r}\n"
+        "device = torch.device('cuda')\n"
+        "use_autocast = False\n"
+        "dtype = None\n"
+        "if precision_mode == 'bf16':\n"
+        "    use_autocast = True\n"
+        "    dtype = torch.bfloat16\n"
+        "elif precision_mode == 'fp16':\n"
+        "    use_autocast = True\n"
+        "    dtype = torch.float16\n"
+        "elif precision_mode == 'auto':\n"
+        "    if torch.cuda.is_bf16_supported():\n"
+        "        use_autocast = True\n"
+        "        dtype = torch.bfloat16\n"
+        "    else:\n"
+        "        use_autocast = True\n"
+        "        dtype = torch.float16\n"
+        "elif precision_mode != 'none':\n"
+        "    raise SystemExit(f'UNSUPPORTED_PRECISION_MODE:{precision_mode}')\n"
+        "\n"
+        "torch.manual_seed(0)\n"
+        "model = torch.nn.Sequential(\n"
+        "    torch.nn.Linear(64, 32),\n"
+        "    torch.nn.GELU(),\n"
+        "    torch.nn.Linear(32, 1),\n"
+        ").to(device)\n"
+        "optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)\n"
+        "inputs = torch.randn(8, 64, device=device)\n"
+        "targets = torch.randn(8, 1, device=device)\n"
+        "optimizer.zero_grad(set_to_none=True)\n"
+        "with torch.amp.autocast(device_type='cuda', dtype=dtype, enabled=use_autocast):\n"
+        "    predictions = model(inputs)\n"
+        "    loss = torch.nn.functional.mse_loss(predictions, targets)\n"
+        "if not torch.isfinite(loss):\n"
+        "    raise SystemExit('CANARY_NONFINITE_LOSS')\n"
+        "use_scaler = dtype == torch.float16\n"
+        "scaler = torch.amp.GradScaler('cuda', enabled=use_scaler)\n"
+        "if use_scaler:\n"
+        "    scaler.scale(loss).backward()\n"
+        "    scaler.unscale_(optimizer)\n"
+        "    for parameter in model.parameters():\n"
+        "        grad = parameter.grad\n"
+        "        if grad is None:\n"
+        "            continue\n"
+        "        if not torch.isfinite(grad).all():\n"
+        "            raise SystemExit('CANARY_NONFINITE_GRAD')\n"
+        "    scaler.step(optimizer)\n"
+        "    scaler.update()\n"
+        "else:\n"
+        "    loss.backward()\n"
+        "    for parameter in model.parameters():\n"
+        "        grad = parameter.grad\n"
+        "        if grad is None:\n"
+        "            continue\n"
+        "        if not torch.isfinite(grad).all():\n"
+        "            raise SystemExit('CANARY_NONFINITE_GRAD')\n"
+        "    optimizer.step()\n"
+        "with torch.no_grad():\n"
+        "    for parameter in model.parameters():\n"
+        "        if not torch.isfinite(parameter).all():\n"
+        "            raise SystemExit('CANARY_NONFINITE_PARAM')\n"
+        "print('PRECISION_CANARY_OK')\n"
         "PY\n"
         f"sudo docker exec {container} /bin/bash -lc "
         '"NO_COLOR=1 COLUMNS=240 python -m scripts.ml_training.essay_scoring.cli '

@@ -82,17 +82,14 @@ pdm run essay-scoring-research drop-column --dataset-kind ellipse --feature-set 
 Note: DeBERTa embeddings require `sentencepiece` + `tiktoken` (included in `ml-research`)
 and the first run will download model weights from Hugging Face.
 
-Latest verification snapshot (2026-02-06):
-- `scripts/ml_training/essay_scoring/transformer_finetune.py` reviewed against current
-  `/huggingface/transformers` and `/pytorch/pytorch` guidance.
-- AMP usage modernized (`torch.amp.GradScaler`, `torch.amp.autocast`).
+Latest verification snapshot (2026-02-07):
+- `scripts/ml_training/essay_scoring/transformer_finetune.py` uses modern AMP API
+  (`torch.amp.GradScaler`, `torch.amp.autocast`).
 - G3 hardening landed:
   - tokenizer-agnostic chunk special-token wrapping via `cls/sep` (fallback `bos/eos`) ids,
   - `require_gpu` runtime guard for transformer fine-tuning,
   - length-bucketing in dataloaders,
-  - ROCm mixed precision safety:
-    - `mixed_precision=auto` resolves to fp16 on ROCm,
-    - GradScaler disabled for ROCm fp16 path.
+  - ROCm precision handling was changed during investigation and remains under evaluation.
 - G3 launcher hardening verified:
   - canonical Hemma root fixed and enforced: `/home/paunchygent/apps/huleedu`,
   - preflight `--help` flag checks made deterministic (`NO_COLOR=1 COLUMNS=240`),
@@ -107,11 +104,23 @@ Latest verification snapshot (2026-02-06):
   - `pdm run run-hemma -- <command> [args]` for Hemma SSH commands from canonical remote root.
 - Hemma GPU execution is standardized on compose profile
   `research-transformer-train` (`huleedu_essay_transformer_train`).
+- Observed G3.1 ROCm outcomes on 2026-02-06:
+  - bf16 run failed with `HIP error: unspecified launch failure`,
+  - fp16 + GradScaler run failed with `ValueError: Attempting to unscale FP16 gradients.`,
+  - fp16 without GradScaler produced non-finite training (`loss=nan`, `val_mae=nan` in driver log).
+- No ROCm mixed-precision profile is accepted yet for gate evidence.
+- Local fail-closed hardening landed (not redeployed while run is active):
+  - `g3-launch-hemma` default precision set to `none` (fp32),
+  - preflight now enforces approved transformer base-image label, runtime version prefixes
+    (HIP/Torch/Python), and a finite pre-launch precision canary,
+  - transformer training loop now fails fast on non-finite loss/logits/predictions,
+  - transformer training base image default pinned to
+    `rocm/pytorch:rocm7.2_ubuntu24.04_py3.12_pytorch_release_2.9.1`.
 - Validation gate run from repo root (via `./scripts/dev-shell.sh`) is green:
   `pdm run format-all`, `pdm run lint-fix --unsafe-fixes`, `pdm run typecheck-all`,
   `pdm run pytest-root scripts/ml_training/essay_scoring/tests/test_transformer_finetune.py -q`,
   `pdm run pytest-root scripts/ml_training/essay_scoring/tests/test_g3_launch_hemma.py -q`
-  (`20 passed` + `8 passed`).
+  (`20 passed` + `9 passed`).
 
 ### Hemma Offload (single tunnel)
 
